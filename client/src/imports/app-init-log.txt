@@ -1,0 +1,71 @@
+[Hydrated] sites-runtime.10fac82dddb7a144f1d31fa497b4f8db3871806ec3e8c63c5439a4f41f18b654.js:127:3806
+✅ [Supabase] Singleton client initialized f874dc82450a2c5bbac1bc226634111356a9fcfc.js:28372:17
+🏢 Organization System: BACKEND MODE (Supabase) f874dc82450a2c5bbac1bc226634111356a9fcfc.js:75234:9
+📡 All data stored in Supabase KV store f874dc82450a2c5bbac1bc226634111356a9fcfc.js:75235:9
+⚠️ [App] STUCK IN LOADING STATE - isLoading: true f874dc82450a2c5bbac1bc226634111356a9fcfc.js:7291:28
+✅ IndexedDB: Database opened successfully f874dc82450a2c5bbac1bc226634111356a9fcfc.js:70854:37
+🔍 [App Init] Full URL: https://startupverse.space/ f874dc82450a2c5bbac1bc226634111356a9fcfc.js:7103:19
+🔍 [App Init] URL Params: <empty string> f874dc82450a2c5bbac1bc226634111356a9fcfc.js:7103:81
+🔍 [App Init] Invitation token: null f874dc82450a2c5bbac1bc226634111356a9fcfc.js:7103:137
+🔍 [App Init] All URL params: 
+Object {  }
+f874dc82450a2c5bbac1bc226634111356a9fcfc.js:7103:188
+🔍 [App Init] window.location.search: <empty string> f874dc82450a2c5bbac1bc226634111356a9fcfc.js:7103:267
+🔍 [App Init] window.location.hash: <empty string> f874dc82450a2c5bbac1bc226634111356a9fcfc.js:7103:345
+❌ [App Init] No invitation token found f874dc82450a2c5bbac1bc226634111356a9fcfc.js:7107:17
+Loading user from localStorage: 
+Object { id: "user-1772151256036", name: "G2", role: "organization-admin", email: "g2@gmail.com", profile: {…}, createdAt: "2026-02-27T00:14:16.036Z", updatedAt: "2026-02-27T00:15:52.775Z", onboardingComplete: true, isAdmin: false }
+f874dc82450a2c5bbac1bc226634111356a9fcfc.js:7120:19
+🔍 [App] onboardingComplete: true f874dc82450a2c5bbac1bc226634111356a9fcfc.js:7120:70
+🔍 [App] Has profile: true f874dc82450a2c5bbac1bc226634111356a9fcfc.js:7120:137
+✅ [App] Onboarding complete - redirecting to dashboard f874dc82450a2c5bbac1bc226634111356a9fcfc.js:7124:47
+🔍 [App] Checking onboarding status... f874dc82450a2c5bbac1bc226634111356a9fcfc.js:7290:13
+📋 [App] User: null f874dc82450a2c5bbac1bc226634111356a9fcfc.js:7290:68
+📋 [App] Current view: landing f874dc82450a2c5bbac1bc226634111356a9fcfc.js:7290:102
+📬 [Notifications] No user ID, clearing notifications f874dc82450a2c5bbac1bc226634111356a9fcfc.js:6680:15
+✅ [App] Rendering main content - currentView: dashboard user: G2 f874dc82450a2c5bbac1bc226634111356a9fcfc.js:7298:23
+🔍 [App] Checking onboarding status... f874dc82450a2c5bbac1bc226634111356a9fcfc.js:7290:13
+📋 [App] User: 
+Object { id: "user-1772151256036", name: "G2", role: "organization-admin", email: "g2@gmail.com", profile: {…}, createdAt: "2026-02-27T00:14:16.036Z", updatedAt: "2026-02-27T00:15:52.775Z", onboardingComplete: true, isAdmin: false }
+f874dc82450a2c5bbac1bc226634111356a9fcfc.js:7290:68
+📋 [App] Current view: dashboard f874dc82450a2c5bbac1bc226634111356a9fcfc.js:7290:102
+📬 [Notifications] User ID set, fetching notifications for: user-1772151256036 f874dc82450a2c5bbac1bc226634111356a9fcfc.js:6674:15
+📤 Fetching organizations from Supabase for user: user-1772151256036 f874dc82450a2c5bbac1bc226634111356a9fcfc.js:75255:11
+✅ IndexedDB: Retrieved 0 pending actions f874dc82450a2c5bbac1bc226634111356a9fcfc.js:70951:17
+ℹ️ Service Worker registration skipped (using IndexedDB-only mode) f874dc82450a2c5bbac1bc226634111356a9fcfc.js:72061:20
+✅ Offline data storage enabled via IndexedDB f874dc82450a2c5bbac1bc226634111356a9fcfc.js:72061:103
+✅ IndexedDB: Database opened successfully f874dc82450a2c5bbac1bc226634111356a9fcfc.js:70854:37
+📬 [Notifications] User ID set, fetching notifications for: user-1772151256036 f874dc82450a2c5bbac1bc226634111356a9fcfc.js:6619:13
+Cookie “__cf_bm” has been rejected for invalid domain. community_published_banner_details
+✅ Found 1 organizations f874dc82450a2c5bbac1bc226634111356a9fcfc.js:75258:20
+📤 Fetching cohorts from Supabase for org: org-1772151394906-by93lbg5h f874dc82450a2c5bbac1bc226634111356a9fcfc.js:75299:11
+📤 Checking organization admin status in Supabase... 
+Object { userId: "user-1772151256036", organizationId: "org-1772151394906-by93lbg5h" }
+f874dc82450a2c5bbac1bc226634111356a9fcfc.js:75272:11
+📬 [Notifications] Received 0 notifications from backend f874dc82450a2c5bbac1bc226634111356a9fcfc.js:6634:17
+📬 [Notifications] Notifications: 
+Array []
+f874dc82450a2c5bbac1bc226634111356a9fcfc.js:6634:100
+✅ [Notifications] Loaded 0 notifications for user user-1772151256036 f874dc82450a2c5bbac1bc226634111356a9fcfc.js:6639:105
+✅ Admin check result: true f874dc82450a2c5bbac1bc226634111356a9fcfc.js:75275:20
+✅ Found 2 cohorts f874dc82450a2c5bbac1bc226634111356a9fcfc.js:75302:20
+📤 Fetching cohort from Supabase: cohort-1772153233097-rt1njmmlz f874dc82450a2c5bbac1bc226634111356a9fcfc.js:75308:11
+API Error (404): {"error":"Cohort not found"} f874dc82450a2c5bbac1bc226634111356a9fcfc.js:75179:21
+API Call failed: Error: API Error (404): {"error":"Cohort not found"}
+    za https://startupverse.space/_components/v2/f874dc82450a2c5bbac1bc226634111356a9fcfc.js:75179
+f874dc82450a2c5bbac1bc226634111356a9fcfc.js:75183:19
+❌ Failed to fetch cohort: Error: BACKEND_NOT_DEPLOYED: Backend functions not found (404). Please deploy Supabase functions.
+    za https://startupverse.space/_components/v2/f874dc82450a2c5bbac1bc226634111356a9fcfc.js:75183
+f874dc82450a2c5bbac1bc226634111356a9fcfc.js:75312:20
+✅ Deadline check completed: 
+Object { success: true, remindersSent: 0, errors: 0 }
+f874dc82450a2c5bbac1bc226634111356a9fcfc.js:71594:21
+The resource at “https://startupverse.space/_runtimes/sites-runtime.10fac82dddb7a144f1d31fa497b4f8db3871806ec3e8c63c5439a4f41f18b654.js” preloaded with link preload was not used within a few seconds. Make sure all attributes of the preload tag are set correctly. startupverse.space
+The resource at “https://startupverse.space/_components/v2/f874dc82450a2c5bbac1bc226634111356a9fcfc.js” preloaded with link preload was not used within a few seconds. Make sure all attributes of the preload tag are set correctly. startupverse.space
+✅ Deadline check completed: 
+Object { success: true, remindersSent: 0, errors: 0 }
+f874dc82450a2c5bbac1bc226634111356a9fcfc.js:71594:21
+✅ Weekly review check completed: 
+Object { success: true, remindersSent: 0, errors: 0 }
+f874dc82450a2c5bbac1bc226634111356a9fcfc.js:71613:21
+📬 [Notifications] User ID set, fetching notifications for: user-1772151256036 f874dc82450a2c5bbac1bc226634111356a9fcfc.js:6619:13

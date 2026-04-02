@@ -1,0 +1,52 @@
+================================================================================
+SUPABASE EDGE FUNCTION DEPLOYMENT FILE
+================================================================================
+
+Function Name: make-server-78157e08
+File to Upload: /supabase/functions/server/index.tsx
+
+================================================================================
+DEPLOYMENT STEPS:
+================================================================================
+
+1. Go to: https://supabase.com/dashboard/project/zuvrtclwxqycfskgtpbs/functions
+
+2. Find or Create function: "make-server-78157e08"
+
+3. Upload the file: /supabase/functions/server/index.tsx
+
+4. Click "Deploy" and wait 30 seconds
+
+5. Test at: https://zuvrtclwxqycfskgtpbs.supabase.co/functions/v1/make-server-78157e08/health
+
+================================================================================
+EXPECTED RESULT:
+================================================================================
+
+{"status":"ok"}
+
+================================================================================
+IF YOU SEE 404 ERROR:
+================================================================================
+
+The function is NOT deployed yet. You MUST:
+
+1. Open Supabase Dashboard
+2. Go to Edge Functions section
+3. Upload/paste the index.tsx code
+4. Click the Deploy button
+5. Wait for deployment to complete
+
+The 404 error means Supabase doesn't have the function deployed.
+Local code changes don't automatically deploy to Supabase!
+
+================================================================================
+ALTERNATIVE: COPY THE ENTIRE index.tsx FILE
+================================================================================
+
+Location: /supabase/functions/server/index.tsx
+Lines: ~4400 lines of code
+
+Copy ALL of it and paste into Supabase dashboard code editor.
+
+================================================================================

@@ -1,0 +1,356 @@
+Cookie “__cf_bm” has been rejected for invalid domain. startupverse.space
+Cookie “__cf_bm” has been rejected for invalid domain. _index.json
+[Hydrated] sites-runtime.ed340f7bffa7e99869e4202e80427255dbdc8bff3e9b8cbc6cc79c5d908c29e6.js:127:3806
+✅ [Supabase] Singleton client initialized 81355dc151cf20a43701f747a396bef55b24b417.js:30876:17
+🏢 Organization System: BACKEND MODE (Supabase) 81355dc151cf20a43701f747a396bef55b24b417.js:76953:9
+📡 All data stored in Supabase KV store 81355dc151cf20a43701f747a396bef55b24b417.js:76954:9
+⚠️ [App] STUCK IN LOADING STATE - isLoading: true 81355dc151cf20a43701f747a396bef55b24b417.js:9804:28
+🔍 [App Init] Full URL: https://startupverse.space/ 81355dc151cf20a43701f747a396bef55b24b417.js:9616:19
+🔍 [App Init] URL Params: <empty string> 81355dc151cf20a43701f747a396bef55b24b417.js:9616:81
+🔍 [App Init] Invitation token: null 81355dc151cf20a43701f747a396bef55b24b417.js:9616:137
+🔍 [App Init] All URL params: 
+Object {  }
+81355dc151cf20a43701f747a396bef55b24b417.js:9616:188
+🔍 [App Init] window.location.search: <empty string> 81355dc151cf20a43701f747a396bef55b24b417.js:9616:267
+🔍 [App Init] window.location.hash: <empty string> 81355dc151cf20a43701f747a396bef55b24b417.js:9616:345
+❌ [App Init] No invitation token found 81355dc151cf20a43701f747a396bef55b24b417.js:9620:17
+Loading user from localStorage: 
+Object { id: "user-1770472388642", name: "StartupVerse", role: "founder", email: "startupverse35@gmail.com", avatar: "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAE9gAABPYCAYAAADoAgl0AAAACXBIWXMAAMNQAADDUAEyTO4IAAAGjmlUWHRYTUw6Y29tLmFkb2JlLnhtcAAAAAAAPD94cGFja2V0IGJlZ2luPSLvu78iIGlkPSJXNU0wTXBDZWhpSHpyZVN6TlRjemtjOWQiPz4gPHg6eG1wbWV0YSB4bWxuczp4PSJhZG9iZTpuczptZXRhLyIgeDp4bXB0az0iQWRvYmUgWE1QIENvcmUgNi4wLWMwMDIgNzkuMTY0NDYwLCAyMDIwLzA1LzEyLTE2OjA0OjE3ICAgICAgICAiPiA8cmRmOlJERiB4bWxuczpyZGY9Imh0dHA6Ly93d3cudzMub3JnLzE5OTkvMDIvMjItcmRmLXN5bnRheC1ucyMiPiA8cmRmOkRlc2NyaXB0aW9uIHJkZjphYm91dD0iIiB4bWxuczp4bXA9Imh0dHA6Ly9ucy5hZG9iZS5jb20veGFwLzEuMC8iIHhtbG5zOnhtcE1NPSJodHRwOi8vbnMuYWRvYmUuY29tL3hhcC8xLjAvbW0vIiB4bWxuczpzdEV2dD0iaHR0cDovL25zLmFkb2JlLmNvbS94YXAvMS4wL3NUeXBlL1Jlc291cmNlRXZlbnQjIiB4bWxuczpwaG90b3Nob3A9Imh0dHA6Ly9ucy5hZG9iZS5jb20vcGhvdG9zaG9wLzEuMC8iIHhtbG5zOmRjPSJodHRwOi8vcHVybC5vcmcvZGMvZWxlbWVudHMvMS4xLyIgeG1wOkNyZWF0b3JUb29sPSJBZG9iZSBQaG90b3Nob3AgMjEuMiAoV2luZG93cykiIHhtcDpDcmVhdGVEYXRlPSIyMDI2LTAxLTIyVDE2OjM4OjE0WiIgeG1wOk1ldGFkYXRhRGF0ZT0iMjAyNi0wMS0yMlQxNjozODoxNFoiIHhtcDpNb2RpZnlEYXRlPS…", profile: {…}, createdAt: "2026-02-07T13:53:08.642Z", onboardingComplete: true, isAdmin: true }
+81355dc151cf20a43701f747a396bef55b24b417.js:9633:19
+🔍 [App] onboardingComplete: true 81355dc151cf20a43701f747a396bef55b24b417.js:9633:70
+🔍 [App] Has profile: true 81355dc151cf20a43701f747a396bef55b24b417.js:9633:137
+✅ [App] Onboarding complete - redirecting to dashboard 81355dc151cf20a43701f747a396bef55b24b417.js:9637:47
+🔍 [App] Checking onboarding status... 81355dc151cf20a43701f747a396bef55b24b417.js:9803:13
+📋 [App] User: null 81355dc151cf20a43701f747a396bef55b24b417.js:9803:68
+📋 [App] Current view: landing 81355dc151cf20a43701f747a396bef55b24b417.js:9803:102
+📬 [Notifications] No user ID, clearing notifications 81355dc151cf20a43701f747a396bef55b24b417.js:9193:15
+✅ IndexedDB: Database opened successfully 81355dc151cf20a43701f747a396bef55b24b417.js:72262:37
+✅ [App] Rendering main content - currentView: dashboard user: StartupVerse 81355dc151cf20a43701f747a396bef55b24b417.js:9811:23
+🔍 [App] Checking onboarding status... 81355dc151cf20a43701f747a396bef55b24b417.js:9803:13
+📋 [App] User: 
+Object { id: "user-1770472388642", name: "StartupVerse", role: "founder", email: "startupverse35@gmail.com", avatar: "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAE9gAABPYCAYAAADoAgl0AAAACXBIWXMAAMNQAADDUAEyTO4IAAAGjmlUWHRYTUw6Y29tLmFkb2JlLnhtcAAAAAAAPD94cGFja2V0IGJlZ2luPSLvu78iIGlkPSJXNU0wTXBDZWhpSHpyZVN6TlRjemtjOWQiPz4gPHg6eG1wbWV0YSB4bWxuczp4PSJhZG9iZTpuczptZXRhLyIgeDp4bXB0az0iQWRvYmUgWE1QIENvcmUgNi4wLWMwMDIgNzkuMTY0NDYwLCAyMDIwLzA1LzEyLTE2OjA0OjE3ICAgICAgICAiPiA8cmRmOlJERiB4bWxuczpyZGY9Imh0dHA6Ly93d3cudzMub3JnLzE5OTkvMDIvMjItcmRmLXN5bnRheC1ucyMiPiA8cmRmOkRlc2NyaXB0aW9uIHJkZjphYm91dD0iIiB4bWxuczp4bXA9Imh0dHA6Ly9ucy5hZG9iZS5jb20veGFwLzEuMC8iIHhtbG5zOnhtcE1NPSJodHRwOi8vbnMuYWRvYmUuY29tL3hhcC8xLjAvbW0vIiB4bWxuczpzdEV2dD0iaHR0cDovL25zLmFkb2JlLmNvbS94YXAvMS4wL3NUeXBlL1Jlc291cmNlRXZlbnQjIiB4bWxuczpwaG90b3Nob3A9Imh0dHA6Ly9ucy5hZG9iZS5jb20vcGhvdG9zaG9wLzEuMC8iIHhtbG5zOmRjPSJodHRwOi8vcHVybC5vcmcvZGMvZWxlbWVudHMvMS4xLyIgeG1wOkNyZWF0b3JUb29sPSJBZG9iZSBQaG90b3Nob3AgMjEuMiAoV2luZG93cykiIHhtcDpDcmVhdGVEYXRlPSIyMDI2LTAxLTIyVDE2OjM4OjE0WiIgeG1wOk1ldGFkYXRhRGF0ZT0iMjAyNi0wMS0yMlQxNjozODoxNFoiIHhtcDpNb2RpZnlEYXRlPS…", profile: {…}, createdAt: "2026-02-07T13:53:08.642Z", onboardingComplete: true, isAdmin: true }
+81355dc151cf20a43701f747a396bef55b24b417.js:9803:68
+📋 [App] Current view: dashboard 81355dc151cf20a43701f747a396bef55b24b417.js:9803:102
+📬 [Notifications] User ID set, fetching notifications for: user-1770472388642 81355dc151cf20a43701f747a396bef55b24b417.js:9187:15
+🔄 [StageProgression] Initializing periodic stage progression check 81355dc151cf20a43701f747a396bef55b24b417.js:75685:11
+🔄 [Task Migration] Starting migration for founder user-1770472388642... 81355dc151cf20a43701f747a396bef55b24b417.js:77360:11
+📦 [Task Migration] Found 12 tasks in localStorage 81355dc151cf20a43701f747a396bef55b24b417.js:77366:13
+📊 [FounderDashboard] Team members loaded from localStorage: 1 81355dc151cf20a43701f747a396bef55b24b417.js:77760:25
+📥 Fetching team members for startup: user-1770472388642 81355dc151cf20a43701f747a396bef55b24b417.js:9461:11
+📊 [FounderDashboard] Loaded existing journey progress - Stage 1 81355dc151cf20a43701f747a396bef55b24b417.js:77799:15
+🔍 [AppLayout] Fetching inbox count for founder: user-1770472388642 81355dc151cf20a43701f747a396bef55b24b417.js:14717:19
+📥 Fetching startup memberships from backend... 
+Object { startupId: "user-1770472388642" }
+81355dc151cf20a43701f747a396bef55b24b417.js:77079:11
+✅ IndexedDB: Retrieved 0 pending actions 81355dc151cf20a43701f747a396bef55b24b417.js:72359:17
+ℹ️ Service Worker registration skipped (using IndexedDB-only mode) 81355dc151cf20a43701f747a396bef55b24b417.js:73469:20
+✅ Offline data storage enabled via IndexedDB 81355dc151cf20a43701f747a396bef55b24b417.js:73469:103
+✅ IndexedDB: Database opened successfully 81355dc151cf20a43701f747a396bef55b24b417.js:72262:37
+📬 [Notifications] User ID set, fetching notifications for: user-1770472388642 81355dc151cf20a43701f747a396bef55b24b417.js:9132:13
+Cookie “__cf_bm” has been rejected for invalid domain. community_published_banner_details
+✅ Loaded startup memberships: 0 81355dc151cf20a43701f747a396bef55b24b417.js:77082:50
+📊 [AppLayout] Pending interests: 0 81355dc151cf20a43701f747a396bef55b24b417.js:14732:19
+✅ Task task-milestone-4-2 saved to backend 81355dc151cf20a43701f747a396bef55b24b417.js:49626:13
+✅ Task cache updated after backend save 81355dc151cf20a43701f747a396bef55b24b417.js:49628:99
+✅ [Task Migration] Migrated task: task-milestone-4-2 81355dc151cf20a43701f747a396bef55b24b417.js:77370:38
+🧭 [DashboardHybrid] handleNavigate called with: startup-office undefined 81355dc151cf20a43701f747a396bef55b24b417.js:48112:13
+🧭 [DashboardHybrid] Current page: dashboard 81355dc151cf20a43701f747a396bef55b24b417.js:48112:84
+✅ [DashboardHybrid] Page navigation triggered to: startup-office 81355dc151cf20a43701f747a396bef55b24b417.js:48112:436
+🎬 [LiveActivityFeed] Initializing with 50 activities, first ID: 1772438191265-68xzhjjtm 81355dc151cf20a43701f747a396bef55b24b417.js:41364:15
+🔇 [LiveActivityFeed] Skipping - showPopups: true isInitialized: false 81355dc151cf20a43701f747a396bef55b24b417.js:41368:15
+🎬 [LiveActivityFeed] Initializing with 50 activities, first ID: 1772438191265-68xzhjjtm 81355dc151cf20a43701f747a396bef55b24b417.js:41364:15
+🔇 [LiveActivityFeed] Skipping - showPopups: true isInitialized: false 81355dc151cf20a43701f747a396bef55b24b417.js:41368:15
+🔍 [VirtualOffice] Loading team members... 81355dc151cf20a43701f747a396bef55b24b417.js:41842:15
+🔍 [VirtualOffice] Current user: 
+Object { id: "user-1770472388642", name: "StartupVerse", role: "founder", companyId: undefined, startupId: undefined }
+81355dc151cf20a43701f747a396bef55b24b417.js:41842:74
+🔍 [VirtualOffice] All users in localStorage: 2 81355dc151cf20a43701f747a396bef55b24b417.js:41842:213
+🔍 [VirtualOffice] All users: 
+Array [ {…}, {…} ]
+81355dc151cf20a43701f747a396bef55b24b417.js:41842:286
+🔍 [VirtualOffice] Checking user genomachub: 
+Object { matchByStartupId: true, matchByFounderId: true, shouldInclude: true, userStartupId: "user-1770472388642", userFounderId: "user-1770472388642", currentUserId: "user-1770472388642" }
+81355dc151cf20a43701f747a396bef55b24b417.js:41847:26
+🔍 [VirtualOffice] Checking user New User: 
+Object { matchByStartupId: false, matchByFounderId: false, shouldInclude: false, userStartupId: undefined, userFounderId: undefined, currentUserId: "user-1770472388642" }
+81355dc151cf20a43701f747a396bef55b24b417.js:41847:26
+✅ [VirtualOffice] Filtered team members: 1 
+Array [ {…} ]
+81355dc151cf20a43701f747a396bef55b24b417.js:41862:15
+✅ Team members loaded from localStorage: 2 81355dc151cf20a43701f747a396bef55b24b417.js:41903:44
+🔍 [VirtualOffice] Fetching from backend with startupId: user-1770472388642 81355dc151cf20a43701f747a396bef55b24b417.js:41905:19
+📥 Fetching team members for startup: user-1770472388642 81355dc151cf20a43701f747a396bef55b24b417.js:9461:11
+🐛 [DEBUG] Checking database for startup: user-1770472388642 81355dc151cf20a43701f747a396bef55b24b417.js:41962:15
+📡 Setting up realtime activity subscription... 81355dc151cf20a43701f747a396bef55b24b417.js:42099:13
+📡 Subscribing to realtime activities for startup: user-1770472388642 81355dc151cf20a43701f747a396bef55b24b417.js:41656:11
+🔌 Cleaning up realtime subscription 81355dc151cf20a43701f747a396bef55b24b417.js:42112:15
+🔌 Unsubscribing from startup:user-1770472388642:activities 81355dc151cf20a43701f747a396bef55b24b417.js:41665:13
+📡 Channel status: CLOSED 81355dc151cf20a43701f747a396bef55b24b417.js:41663:262
+📊 [LiveActivityFeed] Current first ID: 1772438191265-68xzhjjtm Previous: 1772438191265-68xzhjjtm 2 81355dc151cf20a43701f747a396bef55b24b417.js:41372:17
+📡 Setting up realtime activity subscription... 81355dc151cf20a43701f747a396bef55b24b417.js:42099:13
+📡 Subscribing to realtime activities for startup: user-1770472388642 81355dc151cf20a43701f747a396bef55b24b417.js:41656:11
+🔌 Cleaning up realtime subscription 81355dc151cf20a43701f747a396bef55b24b417.js:42112:15
+🔌 Unsubscribing from startup:user-1770472388642:activities 81355dc151cf20a43701f747a396bef55b24b417.js:41665:13
+📡 Channel status: CLOSED 81355dc151cf20a43701f747a396bef55b24b417.js:41663:262
+📡 Setting up realtime activity subscription... 81355dc151cf20a43701f747a396bef55b24b417.js:42099:13
+📡 Subscribing to realtime activities for startup: user-1770472388642 81355dc151cf20a43701f747a396bef55b24b417.js:41656:11
+📬 [Notifications] Received 6 notifications from backend 81355dc151cf20a43701f747a396bef55b24b417.js:9147:17
+📬 [Notifications] Notifications: 
+Array(6) [ {…}, {…}, {…}, {…}, {…}, {…} ]
+81355dc151cf20a43701f747a396bef55b24b417.js:9147:100
+✅ [Notifications] Loaded 6 notifications for user user-1770472388642 81355dc151cf20a43701f747a396bef55b24b417.js:9152:105
+🔌 Cleaning up realtime subscription 81355dc151cf20a43701f747a396bef55b24b417.js:42112:15
+🔌 Unsubscribing from startup:user-1770472388642:activities 81355dc151cf20a43701f747a396bef55b24b417.js:41665:13
+📡 Channel status: CLOSED 81355dc151cf20a43701f747a396bef55b24b417.js:41663:262
+📡 Setting up realtime activity subscription... 81355dc151cf20a43701f747a396bef55b24b417.js:42099:13
+📡 Subscribing to realtime activities for startup: user-1770472388642 81355dc151cf20a43701f747a396bef55b24b417.js:41656:11
+📊 [AppLayout] Pending org invitations: 0 data: 
+Array []
+81355dc151cf20a43701f747a396bef55b24b417.js:14745:35
+📊 [AppLayout] Total inbox count: 0 (interests: 0 + org: 0 ) 81355dc151cf20a43701f747a396bef55b24b417.js:14749:19
+✅ Task task-milestone-2-1 saved to backend 81355dc151cf20a43701f747a396bef55b24b417.js:49626:13
+✅ Task cache updated after backend save 81355dc151cf20a43701f747a396bef55b24b417.js:49628:99
+✅ [Task Migration] Migrated task: task-milestone-2-1 81355dc151cf20a43701f747a396bef55b24b417.js:77370:38
+Cookie “__cf_bm” has been rejected for invalid domain. websocket
+✅ Team members fetched: 3 members 81355dc151cf20a43701f747a396bef55b24b417.js:9465:18
+🔌 Cleaning up realtime subscription 81355dc151cf20a43701f747a396bef55b24b417.js:42112:15
+🔌 Unsubscribing from startup:user-1770472388642:activities 81355dc151cf20a43701f747a396bef55b24b417.js:41665:13
+📡 Channel status: CLOSED 81355dc151cf20a43701f747a396bef55b24b417.js:41663:262
+📡 Setting up realtime activity subscription... 81355dc151cf20a43701f747a396bef55b24b417.js:42099:13
+📡 Subscribing to realtime activities for startup: user-1770472388642 81355dc151cf20a43701f747a396bef55b24b417.js:41656:11
+✅ [TASK SYNC] Updated 12 tasks from backend for founder user-1770472388642 81355dc151cf20a43701f747a396bef55b24b417.js:35181:99
+🔌 Cleaning up realtime subscription 81355dc151cf20a43701f747a396bef55b24b417.js:42112:15
+🔌 Unsubscribing from startup:user-1770472388642:activities 81355dc151cf20a43701f747a396bef55b24b417.js:41665:13
+📡 Channel status: CLOSED 81355dc151cf20a43701f747a396bef55b24b417.js:41663:262
+📡 Setting up realtime activity subscription... 81355dc151cf20a43701f747a396bef55b24b417.js:42099:13
+📡 Subscribing to realtime activities for startup: user-1770472388642 81355dc151cf20a43701f747a396bef55b24b417.js:41656:11
+✅ Task task-milestone-2-2 saved to backend 81355dc151cf20a43701f747a396bef55b24b417.js:49626:13
+✅ Task cache updated after backend save 81355dc151cf20a43701f747a396bef55b24b417.js:49628:99
+✅ [Task Migration] Migrated task: task-milestone-2-2 81355dc151cf20a43701f747a396bef55b24b417.js:77370:38
+✅ [Virtual Office] Loaded organization announcements: 0 81355dc151cf20a43701f747a396bef55b24b417.js:41805:17
+🔌 Cleaning up realtime subscription 81355dc151cf20a43701f747a396bef55b24b417.js:42112:15
+🔌 Unsubscribing from startup:user-1770472388642:activities 81355dc151cf20a43701f747a396bef55b24b417.js:41665:13
+📡 Channel status: CLOSED 81355dc151cf20a43701f747a396bef55b24b417.js:41663:262
+📡 Setting up realtime activity subscription... 81355dc151cf20a43701f747a396bef55b24b417.js:42099:13
+📡 Subscribing to realtime activities for startup: user-1770472388642 81355dc151cf20a43701f747a396bef55b24b417.js:41656:11
+🔌 Cleaning up realtime subscription 81355dc151cf20a43701f747a396bef55b24b417.js:42112:15
+🔌 Unsubscribing from startup:user-1770472388642:activities 81355dc151cf20a43701f747a396bef55b24b417.js:41665:13
+📡 Channel status: CLOSED 81355dc151cf20a43701f747a396bef55b24b417.js:41663:262
+📡 Setting up realtime activity subscription... 81355dc151cf20a43701f747a396bef55b24b417.js:42099:13
+📡 Subscribing to realtime activities for startup: user-1770472388642 81355dc151cf20a43701f747a396bef55b24b417.js:41656:11
+✅ [TASK SYNC] Updated 12 tasks from backend for founder user-1770472388642 81355dc151cf20a43701f747a396bef55b24b417.js:35181:99
+🔌 Cleaning up realtime subscription 81355dc151cf20a43701f747a396bef55b24b417.js:42112:15
+🔌 Unsubscribing from startup:user-1770472388642:activities 81355dc151cf20a43701f747a396bef55b24b417.js:41665:13
+📡 Channel status: CLOSED 81355dc151cf20a43701f747a396bef55b24b417.js:41663:262
+📡 Setting up realtime activity subscription... 81355dc151cf20a43701f747a396bef55b24b417.js:42099:13
+📡 Subscribing to realtime activities for startup: user-1770472388642 81355dc151cf20a43701f747a396bef55b24b417.js:41656:11
+🔌 Cleaning up realtime subscription 81355dc151cf20a43701f747a396bef55b24b417.js:42112:15
+🔌 Unsubscribing from startup:user-1770472388642:activities 81355dc151cf20a43701f747a396bef55b24b417.js:41665:13
+📡 Channel status: CLOSED 81355dc151cf20a43701f747a396bef55b24b417.js:41663:262
+📡 Setting up realtime activity subscription... 81355dc151cf20a43701f747a396bef55b24b417.js:42099:13
+📡 Subscribing to realtime activities for startup: user-1770472388642 81355dc151cf20a43701f747a396bef55b24b417.js:41656:11
+✅ Successfully subscribed to startup:user-1770472388642:activities 81355dc151cf20a43701f747a396bef55b24b417.js:41663:34
+🔍 [Activity API] Fetching activities from: https://zuvrtclwxqycfskgtpbs.supabase.co/functions/v1/make-server-78157e08/presence/user-1770472388642 81355dc151cf20a43701f747a396bef55b24b417.js:35399:13
+🔍 [Activity API] BASE_URL: https://zuvrtclwxqycfskgtpbs.supabase.co/functions/v1/make-server-78157e08 81355dc151cf20a43701f747a396bef55b24b417.js:35399:76
+🔍 [Activity API] projectId: zuvrtclwxqycfskgtpbs 81355dc151cf20a43701f747a396bef55b24b417.js:35399:124
+🔍 [Activity API] publicAnonKey: Present 81355dc151cf20a43701f747a396bef55b24b417.js:35399:173
+✅ Task task-milestone-3-0 saved to backend 81355dc151cf20a43701f747a396bef55b24b417.js:49626:13
+✅ Task cache updated after backend save 81355dc151cf20a43701f747a396bef55b24b417.js:49628:99
+✅ [Task Migration] Migrated task: task-milestone-3-0 81355dc151cf20a43701f747a396bef55b24b417.js:77370:38
+🐛 [DEBUG] Database state: 
+Object { success: true, startupId: "user-1770472388642", results: {…} }
+81355dc151cf20a43701f747a396bef55b24b417.js:41973:15
+✅ [TASK SYNC] Updated 12 tasks from backend for founder user-1770472388642 81355dc151cf20a43701f747a396bef55b24b417.js:35181:99
+🔌 Cleaning up realtime subscription 81355dc151cf20a43701f747a396bef55b24b417.js:42112:15
+🔌 Unsubscribing from startup:user-1770472388642:activities 81355dc151cf20a43701f747a396bef55b24b417.js:41665:13
+📡 Channel status: CLOSED 81355dc151cf20a43701f747a396bef55b24b417.js:41663:262
+📡 Setting up realtime activity subscription... 81355dc151cf20a43701f747a396bef55b24b417.js:42099:13
+📡 Subscribing to realtime activities for startup: user-1770472388642 81355dc151cf20a43701f747a396bef55b24b417.js:41656:11
+🔌 Cleaning up realtime subscription 81355dc151cf20a43701f747a396bef55b24b417.js:42112:15
+🔌 Unsubscribing from startup:user-1770472388642:activities 81355dc151cf20a43701f747a396bef55b24b417.js:41665:13
+📡 Channel status: CLOSED 81355dc151cf20a43701f747a396bef55b24b417.js:41663:262
+📡 Setting up realtime activity subscription... 81355dc151cf20a43701f747a396bef55b24b417.js:42099:13
+📡 Subscribing to realtime activities for startup: user-1770472388642 81355dc151cf20a43701f747a396bef55b24b417.js:41656:11
+✅ Team members fetched: 3 members 81355dc151cf20a43701f747a396bef55b24b417.js:9465:18
+🔍 [VirtualOffice] Backend returned team members: 
+Array(3) [ {…}, {…}, {…} ]
+81355dc151cf20a43701f747a396bef55b24b417.js:41908:23
+🔍 [VirtualOffice] Backend team members details: 
+Array(3) [ {…}, {…}, {…} ]
+81355dc151cf20a43701f747a396bef55b24b417.js:41908:93
+✅ Team members updated from backend: 3 81355dc151cf20a43701f747a396bef55b24b417.js:41939:50
+🧹 localStorage cleaned: removed deleted team members 81355dc151cf20a43701f747a396bef55b24b417.js:41941:85
+🔌 Cleaning up realtime subscription 81355dc151cf20a43701f747a396bef55b24b417.js:42112:15
+🔌 Unsubscribing from startup:user-1770472388642:activities 81355dc151cf20a43701f747a396bef55b24b417.js:41665:13
+📡 Channel status: CLOSED 81355dc151cf20a43701f747a396bef55b24b417.js:41663:262
+📡 Setting up realtime activity subscription... 81355dc151cf20a43701f747a396bef55b24b417.js:42099:13
+📡 Subscribing to realtime activities for startup: user-1770472388642 81355dc151cf20a43701f747a396bef55b24b417.js:41656:11
+✅ Successfully subscribed to startup:user-1770472388642:activities 81355dc151cf20a43701f747a396bef55b24b417.js:41663:34
+✅ Task task-milestone-3-1 saved to backend 81355dc151cf20a43701f747a396bef55b24b417.js:49626:13
+✅ Task cache updated after backend save 81355dc151cf20a43701f747a396bef55b24b417.js:49628:99
+✅ [Task Migration] Migrated task: task-milestone-3-1 81355dc151cf20a43701f747a396bef55b24b417.js:77370:38
+✅ [TASK SYNC] Updated 12 tasks from backend for founder user-1770472388642 81355dc151cf20a43701f747a396bef55b24b417.js:35181:99
+🔌 Cleaning up realtime subscription 81355dc151cf20a43701f747a396bef55b24b417.js:42112:15
+🔌 Unsubscribing from startup:user-1770472388642:activities 81355dc151cf20a43701f747a396bef55b24b417.js:41665:13
+📡 Channel status: CLOSED 81355dc151cf20a43701f747a396bef55b24b417.js:41663:262
+📡 Setting up realtime activity subscription... 81355dc151cf20a43701f747a396bef55b24b417.js:42099:13
+📡 Subscribing to realtime activities for startup: user-1770472388642 81355dc151cf20a43701f747a396bef55b24b417.js:41656:11
+🔌 Cleaning up realtime subscription 81355dc151cf20a43701f747a396bef55b24b417.js:42112:15
+🔌 Unsubscribing from startup:user-1770472388642:activities 81355dc151cf20a43701f747a396bef55b24b417.js:41665:13
+📡 Channel status: CLOSED 81355dc151cf20a43701f747a396bef55b24b417.js:41663:262
+📡 Setting up realtime activity subscription... 81355dc151cf20a43701f747a396bef55b24b417.js:42099:13
+📡 Subscribing to realtime activities for startup: user-1770472388642 81355dc151cf20a43701f747a396bef55b24b417.js:41656:11
+✅ Task task-milestone-3-2 saved to backend 81355dc151cf20a43701f747a396bef55b24b417.js:49626:13
+✅ Task cache updated after backend save 81355dc151cf20a43701f747a396bef55b24b417.js:49628:99
+✅ [Task Migration] Migrated task: task-milestone-3-2 81355dc151cf20a43701f747a396bef55b24b417.js:77370:38
+✅ Successfully subscribed to startup:user-1770472388642:activities 81355dc151cf20a43701f747a396bef55b24b417.js:41663:34
+✅ Fetched 45 activities from backend 81355dc151cf20a43701f747a396bef55b24b417.js:35416:20
+🔌 Cleaning up realtime subscription 81355dc151cf20a43701f747a396bef55b24b417.js:42112:15
+🔌 Unsubscribing from startup:user-1770472388642:activities 81355dc151cf20a43701f747a396bef55b24b417.js:41665:13
+📡 Channel status: CLOSED 81355dc151cf20a43701f747a396bef55b24b417.js:41663:262
+📊 [LiveActivityFeed] Current first ID: user-1770472388642-1772438191981 Previous: 1772438191265-68xzhjjtm 81355dc151cf20a43701f747a396bef55b24b417.js:41372:17
+🆕 [LiveActivityFeed] New activity detected! 81355dc151cf20a43701f747a396bef55b24b417.js:41373:15
+🔍 [LiveActivityFeed] New activities: 1 81355dc151cf20a43701f747a396bef55b24b417.js:41379:15
+✅ [LiveActivityFeed] 0 public activities to show 81355dc151cf20a43701f747a396bef55b24b417.js:41381:15
+📊 [LiveActivityFeed] Current first ID: user-1770472388642-1772438191981 Previous: 1772438191265-68xzhjjtm 81355dc151cf20a43701f747a396bef55b24b417.js:41372:17
+🆕 [LiveActivityFeed] New activity detected! 81355dc151cf20a43701f747a396bef55b24b417.js:41373:15
+🔍 [LiveActivityFeed] New activities: 1 81355dc151cf20a43701f747a396bef55b24b417.js:41379:15
+✅ [LiveActivityFeed] 0 public activities to show 81355dc151cf20a43701f747a396bef55b24b417.js:41381:15
+📡 Setting up realtime activity subscription... 81355dc151cf20a43701f747a396bef55b24b417.js:42099:13
+📡 Subscribing to realtime activities for startup: user-1770472388642 81355dc151cf20a43701f747a396bef55b24b417.js:41656:11
+📊 [LiveActivityFeed] Current first ID: user-1770472388642-1772438191981 Previous: user-1770472388642-1772438191981 2 81355dc151cf20a43701f747a396bef55b24b417.js:41372:17
+✅ [TASK SYNC] Updated 12 tasks from backend for founder user-1770472388642 81355dc151cf20a43701f747a396bef55b24b417.js:35181:99
+🔌 Cleaning up realtime subscription 81355dc151cf20a43701f747a396bef55b24b417.js:42112:15
+🔌 Unsubscribing from startup:user-1770472388642:activities 81355dc151cf20a43701f747a396bef55b24b417.js:41665:13
+📡 Channel status: CLOSED 81355dc151cf20a43701f747a396bef55b24b417.js:41663:262
+📡 Setting up realtime activity subscription... 81355dc151cf20a43701f747a396bef55b24b417.js:42099:13
+📡 Subscribing to realtime activities for startup: user-1770472388642 81355dc151cf20a43701f747a396bef55b24b417.js:41656:11
+✅ Task task-milestone-2-0 saved to backend 81355dc151cf20a43701f747a396bef55b24b417.js:49626:13
+✅ Task cache updated after backend save 81355dc151cf20a43701f747a396bef55b24b417.js:49628:99
+✅ [Task Migration] Migrated task: task-milestone-2-0 81355dc151cf20a43701f747a396bef55b24b417.js:77370:38
+✅ Successfully subscribed to startup:user-1770472388642:activities 81355dc151cf20a43701f747a396bef55b24b417.js:41663:34
+✅ [TASK SYNC] Updated 12 tasks from backend for founder user-1770472388642 81355dc151cf20a43701f747a396bef55b24b417.js:35181:99
+🔌 Cleaning up realtime subscription 81355dc151cf20a43701f747a396bef55b24b417.js:42112:15
+🔌 Unsubscribing from startup:user-1770472388642:activities 81355dc151cf20a43701f747a396bef55b24b417.js:41665:13
+📡 Channel status: CLOSED 81355dc151cf20a43701f747a396bef55b24b417.js:41663:262
+📡 Setting up realtime activity subscription... 81355dc151cf20a43701f747a396bef55b24b417.js:42099:13
+📡 Subscribing to realtime activities for startup: user-1770472388642 81355dc151cf20a43701f747a396bef55b24b417.js:41656:11
+✅ Task task-milestone-4-0 saved to backend 81355dc151cf20a43701f747a396bef55b24b417.js:49626:13
+✅ Task cache updated after backend save 81355dc151cf20a43701f747a396bef55b24b417.js:49628:99
+✅ [Task Migration] Migrated task: task-milestone-4-0 81355dc151cf20a43701f747a396bef55b24b417.js:77370:38
+✅ Successfully subscribed to startup:user-1770472388642:activities 81355dc151cf20a43701f747a396bef55b24b417.js:41663:34
+This site appears to use a scroll-linked positioning effect. This may not work well with asynchronous panning; see https://firefox-source-docs.mozilla.org/performance/scroll-linked_effects.html for further details and to join the discussion on related tools and features! startupverse.space
+✅ [TASK SYNC] Updated 12 tasks from backend for founder user-1770472388642 81355dc151cf20a43701f747a396bef55b24b417.js:35181:99
+🔌 Cleaning up realtime subscription 81355dc151cf20a43701f747a396bef55b24b417.js:42112:15
+🔌 Unsubscribing from startup:user-1770472388642:activities 81355dc151cf20a43701f747a396bef55b24b417.js:41665:13
+📡 Channel status: CLOSED 81355dc151cf20a43701f747a396bef55b24b417.js:41663:262
+📡 Setting up realtime activity subscription... 81355dc151cf20a43701f747a396bef55b24b417.js:42099:13
+📡 Subscribing to realtime activities for startup: user-1770472388642 81355dc151cf20a43701f747a396bef55b24b417.js:41656:11
+✅ Deadline check completed: 
+Object { success: true, remindersSent: 0, errors: 0 }
+81355dc151cf20a43701f747a396bef55b24b417.js:73002:21
+✅ Successfully subscribed to startup:user-1770472388642:activities 81355dc151cf20a43701f747a396bef55b24b417.js:41663:34
+✅ Task task-milestone-4-1 saved to backend 81355dc151cf20a43701f747a396bef55b24b417.js:49626:13
+✅ Task cache updated after backend save 81355dc151cf20a43701f747a396bef55b24b417.js:49628:99
+✅ [Task Migration] Migrated task: task-milestone-4-1 81355dc151cf20a43701f747a396bef55b24b417.js:77370:38
+✅ [TASK SYNC] Updated 12 tasks from backend for founder user-1770472388642 81355dc151cf20a43701f747a396bef55b24b417.js:35181:99
+🔌 Cleaning up realtime subscription 81355dc151cf20a43701f747a396bef55b24b417.js:42112:15
+🔌 Unsubscribing from startup:user-1770472388642:activities 81355dc151cf20a43701f747a396bef55b24b417.js:41665:13
+📡 Channel status: CLOSED 81355dc151cf20a43701f747a396bef55b24b417.js:41663:262
+📡 Setting up realtime activity subscription... 81355dc151cf20a43701f747a396bef55b24b417.js:42099:13
+📡 Subscribing to realtime activities for startup: user-1770472388642 81355dc151cf20a43701f747a396bef55b24b417.js:41656:11
+✅ Successfully subscribed to startup:user-1770472388642:activities 81355dc151cf20a43701f747a396bef55b24b417.js:41663:34
+✅ Task task-milestone-1-2 saved to backend 81355dc151cf20a43701f747a396bef55b24b417.js:49626:13
+✅ Task cache updated after backend save 81355dc151cf20a43701f747a396bef55b24b417.js:49628:99
+✅ [Task Migration] Migrated task: task-milestone-1-2 81355dc151cf20a43701f747a396bef55b24b417.js:77370:38
+✅ [TASK SYNC] Updated 12 tasks from backend for founder user-1770472388642 81355dc151cf20a43701f747a396bef55b24b417.js:35181:99
+🔌 Cleaning up realtime subscription 81355dc151cf20a43701f747a396bef55b24b417.js:42112:15
+🔌 Unsubscribing from startup:user-1770472388642:activities 81355dc151cf20a43701f747a396bef55b24b417.js:41665:13
+📡 Channel status: CLOSED 81355dc151cf20a43701f747a396bef55b24b417.js:41663:262
+📡 Setting up realtime activity subscription... 81355dc151cf20a43701f747a396bef55b24b417.js:42099:13
+📡 Subscribing to realtime activities for startup: user-1770472388642 81355dc151cf20a43701f747a396bef55b24b417.js:41656:11
+✅ Successfully subscribed to startup:user-1770472388642:activities 81355dc151cf20a43701f747a396bef55b24b417.js:41663:34
+✅ [TASK SYNC] Updated 12 tasks from backend for founder user-1770472388642 81355dc151cf20a43701f747a396bef55b24b417.js:35181:99
+🔌 Cleaning up realtime subscription 81355dc151cf20a43701f747a396bef55b24b417.js:42112:15
+🔌 Unsubscribing from startup:user-1770472388642:activities 81355dc151cf20a43701f747a396bef55b24b417.js:41665:13
+📡 Channel status: CLOSED 81355dc151cf20a43701f747a396bef55b24b417.js:41663:262
+📡 Setting up realtime activity subscription... 81355dc151cf20a43701f747a396bef55b24b417.js:42099:13
+📡 Subscribing to realtime activities for startup: user-1770472388642 81355dc151cf20a43701f747a396bef55b24b417.js:41656:11
+✅ Task task-milestone-1-1 saved to backend 81355dc151cf20a43701f747a396bef55b24b417.js:49626:13
+✅ Task cache updated after backend save 81355dc151cf20a43701f747a396bef55b24b417.js:49628:99
+✅ [Task Migration] Migrated task: task-milestone-1-1 81355dc151cf20a43701f747a396bef55b24b417.js:77370:38
+✅ Successfully subscribed to startup:user-1770472388642:activities 81355dc151cf20a43701f747a396bef55b24b417.js:41663:34
+✅ [App] Rendering main content - currentView: landing user: undefined 81355dc151cf20a43701f747a396bef55b24b417.js:9811:23
+🔌 Cleaning up realtime subscription 81355dc151cf20a43701f747a396bef55b24b417.js:42112:15
+🔌 Unsubscribing from startup:user-1770472388642:activities 81355dc151cf20a43701f747a396bef55b24b417.js:41665:13
+📡 Channel status: CLOSED 81355dc151cf20a43701f747a396bef55b24b417.js:41663:262
+🔍 [App] Checking onboarding status... 81355dc151cf20a43701f747a396bef55b24b417.js:9803:13
+📋 [App] User: null 81355dc151cf20a43701f747a396bef55b24b417.js:9803:68
+📋 [App] Current view: landing 81355dc151cf20a43701f747a396bef55b24b417.js:9803:102
+✅ Task task-milestone-1-0 saved to backend 81355dc151cf20a43701f747a396bef55b24b417.js:49626:13
+✅ Task cache updated after backend save 81355dc151cf20a43701f747a396bef55b24b417.js:49628:99
+✅ [Task Migration] Migrated task: task-milestone-1-0 81355dc151cf20a43701f747a396bef55b24b417.js:77370:38
+🎉 [Task Migration] Complete! Migrated: 12, Errors: 0 81355dc151cf20a43701f747a396bef55b24b417.js:77374:20
+🔄 Migrated 12 tasks from localStorage to backend 81355dc151cf20a43701f747a396bef55b24b417.js:77717:38
+✅ [TASK SYNC] Updated 12 tasks from backend for founder user-1770472388642 81355dc151cf20a43701f747a396bef55b24b417.js:35181:99
+The resource at “https://startupverse.space/_runtimes/sites-runtime.ed340f7bffa7e99869e4202e80427255dbdc8bff3e9b8cbc6cc79c5d908c29e6.js” preloaded with link preload was not used within a few seconds. Make sure all attributes of the preload tag are set correctly. startupverse.space
+The resource at “https://startupverse.space/_components/v2/81355dc151cf20a43701f747a396bef55b24b417.js” preloaded with link preload was not used within a few seconds. Make sure all attributes of the preload tag are set correctly. startupverse.space
+✅ Deadline check completed: 
+Object { success: true, remindersSent: 0, errors: 0 }
+81355dc151cf20a43701f747a396bef55b24b417.js:73002:21
+🔐 [AuthAPI] Signing in: g2@gmail.com 81355dc151cf20a43701f747a396bef55b24b417.js:6161:13
+✅ [AuthAPI] Signin successful: g2@gmail.com 81355dc151cf20a43701f747a396bef55b24b417.js:6172:20
+✅ [LoginPage] Backend signin successful: 
+Object { id: "user-1772151256036", name: "G2", role: "organization-admin", email: "g2@gmail.com", profile: {…}, createdAt: "2026-02-27T00:14:16.036Z", updatedAt: "2026-02-27T00:15:52.775Z", onboardingComplete: true }
+81355dc151cf20a43701f747a396bef55b24b417.js:6236:17
+✅ [Auth] Using backend user data: 
+Object { id: "user-1772151256036", name: "G2", role: "organization-admin", email: "g2@gmail.com", profile: {…}, createdAt: "2026-02-27T00:14:16.036Z", updatedAt: "2026-02-27T00:15:52.775Z", onboardingComplete: true }
+81355dc151cf20a43701f747a396bef55b24b417.js:9651:19
+✅ [App] Rendering main content - currentView: dashboard user: G2 81355dc151cf20a43701f747a396bef55b24b417.js:9811:23
+🔍 [App] Checking onboarding status... 81355dc151cf20a43701f747a396bef55b24b417.js:9803:13
+📋 [App] User: 
+Object { id: "user-1772151256036", name: "G2", role: "organization-admin", email: "g2@gmail.com", profile: {…}, createdAt: "2026-02-27T00:14:16.036Z", updatedAt: "2026-02-27T00:15:52.775Z", onboardingComplete: true }
+81355dc151cf20a43701f747a396bef55b24b417.js:9803:68
+📋 [App] Current view: dashboard 81355dc151cf20a43701f747a396bef55b24b417.js:9803:102
+📤 Fetching organizations from Supabase for user: user-1772151256036 81355dc151cf20a43701f747a396bef55b24b417.js:76974:11
+✅ Found 2 organizations 81355dc151cf20a43701f747a396bef55b24b417.js:76977:20
+📤 Fetching cohorts from Supabase for org: org-1772151394906-by93lbg5h 81355dc151cf20a43701f747a396bef55b24b417.js:77018:11
+📤 Checking organization admin status in Supabase... 
+Object { userId: "user-1772151256036", organizationId: "org-1772151394906-by93lbg5h" }
+81355dc151cf20a43701f747a396bef55b24b417.js:76991:11
+✅ Admin check result: true 81355dc151cf20a43701f747a396bef55b24b417.js:76994:20
+✅ Found 4 cohorts 81355dc151cf20a43701f747a396bef55b24b417.js:77021:20
+✅ Loaded 4 cohort(s) 81355dc151cf20a43701f747a396bef55b24b417.js:84046:15
+📤 Fetching cohort from Supabase: cohort-1772183829937-jci2zcr7h 81355dc151cf20a43701f747a396bef55b24b417.js:77035:11
+⏭️ Cohort cohort-1772183829937-jci2zcr7h not found (404) 81355dc151cf20a43701f747a396bef55b24b417.js:77039:62
+📤 Fetching cohorts from Supabase for org: org-1772308034533-gsxdeoy40 81355dc151cf20a43701f747a396bef55b24b417.js:77018:11
+📤 Checking organization admin status in Supabase... 
+Object { userId: "user-1772151256036", organizationId: "org-1772308034533-gsxdeoy40" }
+81355dc151cf20a43701f747a396bef55b24b417.js:76991:11
+✅ Weekly review check completed: 
+Object { success: true, skipped: true }
+81355dc151cf20a43701f747a396bef55b24b417.js:73021:21
+✅ Found 1 cohorts 81355dc151cf20a43701f747a396bef55b24b417.js:77021:20
+✅ Loaded 1 cohort(s) 81355dc151cf20a43701f747a396bef55b24b417.js:84046:15
+📤 Fetching cohort from Supabase: cohort-1772310819256-nvxrdbipo 81355dc151cf20a43701f747a396bef55b24b417.js:77035:11
+✅ Admin check result: true 81355dc151cf20a43701f747a396bef55b24b417.js:76994:20
+📤 Fetching cohort members from Supabase: cohort-1772310819256-nvxrdbipo 81355dc151cf20a43701f747a396bef55b24b417.js:77070:11
+✅ Found 1 cohort members 81355dc151cf20a43701f747a396bef55b24b417.js:77073:20
+📬 [Notifications] User ID set, fetching notifications for: user-1770472388642 81355dc151cf20a43701f747a396bef55b24b417.js:9132:13
+📬 [Notifications] Received 6 notifications from backend 81355dc151cf20a43701f747a396bef55b24b417.js:9147:17
+📬 [Notifications] Notifications: 
+Array(6) [ {…}, {…}, {…}, {…}, {…}, {…} ]
+81355dc151cf20a43701f747a396bef55b24b417.js:9147:100
+✅ [Notifications] Loaded 6 notifications for user user-1770472388642 81355dc151cf20a43701f747a396bef55b24b417.js:9152:105
+📬 [Notifications] User ID set, fetching notifications for: user-1770472388642 81355dc151cf20a43701f747a396bef55b24b417.js:9132:13
+📬 [Notifications] Received 6 notifications from backend 81355dc151cf20a43701f747a396bef55b24b417.js:9147:17
+📬 [Notifications] Notifications: 
+Array(6) [ {…}, {…}, {…}, {…}, {…}, {…} ]
+81355dc151cf20a43701f747a396bef55b24b417.js:9147:100
+✅ [Notifications] Loaded 6 notifications for user user-1770472388642 81355dc151cf20a43701f747a396bef55b24b417.js:9152:105
+📬 [Notifications] User ID set, fetching notifications for: user-1770472388642 81355dc151cf20a43701f747a396bef55b24b417.js:9132:13
+📬 [Notifications] Received 6 notifications from backend 81355dc151cf20a43701f747a396bef55b24b417.js:9147:17
+📬 [Notifications] Notifications: 
+Array(6) [ {…}, {…}, {…}, {…}, {…}, {…} ]
+81355dc151cf20a43701f747a396bef55b24b417.js:9147:100
+✅ [Notifications] Loaded 6 notifications for user user-1770472388642 81355dc151cf20a43701f747a396bef55b24b417.js:9152:105

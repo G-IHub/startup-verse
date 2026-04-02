@@ -1,0 +1,191 @@
+Cookie “__cf_bm” has been rejected for invalid domain. login
+Cookie “__cf_bm” has been rejected for invalid domain. _index.json
+Cookie “__cf_bm” has been rejected for invalid domain. login.json
+[Hydrated] sites-runtime.ed340f7bffa7e99869e4202e80427255dbdc8bff3e9b8cbc6cc79c5d908c29e6.js:127:3806
+✅ Early error suppression initialized eb1c3595a5829c6b8e00df156b7ba82d77c42c1a.js:31:9
+✅ [Supabase] Singleton client initialized eb1c3595a5829c6b8e00df156b7ba82d77c42c1a.js:30976:17
+🏢 Organization System: BACKEND MODE (Supabase) eb1c3595a5829c6b8e00df156b7ba82d77c42c1a.js:78970:9
+📡 All data stored in Supabase KV store eb1c3595a5829c6b8e00df156b7ba82d77c42c1a.js:78971:9
+⚠️ [App] STUCK IN LOADING STATE - isLoading: true eb1c3595a5829c6b8e00df156b7ba82d77c42c1a.js:9902:28
+🔍 [App] Checking onboarding status... eb1c3595a5829c6b8e00df156b7ba82d77c42c1a.js:9901:13
+📋 [App] User: null eb1c3595a5829c6b8e00df156b7ba82d77c42c1a.js:9901:68
+📋 [App] Current view: landing eb1c3595a5829c6b8e00df156b7ba82d77c42c1a.js:9901:102
+📬 [Notifications] No user ID, clearing notifications eb1c3595a5829c6b8e00df156b7ba82d77c42c1a.js:9262:15
+✅ [App] Rendering main content - currentView: mentor-login user: undefined eb1c3595a5829c6b8e00df156b7ba82d77c42c1a.js:9909:23
+🔍 [App] Checking onboarding status... eb1c3595a5829c6b8e00df156b7ba82d77c42c1a.js:9901:13
+📋 [App] User: null eb1c3595a5829c6b8e00df156b7ba82d77c42c1a.js:9901:68
+📋 [App] Current view: mentor-login eb1c3595a5829c6b8e00df156b7ba82d77c42c1a.js:9901:102
+📬 [Notifications] User ID set, fetching notifications for: user-1772151256036 eb1c3595a5829c6b8e00df156b7ba82d77c42c1a.js:9256:15
+✅ IndexedDB: Database opened successfully eb1c3595a5829c6b8e00df156b7ba82d77c42c1a.js:74150:37
+Error: useLocation() may be used only in the context of a <Router> component.
+    On https://startupverse.space/_components/v2/eb1c3595a5829c6b8e00df156b7ba82d77c42c1a.js:70171
+    Eo https://startupverse.space/_components/v2/eb1c3595a5829c6b8e00df156b7ba82d77c42c1a.js:70571
+    OOe https://startupverse.space/_components/v2/eb1c3595a5829c6b8e00df156b7ba82d77c42c1a.js:71517
+    jOe https://startupverse.space/_components/v2/eb1c3595a5829c6b8e00df156b7ba82d77c42c1a.js:71778
+    lS https://startupverse.space/_runtimes/sites-runtime.ed340f7bffa7e99869e4202e80427255dbdc8bff3e9b8cbc6cc79c5d908c29e6.js:6
+    Tv https://startupverse.space/_runtimes/sites-runtime.ed340f7bffa7e99869e4202e80427255dbdc8bff3e9b8cbc6cc79c5d908c29e6.js:8
+    _1 https://startupverse.space/_runtimes/sites-runtime.ed340f7bffa7e99869e4202e80427255dbdc8bff3e9b8cbc6cc79c5d908c29e6.js:8
+    P1 https://startupverse.space/_runtimes/sites-runtime.ed340f7bffa7e99869e4202e80427255dbdc8bff3e9b8cbc6cc79c5d908c29e6.js:8
+    qM https://startupverse.space/_runtimes/sites-runtime.ed340f7bffa7e99869e4202e80427255dbdc8bff3e9b8cbc6cc79c5d908c29e6.js:8
+    tp https://startupverse.space/_runtimes/sites-runtime.ed340f7bffa7e99869e4202e80427255dbdc8bff3e9b8cbc6cc79c5d908c29e6.js:8
+    Nv https://startupverse.space/_runtimes/sites-runtime.ed340f7bffa7e99869e4202e80427255dbdc8bff3e9b8cbc6cc79c5d908c29e6.js:8
+    R1 https://startupverse.space/_runtimes/sites-runtime.ed340f7bffa7e99869e4202e80427255dbdc8bff3e9b8cbc6cc79c5d908c29e6.js:8
+    yy https://startupverse.space/_runtimes/sites-runtime.ed340f7bffa7e99869e4202e80427255dbdc8bff3e9b8cbc6cc79c5d908c29e6.js:1
+    dy https://startupverse.space/_runtimes/sites-runtime.ed340f7bffa7e99869e4202e80427255dbdc8bff3e9b8cbc6cc79c5d908c29e6.js:1
+    jOe https://startupverse.space/_components/v2/eb1c3595a5829c6b8e00df156b7ba82d77c42c1a.js:71778
+    BK https://startupverse.space/_components/v2/eb1c3595a5829c6b8e00df156b7ba82d77c42c1a.js:9669
+    uK https://startupverse.space/_components/v2/eb1c3595a5829c6b8e00df156b7ba82d77c42c1a.js:9183
+    cK https://startupverse.space/_components/v2/eb1c3595a5829c6b8e00df156b7ba82d77c42c1a.js:9135
+    XH https://startupverse.space/_components/v2/eb1c3595a5829c6b8e00df156b7ba82d77c42c1a.js:4839
+    xs https://startupverse.space/_runtimes/sites-runtime.ed340f7bffa7e99869e4202e80427255dbdc8bff3e9b8cbc6cc79c5d908c29e6.js:77
+    nj https://startupverse.space/_runtimes/sites-runtime.ed340f7bffa7e99869e4202e80427255dbdc8bff3e9b8cbc6cc79c5d908c29e6.js:78
+    mr https://startupverse.space/_runtimes/sites-runtime.ed340f7bffa7e99869e4202e80427255dbdc8bff3e9b8cbc6cc79c5d908c29e6.js:75
+    WL https://startupverse.space/_runtimes/sites-runtime.ed340f7bffa7e99869e4202e80427255dbdc8bff3e9b8cbc6cc79c5d908c29e6.js:78
+    vT https://startupverse.space/_runtimes/sites-runtime.ed340f7bffa7e99869e4202e80427255dbdc8bff3e9b8cbc6cc79c5d908c29e6.js:75
+    Gf https://startupverse.space/_runtimes/sites-runtime.ed340f7bffa7e99869e4202e80427255dbdc8bff3e9b8cbc6cc79c5d908c29e6.js:75
+    vr https://startupverse.space/_runtimes/sites-runtime.ed340f7bffa7e99869e4202e80427255dbdc8bff3e9b8cbc6cc79c5d908c29e6.js:75
+    Qt https://startupverse.space/_runtimes/sites-runtime.ed340f7bffa7e99869e4202e80427255dbdc8bff3e9b8cbc6cc79c5d908c29e6.js:75
+    UL https://startupverse.space/_runtimes/sites-runtime.ed340f7bffa7e99869e4202e80427255dbdc8bff3e9b8cbc6cc79c5d908c29e6.js:78
+    wN https://startupverse.space/_runtimes/sites-runtime.ed340f7bffa7e99869e4202e80427255dbdc8bff3e9b8cbc6cc79c5d908c29e6.js:75
+    Fr https://startupverse.space/_runtimes/sites-runtime.ed340f7bffa7e99869e4202e80427255dbdc8bff3e9b8cbc6cc79c5d908c29e6.js:124
+    xs https://startupverse.space/_runtimes/sites-runtime.ed340f7bffa7e99869e4202e80427255dbdc8bff3e9b8cbc6cc79c5d908c29e6.js:77
+    _g https://startupverse.space/_runtimes/sites-runtime.ed340f7bffa7e99869e4202e80427255dbdc8bff3e9b8cbc6cc79c5d908c29e6.js:124
+    oL https://startupverse.space/_runtimes/sites-runtime.ed340f7bffa7e99869e4202e80427255dbdc8bff3e9b8cbc6cc79c5d908c29e6.js:75
+    dn https://startupverse.space/_runtimes/sites-runtime.ed340f7bffa7e99869e4202e80427255dbdc8bff3e9b8cbc6cc79c5d908c29e6.js:75
+    dn https://startupverse.space/_runtimes/sites-runtime.ed340f7bffa7e99869e4202e80427255dbdc8bff3e9b8cbc6cc79c5d908c29e6.js:75
+    cL https://startupverse.space/_runtimes/sites-runtime.ed340f7bffa7e99869e4202e80427255dbdc8bff3e9b8cbc6cc79c5d908c29e6.js:75
+    IT https://startupverse.space/_runtimes/sites-runtime.ed340f7bffa7e99869e4202e80427255dbdc8bff3e9b8cbc6cc79c5d908c29e6.js:75
+    Hu https://startupverse.space/_runtimes/sites-runtime.ed340f7bffa7e99869e4202e80427255dbdc8bff3e9b8cbc6cc79c5d908c29e6.js:75
+    wN https://startupverse.space/_runtimes/sites-runtime.ed340f7bffa7e99869e4202e80427255dbdc8bff3e9b8cbc6cc79c5d908c29e6.js:75
+    Fr https://startupverse.space/_runtimes/sites-runtime.ed340f7bffa7e99869e4202e80427255dbdc8bff3e9b8cbc6cc79c5d908c29e6.js:124
+    xs https://startupverse.space/_runtimes/sites-runtime.ed340f7bffa7e99869e4202e80427255dbdc8bff3e9b8cbc6cc79c5d908c29e6.js:77
+    lT https://startupverse.space/_runtimes/sites-runtime.ed340f7bffa7e99869e4202e80427255dbdc8bff3e9b8cbc6cc79c5d908c29e6.js:75
+    gT https://startupverse.space/_runtimes/sites-runtime.ed340f7bffa7e99869e4202e80427255dbdc8bff3e9b8cbc6cc79c5d908c29e6.js:75
+    x_ https://startupverse.space/_runtimes/sites-runtime.ed340f7bffa7e99869e4202e80427255dbdc8bff3e9b8cbc6cc79c5d908c29e6.js:124
+    wN https://startupverse.space/_runtimes/sites-runtime.ed340f7bffa7e99869e4202e80427255dbdc8bff3e9b8cbc6cc79c5d908c29e6.js:75
+    Fr https://startupverse.space/_runtimes/sites-runtime.ed340f7bffa7e99869e4202e80427255dbdc8bff3e9b8cbc6cc79c5d908c29e6.js:124
+    t0 https://startupverse.space/_runtimes/sites-runtime.ed340f7bffa7e99869e4202e80427255dbdc8bff3e9b8cbc6cc79c5d908c29e6.js:75
+    eW https://startupverse.space/_runtimes/sites-runtime.ed340f7bffa7e99869e4202e80427255dbdc8bff3e9b8cbc6cc79c5d908c29e6.js:127
+    HL https://startupverse.space/_runtimes/sites-runtime.ed340f7bffa7e99869e4202e80427255dbdc8bff3e9b8cbc6cc79c5d908c29e6.js:78
+    JS https://startupverse.space/_runtimes/sites-runtime.ed340f7bffa7e99869e4202e80427255dbdc8bff3e9b8cbc6cc79c5d908c29e6.js:65
+    xs https://startupverse.space/_runtimes/sites-runtime.ed340f7bffa7e99869e4202e80427255dbdc8bff3e9b8cbc6cc79c5d908c29e6.js:77
+    yI https://startupverse.space/_runtimes/sites-runtime.ed340f7bffa7e99869e4202e80427255dbdc8bff3e9b8cbc6cc79c5d908c29e6.js:65
+    w_ https://startupverse.space/_runtimes/sites-runtime.ed340f7bffa7e99869e4202e80427255dbdc8bff3e9b8cbc6cc79c5d908c29e6.js:127
+Caused by: Error: React component stack where the error occurred
+    jOe https://startupverse.space/_components/v2/eb1c3595a5829c6b8e00df156b7ba82d77c42c1a.js:71778
+    BK https://startupverse.space/_components/v2/eb1c3595a5829c6b8e00df156b7ba82d77c42c1a.js:9669
+    uK https://startupverse.space/_components/v2/eb1c3595a5829c6b8e00df156b7ba82d77c42c1a.js:9183
+    cK https://startupverse.space/_components/v2/eb1c3595a5829c6b8e00df156b7ba82d77c42c1a.js:9135
+    XH https://startupverse.space/_components/v2/eb1c3595a5829c6b8e00df156b7ba82d77c42c1a.js:4839
+    xs https://startupverse.space/_runtimes/sites-runtime.ed340f7bffa7e99869e4202e80427255dbdc8bff3e9b8cbc6cc79c5d908c29e6.js:77
+    nj https://startupverse.space/_runtimes/sites-runtime.ed340f7bffa7e99869e4202e80427255dbdc8bff3e9b8cbc6cc79c5d908c29e6.js:78
+    mr https://startupverse.space/_runtimes/sites-runtime.ed340f7bffa7e99869e4202e80427255dbdc8bff3e9b8cbc6cc79c5d908c29e6.js:75
+    WL https://startupverse.space/_runtimes/sites-runtime.ed340f7bffa7e99869e4202e80427255dbdc8bff3e9b8cbc6cc79c5d908c29e6.js:78
+    vT https://startupverse.space/_runtimes/sites-runtime.ed340f7bffa7e99869e4202e80427255dbdc8bff3e9b8cbc6cc79c5d908c29e6.js:75
+    Gf https://startupverse.space/_runtimes/sites-runtime.ed340f7bffa7e99869e4202e80427255dbdc8bff3e9b8cbc6cc79c5d908c29e6.js:75
+    vr https://startupverse.space/_runtimes/sites-runtime.ed340f7bffa7e99869e4202e80427255dbdc8bff3e9b8cbc6cc79c5d908c29e6.js:75
+    Qt https://startupverse.space/_runtimes/sites-runtime.ed340f7bffa7e99869e4202e80427255dbdc8bff3e9b8cbc6cc79c5d908c29e6.js:75
+    UL https://startupverse.space/_runtimes/sites-runtime.ed340f7bffa7e99869e4202e80427255dbdc8bff3e9b8cbc6cc79c5d908c29e6.js:78
+    wN https://startupverse.space/_runtimes/sites-runtime.ed340f7bffa7e99869e4202e80427255dbdc8bff3e9b8cbc6cc79c5d908c29e6.js:75
+    Fr https://startupverse.space/_runtimes/sites-runtime.ed340f7bffa7e99869e4202e80427255dbdc8bff3e9b8cbc6cc79c5d908c29e6.js:124
+    xs https://startupverse.space/_runtimes/sites-runtime.ed340f7bffa7e99869e4202e80427255dbdc8bff3e9b8cbc6cc79c5d908c29e6.js:77
+    _g https://startupverse.space/_runtimes/sites-runtime.ed340f7bffa7e99869e4202e80427255dbdc8bff3e9b8cbc6cc79c5d908c29e6.js:124
+    oL https://startupverse.space/_runtimes/sites-runtime.ed340f7bffa7e99869e4202e80427255dbdc8bff3e9b8cbc6cc79c5d908c29e6.js:75
+    dn https://startupverse.space/_runtimes/sites-runtime.ed340f7bffa7e99869e4202e80427255dbdc8bff3e9b8cbc6cc79c5d908c29e6.js:75
+    dn https://startupverse.space/_runtimes/sites-runtime.ed340f7bffa7e99869e4202e80427255dbdc8bff3e9b8cbc6cc79c5d908c29e6.js:75
+    cL https://startupverse.space/_runtimes/sites-runtime.ed340f7bffa7e99869e4202e80427255dbdc8bff3e9b8cbc6cc79c5d908c29e6.js:75
+    IT https://startupverse.space/_runtimes/sites-runtime.ed340f7bffa7e99869e4202e80427255dbdc8bff3e9b8cbc6cc79c5d908c29e6.js:75
+    Hu https://startupverse.space/_runtimes/sites-runtime.ed340f7bffa7e99869e4202e80427255dbdc8bff3e9b8cbc6cc79c5d908c29e6.js:75
+    wN https://startupverse.space/_runtimes/sites-runtime.ed340f7bffa7e99869e4202e80427255dbdc8bff3e9b8cbc6cc79c5d908c29e6.js:75
+    Fr https://startupverse.space/_runtimes/sites-runtime.ed340f7bffa7e99869e4202e80427255dbdc8bff3e9b8cbc6cc79c5d908c29e6.js:124
+    xs https://startupverse.space/_runtimes/sites-runtime.ed340f7bffa7e99869e4202e80427255dbdc8bff3e9b8cbc6cc79c5d908c29e6.js:77
+    lT https://startupverse.space/_runtimes/sites-runtime.ed340f7bffa7e99869e4202e80427255dbdc8bff3e9b8cbc6cc79c5d908c29e6.js:75
+    gT https://startupverse.space/_runtimes/sites-runtime.ed340f7bffa7e99869e4202e80427255dbdc8bff3e9b8cbc6cc79c5d908c29e6.js:75
+    x_ https://startupverse.space/_runtimes/sites-runtime.ed340f7bffa7e99869e4202e80427255dbdc8bff3e9b8cbc6cc79c5d908c29e6.js:124
+    wN https://startupverse.space/_runtimes/sites-runtime.ed340f7bffa7e99869e4202e80427255dbdc8bff3e9b8cbc6cc79c5d908c29e6.js:75
+    Fr https://startupverse.space/_runtimes/sites-runtime.ed340f7bffa7e99869e4202e80427255dbdc8bff3e9b8cbc6cc79c5d908c29e6.js:124
+    t0 https://startupverse.space/_runtimes/sites-runtime.ed340f7bffa7e99869e4202e80427255dbdc8bff3e9b8cbc6cc79c5d908c29e6.js:75
+    eW https://startupverse.space/_runtimes/sites-runtime.ed340f7bffa7e99869e4202e80427255dbdc8bff3e9b8cbc6cc79c5d908c29e6.js:127
+    HL https://startupverse.space/_runtimes/sites-runtime.ed340f7bffa7e99869e4202e80427255dbdc8bff3e9b8cbc6cc79c5d908c29e6.js:78
+    JS https://startupverse.space/_runtimes/sites-runtime.ed340f7bffa7e99869e4202e80427255dbdc8bff3e9b8cbc6cc79c5d908c29e6.js:65
+    xs https://startupverse.space/_runtimes/sites-runtime.ed340f7bffa7e99869e4202e80427255dbdc8bff3e9b8cbc6cc79c5d908c29e6.js:77
+    yI https://startupverse.space/_runtimes/sites-runtime.ed340f7bffa7e99869e4202e80427255dbdc8bff3e9b8cbc6cc79c5d908c29e6.js:65
+    w_ https://startupverse.space/_runtimes/sites-runtime.ed340f7bffa7e99869e4202e80427255dbdc8bff3e9b8cbc6cc79c5d908c29e6.js:127
+eb1c3595a5829c6b8e00df156b7ba82d77c42c1a.js:18:15
+New error in code-component (0:7) On@https://startupverse.space/_components/v2/eb1c3595a5829c6b8e00df156b7ba82d77c42c1a.js:70171:11
+Eo@https://startupverse.space/_components/v2/eb1c3595a5829c6b8e00df156b7ba82d77c42c1a.js:70571:12
+OOe@https://startupverse.space/_components/v2/eb1c3595a5829c6b8e00df156b7ba82d77c42c1a.js:71517:38
+jOe@https://startupverse.space/_components/v2/eb1c3595a5829c6b8e00df156b7ba82d77c42c1a.js:71778:15
+lS@https://startupverse.space/_runtimes/sites-runtime.ed340f7bffa7e99869e4202e80427255dbdc8bff3e9b8cbc6cc79c5d908c29e6.js:6:16997
+Tv@https://startupverse.space/_runtimes/sites-runtime.ed340f7bffa7e99869e4202e80427255dbdc8bff3e9b8cbc6cc79c5d908c29e6.js:8:3139
+_1@https://startupverse.space/_runtimes/sites-runtime.ed340f7bffa7e99869e4202e80427255dbdc8bff3e9b8cbc6cc79c5d908c29e6.js:8:44498
+P1@https://startupverse.space/_runtimes/sites-runtime.ed340f7bffa7e99869e4202e80427255dbdc8bff3e9b8cbc6cc79c5d908c29e6.js:8:39728
+qM@https://startupverse.space/_runtimes/sites-runtime.ed340f7bffa7e99869e4202e80427255dbdc8bff3e9b8cbc6cc79c5d908c29e6.js:8:39656
+tp@https://startupverse.space/_runtimes/sites-runtime.ed340f7bffa7e99869e4202e80427255dbdc8bff3e9b8cbc6cc79c5d908c29e6.js:8:39508
+Nv@https://startupverse.space/_runtimes/sites-runtime.ed340f7bffa7e99869e4202e80427255dbdc8bff3e9b8cbc6cc79c5d908c29e6.js:8:35876
+R1@https://startupverse.space/_runtimes/sites-runtime.ed340f7bffa7e99869e4202e80427255dbdc8bff3e9b8cbc6cc79c5d908c29e6.js:8:34827
+yy@https://startupverse.space/_runtimes/sites-runtime.ed340f7bffa7e99869e4202e80427255dbdc8bff3e9b8cbc6cc79c5d908c29e6.js:1:9207
+dy@https://startupverse.space/_runtimes/sites-runtime.ed340f7bffa7e99869e4202e80427255dbdc8bff3e9b8cbc6cc79c5d908c29e6.js:1:9600
+
+
+React stack:
+jOe@https://startupverse.space/_components/v2/eb1c3595a5829c6b8e00df156b7ba82d77c42c1a.js:71778:15
+Suspense
+div
+BK@https://startupverse.space/_components/v2/eb1c3595a5829c6b8e00df156b7ba82d77c42c1a.js:9669:19
+uK@https://startupverse.space/_components/v2/eb1c3595a5829c6b8e00df156b7ba82d77c42c1a.js:9183:12
+cK@https://startupverse.space/_components/v2/eb1c3595a5829c6b8e00df156b7ba82d77c42c1a.js:9135:12
+XH@https://startupverse.space/_components/v2/eb1c3595a5829c6b8e00df156b7ba82d77c42c1a.js:4839:12
+zK
+xs@https://startupverse.space/_runtimes/sites-runtime.ed340f7bffa7e99869e4202e80427255dbdc8bff3e9b8cbc6cc79c5d908c29e6.js:77:141
+nj@https://startupverse.space/_runtimes/sites-runtime.ed340f7bffa7e99869e4202e80427255dbdc8bff3e9b8cbc6cc79c5d908c29e6.js:78:35945
+mr@https://startupverse.space/_runtimes/sites-runtime.ed340f7bffa7e99869e4202e80427255dbdc8bff3e9b8cbc6cc79c5d908c29e6.js:75:134525
+div
+WL<@https://startupverse.space/_runtimes/sites-runtime.ed340f7bffa7e99869e4202e80427255dbdc8bff3e9b8cbc6cc79c5d908c29e6.js:78:34528
+vT@https://startupverse.space/_runtimes/sites-runtime.ed340f7bffa7e99869e4202e80427255dbdc8bff3e9b8cbc6cc79c5d908c29e6.js:75:162663
+Gf@https://startupverse.space/_runtimes/sites-runtime.ed340f7bffa7e99869e4202e80427255dbdc8bff3e9b8cbc6cc79c5d908c29e6.js:75:163927
+vr@https://startupverse.space/_runtimes/sites-runtime.ed340f7bffa7e99869e4202e80427255dbdc8bff3e9b8cbc6cc79c5d908c29e6.js:75:169774
+Qt@https://startupverse.space/_runtimes/sites-runtime.ed340f7bffa7e99869e4202e80427255dbdc8bff3e9b8cbc6cc79c5d908c29e6.js:75:139548
+UL@https://startupverse.space/_runtimes/sites-runtime.ed340f7bffa7e99869e4202e80427255dbdc8bff3e9b8cbc6cc79c5d908c29e6.js:78:34902
+wN@https://startupverse.space/_runtimes/sites-runtime.ed340f7bffa7e99869e4202e80427255dbdc8bff3e9b8cbc6cc79c5d908c29e6.js:75:139838
+Fr<@https://startupverse.space/_runtimes/sites-runtime.ed340f7bffa7e99869e4202e80427255dbdc8bff3e9b8cbc6cc79c5d908c29e6.js:124:2286
+xs@https://startupverse.space/_runtimes/sites-runtime.ed340f7bffa7e99869e4202e80427255dbdc8bff3e9b8cbc6cc79c5d908c29e6.js:77:141
+_g<@https://startupverse.space/_runtimes/sites-runtime.ed340f7bffa7e99869e4202e80427255dbdc8bff3e9b8cbc6cc79c5d908c29e6.js:124:4953
+oL@https://startupverse.space/_runtimes/sites-runtime.ed340f7bffa7e99869e4202e80427255dbdc8bff3e9b8cbc6cc79c5d908c29e6.js:75:176240
+dn<@https://startupverse.space/_runtimes/sites-runtime.ed340f7bffa7e99869e4202e80427255dbdc8bff3e9b8cbc6cc79c5d908c29e6.js:75:139381
+dn<@https://startupverse.space/_runtimes/sites-runtime.ed340f7bffa7e99869e4202e80427255dbdc8bff3e9b8cbc6cc79c5d908c29e6.js:75:139381
+cL@https://startupverse.space/_runtimes/sites-runtime.ed340f7bffa7e99869e4202e80427255dbdc8bff3e9b8cbc6cc79c5d908c29e6.js:75:180773
+IT<@https://startupverse.space/_runtimes/sites-runtime.ed340f7bffa7e99869e4202e80427255dbdc8bff3e9b8cbc6cc79c5d908c29e6.js:75:183242
+Hu/<@https://startupverse.space/_runtimes/sites-runtime.ed340f7bffa7e99869e4202e80427255dbdc8bff3e9b8cbc6cc79c5d908c29e6.js:75:158904
+wN@https://startupverse.space/_runtimes/sites-runtime.ed340f7bffa7e99869e4202e80427255dbdc8bff3e9b8cbc6cc79c5d908c29e6.js:75:139838
+Fr<@https://startupverse.space/_runtimes/sites-runtime.ed340f7bffa7e99869e4202e80427255dbdc8bff3e9b8cbc6cc79c5d908c29e6.js:124:2286
+xs@https://startupverse.space/_runtimes/sites-runtime.ed340f7bffa7e99869e4202e80427255dbdc8bff3e9b8cbc6cc79c5d908c29e6.js:77:141
+lT@https://startupverse.space/_runtimes/sites-runtime.ed340f7bffa7e99869e4202e80427255dbdc8bff3e9b8cbc6cc79c5d908c29e6.js:75:140538
+gT@https://startupverse.space/_runtimes/sites-runtime.ed340f7bffa7e99869e4202e80427255dbdc8bff3e9b8cbc6cc79c5d908c29e6.js:75:155929
+x_@https://startupverse.space/_runtimes/sites-runtime.ed340f7bffa7e99869e4202e80427255dbdc8bff3e9b8cbc6cc79c5d908c29e6.js:124:1683
+wN@https://startupverse.space/_runtimes/sites-runtime.ed340f7bffa7e99869e4202e80427255dbdc8bff3e9b8cbc6cc79c5d908c29e6.js:75:139838
+Fr<@https://startupverse.space/_runtimes/sites-runtime.ed340f7bffa7e99869e4202e80427255dbdc8bff3e9b8cbc6cc79c5d908c29e6.js:124:2286
+t0@https://startupverse.space/_runtimes/sites-runtime.ed340f7bffa7e99869e4202e80427255dbdc8bff3e9b8cbc6cc79c5d908c29e6.js:75:5362
+eW@https://startupverse.space/_runtimes/sites-runtime.ed340f7bffa7e99869e4202e80427255dbdc8bff3e9b8cbc6cc79c5d908c29e6.js:127:2622
+div
+div
+HL@https://startupverse.space/_runtimes/sites-runtime.ed340f7bffa7e99869e4202e80427255dbdc8bff3e9b8cbc6cc79c5d908c29e6.js:78:33522
+JS@https://startupverse.space/_runtimes/sites-runtime.ed340f7bffa7e99869e4202e80427255dbdc8bff3e9b8cbc6cc79c5d908c29e6.js:65:13698
+xs@https://startupverse.space/_runtimes/sites-runtime.ed340f7bffa7e99869e4202e80427255dbdc8bff3e9b8cbc6cc79c5d908c29e6.js:77:141
+yI@https://startupverse.space/_runtimes/sites-runtime.ed340f7bffa7e99869e4202e80427255dbdc8bff3e9b8cbc6cc79c5d908c29e6.js:65:12453
+w_@https://startupverse.space/_runtimes/sites-runtime.ed340f7bffa7e99869e4202e80427255dbdc8bff3e9b8cbc6cc79c5d908c29e6.js:127:16 eb1c3595a5829c6b8e00df156b7ba82d77c42c1a.js:18:15
+✅ Figma iframe error suppression configured eb1c3595a5829c6b8e00df156b7ba82d77c42c1a.js:9638:14
+✅ Global error handler configured eb1c3595a5829c6b8e00df156b7ba82d77c42c1a.js:9628:15
+ℹ️ Service Worker registration skipped (using IndexedDB-only mode) eb1c3595a5829c6b8e00df156b7ba82d77c42c1a.js:75486:20
+✅ Offline data storage enabled via IndexedDB eb1c3595a5829c6b8e00df156b7ba82d77c42c1a.js:75486:103
+✅ IndexedDB: Database opened successfully eb1c3595a5829c6b8e00df156b7ba82d77c42c1a.js:74150:37
+📬 [Notifications] User ID set, fetching notifications for: user-1772151256036 eb1c3595a5829c6b8e00df156b7ba82d77c42c1a.js:9201:13
+Cookie “__cf_bm” has been rejected for invalid domain. community_published_banner_details
+📬 [Notifications] Received 0 notifications from backend eb1c3595a5829c6b8e00df156b7ba82d77c42c1a.js:9216:17
+📬 [Notifications] Notifications: 
+Array []
+eb1c3595a5829c6b8e00df156b7ba82d77c42c1a.js:9216:100
+✅ [Notifications] Loaded 0 notifications for user user-1772151256036 eb1c3595a5829c6b8e00df156b7ba82d77c42c1a.js:9221:105
+The resource at “https://startupverse.space/_runtimes/sites-runtime.ed340f7bffa7e99869e4202e80427255dbdc8bff3e9b8cbc6cc79c5d908c29e6.js” preloaded with link preload was not used within a few seconds. Make sure all attributes of the preload tag are set correctly. login
+The resource at “https://startupverse.space/_components/v2/eb1c3595a5829c6b8e00df156b7ba82d77c42c1a.js” preloaded with link preload was not used within a few seconds. Make sure all attributes of the preload tag are set correctly. login
+The resource at “https://startupverse.space/_json/18599546-148b-4c1d-bf10-5a1c7b5e7280/_index.json” preloaded with link preload was not used within a few seconds. Make sure all attributes of the preload tag are set correctly. login

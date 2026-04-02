@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin System Test - StartupVerse</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #f8f9fa;
+        }
+        .test-card {
+            background: white;
+            border-radius: 8px;
+            padding: 24px;
+            margin-bottom: 16px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #3A5AFE;
+            margin-bottom: 8px;
+        }
+        h2 {
+            color: #1f1f1f;
+            font-size: 18px;
+            margin-top: 0;
+        }
+        .badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 600;
+            margin-right: 8px;
+        }
+        .badge-success {
+            background: #d4edda;
+            color: #155724;
+        }
+        .badge-danger {
+            background: #f8d7da;
+            color: #721c24;
+        }
+        .badge-info {
+            background: #d1ecf1;
+            color: #0c5460;
+        }
+        .badge-admin {
+            background: #e9d5ff;
+            color: #6b21a8;
+        }
+        button {
+            background: #3A5AFE;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            margin-right: 8px;
+            margin-bottom: 8px;
+        }
+        button:hover {
+            background: #304FFE;
+        }
+        button.secondary {
+            background: #e0e0e0;
+            color: #1f1f1f;
+        }
+        button.secondary:hover {
+            background: #d0d0d0;
+        }
+        pre {
+            background: #2c2d2f;
+            color: #e8eaed;
+            padding: 16px;
+            border-radius: 6px;
+            overflow-x: auto;
+            font-size: 13px;
+        }
+        .result {
+            margin-top: 12px;
+            padding: 12px;
+            border-radius: 6px;
+            border-left: 4px solid #3A5AFE;
+            background: #f8f9fa;
+        }
+        .admin-indicator {
+            position: fixed;
+            bottom: 20px;
+            left: 20px;
+            background: #a855f7;
+            color: white;
+            padding: 12px 20px;
+            border-radius: 30px;
+            font-weight: 600;
+            box-shadow: 0 4px 12px rgba(168, 85, 247, 0.3);
+            animation: pulse 2s infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+        }
+        .info-box {
+            background: #e8f0fe;
+            border: 1px solid #4285f4;
+            padding: 16px;
+            border-radius: 6px;
+            margin: 16px 0;
+        }
+        .info-box h3 {
+            margin-top: 0;
+            color: #1967d2;
+        }
+        .status-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 12px;
+            margin-top: 16px;
+        }
+        .status-item {
+            padding: 12px;
+            background: #f8f9fa;
+            border-radius: 6px;
+            border-left: 3px solid #3A5AFE;
+        }
+        .status-item strong {
+            display: block;
+            margin-bottom: 4px;
+            color: #1f1f1f;
+        }
+        .status-item span {
+            color: #5f6368;
+            font-size: 13px;
+        }
+    </style>
+</head>
+<body>
+    <div class="admin-indicator" id="adminIndicator" style="display: none;">
+        🔧 Admin Mode Active
+    </div>
+
+    <h1>🔧 Admin System Test</h1>
+    <p style="color: #5f6368;">StartupVerse Platform - Development Tools</p>
+
+    <!-- Current Status -->
+    <div class="test-card">
+        <h2>📊 Current Status</h2>
+        <div class="status-grid">
+            <div class="status-item">
+                <strong>User Status</strong>
+                <span id="userStatus">Not logged in</span>
+            </div>
+            <div class="status-item">
+                <strong>Admin Status</strong>
+                <span id="adminStatus">Unknown</span>
+            </div>
+            <div class="status-item">
+                <strong>Email</strong>
+                <span id="userEmail">-</span>
+            </div>
+            <div class="status-item">
+                <strong>Name</strong>
+                <span id="userName">-</span>
+            </div>
+        </div>
+        <div style="margin-top: 16px;">
+            <button onclick="checkStatus()">🔄 Refresh Status</button>
+        </div>
+    </div>
+
+    <!-- Admin Account Test -->
+    <div class="test-card">
+        <h2>✅ Test 1: Login as Admin (Abraham)</h2>
+        <p>This will simulate logging in as Abraham Olawale (admin account)</p>
+        <button onclick="loginAsAdmin()">Login as Abraham (Admin)</button>
+        <div id="adminResult" class="result" style="display: none;"></div>
+    </div>
+
+    <!-- Regular User Test -->
+    <div class="test-card">
+        <h2>❌ Test 2: Login as Regular User</h2>
+        <p>This will simulate logging in as a regular user (no admin access)</p>
+        <button onclick="loginAsRegular()">Login as Regular User</button>
+        <div id="regularResult" class="result" style="display: none;"></div>
+    </div>
+
+    <!-- Manual Admin Toggle -->
+    <div class="test-card">
+        <h2>🔄 Test 3: Toggle Admin Flag</h2>
+        <p>Manually set or remove admin flag on current user</p>
+        <button onclick="setAdminTrue()">Set isAdmin = true</button>
+        <button class="secondary" onclick="setAdminFalse()">Set isAdmin = false</button>
+        <div id="toggleResult" class="result" style="display: none;"></div>
+    </div>
+
+    <!-- Admin Email Check -->
+    <div class="test-card">
+        <h2>📧 Test 4: Check Admin Email List</h2>
+        <p>Verify which emails have admin access</p>
+        <button onclick="showAdminEmails()">Show Admin Emails</button>
+        <div id="emailResult" class="result" style="display: none;"></div>
+    </div>
+
+    <!-- Clear Data -->
+    <div class="test-card">
+        <h2>🗑️ Reset & Cleanup</h2>
+        <p>Clear localStorage and reset to clean state</p>
+        <button class="secondary" onclick="clearData()">Clear All Data</button>
+        <button class="secondary" onclick="logout()">Logout</button>
+    </div>
+
+    <!-- Info Box -->
+    <div class="info-box">
+        <h3>ℹ️ How to Test in Your App</h3>
+        <ol>
+            <li>Open your StartupVerse app</li>
+            <li>Login with <code>seyimba1234@gmail.com</code> as Abraham Olawale</li>
+            <li>You should see:
+                <ul>
+                    <li>Purple "Admin Mode" badge in bottom-left corner</li>
+                    <li>Outcome & Task Debug Panel in FounderDashboard</li>
+                    <li>Notification Debug Panel in any dashboard</li>
+                </ul>
+            </li>
+            <li>Login with any other email → No admin features should appear</li>
+        </ol>
+    </div>
+
+    <script>
+        // Admin email list (must match /utils/adminHelpers.ts)
+        const ADMIN_EMAILS = ['seyimba1234@gmail.com'];
+
+        function checkStatus() {
+            const user = JSON.parse(localStorage.getItem('startupverse_user') || 'null');
+            
+            if (user) {
+                document.getElementById('userStatus').textContent = 'Logged in';
+                document.getElementById('adminStatus').innerHTML = user.isAdmin 
+                    ? '<span class="badge badge-admin">✅ Admin</span>' 
+                    : '<span class="badge badge-danger">❌ Regular User</span>';
+                document.getElementById('userEmail').textContent = user.email || '-';
+                document.getElementById('userName').textContent = user.name || '-';
+                
+                if (user.isAdmin) {
+                    document.getElementById('adminIndicator').style.display = 'block';
+                } else {
+                    document.getElementById('adminIndicator').style.display = 'none';
+                }
+            } else {
+                document.getElementById('userStatus').textContent = 'Not logged in';
+                document.getElementById('adminStatus').textContent = 'N/A';
+                document.getElementById('userEmail').textContent = '-';
+                document.getElementById('userName').textContent = '-';
+                document.getElementById('adminIndicator').style.display = 'none';
+            }
+        }
+
+        function loginAsAdmin() {
+            const adminUser = {
+                id: 'user-' + Date.now(),
+                email: 'seyimba1234@gmail.com',
+                name: 'Abraham Olawale',
+                role: 'founder',
+                isAdmin: true,
+                onboardingComplete: true
+            };
+            
+            localStorage.setItem('startupverse_user', JSON.stringify(adminUser));
+            
+            const result = document.getElementById('adminResult');
+            result.style.display = 'block';
+            result.innerHTML = `
+                <strong>✅ Admin Login Successful!</strong><br>
+                <span class="badge badge-success">isAdmin: true</span>
+                <span class="badge badge-info">Email: ${adminUser.email}</span><br>
+                <div style="margin-top: 12px;">
+                    <strong>Expected in app:</strong>
+                    <ul style="margin: 8px 0;">
+                        <li>Purple "Admin Mode" badge in bottom-left</li>
+                        <li>Outcome & Task Debug Panel visible</li>
+                        <li>Notification Debug Panel visible</li>
+                    </ul>
+                </div>
+            `;
+            
+            checkStatus();
+        }
+
+        function loginAsRegular() {
+            const regularUser = {
+                id: 'user-' + Date.now(),
+                email: 'test@example.com',
+                name: 'Test User',
+                role: 'founder',
+                isAdmin: false,
+                onboardingComplete: true
+            };
+            
+            localStorage.setItem('startupverse_user', JSON.stringify(regularUser));
+            
+            const result = document.getElementById('regularResult');
+            result.style.display = 'block';
+            result.innerHTML = `
+                <strong>✅ Regular User Login Successful!</strong><br>
+                <span class="badge badge-danger">isAdmin: false</span>
+                <span class="badge badge-info">Email: ${regularUser.email}</span><br>
+                <div style="margin-top: 12px;">
+                    <strong>Expected in app:</strong>
+                    <ul style="margin: 8px 0;">
+                        <li>No admin badges or indicators</li>
+                        <li>No debug panels visible</li>
+                        <li>Clean, professional interface</li>
+                    </ul>
+                </div>
+            `;
+            
+            checkStatus();
+        }
+
+        function setAdminTrue() {
+            const user = JSON.parse(localStorage.getItem('startupverse_user'));
+            if (!user) {
+                alert('Please login first');
+                return;
+            }
+            
+            user.isAdmin = true;
+            localStorage.setItem('startupverse_user', JSON.stringify(user));
+            
+            const result = document.getElementById('toggleResult');
+            result.style.display = 'block';
+            result.innerHTML = `
+                <strong>✅ Admin flag enabled!</strong><br>
+                <span class="badge badge-admin">isAdmin: true</span><br>
+                <em>Reload the app to see admin features</em>
+            `;
+            
+            checkStatus();
+        }
+
+        function setAdminFalse() {
+            const user = JSON.parse(localStorage.getItem('startupverse_user'));
+            if (!user) {
+                alert('Please login first');
+                return;
+            }
+            
+            user.isAdmin = false;
+            localStorage.setItem('startupverse_user', JSON.stringify(user));
+            
+            const result = document.getElementById('toggleResult');
+            result.style.display = 'block';
+            result.innerHTML = `
+                <strong>❌ Admin flag disabled!</strong><br>
+                <span class="badge badge-danger">isAdmin: false</span><br>
+                <em>Reload the app - admin features will be hidden</em>
+            `;
+            
+            checkStatus();
+        }
+
+        function showAdminEmails() {
+            const result = document.getElementById('emailResult');
+            result.style.display = 'block';
+            result.innerHTML = `
+                <strong>📧 Admin Email List:</strong><br>
+                <div style="margin-top: 8px; font-family: monospace; background: #2c2d2f; color: #e8eaed; padding: 12px; border-radius: 4px;">
+                    ${ADMIN_EMAILS.map(email => `✅ ${email}`).join('<br>')}
+                </div>
+                <div style="margin-top: 12px; font-size: 13px; color: #5f6368;">
+                    <strong>Note:</strong> These emails are defined in <code>/utils/adminHelpers.ts</code>
+                </div>
+            `;
+        }
+
+        function clearData() {
+            if (confirm('Clear all localStorage data?')) {
+                localStorage.clear();
+                checkStatus();
+                alert('✅ All data cleared!');
+                
+                // Hide all results
+                document.querySelectorAll('.result').forEach(el => el.style.display = 'none');
+            }
+        }
+
+        function logout() {
+            localStorage.removeItem('startupverse_user');
+            checkStatus();
+            alert('✅ Logged out!');
+            
+            // Hide all results
+            document.querySelectorAll('.result').forEach(el => el.style.display = 'none');
+        }
+
+        // Check status on page load
+        checkStatus();
+    </script>
+</body>
+</html>

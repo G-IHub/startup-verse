@@ -1,0 +1,369 @@
+import React, { useState, useEffect } from "react";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "../ui/card";
+import { Badge } from "../ui/badge";
+import { Button } from "../ui/button";
+import { Textarea } from "../ui/textarea";
+import {
+  Sparkles,
+  X,
+  Lightbulb,
+  Target,
+  ChevronRight,
+  Edit3,
+  CheckCircle2,
+  Wand2,
+  TrendingUp,
+} from "lucide-react";
+import {
+  parseFounderIntent,
+  suggestRefinements,
+} from "../../utils/intentParser";
+const EXAMPLE_INTENTS = [
+  "Validate our pricing with 10 potential customers",
+  "Build MVP of our mobile app with core features",
+  "Find and onboard a technical co-founder",
+  "Launch our first marketing campaign on social media",
+  "Close our first 5 paying customers",
+];
+export default function IntentCaptureModal({
+  isOpen,
+  onClose,
+  stageName,
+  weekNumber,
+  onConfirmIntent,
+}) {
+  const [step, setStep] = useState("input");
+  const [userInput, setUserInput] = useState("");
+  const [parsedIntent, setParsedIntent] = useState(null);
+  const [isEditing, setIsEditing] = useState(false);
+  const [customTitle, setCustomTitle] = useState("");
+  const [customDescription, setCustomDescription] = useState("");
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  useEffect(() => {
+    if (!isOpen) {
+      // Reset state when modal closes
+      setStep("input");
+      setUserInput("");
+      setParsedIntent(null);
+      setIsEditing(false);
+      setCustomTitle("");
+      setCustomDescription("");
+    }
+  }, [isOpen]);
+  if (!isOpen) return null;
+  const handleAnalyzeIntent = () => {
+    if (!userInput.trim()) return;
+    setIsAnalyzing(true);
+
+    // Simulate AI processing delay for better UX
+    setTimeout(() => {
+      const parsed = parseFounderIntent(userInput.trim());
+      setParsedIntent(parsed);
+      setCustomTitle(parsed.suggestedTitle);
+      setCustomDescription(parsed.suggestedDescription);
+      setIsAnalyzing(false);
+      setStep("review");
+    }, 800);
+  };
+  const handleConfirm = () => {
+    if (!parsedIntent) return;
+    onConfirmIntent(
+      parsedIntent,
+      isEditing ? customTitle : undefined,
+      isEditing ? customDescription : undefined,
+    );
+    onClose();
+  };
+  const handleUseExample = (example) => {
+    setUserInput(example);
+  };
+  const refinements = parsedIntent ? suggestRefinements(parsedIntent) : [];
+  return (
+    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
+      <Card className="max-w-2xl w-full max-h-[85vh] overflow-y-auto">
+        <CardHeader className="pb-3 pt-3 border-b">
+          <div className="flex items-start justify-between">
+            <div className="flex-1">
+              <CardTitle className="text-base md:text-lg flex items-center gap-2">
+                <Sparkles className="w-4 h-4 md:w-5 md:h-5 text-primary" />
+                What do you want to achieve this week?
+              </CardTitle>
+              <CardDescription className="mt-1 text-xs">
+                {"Week "}
+                {weekNumber}
+                {" • "}
+                {stageName}
+                {" • Describe your goal in your own words"}
+              </CardDescription>
+            </div>
+            <Button variant="ghost" size="sm" onClick={onClose}>
+              <X className="w-5 h-5" />
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          {step === "input" && (
+            <>
+              <div className="p-4 bg-gradient-to-r from-primary/10 to-purple-50 dark:from-primary/20 dark:to-purple-950/20 rounded-lg border border-primary/20">
+                <div className="flex gap-3">
+                  <Lightbulb className="w-5 h-5 text-primary flex-shrink-0 mt-0.5" />
+                  <div className="text-sm">
+                    <p className="font-medium text-primary mb-1">
+                      Tell us your goal in your own words
+                    </p>
+                    <p className="text-muted-foreground">
+                      Describe what you want to accomplish this week. Our system
+                      will translate it into a structured outcome with
+                      milestones and tasks.
+                    </p>
+                  </div>
+                </div>
+              </div>
+              <div>
+                <label className="text-sm font-medium mb-2 block">
+                  What's your main focus this week?
+                </label>
+                <Textarea
+                  value={userInput}
+                  onChange={(e) => setUserInput(e.target.value)}
+                  placeholder="Example: I want to validate our pricing with 10 customer interviews..."
+                  className="min-h-[120px] text-base"
+                  autoFocus={true}
+                />
+                <p className="text-xs text-muted-foreground mt-2">
+                  Be as specific as possible. Include numbers, deliverables, or
+                  outcomes you want to achieve.
+                </p>
+              </div>
+              <div>
+                <p className="text-sm font-medium mb-3">
+                  Need inspiration? Try these:
+                </p>
+                <div className="space-y-2">
+                  {EXAMPLE_INTENTS.map((example, index) => (
+                    <button
+                      key={index}
+                      onClick={() => handleUseExample(example)}
+                      className="w-full text-left p-3 rounded-lg border-2 border-border hover:border-primary/50 hover:bg-primary/5 transition-all group"
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm">{example}</span>
+                        <ChevronRight className="w-4 h-4 text-muted-foreground group-hover:text-primary" />
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div className="flex gap-3 pt-4 border-t">
+                <Button variant="outline" onClick={onClose} className="flex-1">
+                  Cancel
+                </Button>
+                <Button
+                  onClick={handleAnalyzeIntent}
+                  disabled={!userInput.trim() || isAnalyzing}
+                  className="flex-1"
+                >
+                  {isAnalyzing ? (
+                    <>
+                      <Wand2 className="w-4 h-4 mr-2 animate-spin" />
+                      Analyzing...
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="w-4 h-4 mr-2" />
+                      Continue
+                    </>
+                  )}
+                </Button>
+              </div>
+            </>
+          )}
+          {step === "review" && parsedIntent && (
+            <>
+              <div className="flex items-center gap-2">
+                <Badge
+                  variant="outline"
+                  className={
+                    parsedIntent.confidence >= 0.8
+                      ? "border-green-500 text-green-700 dark:text-green-400"
+                      : parsedIntent.confidence >= 0.6
+                        ? "border-yellow-500 text-yellow-700 dark:text-yellow-400"
+                        : "border-orange-500 text-orange-700 dark:text-orange-400"
+                  }
+                >
+                  <TrendingUp className="w-3 h-3 mr-1" />
+                  {Math.round(parsedIntent.confidence * 100)}% confidence match
+                </Badge>
+                <Badge variant="secondary">
+                  {parsedIntent.category.replace("-", " ")}
+                </Badge>
+              </div>
+              <div className="p-4 bg-primary/5 rounded-lg border border-primary/20">
+                <div className="flex items-start gap-3 mb-4">
+                  <Target className="w-6 h-6 text-primary flex-shrink-0 mt-1" />
+                  <div className="flex-1">
+                    {isEditing ? (
+                      <div className="space-y-3">
+                        <div>
+                          <label className="text-xs font-medium text-muted-foreground">
+                            OUTCOME TITLE
+                          </label>
+                          <input
+                            type="text"
+                            value={customTitle}
+                            onChange={(e) => setCustomTitle(e.target.value)}
+                            className="w-full mt-1 px-3 py-2 border rounded-lg text-base font-semibold"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-xs font-medium text-muted-foreground">
+                            DESCRIPTION
+                          </label>
+                          <Textarea
+                            value={customDescription}
+                            onChange={(e) =>
+                              setCustomDescription(e.target.value)
+                            }
+                            className="mt-1"
+                            rows={2}
+                          />
+                        </div>
+                      </div>
+                    ) : (
+                      <>
+                        <h3 className="text-xl font-semibold mb-2">
+                          {parsedIntent.suggestedTitle}
+                        </h3>
+                        <p className="text-muted-foreground">
+                          {parsedIntent.suggestedDescription}
+                        </p>
+                      </>
+                    )}
+                  </div>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setIsEditing(!isEditing)}
+                >
+                  <Edit3 className="w-4 h-4 mr-2" />
+                  {isEditing ? "Done Editing" : "Customize Outcome"}
+                </Button>
+              </div>
+              {parsedIntent.detectedKeywords.length > 0 && (
+                <div>
+                  <p className="text-sm font-medium mb-2">
+                    Detected focus areas:
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    {parsedIntent.detectedKeywords.map((keyword, index) => (
+                      <Badge
+                        key={index}
+                        variant="secondary"
+                        className="text-xs"
+                      >
+                        {keyword}
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+              )}
+              <div>
+                <h4 className="font-semibold mb-3 flex items-center gap-2">
+                  <Sparkles className="w-4 h-4 text-primary" />
+                  Generated Milestones (
+                  {parsedIntent.suggestedMilestones.length})
+                </h4>
+                <div className="space-y-2">
+                  {parsedIntent.suggestedMilestones.map((milestone, index) => (
+                    <div
+                      key={index}
+                      className="p-3 bg-muted/50 rounded-lg border"
+                    >
+                      <div className="flex items-start gap-3">
+                        <div className="w-6 h-6 rounded-full bg-primary/10 text-primary flex items-center justify-center text-sm font-semibold flex-shrink-0">
+                          {index + 1}
+                        </div>
+                        <div className="flex-1">
+                          <p className="font-medium mb-1">{milestone.title}</p>
+                          <div className="text-xs text-muted-foreground">
+                            {milestone.tasks.length}
+                            {" tasks • "}
+                            {milestone.tasks.slice(0, 2).join(" • ")}
+                            {milestone.tasks.length > 2 && "..."}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              {refinements.length > 0 && parsedIntent.confidence < 0.8 && (
+                <div className="p-3 bg-yellow-50 dark:bg-yellow-950/20 rounded-lg border border-yellow-200 dark:border-yellow-900">
+                  <p className="text-sm font-medium text-yellow-900 dark:text-yellow-100 mb-2">
+                    💡 Suggestions to improve:
+                  </p>
+                  <ul className="text-sm text-yellow-800 dark:text-yellow-200 space-y-1">
+                    {refinements.map((suggestion, index) => (
+                      <li key={index} className="flex items-start gap-2">
+                        <span>•</span>
+                        <span>{suggestion}</span>
+                      </li>
+                    ))}
+                  </ul>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="mt-3"
+                    onClick={() => {
+                      setStep("input");
+                      setParsedIntent(null);
+                    }}
+                  >
+                    <Edit3 className="w-4 h-4 mr-2" />
+                    Refine My Input
+                  </Button>
+                </div>
+              )}
+              <div className="p-3 bg-muted/30 rounded-lg">
+                <p className="text-xs font-medium text-muted-foreground mb-1">
+                  YOUR ORIGINAL INPUT:
+                </p>
+                <p className="text-sm italic">"{parsedIntent.originalInput}"</p>
+              </div>
+              <div className="flex gap-3 pt-4 border-t">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setStep("input");
+                    setParsedIntent(null);
+                  }}
+                  className="flex-1"
+                >
+                  Start Over
+                </Button>
+                <Button
+                  onClick={handleConfirm}
+                  disabled={
+                    isEditing &&
+                    (!customTitle.trim() || !customDescription.trim())
+                  }
+                  className="flex-1"
+                >
+                  <CheckCircle2 className="w-4 h-4 mr-2" />
+                  Set This Week's Outcome
+                </Button>
+              </div>
+            </>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
