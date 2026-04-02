@@ -17,9 +17,10 @@ export async function connectDatabase() {
       dbName: mongodbDbName,
     });
     console.log("Database connected successfully.");
-  } catch (error) {
-    console.error("Database connection failed.");
-    console.error(error);
-    throw error;
-  }
+   } catch (error) {
+     console.error("Database connection failed.");
+-    console.error(error);
++    console.error(error instanceof Error ? error.message : "Unknown database error");
+     throw error;
+   }
 }

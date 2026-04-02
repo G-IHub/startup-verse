@@ -4,13 +4,19 @@ import errorHandler from "./middleware/errorHandler.js";
 import notFound from "./middleware/notFound.js";
 
 const app = express();
+const configuredCorsOrigin = (process.env.CORS_ORIGIN || "").trim();
+const allowAnyOrigin =
+  configuredCorsOrigin.length === 0 || configuredCorsOrigin === "*";
 
 app.use(
   cors({
     origin: process.env.CORS_ORIGIN || "*",
-    credentials: true,
+    credentials: Boolean(
+      process.env.CORS_ORIGIN && process.env.CORS_ORIGIN !== "*",
+    ),
   }),
 );
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
