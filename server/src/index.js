@@ -1,22 +1,42 @@
-import dotenv from "dotenv";
+import dns from "node:dns";
 import app from "./app.js";
 import { connectDatabase } from "./config/db.js";
+import { env } from "./config/env.js";
+import { logger } from "./config/logger.js";
 
-dotenv.config({ path: ".env.local", quiet: true });
-dotenv.config({ quiet: true });
-
-const PORT = Number(process.env.PORT) || 8000;
+function configureDnsResolvers() {
+  if (!Array.isArray(env.dnsServers) || env.dnsServers.length === 0) {
+    return;
+  }
+  try {
+    dns.setServers(env.dnsServers);
+    logger.info("Custom DNS resolvers configured.", {
+      dnsServers: env.dnsServers,
+    });
+  } catch (error) {
+    logger.error("Failed to configure DNS resolvers.", {
+      dnsServers: env.dnsServers,
+      error: error instanceof Error ? error.message : "Unknown error",
+    });
+    throw error;
+  }
+}
 
 async function startServer() {
   try {
+    configureDnsResolvers();
     await connectDatabase();
 
-    app.listen(PORT, () => {
-      console.log(`Server running on http://localhost:${PORT}`);
+    app.listen(env.port, () => {
+      logger.info("Server running.", {
+        port: env.port,
+        nodeEnv: env.nodeEnv,
+      });
     });
   } catch (error) {
-    console.error("Failed to start server.");
-    console.error(error);
+    logger.error("Failed to start server.", {
+      error: error instanceof Error ? error.message : "Unknown startup error",
+    });
     process.exit(1);
   }
 }
