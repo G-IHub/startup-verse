@@ -1,11 +1,12 @@
 import { env } from "./env.js";
 
 function write(level, message, meta = {}) {
+  const { timestamp: _t, level: _l, message: _m, ...safeMeta } = meta;
   const payload = {
     timestamp: new Date().toISOString(),
     level,
     message,
-    ...meta,
+    ...safeMeta,
   };
 
   const line = JSON.stringify(payload);

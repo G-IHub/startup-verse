@@ -8,9 +8,18 @@ function configureDnsResolvers() {
   if (!Array.isArray(env.dnsServers) || env.dnsServers.length === 0) {
     return;
   }
-
-  dns.setServers(env.dnsServers);
-  logger.info("Custom DNS resolvers configured.", { dnsServers: env.dnsServers });
+  try {
+    dns.setServers(env.dnsServers);
+    logger.info("Custom DNS resolvers configured.", {
+      dnsServers: env.dnsServers,
+    });
+  } catch (error) {
+    logger.error("Failed to configure DNS resolvers.", {
+      dnsServers: env.dnsServers,
+      error: error instanceof Error ? error.message : "Unknown error",
+    });
+    throw error;
+  }
 }
 
 async function startServer() {
