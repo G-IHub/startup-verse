@@ -21,8 +21,9 @@ function write(level, message, meta = {}) {
     return;
   }
 
-  if (level === "debug" && env.nodeEnv === "production") {
+  if (level === "debug" && env.nodeEnv.toLowerCase() === "production") {
     return;
+  }
   }
 
   console.log(line);
