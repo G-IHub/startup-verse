@@ -40,17 +40,6 @@ function parseCorsOrigins(rawOrigin) {
   return origins;
 }
 
-function parseDnsServers(rawDnsServers = "") {
-  if (!rawDnsServers || rawDnsServers.trim().length === 0) {
-    return [];
-  }
-
-  return rawDnsServers
-    .split(",")
-    .map((item) => item.trim())
-    .filter(Boolean);
-}
-
 const missingEnvVars = getMissingEnvVars();
 
 if (missingEnvVars.length > 0) {
@@ -62,7 +51,6 @@ if (missingEnvVars.length > 0) {
 const nodeEnv = process.env.NODE_ENV.trim();
 const port = parsePort(process.env.PORT.trim());
 const corsOrigins = parseCorsOrigins(process.env.CORS_ORIGIN.trim());
-const dnsServers = parseDnsServers(process.env.DNS_SERVERS);
 
 export const env = Object.freeze({
   nodeEnv,
@@ -72,5 +60,5 @@ export const env = Object.freeze({
   jwtExpiresIn: process.env.JWT_EXPIRES_IN.trim(),
   mongodbConnectionUri: process.env.MONGODB_CONNECTION_URI.trim(),
   mongodbDbName: process.env.MONGODB_DB_NAME?.trim() || "",
-  dnsServers,
 });
+

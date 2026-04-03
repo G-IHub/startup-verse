@@ -1,12 +1,11 @@
 import { env } from "./env.js";
 
 function write(level, message, meta = {}) {
-  const { timestamp: _t, level: _l, message: _m, ...safeMeta } = meta;
   const payload = {
     timestamp: new Date().toISOString(),
     level,
     message,
-    ...safeMeta,
+    ...meta,
   };
 
   const line = JSON.stringify(payload);
@@ -21,9 +20,8 @@ function write(level, message, meta = {}) {
     return;
   }
 
-  if (level === "debug" && env.nodeEnv.toLowerCase() === "production") {
+  if (level === "debug" && env.nodeEnv === "production") {
     return;
-  }
   }
 
   console.log(line);
@@ -43,3 +41,4 @@ export const logger = Object.freeze({
     write("debug", message, meta);
   },
 });
+
