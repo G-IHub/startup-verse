@@ -54,11 +54,17 @@ export default function validateRequest(validator) {
 
       return next();
     } catch (validationError) {
-      return apiError(res, "Validation failed.", 422, [
-        validationError instanceof Error
-          ? validationError.message
-          : "Unknown validation error.",
-      ]);
+      return apiError(
+        res,
+        "Validation failed.",
+        422,
+        [
+          validationError instanceof Error
+            ? validationError.message
+            : "Unknown validation error.",
+        ],
+      );
     }
   };
 }
+

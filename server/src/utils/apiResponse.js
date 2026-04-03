@@ -21,3 +21,4 @@ export function error(res, message, status = 500, errors) {
 
   return res.status(status).json(payload);
 }
+

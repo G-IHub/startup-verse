@@ -24,3 +24,4 @@ export default function errorHandler(err, req, res, next) {
 
   return apiError(res, message, statusCode, errors);
 }
+

@@ -1,30 +1,10 @@
-import dns from "node:dns";
 import app from "./app.js";
 import { connectDatabase } from "./config/db.js";
 import { env } from "./config/env.js";
 import { logger } from "./config/logger.js";
 
-function configureDnsResolvers() {
-  if (!Array.isArray(env.dnsServers) || env.dnsServers.length === 0) {
-    return;
-  }
-  try {
-    dns.setServers(env.dnsServers);
-    logger.info("Custom DNS resolvers configured.", {
-      dnsServers: env.dnsServers,
-    });
-  } catch (error) {
-    logger.error("Failed to configure DNS resolvers.", {
-      dnsServers: env.dnsServers,
-      error: error instanceof Error ? error.message : "Unknown error",
-    });
-    throw error;
-  }
-}
-
 async function startServer() {
   try {
-    configureDnsResolvers();
     await connectDatabase();
 
     app.listen(env.port, () => {
@@ -42,3 +22,4 @@ async function startServer() {
 }
 
 startServer();
+
