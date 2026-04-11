@@ -11,6 +11,7 @@ import {
 } from "../utils/algorithmicStageDetection";
 import { setCurrentStage } from "../utils/journeyProgress";
 import { toast } from "sonner";
+import { getAccessToken } from "../app/session";
 
 // Single-select dropdown component with scroll indicators
 function SingleSelectDropdown({
@@ -493,7 +494,7 @@ export default function ProfileCompletionModal({
         {
           method: "POST",
           headers: {
-            Authorization: `Bearer ${localStorage.getItem("startupverse_token") || ""}`,
+            Authorization: `Bearer ${getAccessToken()}`,
           },
           body: formData,
         },

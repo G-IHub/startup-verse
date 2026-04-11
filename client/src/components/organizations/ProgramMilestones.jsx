@@ -13,6 +13,10 @@ import { Button } from "../ui/button";
 import { Badge } from "../ui/badge";
 import { Calendar, Target, Clock, AlertCircle, Sparkles } from "lucide-react";
 import StructuredMilestoneCreator from "./StructuredMilestoneCreator";
+import { getAccessToken } from "../../app/session";
+
+const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:8000/api/v1";
+
 export default function ProgramMilestones({
   cohortId,
   organizationId,
@@ -28,17 +32,19 @@ export default function ProgramMilestones({
   const loadMilestones = async () => {
     try {
       setLoading(true);
+      const token = getAccessToken();
       const response = await fetch(
-        `${import.meta.env.VITE_API_URL || "http://localhost:8000/api/v1"}/program-milestones/${cohortId}`,
+        `${API_BASE}/cohorts/${cohortId}/program-milestones`,
         {
           headers: {
-            Authorization: `Bearer ${localStorage.getItem("startupverse_token") || ""}`,
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
           },
         },
       );
       if (!response.ok) throw new Error("Failed to fetch milestones");
-      const data = await response.json();
-      setMilestones(data.milestones);
+      const payload = await response.json();
+      const inner = payload?.data ?? payload;
+      setMilestones(inner.milestones || []);
     } catch (error) {
       console.error("Error loading milestones:", error);
     } finally {
@@ -47,16 +53,16 @@ export default function ProgramMilestones({
   };
   const handleCreateStructuredMilestone = async (data) => {
     try {
+      const token = getAccessToken();
       const response = await fetch(
-        `${import.meta.env.VITE_API_URL || "http://localhost:8000/api/v1"}/program-milestones/create`,
+        `${API_BASE}/cohorts/${cohortId}/program-milestones`,
         {
           method: "POST",
           headers: {
-            Authorization: `Bearer ${localStorage.getItem("startupverse_token") || ""}`,
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
-            cohortId,
             organizationId,
             title: data.title,
             description: data.description,
@@ -64,7 +70,6 @@ export default function ProgramMilestones({
             week: data.week,
             category: data.category,
             createdBy: userId,
-            // 🎯 NEW: Include structured milestones
             structuredMilestones: data.milestones,
           }),
         },

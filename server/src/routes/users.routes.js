@@ -1,0 +1,62 @@
+import { Router } from "express";
+import asyncHandler from "../utils/asyncHandler.js";
+import requireAuth from "../middleware/requireAuth.js";
+import requireSelfOrAdmin from "../middleware/requireSelfOrAdmin.js";
+import * as usersController from "../controllers/users.controller.js";
+
+const usersRouter = Router();
+
+usersRouter.get(
+  "/users/:userId",
+  requireAuth,
+  requireSelfOrAdmin("userId"),
+  asyncHandler(usersController.getUserById)
+);
+
+usersRouter.post(
+  "/users/search-by-email",
+  requireAuth,
+  asyncHandler(usersController.searchByEmail)
+);
+
+usersRouter.get(
+  "/users/:userId/notifications",
+  requireAuth,
+  requireSelfOrAdmin("userId"),
+  asyncHandler(usersController.getNotifications)
+);
+
+usersRouter.post(
+  "/users/:userId/notifications/mark-all-read",
+  requireAuth,
+  requireSelfOrAdmin("userId"),
+  asyncHandler(usersController.markAllNotificationsRead)
+);
+
+usersRouter.get(
+  "/users/:userId/notification-preferences",
+  requireAuth,
+  requireSelfOrAdmin("userId"),
+  asyncHandler(usersController.getNotificationPreferences)
+);
+
+usersRouter.put(
+  "/users/:userId/notification-preferences",
+  requireAuth,
+  requireSelfOrAdmin("userId"),
+  asyncHandler(usersController.updateNotificationPreferences)
+);
+
+usersRouter.post(
+  "/users/upload-avatar",
+  requireAuth,
+  asyncHandler(usersController.uploadAvatar)
+);
+
+usersRouter.post(
+  "/upload-avatar",
+  requireAuth,
+  asyncHandler(usersController.uploadAvatar)
+);
+
+export default usersRouter;

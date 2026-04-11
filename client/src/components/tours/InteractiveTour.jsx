@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import Joyride, { STATUS, ACTIONS, EVENTS } from "react-joyride";
+import { Joyride, STATUS, ACTIONS, EVENTS } from "react-joyride";
 import { useTheme } from "../../contexts/ThemeContext";
 export default function InteractiveTour({
   steps,

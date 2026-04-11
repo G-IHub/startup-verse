@@ -202,7 +202,7 @@ An all-in-one workspace that combines:
 **Current State:**
 
 - ✅ Fully functional frontend (React + TypeScript + TailwindCSS)
-- ✅ Backend in final testing (Supabase + PostgreSQL)
+- ✅ Backend in final testing (Node/Express + MongoDB)
 - ✅ 500+ waitlist signups
 - ✅ 50+ beta users giving feedback
 
@@ -210,7 +210,7 @@ An all-in-one workspace that combines:
 
 - React + TypeScript
 - TailwindCSS (Material Design system)
-- Supabase (auth, database, real-time)
+- Node/Express API, MongoDB, Socket.IO where needed
 - Web Audio API (ambient sounds)
 - Motion (smooth animations)
 
@@ -388,7 +388,7 @@ Security is critical, especially for startups working on stealth projects.
 
 **Our approach:**
 - 🔒 **Encryption:** All data encrypted at rest & in transit (AES-256)
-- 🔒 **Hosting:** Supabase (SOC 2 Type II certified)
+- 🔒 **Hosting:** Managed cloud (TLS, access controls)
 - 🔒 **Authentication:** OAuth 2.0, 2FA support
 - 🔒 **Backups:** Daily automated backups
 - 🔒 **Privacy:** We never sell your data. Ever.
@@ -411,7 +411,7 @@ Anything specific you're concerned about?
 Not right now, but we're exploring it!
 
 **Why not yet:**
-1. We use Supabase for real-time features (tricky to self-host)
+1. Real-time uses a managed Socket.IO layer (self-host roadmap TBD)
 2. Our matching algorithm requires centralized data
 3. We're still iterating fast (self-hosted versions would get outdated quickly)
 
@@ -491,7 +491,7 @@ Totally fair concern!
 - ✅ Passionate about the problem (I use this daily)
 
 **Financials:**
-- Monthly costs: ~$200 (Supabase, hosting, domains)
+- Monthly costs: ~$200 (database, hosting, domains)
 - Break-even: 7 Pro customers
 - Current beta revenue: $580 MRR (20 paying beta users)
 

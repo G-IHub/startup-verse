@@ -3,6 +3,72 @@
  * Aggregates all date-tracked activities across the platform
  */
 
+import { getAccessToken } from "../app/session";
+
+const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:8000/api/v1";
+
+function authHeaders() {
+  const token = getAccessToken();
+  return {
+    Authorization: token ? `Bearer ${token}` : "",
+    "Content-Type": "application/json",
+  };
+}
+
+function unwrapData(json) {
+  if (!json || typeof json !== "object") return json;
+  return json.data !== undefined ? json.data : json;
+}
+
+/** Handles `{ data: T[] }`, `{ data: { events: T[] } }`, and compat `{ data: { 0: row, 1: row, _compat } }`. */
+function listFromApi(json, ...namedKeys) {
+  const data = unwrapData(json);
+  if (Array.isArray(data)) return data;
+  for (const key of namedKeys) {
+    if (Array.isArray(data?.[key])) return data[key];
+  }
+  if (data && typeof data === "object") {
+    const numeric = Object.keys(data)
+      .filter((k) => /^\d+$/.test(k))
+      .sort((a, b) => Number(a) - Number(b))
+      .map((k) => data[k])
+      .filter((row) => row && typeof row === "object");
+    if (numeric.length) return numeric;
+  }
+  return [];
+}
+
+function milestonesFromApi(json) {
+  const data = unwrapData(json);
+  if (Array.isArray(data?.milestones)) return data.milestones;
+  return listFromApi(json, "milestones");
+}
+
+function mapApiEventToCalendar(event, source, extraMeta = {}) {
+  const id = event.id || event._id;
+  const startDate = event.startTime || event.startsAt;
+  const endDate = event.endTime || event.endsAt;
+  return {
+    id,
+    title: event.title,
+    description: event.description,
+    startDate,
+    endDate,
+    type: "event",
+    location: event.location,
+    isVirtual: event.isVirtual,
+    meetingUrl: event.meetingUrl,
+    source,
+    metadata: {
+      eventType: event.eventType,
+      organizationName: event.organizationName,
+      attendees: event.attendees,
+      capacity: event.capacity,
+      ...extraMeta,
+    },
+  };
+}
+
 /**
  * Get all calendar events for a founder
  * Aggregates: Cohort events, deliverables, milestones, weekly outcomes
@@ -18,54 +84,31 @@ export async function getFounderCalendarEvents(founderId) {
 
     // 1. Get cohort events
     const eventsResponse = await fetch(
-      `${import.meta.env.VITE_API_URL || "http://localhost:8000/api/v1"}/founder/${founderId}/events`,
-      {
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem("startupverse_token") || ""}`,
-          "Content-Type": "application/json",
-        },
-      },
+      `${API_BASE}/founder/${founderId}/events`,
+      { headers: authHeaders() },
     );
 
     if (eventsResponse.ok) {
-      const { events } = await eventsResponse.json();
-      const calendarEvents = events.map((event) => ({
-        id: event.id,
-        title: event.title,
-        description: event.description,
-        startDate: event.startTime,
-        endDate: event.endTime,
-        type: "event",
-        location: event.location,
-        isVirtual: event.isVirtual,
-        meetingUrl: event.meetingUrl,
-        source: "cohort",
-        metadata: {
-          eventType: event.eventType,
-          organizationName: event.organizationName,
-          attendees: event.attendees,
-          capacity: event.capacity,
-        },
-      }));
+      const payload = await eventsResponse.json();
+      const events = listFromApi(payload, "events");
+      const calendarEvents = events.map((event) =>
+        mapApiEventToCalendar(event, "cohort"),
+      );
       allEvents.push(...calendarEvents);
       console.log(`📅 [Calendar] Found ${calendarEvents.length} cohort events`);
     }
 
     // 2. Get deliverables
     const deliverablesResponse = await fetch(
-      `${import.meta.env.VITE_API_URL || "http://localhost:8000/api/v1"}/deliverables/founder/${founderId}`,
-      {
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem("startupverse_token") || ""}`,
-          "Content-Type": "application/json",
-        },
-      },
+      `${API_BASE}/deliverables/founder/${founderId}`,
+      { headers: authHeaders() },
     );
 
     if (deliverablesResponse.ok) {
-      const { deliverables } = await deliverablesResponse.json();
+      const payload = await deliverablesResponse.json();
+      const deliverables = listFromApi(payload, "deliverables");
       const calendarDeliverables = deliverables.map((deliverable) => ({
-        id: deliverable.id,
+        id: deliverable.id || deliverable._id,
         title: `📝 ${deliverable.title}`,
         description: deliverable.description,
         startDate: deliverable.dueDate,
@@ -84,43 +127,33 @@ export async function getFounderCalendarEvents(founderId) {
       );
     }
 
-    // 3. Get program milestones
-    // Note: Milestones are cohort-specific, need to get from each cohort
-    const founderCohortsKey = `founder:${founderId}:cohorts`;
+    // 3. Program milestones (canonical cohort ids from membership)
     const cohortsResponse = await fetch(
-      `${import.meta.env.VITE_API_URL || "http://localhost:8000/api/v1"}/kv/get?key=${founderCohortsKey}`,
-      {
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem("startupverse_token") || ""}`,
-          "Content-Type": "application/json",
-        },
-      },
+      `${API_BASE}/cohorts/founder/${founderId}`,
+      { headers: authHeaders() },
     );
 
     if (cohortsResponse.ok) {
-      const cohortData = await cohortsResponse.json();
-      const cohortIds = cohortData.value || [];
+      const payload = await cohortsResponse.json();
+      const data = unwrapData(payload);
+      const cohortIds = Array.isArray(data?.cohortIds) ? data.cohortIds : [];
 
       for (const cohortId of cohortIds) {
         const milestonesResponse = await fetch(
-          `${import.meta.env.VITE_API_URL || "http://localhost:8000/api/v1"}/program-milestones/${cohortId}`,
-          {
-            headers: {
-              Authorization: `Bearer ${localStorage.getItem("startupverse_token") || ""}`,
-              "Content-Type": "application/json",
-            },
-          },
+          `${API_BASE}/cohorts/${cohortId}/program-milestones`,
+          { headers: authHeaders() },
         );
 
         if (milestonesResponse.ok) {
-          const { milestones } = await milestonesResponse.json();
+          const mPayload = await milestonesResponse.json();
+          const milestones = milestonesFromApi(mPayload);
           const calendarMilestones = milestones
-            .filter((m) => m.targetDate)
+            .filter((m) => m.targetDate || m.dueDate)
             .map((milestone) => ({
-              id: milestone.id,
+              id: milestone.id || milestone._id,
               title: `🎯 ${milestone.title}`,
               description: milestone.description,
-              startDate: milestone.targetDate,
+              startDate: milestone.targetDate || milestone.dueDate,
               type: "milestone",
               status: milestone.status,
               source: "cohort",
@@ -238,15 +271,9 @@ export async function getOrganizationCalendarEvents(organizationId) {
 
     const allEvents = [];
 
-    // Get all cohorts for this organization
     const cohortsResponse = await fetch(
-      `${import.meta.env.VITE_API_URL || "http://localhost:8000/api/v1"}/cohorts/organization/${organizationId}`,
-      {
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem("startupverse_token") || ""}`,
-          "Content-Type": "application/json",
-        },
-      },
+      `${API_BASE}/cohorts/organization/${organizationId}`,
+      { headers: authHeaders() },
     );
 
     if (!cohortsResponse.ok) {
@@ -257,68 +284,47 @@ export async function getOrganizationCalendarEvents(organizationId) {
       return [];
     }
 
-    const { cohorts } = await cohortsResponse.json();
+    const cohortPayload = await cohortsResponse.json();
+    const cohorts = listFromApi(cohortPayload, "cohorts");
 
-    // Get events, deliverables, and milestones for each cohort
     for (const cohort of cohorts) {
-      // Events
-      const eventsResponse = await fetch(
-        `${import.meta.env.VITE_API_URL || "http://localhost:8000/api/v1"}/events/${cohort.id}`,
-        {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem("startupverse_token") || ""}`,
-            "Content-Type": "application/json",
-          },
-        },
-      );
+      const cohortId = cohort.id || cohort._id;
+      const cohortName = cohort.name;
+
+      const eventsResponse = await fetch(`${API_BASE}/cohorts/${cohortId}/events`, {
+        headers: authHeaders(),
+      });
 
       if (eventsResponse.ok) {
-        const { events } = await eventsResponse.json();
-        const calendarEvents = events.map((event) => ({
-          id: event.id,
-          title: event.title,
-          description: event.description,
-          startDate: event.startTime,
-          endDate: event.endTime,
-          type: "event",
-          location: event.location,
-          isVirtual: event.isVirtual,
-          meetingUrl: event.meetingUrl,
-          source: "organization",
-          metadata: {
-            cohortId: cohort.id,
-            cohortName: cohort.name,
-            eventType: event.eventType,
-            attendees: event.attendees,
-            capacity: event.capacity,
-          },
-        }));
+        const payload = await eventsResponse.json();
+        const events = listFromApi(payload, "events");
+        const calendarEvents = events.map((event) =>
+          mapApiEventToCalendar(event, "organization", {
+            cohortId,
+            cohortName,
+          }),
+        );
         allEvents.push(...calendarEvents);
       }
 
-      // Deliverables
       const deliverablesResponse = await fetch(
-        `${import.meta.env.VITE_API_URL || "http://localhost:8000/api/v1"}/deliverables/${cohort.id}`,
-        {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem("startupverse_token") || ""}`,
-            "Content-Type": "application/json",
-          },
-        },
+        `${API_BASE}/deliverables/${cohortId}`,
+        { headers: authHeaders() },
       );
 
       if (deliverablesResponse.ok) {
-        const { deliverables } = await deliverablesResponse.json();
+        const payload = await deliverablesResponse.json();
+        const deliverables = listFromApi(payload, "deliverables");
         const calendarDeliverables = deliverables.map((deliverable) => ({
-          id: deliverable.id,
+          id: deliverable.id || deliverable._id,
           title: `📝 ${deliverable.title}`,
           description: deliverable.description,
           startDate: deliverable.dueDate,
           type: "deliverable",
           source: "organization",
           metadata: {
-            cohortId: cohort.id,
-            cohortName: cohort.name,
+            cohortId,
+            cohortName,
             submissionType: deliverable.submissionType,
             totalSubmissions: deliverable.submissions?.length || 0,
           },
@@ -326,32 +332,27 @@ export async function getOrganizationCalendarEvents(organizationId) {
         allEvents.push(...calendarDeliverables);
       }
 
-      // Milestones
       const milestonesResponse = await fetch(
-        `${import.meta.env.VITE_API_URL || "http://localhost:8000/api/v1"}/program-milestones/${cohort.id}`,
-        {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem("startupverse_token") || ""}`,
-            "Content-Type": "application/json",
-          },
-        },
+        `${API_BASE}/cohorts/${cohortId}/program-milestones`,
+        { headers: authHeaders() },
       );
 
       if (milestonesResponse.ok) {
-        const { milestones } = await milestonesResponse.json();
+        const payload = await milestonesResponse.json();
+        const milestones = milestonesFromApi(payload);
         const calendarMilestones = milestones
-          .filter((m) => m.targetDate)
+          .filter((m) => m.targetDate || m.dueDate)
           .map((milestone) => ({
-            id: milestone.id,
+            id: milestone.id || milestone._id,
             title: `🎯 ${milestone.title}`,
             description: milestone.description,
-            startDate: milestone.targetDate,
+            startDate: milestone.targetDate || milestone.dueDate,
             type: "milestone",
             status: milestone.status,
             source: "organization",
             metadata: {
-              cohortId: cohort.id,
-              cohortName: cohort.name,
+              cohortId,
+              cohortName,
               category: milestone.category,
             },
           }));
@@ -359,7 +360,6 @@ export async function getOrganizationCalendarEvents(organizationId) {
       }
     }
 
-    // Sort by date
     allEvents.sort(
       (a, b) =>
         new Date(a.startDate).getTime() - new Date(b.startDate).getTime(),

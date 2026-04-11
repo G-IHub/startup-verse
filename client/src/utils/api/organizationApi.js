@@ -1,9 +1,9 @@
 /**
- * Organization API - Supabase Backend Client
+ * Organization API client
  * All organization-related API calls
  */
+import { getAccessToken } from "../../app/session";
 
-// Use the actual Supabase project URL
 const API_BASE_URL =
   import.meta.env.VITE_API_URL || "http://localhost:8000/api/v1";
 
@@ -15,7 +15,7 @@ async function apiCall(endpoint, options = {}, silent404 = false) {
       ...options,
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${localStorage.getItem("startupverse_token") || ""}`,
+        Authorization: `Bearer ${getAccessToken()}`,
         ...options.headers,
       },
     });
@@ -46,7 +46,7 @@ async function apiCall(endpoint, options = {}, silent404 = false) {
     // Re-throw with more context
     if (error.message.includes("404")) {
       throw new Error(
-        "BACKEND_NOT_DEPLOYED: Backend functions not found (404). Please deploy Supabase functions.",
+        "BACKEND_NOT_DEPLOYED: Backend endpoints not found (404). Please verify backend deployment.",
       );
     }
     throw error;

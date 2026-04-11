@@ -7,20 +7,20 @@
  * Run this in the browser console while on the app to test quickly.
  */
 
-// Test configuration
+// Test configuration — point at your Express API (`VITE_API_URL`) and a valid JWT.
 const TEST_CONFIG = {
-  // Update these from /utils/supabase/info.tsx
-  projectId: "YOUR_PROJECT_ID",
-  publicAnonKey: "YOUR_PUBLIC_ANON_KEY",
+  apiBase:
+    (typeof import.meta !== "undefined" && import.meta.env?.VITE_API_URL) ||
+    "http://localhost:5000/api/v1",
+  accessToken: "PASTE_JWT_FROM_SESSION",
 
-  // Test user IDs (get from your database)
   founderId: "test-founder-id",
   startupId: "test-startup-id",
   teamMemberId: "test-team-member-id",
   talentId: "test-talent-id",
 };
 
-const BASE_URL = `https://${TEST_CONFIG.projectId}.supabase.co/functions/v1/make-server-78157e08`;
+const BASE_URL = String(TEST_CONFIG.apiBase).replace(/\/$/, "");
 
 // Test result tracking
 const results = {
@@ -36,7 +36,7 @@ async function testEndpoint(name, endpoint, expectedFields = []) {
 
     const response = await fetch(`${BASE_URL}${endpoint}`, {
       headers: {
-        Authorization: `Bearer ${TEST_CONFIG.publicAnonKey}`,
+        Authorization: `Bearer ${TEST_CONFIG.accessToken}`,
         "Content-Type": "application/json",
       },
     });

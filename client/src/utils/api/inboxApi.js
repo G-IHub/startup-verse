@@ -1,4 +1,4 @@
-const BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:8000/api/v1";
+import { request } from "../backendClient";
 
 // Pagination types
 
@@ -22,9 +22,10 @@ function buildQueryString(params) {
   return queryString ? `?${queryString}` : "";
 }
 
-// ==========================================
-// INTERESTS (Talent -> Founder)
-// ==========================================
+async function apiRequest(endpoint, options = {}) {
+  const payload = await request(endpoint, options);
+  return payload.data;
+}
 
 // ==========================================
 // ORGANIZATION INVITATIONS
@@ -41,25 +42,7 @@ export async function getOrganizationInvitations(founderId) {
     `${BASE_URL}/invitations/founder/${founderId}`,
   );
 
-  const response = await fetch(`${BASE_URL}/invitations/founder/${founderId}`, {
-    headers: {
-      Authorization: `Bearer ${localStorage.getItem("startupverse_token") || ""}`,
-      "Content-Type": "application/json",
-    },
-  });
-
-  console.log("📡 [InboxAPI] Response status:", response.status);
-
-  if (!response.ok) {
-    const errorText = await response.text();
-    console.error(
-      "❌ [InboxAPI] Failed to fetch organization invitations:",
-      errorText,
-    );
-    throw new Error(`Failed to fetch organization invitations: ${errorText}`);
-  }
-
-  const result = await response.json();
+  const result = await apiRequest(`/invitations/founder/${founderId}`);
   console.log("✅ [InboxAPI] Organization invitations received:", result);
 
   const invitations = result.invitations || [];
@@ -78,67 +61,31 @@ export async function respondToOrganizationInvitation(
   founderId,
   accept,
 ) {
-  const response = await fetch(
-    `${BASE_URL}/invitations/${invitationId}/respond`,
-    {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${localStorage.getItem("startupverse_token") || ""}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        status: accept ? "accepted" : "rejected",
-        founderId,
-      }),
-    },
-  );
-
-  if (!response.ok) {
-    throw new Error("Failed to respond to invitation");
-  }
-
-  return response.json();
+  return apiRequest(`/invitations/${invitationId}/respond`, {
+    method: "POST",
+    body: JSON.stringify({
+      status: accept ? "accepted" : "declined",
+      founderId,
+    }),
+  });
 }
 
 // Send interest (Talent expressing interest in a startup)
 export async function sendInterest(interest) {
-  const response = await fetch(`${BASE_URL}/interests/send`, {
+  return apiRequest("/interests/send", {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${localStorage.getItem("startupverse_token") || ""}`,
-    },
     body: JSON.stringify({ interest }),
   });
-
-  if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.error || "Failed to send interest");
-  }
-
-  return response.json();
 }
 
 // Get interests received by a founder
 export async function getReceivedInterests(founderId, params = {}) {
   try {
     const queryString = buildQueryString(params);
-    const response = await fetch(
-      `${BASE_URL}/interests/received/${founderId}${queryString}`,
-      {
-        method: "GET",
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem("startupverse_token") || ""}`,
-        },
-      },
+    const data = await apiRequest(
+      `/interests/received/${founderId}${queryString}`,
+      { method: "GET" },
     );
-
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.error || "Failed to fetch received interests");
-    }
-
-    const data = await response.json();
     return data.interests || data.items || [];
   } catch (error) {
     // Debug log only - backend is optional in demo mode
@@ -156,81 +103,35 @@ export async function getReceivedInterests(founderId, params = {}) {
 // Get interests sent by a talent
 export async function getSentInterests(talentId, params = {}) {
   const queryString = buildQueryString(params);
-  const response = await fetch(
-    `${BASE_URL}/interests/sent/${talentId}${queryString}`,
-    {
-      method: "GET",
-      headers: {
-        Authorization: `Bearer ${localStorage.getItem("startupverse_token") || ""}`,
-      },
-    },
-  );
-
-  if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.error || "Failed to fetch sent interests");
-  }
-
-  const data = await response.json();
+  const data = await apiRequest(`/interests/sent/${talentId}${queryString}`, {
+    method: "GET",
+  });
   return data.interests || data.items || [];
 }
 
 // Update interest status (accept/reject)
 export async function updateInterestStatus(interestId, status, response) {
-  const res = await fetch(`${BASE_URL}/interests/${interestId}/status`, {
+  const data = await apiRequest(`/interests/${interestId}/status`, {
     method: "PUT",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${localStorage.getItem("startupverse_token") || ""}`,
-    },
     body: JSON.stringify({ status, response }),
   });
-
-  if (!res.ok) {
-    const error = await res.json();
-    throw new Error(error.error || "Failed to update interest status");
-  }
-
-  const data = await res.json();
   return data.interest;
 }
 
 // Add message to interest conversation
 export async function addInterestMessage(interestId, message) {
-  const response = await fetch(`${BASE_URL}/interests/${interestId}/messages`, {
+  const data = await apiRequest(`/interests/${interestId}/messages`, {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${localStorage.getItem("startupverse_token") || ""}`,
-    },
     body: JSON.stringify({ message }),
   });
-
-  if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.error || "Failed to add message");
-  }
-
-  const data = await response.json();
   return data.interest;
 }
 
 // Mark interest as onboarded (after compensation setup)
 export async function markInterestAsOnboarded(interestId) {
-  const response = await fetch(`${BASE_URL}/interests/${interestId}/onboard`, {
+  return apiRequest(`/interests/${interestId}/onboard`, {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${localStorage.getItem("startupverse_token") || ""}`,
-    },
   });
-
-  if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.error || "Failed to mark interest as onboarded");
-  }
-
-  return response.json();
 }
 
 // ==========================================
@@ -239,106 +140,47 @@ export async function markInterestAsOnboarded(interestId) {
 
 // Send invitation (Founder inviting talent)
 export async function sendInvitation(invitation) {
-  const response = await fetch(`${BASE_URL}/invitations/send`, {
+  return apiRequest("/invitations/send", {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${localStorage.getItem("startupverse_token") || ""}`,
-    },
     body: JSON.stringify({ invitation }),
   });
-
-  if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.error || "Failed to send invitation");
-  }
-
-  return response.json();
 }
 
 // Get invitations sent by a founder
 export async function getSentInvitations(founderId, params = {}) {
   const queryString = buildQueryString(params);
-  const response = await fetch(
-    `${BASE_URL}/invitations/sent/${founderId}${queryString}`,
-    {
-      method: "GET",
-      headers: {
-        Authorization: `Bearer ${localStorage.getItem("startupverse_token") || ""}`,
-      },
-    },
-  );
-
-  if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.error || "Failed to fetch sent invitations");
-  }
-
-  const data = await response.json();
+  const data = await apiRequest(`/invitations/sent/${founderId}${queryString}`, {
+    method: "GET",
+  });
   return data.invitations || data.items || [];
 }
 
 // Get invitations received by a talent
 export async function getReceivedInvitations(talentId, params = {}) {
   const queryString = buildQueryString(params);
-  const response = await fetch(
-    `${BASE_URL}/invitations/received/${talentId}${queryString}`,
+  const data = await apiRequest(
+    `/invitations/received/${talentId}${queryString}`,
     {
       method: "GET",
-      headers: {
-        Authorization: `Bearer ${localStorage.getItem("startupverse_token") || ""}`,
-      },
     },
   );
-
-  if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.error || "Failed to fetch received invitations");
-  }
-
-  const data = await response.json();
   return data.invitations || data.items || [];
 }
 
 // Update invitation status (accept/reject)
 export async function updateInvitationStatus(invitationId, status, response) {
-  const res = await fetch(`${BASE_URL}/invitations/${invitationId}/status`, {
+  const data = await apiRequest(`/invitations/${invitationId}/status`, {
     method: "PUT",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${localStorage.getItem("startupverse_token") || ""}`,
-    },
     body: JSON.stringify({ status, response }),
   });
-
-  if (!res.ok) {
-    const error = await res.json();
-    throw new Error(error.error || "Failed to update invitation status");
-  }
-
-  const data = await res.json();
   return data.invitation;
 }
 
 // Add message to invitation conversation
 export async function addInvitationMessage(invitationId, message) {
-  const response = await fetch(
-    `${BASE_URL}/invitations/${invitationId}/messages`,
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${localStorage.getItem("startupverse_token") || ""}`,
-      },
-      body: JSON.stringify({ message }),
-    },
-  );
-
-  if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.error || "Failed to add message");
-  }
-
-  const data = await response.json();
+  const data = await apiRequest(`/invitations/${invitationId}/messages`, {
+    method: "POST",
+    body: JSON.stringify({ message }),
+  });
   return data.invitation;
 }

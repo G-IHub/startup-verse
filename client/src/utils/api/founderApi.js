@@ -3,29 +3,19 @@
  * Handles all backend API calls for Founder users
  */
 
-const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:8000/api/v1";
+import { request } from "../backendClient";
 
 // Pagination types
 
 // Helper function for API calls
 async function apiCall(endpoint, options = {}) {
-  const response = await fetch(`${API_BASE}${endpoint}`, {
-    ...options,
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${localStorage.getItem("startupverse_token") || ""}`,
-      ...options.headers,
-    },
-  });
-
-  const data = await response.json();
-
-  if (!response.ok) {
-    console.error(`API Error (${endpoint}):`, data);
-    throw new Error(data.error || "API request failed");
+  try {
+    const payload = await request(endpoint, options);
+    return payload.data;
+  } catch (error) {
+    console.error(`API Error (${endpoint}):`, error);
+    throw error;
   }
-
-  return data;
 }
 
 // Helper to build query string from params
@@ -108,7 +98,7 @@ export async function getInvitationByToken(token) {
 }
 
 export async function updateInvitationStatus(invitationId, status) {
-  return apiCall(`/invitations/${invitationId}`, {
+  return apiCall(`/invitations/${invitationId}/status`, {
     method: "PUT",
     body: JSON.stringify({ status }),
   });

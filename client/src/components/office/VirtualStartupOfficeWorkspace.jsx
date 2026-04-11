@@ -40,6 +40,7 @@ import * as teamMemberApi from "../../utils/api/teamMemberApi";
 import * as activityApi from "../../utils/activityApi";
 import * as meetingApi from "../../utils/api/meetingApi";
 import * as agendaApi from "../../utils/api/agendaApi";
+import { sendInvitation } from "../../utils/api/inboxApi";
 import { getTasks, refreshTasksFromBackend } from "../../utils/executionEngine";
 import { getUnreadCount } from "../../utils/messaging";
 import { TaskManagementPanel } from "./TaskManagementPanel";
@@ -51,13 +52,16 @@ import { useAudioManager } from "../../hooks/useAudioManager";
 import { useOfficeSettings } from "../../hooks/useOfficeSettings";
 import { LiveActivityFeed } from "../presence/LiveActivityFeed";
 import { getStartupId } from "../../utils/startupId";
+import { getAccessToken } from "../../app/session";
+import { unwrapData } from "../../utils/apiEnvelope";
 import { TeamEnergyPulse } from "../presence/TeamEnergyPulse";
 import { useNotifications } from "../../contexts/NotificationContext";
 import * as presenceApi from "../../utils/presenceApi";
 import {
   subscribeToActivities,
   broadcastActivity,
-} from "../../utils/supabaseRealtime";
+  isRealtimeConnected,
+} from "../../utils/realtimeSubscriptions";
 // 🔥 NEW: Real-time hooks for seamless updates without polling
 
 import {
@@ -90,6 +94,25 @@ import {
   Trash2,
   AtSign,
 } from "lucide-react";
+
+function mergeActivityFeed(prev, incoming) {
+  const ids = new Set(prev.map((a) => a?.id).filter(Boolean));
+  const next = [...prev];
+  for (const raw of incoming) {
+    const id = raw?.id;
+    if (!id || ids.has(id)) continue;
+    ids.add(id);
+    next.unshift({
+      ...raw,
+      timestamp:
+        raw.timestamp instanceof Date
+          ? raw.timestamp
+          : new Date(raw.timestamp || Date.now()),
+      icon: typeof raw.icon === "string" ? raw.icon : "📋",
+    });
+  }
+  return next.slice(0, 50);
+}
 
 // ActivityEvent type imported from LiveActivityFeed
 
@@ -479,21 +502,23 @@ export default function VirtualStartupOffice({
   }, [user?.id, user?.role]);
   const loadOrganizationAnnouncements = async () => {
     try {
+      const token = getAccessToken();
       const response = await fetch(
         `${import.meta.env.VITE_API_URL || "http://localhost:8000/api/v1"}/founder/${user.id}/announcements`,
         {
           headers: {
-            Authorization: `Bearer ${localStorage.getItem("startupverse_token") || ""}`,
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
           },
         },
       );
       if (response.ok) {
-        const data = await response.json();
+        const raw = unwrapData(await response.json());
+        const list = Array.isArray(raw) ? raw : raw.announcements || [];
         console.log(
           "✅ [Virtual Office] Loaded organization announcements:",
-          data.announcements?.length || 0,
+          list.length,
         );
-        setOrgAnnouncements(data.announcements || []);
+        setOrgAnnouncements(list);
       }
     } catch (error) {
       console.error("❌ Error loading organization announcements:", error);
@@ -1140,7 +1165,7 @@ export default function VirtualStartupOffice({
     },
   ];
 
-  // Activity feed will be populated from real Supabase data
+  // Activity feed is driven by API + Socket.IO where configured
   // No mock data generation
 
   // Persist activity feed to localStorage (startup-specific)
@@ -1275,6 +1300,27 @@ export default function VirtualStartupOffice({
       unsubscribe();
     };
   }, [user.id, user.role, user.startupId, user.founderId, audio]);
+
+  // Polling fallback when the socket is offline (Phase 4 graceful degradation)
+  useEffect(() => {
+    const currentStartupId =
+      user.role === "founder"
+        ? user.id
+        : user.startupId || user.founderId || "";
+    if (!currentStartupId) return;
+
+    const tick = async () => {
+      if (isRealtimeConnected()) return;
+      const res = await activityApi.getStartupActivities(currentStartupId);
+      if (!res.success || !res.activities?.length) return;
+      setActivityFeed((prev) => mergeActivityFeed(prev, res.activities));
+    };
+
+    const intervalId = setInterval(tick, 35000);
+    void tick();
+    return () => clearInterval(intervalId);
+  }, [user.id, user.role, user.startupId, user.founderId]);
+
   const addActivity = async (type, message, icon) => {
     const currentStartupId =
       user.role === "founder"
@@ -1309,7 +1355,7 @@ export default function VirtualStartupOffice({
         icon,
       });
       if (result.success) {
-        // Broadcast to all clients via Supabase Realtime
+        // Broadcast to connected clients (Socket.IO when available)
         const broadcasted = await broadcastActivity(currentStartupId, {
           id: newEvent.id,
           userId: user.id,
@@ -1497,32 +1543,7 @@ export default function VirtualStartupOffice({
         expectedInvitationLink,
       );
 
-      // Save invitation to backend
-      const projectId = "zuvrtclwxqycfskgtpbs";
-      const publicAnonKey =
-        "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inp1dnJ0Y2x3eHF5Y2Zza2d0cGJzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjgzNzA4NTcsImV4cCI6MjA4Mzk0Njg1N30.4QY7N-tAXL9LNzK5_c9WGF1UPbezNaWABkV7n29bM1M";
-      const API_URL = `https://${projectId}.supabase.co/functions/v1/make-server-78157e08`;
-      console.log(
-        "📡 [VirtualOffice] Calling API:",
-        `${API_URL}/founders/invitations`,
-      );
-      const response = await fetch(`${API_URL}/founders/invitations`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${localStorage.getItem("startupverse_token") || ""}`,
-        },
-        body: JSON.stringify({
-          invitation: invitationData,
-          sendEmail: true, // This triggers email sending
-        }),
-      });
-      console.log("📡 [VirtualOffice] Response status:", response.status);
-      const data = await response.json();
-      console.log("📡 [VirtualOffice] Response data:", data);
-      if (!response.ok || !data.success) {
-        throw new Error(data.error || "Failed to send invitation");
-      }
+      const data = await sendInvitation(invitationData);
       console.log("✅ [VirtualOffice] Invitation sent successfully:", data);
       toast.success(`📧 Invitation sent to ${inviteForm.email}!`);
       audio.playClickSound();

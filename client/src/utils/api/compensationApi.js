@@ -1,3 +1,5 @@
+import { getAccessToken } from "../../app/session";
+
 const BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:8000/api/v1";
 
 // Create compensation contract
@@ -12,7 +14,7 @@ export async function createCompensationContract(
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${localStorage.getItem("startupverse_token") || ""}`,
+        Authorization: `Bearer ${getAccessToken()}`,
       },
       body: JSON.stringify({
         founderId,
@@ -54,7 +56,7 @@ export async function getCompensationContract(teamMemberId) {
         method: "GET",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${localStorage.getItem("startupverse_token") || ""}`,
+          Authorization: `Bearer ${getAccessToken()}`,
         },
       },
     );
@@ -111,7 +113,7 @@ export async function getCompensationStatus(teamMemberId) {
         method: "GET",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${localStorage.getItem("startupverse_token") || ""}`,
+          Authorization: `Bearer ${getAccessToken()}`,
         },
       },
     );
@@ -165,7 +167,7 @@ export async function getStartupCompensationContracts(startupId) {
         method: "GET",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${localStorage.getItem("startupverse_token") || ""}`,
+          Authorization: `Bearer ${getAccessToken()}`,
         },
       },
     );
@@ -224,7 +226,7 @@ export async function convertTalentToTeamMember(
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${localStorage.getItem("startupverse_token") || ""}`,
+        Authorization: `Bearer ${getAccessToken()}`,
       },
       body: JSON.stringify({
         talentId,
@@ -256,7 +258,7 @@ export async function getPendingTeamMembers(startupId) {
         method: "GET",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${localStorage.getItem("startupverse_token") || ""}`,
+          Authorization: `Bearer ${getAccessToken()}`,
         },
       },
     );

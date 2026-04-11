@@ -14,6 +14,10 @@ import { Input } from "../components/ui/input";
 import { UserPlus, Mail, ArrowRight, CheckCircle } from "lucide-react";
 import { toast } from "sonner";
 import MentorPortal from "../components/mentor/MentorPortal";
+import { unwrapData } from "../utils/apiEnvelope";
+
+const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:8000/api/v1";
+
 export default function MentorLogin() {
   const [verifying, setVerifying] = useState(false);
   const [mentor, setMentor] = useState(null);
@@ -49,23 +53,19 @@ export default function MentorLogin() {
     try {
       setVerifying(true);
       const response = await fetch(
-        `${import.meta.env.VITE_API_URL || "http://localhost:8000/api/v1"}/mentors/verify/${token}`,
-        {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem("startupverse_token") || ""}`,
-          },
-        },
+        `${API_BASE}/mentors/public/verify/${encodeURIComponent(token)}`,
       );
       if (!response.ok) {
         const error = await response.json();
-        throw new Error(error.error || "Invalid or expired token");
+        throw new Error(error.message || error.error || "Invalid or expired token");
       }
-      const data = await response.json();
-      setMentor(data.mentor);
+      const inner = unwrapData(await response.json());
+      const mentor = inner.mentor;
+      setMentor(mentor);
 
       // Store mentor session
-      localStorage.setItem("mentor_session", JSON.stringify(data.mentor));
-      toast.success(`Welcome back, ${data.mentor.name}!`);
+      localStorage.setItem("mentor_session", JSON.stringify(mentor));
+      toast.success(`Welcome back, ${mentor.name}!`);
     } catch (error) {
       console.error("Error verifying token:", error);
       toast.error(error.message || "Failed to verify login link");
@@ -81,19 +81,15 @@ export default function MentorLogin() {
     }
     try {
       setRequesting(true);
-      const response = await fetch(
-        `${import.meta.env.VITE_API_URL || "http://localhost:8000/api/v1"}/mentors/request-link`,
-        {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem("startupverse_token") || ""}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            email,
-          }),
+      const response = await fetch(`${API_BASE}/mentors/public/request-link`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
         },
-      );
+        body: JSON.stringify({
+          email,
+        }),
+      });
       if (!response.ok) {
         const error = await response.json();
         throw new Error(error.error || "Failed to send link");

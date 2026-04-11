@@ -14,7 +14,7 @@ import { Send, Search } from "lucide-react";
 import {
   createInvitation,
   searchUserByEmail,
-} from "../../utils/organizationHelpersSupabase";
+} from "../../utils/organizationHelpersBackend";
 export default function InviteStartupModal({
   isOpen,
   onClose,
@@ -34,7 +34,7 @@ export default function InviteStartupModal({
     setIsSearching(true);
     setSelectedFounder(null);
     try {
-      // Search Supabase for founders
+      // Search backend for founders by email
       const user = await searchUserByEmail(searchEmail);
       if (user && user.role === "founder") {
         setSelectedFounder(user);
@@ -44,7 +44,7 @@ export default function InviteStartupModal({
         return;
       }
 
-      // Not found in Supabase
+      // Not found in directory / API
       alert(
         `No founder found with email "${searchEmail}".\n\nThe founder must have a StartupVerse account first.\n\n✅ Ask them to sign up at StartupVerse\n✅ They should select "Founder" as their role\n✅ After they complete signup, you can search for them here`,
       );

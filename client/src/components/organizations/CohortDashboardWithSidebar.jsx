@@ -25,7 +25,7 @@ import {
   getCohortMembers,
   generateCohortExport,
   downloadCSV,
-} from "../../utils/organizationHelpersSupabase";
+} from "../../utils/organizationHelpersBackend";
 import { checkAdminStatus } from "../../utils/api/organizationApi";
 export default function CohortDashboardWithSidebar({
   cohortId,

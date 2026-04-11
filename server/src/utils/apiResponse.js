@@ -1,8 +1,10 @@
-export function success(res, data, status = 200) {
-  return res.status(status).json({
+export function success(res, data, status = 200, message = null) {
+  const payload = {
     success: true,
     data,
-  });
+  };
+  if (message) payload.message = message;
+  return res.status(status).json(payload);
 }
 
 export function error(res, message, status = 500, errors) {

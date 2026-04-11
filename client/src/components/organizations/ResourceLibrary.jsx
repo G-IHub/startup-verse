@@ -25,6 +25,11 @@ import {
   Newspaper,
   FolderOpen,
 } from "lucide-react";
+import { getAccessToken } from "../../app/session";
+import { unwrapData } from "../../utils/apiEnvelope";
+
+const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:8000/api/v1";
+
 export default function ResourceLibrary({
   cohortId,
   organizationId,
@@ -51,17 +56,15 @@ export default function ResourceLibrary({
   const loadResources = async () => {
     try {
       setLoading(true);
-      const response = await fetch(
-        `${import.meta.env.VITE_API_URL || "http://localhost:8000/api/v1"}/resources/${cohortId}`,
-        {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem("startupverse_token") || ""}`,
-          },
+      const token = getAccessToken();
+      const response = await fetch(`${API_BASE}/cohorts/${cohortId}/resources`, {
+        headers: {
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
-      );
+      });
       if (!response.ok) throw new Error("Failed to fetch resources");
-      const data = await response.json();
-      setResources(data.resources);
+      const inner = unwrapData(await response.json());
+      setResources(inner.resources || []);
     } catch (error) {
       console.error("Error loading resources:", error);
     } finally {
@@ -75,29 +78,21 @@ export default function ResourceLibrary({
         .split(",")
         .filter((t) => t.trim())
         .map((t) => t.trim());
-      const response = await fetch(
-        `${import.meta.env.VITE_API_URL || "http://localhost:8000/api/v1"}/resources/create`,
-        {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem("startupverse_token") || ""}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            cohortId,
-            organizationId,
-            title: formData.title,
-            description: formData.description,
-            category: formData.category,
-            type: formData.type,
-            url: formData.url,
-            fileUrl: formData.url,
-            // For now, using same URL
-            tags,
-            createdBy: userId,
-          }),
+      const token = getAccessToken();
+      const response = await fetch(`${API_BASE}/cohorts/${cohortId}/resources`, {
+        method: "POST",
+        headers: {
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          "Content-Type": "application/json",
         },
-      );
+        body: JSON.stringify({
+          organizationId,
+          title: formData.title,
+          description: formData.description,
+          url: formData.url,
+          founderId: userId,
+        }),
+      });
       if (!response.ok) throw new Error("Failed to create resource");
 
       // Reset form and reload

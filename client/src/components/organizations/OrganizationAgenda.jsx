@@ -23,6 +23,11 @@ import {
   Loader2,
   CalendarDays,
 } from "lucide-react";
+import { getAccessToken } from "../../app/session";
+import { unwrapData } from "../../utils/apiEnvelope";
+
+const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:8000/api/v1";
+
 export default function OrganizationAgenda({
   organizationId,
   userId,
@@ -39,21 +44,20 @@ export default function OrganizationAgenda({
       setLoading(true);
 
       // Load events from all cohorts
+      const token = getAccessToken();
       const eventPromises = cohorts.map(async (cohort) => {
         try {
-          const response = await fetch(
-            `${import.meta.env.VITE_API_URL || "http://localhost:8000/api/v1"}/events/${cohort.id}`,
-            {
-              headers: {
-                Authorization: `Bearer ${localStorage.getItem("startupverse_token") || ""}`,
-              },
+          const cohortId = cohort.id || cohort._id;
+          const response = await fetch(`${API_BASE}/cohorts/${cohortId}/events`, {
+            headers: {
+              ...(token ? { Authorization: `Bearer ${token}` } : {}),
             },
-          );
+          });
           if (!response.ok) return [];
-          const data = await response.json();
+          const inner = unwrapData(await response.json());
 
           // Add cohort name to each event
-          return (data.events || []).map((event) => ({
+          return (inner.events || []).map((event) => ({
             ...event,
             cohortName: cohort.name,
           }));

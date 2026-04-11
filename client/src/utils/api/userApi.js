@@ -1,3 +1,4 @@
+import { getAccessToken } from "../../app/session";
 const API_BASE_URL =
   import.meta.env.VITE_API_URL || "http://localhost:8000/api/v1";
 
@@ -8,7 +9,7 @@ export async function getUserById(userId) {
       method: "GET",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${localStorage.getItem("startupverse_token") || ""}`,
+      Authorization: `Bearer ${getAccessToken()}`,
       },
     });
 

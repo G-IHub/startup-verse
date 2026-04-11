@@ -42,11 +42,7 @@ import {
   Globe,
 } from "lucide-react";
 import { toast } from "sonner";
-
-// Hardcoded Supabase credentials to avoid import issues
-const projectId = "zuvrtclwxqycfskgtpbs";
-const publicAnonKey =
-  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inp1dnJ0Y2x3eHF5Y2Zza2d0cGJzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjgzNzA4NTcsImV4cCI6MjA4Mzk0Njg1N30.4QY7N-tAXL9LNzK5_c9WGF1UPbezNaWABkV7n29bM1M";
+import { sendInvitation as sendInvitationApi } from "../../utils/api/inboxApi";
 export function TeamPanel({
   open,
   onClose,
@@ -192,29 +188,7 @@ export function TeamPanel({
       };
       console.log("📧 [TeamPanel] Sending invitation:", invitationData);
 
-      // Save invitation to backend
-      const API_URL = `https://${projectId}.supabase.co/functions/v1/make-server-78157e08`;
-      console.log(
-        "📡 [TeamPanel] Calling API:",
-        `${API_URL}/founders/invitations`,
-      );
-      const response = await fetch(`${API_URL}/founders/invitations`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${localStorage.getItem("startupverse_token") || ""}`,
-        },
-        body: JSON.stringify({
-          invitation: invitationData,
-          sendEmail: true, // This triggers email sending
-        }),
-      });
-      console.log("📡 [TeamPanel] Response status:", response.status);
-      const data = await response.json();
-      console.log("📡 [TeamPanel] Response data:", data);
-      if (!response.ok || !data.success) {
-        throw new Error(data.error || "Failed to send invitation");
-      }
+      const data = await sendInvitationApi(invitationData);
       console.log("✅ [TeamPanel] Invitation sent successfully:", data);
 
       // Update local state for UI

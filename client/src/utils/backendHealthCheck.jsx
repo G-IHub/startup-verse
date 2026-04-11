@@ -1,6 +1,6 @@
 /**
  * Backend Health Check Utility
- * Monitors Supabase Edge Function deployment status
+ * Monitors Express API availability and response time.
  */
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8000/api/v1";

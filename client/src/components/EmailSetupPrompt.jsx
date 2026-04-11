@@ -40,7 +40,7 @@ export default function EmailSetupPrompt() {
     }
     setError("");
     setSuccess(
-      "API key entered. Please add it to your Supabase environment variables as RESEND_API_KEY and redeploy.",
+      "API key copied. Add RESEND_API_KEY to your server environment (e.g. server/.env) and restart the API.",
     );
 
     // Copy to clipboard
@@ -93,18 +93,15 @@ export default function EmailSetupPrompt() {
             </ol>
           </div>
           <div>
-            <h4 className="font-semibold mb-2">Step 2: Add to Supabase</h4>
+            <h4 className="font-semibold mb-2">Step 2: Configure the API server</h4>
             <ol className="list-decimal list-inside space-y-2 text-sm text-muted-foreground">
-              <li>Go to your Supabase project dashboard</li>
+              <li>Open your server environment file (for example <code className="bg-muted px-1 rounded">server/.env</code>)</li>
               <li>
-                Navigate to Settings → Edge Functions → Environment Variables
-              </li>
-              <li>
-                {"Add a new variable: "}
+                {"Set "}
                 <code className="bg-muted px-1 rounded">RESEND_API_KEY</code>
+                {" to your Resend key"}
               </li>
-              <li>Paste your Resend API key as the value</li>
-              <li>Save and redeploy your edge function</li>
+              <li>Restart the Node process so the new variable loads</li>
             </ol>
           </div>
           {error && (

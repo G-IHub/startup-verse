@@ -23,6 +23,8 @@ import {
   Loader2,
 } from "lucide-react";
 import { toast } from "sonner";
+import { API_BASE_URL } from "../utils/backendClient";
+import { clearAuthSession } from "../app/session";
 export function TeamMemberOnboarding({ invitationToken, onComplete }) {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -46,28 +48,25 @@ export function TeamMemberOnboarding({ invitationToken, onComplete }) {
     try {
       setLoading(true);
       setError(null);
-      const projectId = "zuvrtclwxqycfskgtpbs";
-      const publicAnonKey =
-        "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inp1dnJ0Y2x3eHF5Y2Zza2d0cGJzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjgzNzA4NTcsImV4cCI6MjA4Mzk0Njg1N30.4QY7N-tAXL9LNzK5_c9WGF1UPbezNaWABkV7n29bM1M";
-      const API_URL = `https://${projectId}.supabase.co/functions/v1/make-server-78157e08`;
       console.log("🔍 Fetching invitation details for token:", invitationToken);
-      const response = await fetch(
-        `${API_URL}/founders/invitations/${invitationToken}`,
-        {
-          method: "GET",
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem("startupverse_token") || ""}`,
-          },
+      const response = await fetch(`${API_BASE_URL}/invitations/token/${invitationToken}`, {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
         },
-      );
+      });
       if (!response.ok) {
         throw new Error("Failed to fetch invitation details");
       }
-      const data = await response.json();
-      if (!data.success || !data.invitation) {
-        throw new Error(data.error || "Invitation not found");
+      const payload = await response.json();
+      const data = payload?.data || {};
+      if (!payload?.success || !data?.invitation) {
+        throw new Error(payload?.message || "Invitation not found");
       }
-      const invitationData = data.invitation;
+      const invitationData = {
+        ...data.invitation,
+        startupName: data.startupName || "",
+      };
 
       // Check if invitation is expired
       if (new Date(invitationData.expiresAt) < new Date()) {
@@ -114,46 +113,43 @@ export function TeamMemberOnboarding({ invitationToken, onComplete }) {
     }
     try {
       setSubmitting(true);
-      const projectId = "zuvrtclwxqycfskgtpbs";
-      const publicAnonKey =
-        "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inp1dnJ0Y2x3eHF5Y2Zza2d0cGJzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjgzNzA4NTcsImV4cCI6MjA4Mzk0Njg1N30.4QY7N-tAXL9LNzK5_c9WGF1UPbezNaWABkV7n29bM1M";
-      const API_URL = `https://${projectId}.supabase.co/functions/v1/make-server-78157e08`;
       console.log("📝 Submitting team member onboarding...");
 
-      // Create user account and accept invitation
-      const response = await fetch(
-        `${API_URL}/founders/invitations/${invitationToken}/accept`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${localStorage.getItem("startupverse_token") || ""}`,
-          },
-          body: JSON.stringify({
-            name: formData.name,
-            email: formData.email,
-            password: formData.password,
-            bio: formData.bio,
-            linkedin: formData.linkedin,
-            github: formData.github,
-          }),
+      // Ensure invited onboarding runs on public token endpoint, not existing session.
+      clearAuthSession();
+
+      const response = await fetch(`${API_BASE_URL}/invitations/token/${invitationToken}/accept`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
         },
-      );
+        body: JSON.stringify({
+          name: formData.name,
+          email: formData.email,
+          password: formData.password,
+          bio: formData.bio,
+          linkedin: formData.linkedin,
+          github: formData.github,
+        }),
+      });
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || "Failed to complete onboarding");
+        const errorData = await response.json().catch(() => null);
+        throw new Error(errorData?.message || "Failed to complete onboarding");
       }
-      const result = await response.json();
-      if (!result.success) {
-        throw new Error(result.error || "Failed to complete onboarding");
+      const payload = await response.json();
+      if (!payload?.success) {
+        throw new Error(payload?.message || "Failed to complete onboarding");
       }
-      console.log("✅ Onboarding completed successfully:", result);
+      const authData = payload.data || {};
+      const resultUser = authData.user;
+      console.log("✅ Onboarding completed successfully:", payload);
       toast.success(`🎉 Welcome to ${invitation?.startupName}!`);
 
       // Call onComplete callback with user data
       // IMPORTANT: Use the role from backend (team-member), not from invitation (position like "CTO")
       onComplete({
-        ...result.user,
+        ...resultUser,
+        backendToken: authData.token || "",
         startupId: invitation?.startupId,
         startupName: invitation?.startupName,
         // Don't overwrite role - backend already set it to 'team-member'

@@ -3,7 +3,7 @@
  */
 import React, { useState, useEffect } from "react";
 import MentorAssignmentManager from "./MentorAssignmentManager";
-import { getCohort } from "../../utils/organizationHelpersSupabase";
+import { getCohort } from "../../utils/organizationHelpersBackend";
 export default function MentorNetwork({
   cohortId,
   organizationId,

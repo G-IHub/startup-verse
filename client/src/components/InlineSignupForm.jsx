@@ -12,6 +12,7 @@ import { Label } from "./ui/label";
 import { Separator } from "./ui/separator";
 import { ArrowLeft, Rocket, Star, Building } from "lucide-react";
 import { authApi } from "../api/authApi";
+import { toast } from "sonner";
 export default function InlineSignupForm({ role, onBack, onSignup }) {
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
@@ -27,15 +28,7 @@ export default function InlineSignupForm({ role, onBack, onSignup }) {
     };
   }, []);
   const handleGoogleSignup = () => {
-    if (!isMountedRef.current) return;
-    setLoading(true);
-    // Simulate Google auth
-    setTimeout(() => {
-      if (!isMountedRef.current) return;
-      onSignup(role, {
-        method: "google",
-      });
-    }, 500);
+    toast.info("Google signup is temporarily unavailable. Please use email signup.");
   };
   const handleEmailSignup = async (e) => {
     e.preventDefault();
@@ -44,12 +37,13 @@ export default function InlineSignupForm({ role, onBack, onSignup }) {
     setLoading(true);
     try {
       // Call backend signup API
-      const user = await authApi.signup({
+      const authResult = await authApi.signup({
         email,
         password,
         fullName,
         role,
       });
+      const user = authResult.user;
       console.log("✅ [InlineSignupForm] Backend signup successful:", user);
 
       // Double-check mounted state before callback
@@ -63,6 +57,7 @@ export default function InlineSignupForm({ role, onBack, onSignup }) {
         password,
         userId: user.id,
         backendUser: user,
+        backendToken: authResult.token,
       });
     } catch (error) {
       if (!isMountedRef.current) return;

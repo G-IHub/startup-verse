@@ -1,40 +1,61 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
 import { setAdminFlag } from "../utils/adminHelpers";
+import {
+  clearAuthSession,
+  ensureSessionMigration,
+  getAccessToken,
+  setAccessToken,
+  setSessionUser,
+} from "../app/session";
 const AuthContext = createContext(undefined);
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
+  const [token, setToken] = useState("");
   const [isLoading, setIsLoading] = useState(true);
 
-  // Load user from localStorage on mount
+  // Load auth session on mount
   useEffect(() => {
     try {
-      const savedUser = localStorage.getItem("startupverse_user");
-      if (savedUser) {
-        const parsedUser = JSON.parse(savedUser);
+      const session = ensureSessionMigration();
+      if (session?.user) {
         // Automatically set admin flag based on email
-        const userWithAdmin = setAdminFlag(parsedUser);
+        const userWithAdmin = setAdminFlag(session.user);
         setUser(userWithAdmin);
       }
+      setToken(getAccessToken());
     } catch (error) {
-      console.error("Error loading user from localStorage:", error);
+      console.error("Error loading auth session:", error);
     } finally {
       setIsLoading(false);
     }
   }, []);
 
-  // Save user to localStorage when it changes
-  useEffect(() => {
-    if (user) {
-      localStorage.setItem("startupverse_user", JSON.stringify(user));
-    } else {
-      localStorage.removeItem("startupverse_user");
-    }
-  }, [user]);
+  const updateUser = (nextUser) => {
+    const normalized = nextUser ? setAdminFlag(nextUser) : null;
+    setUser(normalized);
+    setSessionUser(normalized);
+  };
+
+  const login = ({ user: nextUser, accessToken = "" }) => {
+    setAccessToken(accessToken);
+    setToken(accessToken || "");
+    updateUser(nextUser);
+  };
+
+  const logout = () => {
+    clearAuthSession();
+    setUser(null);
+    setToken("");
+  };
+
   return (
     <AuthContext.Provider
       value={{
         user,
-        setUser,
+        setUser: updateUser,
+        token,
+        login,
+        logout,
         isLoading,
       }}
     >

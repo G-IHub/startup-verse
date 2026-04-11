@@ -52,7 +52,7 @@ An all-in-one workspace that combines:
 **Tech Stack** (for the nerds 🤓):
 • React + TypeScript
 • TailwindCSS (Material Design system)
-• Supabase (auth, database, real-time)
+• Node/Express + MongoDB + Socket.IO
 • Web Audio API (ambient sounds)
 • Motion (smooth animations)
 

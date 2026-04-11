@@ -11,7 +11,7 @@ This document defines the backend implementation blueprint for StartupVerse, ali
 - `StartupVerse_AI_Agent_Prompt.md`
 - `StartupVerse_Strategy_Ecosystem_Model.pdf`
 
-It also maps current frontend dependencies to required backend contracts and defines a conservative cleanup plan for Supabase-era artifacts.
+It also maps current frontend dependencies to required backend contracts and defines a conservative cleanup plan for third-party BaaS-era artifacts.
 
 ### Scope
 
@@ -19,7 +19,7 @@ It also maps current frontend dependencies to required backend contracts and def
   - Backend architecture design
   - Data model specifications
   - Public API contracts
-  - Supabase decommission plan
+  - Legacy hosted backend decommission plan
   - Cleanup manifest (plan only)
   - Test and acceptance plan
 - Out of scope in this phase:
@@ -35,7 +35,7 @@ It also maps current frontend dependencies to required backend contracts and def
 
 ### Non-negotiable constraints for this phase
 
-- Final architecture excludes Supabase as a core backend dependency.
+- Final architecture excludes third-party BaaS as a core backend dependency.
 - Backend runtime must be Express + MongoDB/Mongoose.
 - This file is design-only; no implementation or deletions are executed in this phase.
 
@@ -48,11 +48,11 @@ It also maps current frontend dependencies to required backend contracts and def
 | Server application code | Express API app with route groups, models, middleware, jobs, realtime | `server/` has `package.json`, `package-lock.json`, `tsconfig.json`; no `src/` backend code | Critical gap | Build full `server/src/*` architecture (see Section 2) |
 | Backend data layer | MongoDB + Mongoose entity model | MongoDB dependencies installed but no schemas | Critical gap | Implement model catalog from Section 3 |
 | Auth and permissions | JWT + role-based + org-admin middleware | No middleware code exists yet | Critical gap | Implement `requireAuth`, `requireRole`, `requireOrgAdmin` |
-| Frontend API routing | Unified API base (`VITE_API_URL`) | Mixed: many files use `VITE_API_URL`, others hardcode `https://<projectId>.supabase.co/functions/...` | High inconsistency | Standardize all runtime API calls to Express base after parity |
-| Realtime | Supabase replacement with server-side realtime strategy | Supabase-specific realtime helper files and channel assumptions remain in client | High inconsistency | Replace with Socket.IO event contract and polling fallback |
+| Frontend API routing | Unified API base (`VITE_API_URL`) | Mixed: many files use `VITE_API_URL`, others hardcode legacy vendor function URLs | High inconsistency | Standardize all runtime API calls to Express base after parity |
+| Realtime | Legacy vendor replacement with server-side realtime strategy | Vendor-specific realtime helper files and channel assumptions remain in client | High inconsistency | Replace with Socket.IO event contract and polling fallback |
 | Frontend state model (target in prompt) | TanStack Query for server state, Zustand for UI state, router-driven navigation | Active app uses custom `fetch` wrappers, localStorage-heavy state, query-param view switching in `App.jsx` | Architectural mismatch | Preserve behavior short term; plan staged refactor after backend parity |
 | Routing model | Router-centric role routing | Active app does view selection from URL params and local session helpers | Partial mismatch | Keep existing UX contract; align server auth/role responses first |
-| Supabase decommission readiness | No runtime Supabase dependency | Supabase URLs/usages remain in runtime and support files | Not ready | Execute decommission phases in Section 5 |
+| Legacy hosted decommission readiness | No runtime vendor-BaaS dependency | Vendor function URLs/usages remain in runtime and support files | Not ready | Execute decommission phases in Section 5 |
 | Cleanup posture | Conservative and safe | Many historical debug/deploy/test artifacts in `client/src` | Needs triage | Use cleanup matrix in Section 6; defer risky removals until parity gates pass |
 
 ---
@@ -644,35 +644,35 @@ All routes are versioned under `/api/v1`.
 
 ---
 
-## 5) Supabase Decommission Plan (Backend-Centric)
+## 5) Legacy hosted backend decommission plan (backend-centric)
 
 ## 5.1 Dependency categories and replacement map
 
 | Category | Current State | Replacement |
 |---|---|---|
-| Hardcoded Supabase function URLs | Runtime files call `https://<projectId>.supabase.co/functions/v1/...` | Replace with `VITE_API_URL` Express routes |
-| Supabase realtime channel helpers | `supabaseRealtime*.js` and channel semantics in office/presence flows | Socket.IO event contracts + polling fallback |
-| Supabase deploy/debug docs and scripts | `deploy-backend.*`, `DOWNLOAD_THIS_FOR_SUPABASE.txt`, `QUICK_DEPLOY_COMMANDS.txt`, related check files | Remove after backend parity and cutover |
-| Supabase-specific migration helpers | `utils/migrations/*` targeting function URLs | Replace with server-native migration/admin tasks |
+| Hardcoded vendor function URLs | Runtime files call legacy hosted function bases | Replace with `VITE_API_URL` Express routes |
+| Vendor realtime channel helpers | Legacy realtime modules and channel semantics in office/presence flows | Socket.IO event contracts + polling fallback |
+| Vendor deploy/debug docs and scripts | `deploy-backend.*`, `QUICK_DEPLOY_COMMANDS.txt`, related check files | Remove after backend parity and cutover |
+| Vendor-specific migration helpers | `utils/migrations/*` targeting function URLs | Replace with server-native migration/admin tasks |
 
 ## 5.2 Decommission phases
 
 1. Phase A: API parity
-   - Implement all required Express endpoints that currently map to Supabase function URLs.
+   - Implement all required Express endpoints that currently map to legacy vendor function URLs.
 2. Phase B: Realtime parity
    - Implement Socket.IO channels/events for presence, tasks, activities, announcements, wins, unread counts.
 3. Phase C: Client cutover
    - Redirect runtime API clients to `VITE_API_URL`.
-   - Remove runtime imports that depend on `projectId`/Supabase endpoints.
+   - Remove runtime imports that depend on `projectId`/vendor-hosted endpoints.
 4. Phase D: Cleanup
-   - Remove deprecated Supabase runtime and deployment artifacts per Section 6.
+   - Remove deprecated vendor runtime and deployment artifacts per Section 6.
 
-## 5.3 Cutover gate (must pass before deleting runtime Supabase paths)
+## 5.3 Cutover gate (must pass before deleting runtime vendor paths)
 
-- Every Supabase-dependent runtime endpoint has Express equivalent with successful smoke tests.
+- Every vendor-dependent runtime endpoint has Express equivalent with successful smoke tests.
 - Realtime event parity verified (connected and fallback modes).
 - Frontend build and core flows pass against local Express backend.
-- Grep checks show zero Supabase usage in active runtime code paths (excluding intentionally retained historical docs if any).
+- Grep checks show zero vendor-BaaS usage in active runtime code paths (excluding intentionally retained historical docs if any).
 
 ---
 
@@ -698,17 +698,17 @@ This is a deletion plan, not an execution record. No deletions are performed in 
 | `client/src/imports/startupverse-logs.txt` | Historical log artifact | Team confirms no documentation dependency |
 | `client/src/runner-style one-off debug html/txt files` | Non-runtime diagnostics | Confirm no active debugging workflow relies on them |
 
-### Delete After Parity (must wait for Supabase cutover gate)
+### Delete After Parity (must wait for legacy hosted cutover gate)
 
 | Path / Pattern | Reason |
 |---|---|
-| `client/src/utils/supabaseRealtime.js` | Supabase realtime dependency |
-| `client/src/utils/supabaseRealtimeSubscriptions.js` | Supabase realtime dependency |
-| `client/src/utils/cacheInvalidationSupabase.js` | Supabase-specific utility |
-| `client/src/utils/organizationHelpersSupabase.js` | Supabase-specific utility |
-| `client/src/deploy-backend.bat`, `client/src/deploy-backend.sh`, `client/src/deploy.bat`, `client/src/deploy.sh` | Supabase deployment scripts |
-| `client/src/DOWNLOAD_THIS_FOR_SUPABASE.txt`, `client/src/QUICK_DEPLOY_COMMANDS.txt`, `client/src/DEPLOY_VISUAL_GUIDE.txt`, `client/src/FIX_IN_3_WAYS.txt`, `client/src/CHECK_IF_IT_WORKED.txt` | Supabase migration guides |
-| Supabase hardcoded API helper files once replaced | Prevent mixed transport paths in runtime |
+| `client/src/utils/socketIoRealtime.js` | Socket.IO realtime client |
+| `client/src/utils/realtimeSubscriptions.js` | Re-exports realtime helpers |
+| `client/src/utils/backendCacheVersion.js` | Backend version / cache invalidation |
+| `client/src/utils/organizationBackendHelpers.js` | Organization REST wrappers |
+| `client/src/deploy-backend.bat`, `client/src/deploy-backend.sh`, `client/src/deploy.bat`, `client/src/deploy.sh` | Legacy stubs (point to `/server`) |
+| `client/src/QUICK_DEPLOY_COMMANDS.txt`, `client/src/DEPLOY_VISUAL_GUIDE.txt`, `client/src/FIX_IN_3_WAYS.txt`, `client/src/CHECK_IF_IT_WORKED.txt` | Legacy migration guides (review/remove) |
+| Hardcoded vendor API helper files once replaced | Prevent mixed transport paths in runtime |
 
 ---
 
@@ -750,13 +750,13 @@ This is a deletion plan, not an execution record. No deletions are performed in 
 - Socket disconnected:
   - Polling fallback preserves functional visibility and data freshness.
 
-## 7.6 Supabase removal gates
+## 7.6 Vendor-BaaS removal gates
 
 - Runtime grep gate:
-  - No `supabase.co/functions` references in active runtime code.
-  - No `projectId`-based Supabase URL composition in active runtime code.
+  - No legacy vendor function host references in active runtime code.
+  - No `projectId`-based vendor URL composition in active runtime code.
 - Build gate:
-  - Frontend build succeeds without missing Supabase modules.
+  - Frontend build succeeds without missing realtime or API helper modules.
 - Smoke gate:
   - Core founder/team/talent/org flows pass against Express backend.
 

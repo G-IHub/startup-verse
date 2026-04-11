@@ -29,6 +29,11 @@ import {
   isEventSoon,
   getTimeUntilEvent,
 } from "../../utils/eventReminders";
+import { getAccessToken } from "../../app/session";
+import { unwrapData } from "../../utils/apiEnvelope";
+
+const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:8000/api/v1";
+
 export default function OrganizationEventsWidget({
   founderId,
   founderName,
@@ -41,21 +46,25 @@ export default function OrganizationEventsWidget({
     try {
       setLoading(true);
       // Get events for this founder from their cohorts
-      const response = await fetch(
-        `${import.meta.env.VITE_API_URL || "http://localhost:8000/api/v1"}/founder/${founderId}/events`,
-        {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem("startupverse_token") || ""}`,
-          },
+      const token = getAccessToken();
+      const response = await fetch(`${API_BASE}/founder/${founderId}/events`, {
+        headers: {
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
-      );
+      });
       if (!response.ok) {
         console.error("Failed to fetch founder events");
         setEvents([]);
         return;
       }
-      const data = await response.json();
-      setEvents(data.events || []);
+      const raw = unwrapData(await response.json());
+      const list = Array.isArray(raw) ? raw : raw.events || [];
+      const normalized = list.map((e) => ({
+        ...e,
+        id: e.id || e._id,
+        startTime: e.startTime || e.startsAt,
+      }));
+      setEvents(normalized);
     } catch (error) {
       console.error("Error loading events:", error);
       setEvents([]);
@@ -83,27 +92,34 @@ export default function OrganizationEventsWidget({
   const handleRSVP = async (eventId, status) => {
     setRsvpingEventId(eventId);
     try {
-      const response = await fetch(
-        `${import.meta.env.VITE_API_URL || "http://localhost:8000/api/v1"}/events/${eventId}/rsvp`,
-        {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem("startupverse_token") || ""}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            founderId,
-            founderName,
-            status,
-          }),
+      const token = getAccessToken();
+      const response = await fetch(`${API_BASE}/events/${eventId}/rsvp`, {
+        method: "POST",
+        headers: {
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          "Content-Type": "application/json",
         },
-      );
+        body: JSON.stringify({
+          founderId,
+          founderName,
+          status,
+        }),
+      });
       if (!response.ok) throw new Error("Failed to RSVP");
-      const data = await response.json();
+      const inner = unwrapData(await response.json());
+      const updated = inner.event
+        ? {
+            ...inner.event,
+            id: inner.event.id || inner.event._id,
+            startTime: inner.event.startTime || inner.event.startsAt,
+          }
+        : null;
 
       // Update local state
       setEvents((prev) =>
-        prev.map((event) => (event.id === eventId ? data.event : event)),
+        prev.map((event) =>
+          String(event.id) === String(eventId) && updated ? updated : event,
+        ),
       );
       toast.success(
         status === "attending"

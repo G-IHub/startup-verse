@@ -19,6 +19,11 @@ import {
   ArrowRight,
   BarChart3,
 } from "lucide-react";
+import { getAccessToken } from "../../app/session";
+import { unwrapData } from "../../utils/apiEnvelope";
+
+const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:8000/api/v1";
+
 export default function PortfolioOverview({ cohortId, onViewStartup }) {
   const [portfolio, setPortfolio] = useState([]);
   const [cohortStats, setCohortStats] = useState(null);
@@ -36,20 +41,21 @@ export default function PortfolioOverview({ cohortId, onViewStartup }) {
     try {
       setLoading(true);
       setError(null);
+      const token = getAccessToken();
       const response = await fetch(
-        `${import.meta.env.VITE_API_URL || "http://localhost:8000/api/v1"}/portfolio/${cohortId}/health`,
+        `${API_BASE}/cohorts/${cohortId}/portfolio-health`,
         {
           headers: {
-            Authorization: `Bearer ${localStorage.getItem("startupverse_token") || ""}`,
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
           },
         },
       );
       if (!response.ok) {
         throw new Error(`Failed to fetch portfolio health: ${response.status}`);
       }
-      const data = await response.json();
-      setPortfolio(data.portfolio || []);
-      setCohortStats(data.cohortStats || null);
+      const inner = unwrapData(await response.json());
+      setPortfolio(inner.portfolio || []);
+      setCohortStats(inner.cohortStats || null);
     } catch (error) {
       console.error("Error loading portfolio health:", error);
       setError(

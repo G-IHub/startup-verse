@@ -40,6 +40,11 @@ import {
   RefreshCw,
   Download,
 } from "lucide-react";
+import { getAccessToken } from "../../app/session";
+import { unwrapData } from "../../utils/apiEnvelope";
+
+const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:8000/api/v1";
+
 const COLORS = {
   primary: "#3A5AFE",
   success: "#2ECC71",
@@ -63,20 +68,18 @@ export default function AnalyticsDashboard({ founderId, founderName }) {
         setLoading(true);
       }
       setError(null);
-      const response = await fetch(
-        `${import.meta.env.VITE_API_URL || "http://localhost:8000/api/v1"}/analytics/${founderId}`,
-        {
-          method: "GET",
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem("startupverse_token") || ""}`,
-            "Content-Type": "application/json",
-          },
+      const token = getAccessToken();
+      const response = await fetch(`${API_BASE}/founders/${founderId}/analytics`, {
+        method: "GET",
+        headers: {
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          "Content-Type": "application/json",
         },
-      );
+      });
       if (!response.ok) {
         throw new Error("Failed to fetch analytics");
       }
-      const data = await response.json();
+      const data = unwrapData(await response.json());
       setAnalytics(data);
       setLastUpdated(new Date());
       console.log("✅ Analytics data loaded from backend:", data);

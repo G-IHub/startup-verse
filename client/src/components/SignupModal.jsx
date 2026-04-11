@@ -12,6 +12,7 @@ import { Label } from "./ui/label";
 import { Separator } from "./ui/separator";
 import { X, Rocket, Star, Building } from "lucide-react";
 import { authApi } from "../api/authApi";
+import { toast } from "sonner";
 export default function SignupModal({ role, onClose, onSignup }) {
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
@@ -34,13 +35,7 @@ export default function SignupModal({ role, onClose, onSignup }) {
     }
   };
   const handleGoogleSignup = () => {
-    setLoading(true);
-    // Simulate Google auth
-    setTimeout(() => {
-      onSignup(role, {
-        method: "google",
-      });
-    }, 500);
+    toast.info("Google signup is temporarily unavailable. Please use email signup.");
   };
   const handleEmailSignup = async (e) => {
     e.preventDefault();
@@ -50,12 +45,13 @@ export default function SignupModal({ role, onClose, onSignup }) {
     setLoading(true);
     try {
       // Call backend signup API
-      const user = await authApi.signup({
+      const authResult = await authApi.signup({
         email,
         password,
         fullName,
         role,
       });
+      const user = authResult.user;
       console.log("✅ [SignupModal] Backend signup successful:", user);
 
       // Pass user data back to App.tsx
@@ -66,6 +62,7 @@ export default function SignupModal({ role, onClose, onSignup }) {
         password,
         userId: user.id,
         backendUser: user,
+        backendToken: authResult.token,
       });
     } catch (error) {
       const errorMessage = error.message;

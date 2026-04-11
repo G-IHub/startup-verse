@@ -27,6 +27,11 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { Dialog, DialogContent } from "../ui/dialog";
+import { getAccessToken } from "../../app/session";
+import { unwrapData } from "../../utils/apiEnvelope";
+
+const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:8000/api/v1";
+
 export default function MentorAssignmentManager({
   cohortId,
   organizationId,
@@ -66,30 +71,28 @@ export default function MentorAssignmentManager({
       setLoading(true);
 
       // Load mentors for organization
+      const token = getAccessToken();
+      const auth = token ? { Authorization: `Bearer ${token}` } : {};
+
       const mentorsRes = await fetch(
-        `${import.meta.env.VITE_API_URL || "http://localhost:8000/api/v1"}/mentors/organization/${organizationId}`,
-        {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem("startupverse_token") || ""}`,
-          },
-        },
+        `${API_BASE}/organizations/${organizationId}/mentors`,
+        { headers: { ...auth } },
       );
-      const mentorsData = await mentorsRes.json();
-      setMentors(mentorsData.mentors || []);
+      const mentorsInner = unwrapData(await mentorsRes.json());
+      const mentorList = mentorsInner.mentors || [];
+      setMentors(mentorList);
 
       // Load founders in cohort - FIXED URL
-      const foundersRes = await fetch(
-        `${import.meta.env.VITE_API_URL || "http://localhost:8000/api/v1"}/cohorts/${cohortId}/members`,
-        {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem("startupverse_token") || ""}`,
-          },
-        },
-      );
-      const foundersData = await foundersRes.json();
+      const foundersRes = await fetch(`${API_BASE}/cohorts/${cohortId}/members`, {
+        headers: { ...auth },
+      });
+      const foundersRaw = unwrapData(await foundersRes.json());
+      const memberRows = Array.isArray(foundersRaw)
+        ? foundersRaw
+        : foundersRaw.members || [];
 
       // Transform members data to founders format
-      const transformedFounders = (foundersData.members || []).map(
+      const transformedFounders = memberRows.map(
         (member) => ({
           id: member.founderId,
           name: member.founderName || member.name,
@@ -102,19 +105,15 @@ export default function MentorAssignmentManager({
 
       // Load assignments for each mentor
       const assignmentsMap = {};
-      for (const mentor of mentorsData.mentors || []) {
+      for (const mentor of mentorList) {
+        const mid = mentor.id || mentor._id;
         const assignRes = await fetch(
-          `${import.meta.env.VITE_API_URL || "http://localhost:8000/api/v1"}/mentors/${mentor.id}/assigned-founders`,
-          {
-            headers: {
-              Authorization: `Bearer ${localStorage.getItem("startupverse_token") || ""}`,
-            },
-          },
+          `${API_BASE}/mentors/${mid}/assigned-founders`,
+          { headers: { ...auth } },
         );
-        const assignData = await assignRes.json();
-        assignmentsMap[mentor.id] = (assignData.founders || []).map(
-          (f) => f.id,
-        );
+        const assignInner = unwrapData(await assignRes.json());
+        const ids = assignInner.founderIds || (assignInner.founders || []).map((f) => f.id);
+        assignmentsMap[mid] = ids || [];
       }
       setAssignments(assignmentsMap);
     } catch (error) {
@@ -130,12 +129,13 @@ export default function MentorAssignmentManager({
       console.log(
         `📌 [Frontend] Assigning founder ${founderId} to mentor ${mentorId}`,
       );
+      const token = getAccessToken();
       const response = await fetch(
-        `${import.meta.env.VITE_API_URL || "http://localhost:8000/api/v1"}/mentors/${mentorId}/assign-founder`,
+        `${API_BASE}/mentors/${mentorId}/assign-founder`,
         {
           method: "POST",
           headers: {
-            Authorization: `Bearer ${localStorage.getItem("startupverse_token") || ""}`,
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
@@ -146,7 +146,7 @@ export default function MentorAssignmentManager({
       const data = await response.json();
       console.log("📋 [Frontend] Assignment response:", data);
       if (!response.ok) {
-        throw new Error(data.error || "Failed to assign founder");
+        throw new Error(data.message || data.error || "Failed to assign founder");
       }
 
       // Update local state
@@ -166,12 +166,13 @@ export default function MentorAssignmentManager({
   const handleUnassignFounder = async (mentorId, founderId) => {
     try {
       setAssigning(true);
+      const token = getAccessToken();
       const response = await fetch(
-        `${import.meta.env.VITE_API_URL || "http://localhost:8000/api/v1"}/mentors/${mentorId}/unassign-founder/${founderId}`,
+        `${API_BASE}/mentors/${mentorId}/unassign-founder/${founderId}`,
         {
           method: "DELETE",
           headers: {
-            Authorization: `Bearer ${localStorage.getItem("startupverse_token") || ""}`,
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
           },
         },
       );
@@ -213,32 +214,34 @@ export default function MentorAssignmentManager({
   const handleInviteMentor = async () => {
     try {
       setInviting(true);
+      const token = getAccessToken();
       const response = await fetch(
-        `${import.meta.env.VITE_API_URL || "http://localhost:8000/api/v1"}/mentors/invite`,
+        `${API_BASE}/organizations/${organizationId}/mentors`,
         {
           method: "POST",
           headers: {
-            Authorization: `Bearer ${localStorage.getItem("startupverse_token") || ""}`,
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
             email: inviteEmail,
             name: inviteName,
-            organizationId: organizationId,
           }),
         },
       );
-      const data = await response.json();
-      console.log("📋 [Frontend] Invite response:", data);
+      const payload = await response.json();
+      console.log("📋 [Frontend] Invite response:", payload);
       if (!response.ok) {
-        throw new Error(data.error || "Failed to invite mentor");
+        throw new Error(payload.message || payload.error || "Failed to invite mentor");
       }
+      const inner = unwrapData(payload);
+      const m = inner.mentor || inner;
 
       // Update local state
       setMentors((prev) => [
         ...prev,
         {
-          id: data.id,
+          id: m.id || m._id,
           name: inviteName,
           email: inviteEmail,
           expertise: "",

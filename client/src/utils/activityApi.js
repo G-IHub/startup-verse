@@ -1,7 +1,8 @@
 /**
- * Activity Feed API - Using DEPLOYED Presence Endpoints
- * Uses presence/update and presence/:startupId which are already deployed
+ * Activity feed via presence endpoints (startup-scoped).
  */
+
+import { getAccessToken } from "../app/session";
 
 const BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:8000/api/v1";
 
@@ -26,7 +27,7 @@ export async function postActivity(params) {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${localStorage.getItem("startupverse_token") || ""}`,
+        Authorization: `Bearer ${getAccessToken()}`,
       },
       body: JSON.stringify({
         userId: params.userId,
@@ -126,7 +127,7 @@ export async function getStartupActivities(startupId, options) {
     const response = await fetch(url, {
       method: "GET",
       headers: {
-        Authorization: `Bearer ${localStorage.getItem("startupverse_token") || ""}`,
+        Authorization: `Bearer ${getAccessToken()}`,
       },
     });
 
@@ -142,12 +143,28 @@ export async function getStartupActivities(startupId, options) {
       return { success: false, error: `HTTP ${response.status}: ${errorText}` };
     }
 
-    const data = await response.json();
+    const payload = await response.json();
+    const raw = payload?.data;
+    const rows = Array.isArray(raw) ? raw : [];
+    // Presence rows may carry last office activity in metadata.lastFeedActivity
+    const activities = rows
+      .map((row) => {
+        const a = row?.metadata?.lastFeedActivity;
+        if (!a || typeof a !== "object") return null;
+        return {
+          id: `${row.userId}-${a.timestamp || row.updatedAt || ""}`,
+          userId: row.userId,
+          userName: a.userName || row.userName || "",
+          type: a.type || "update",
+          message: a.message || "",
+          icon: typeof a.icon === "string" ? a.icon : "📋",
+          timestamp: new Date(a.timestamp || row.updatedAt || Date.now()),
+          startupId: String(startupId),
+        };
+      })
+      .filter(Boolean);
 
-    // The backend now returns activities array directly
-    const activities = data.activities || [];
-
-    console.log(`✅ Fetched ${activities.length} activities from backend`);
+    console.log(`✅ Derived ${activities.length} feed hints from presence rows`);
 
     return {
       success: true,

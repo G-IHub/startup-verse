@@ -6,7 +6,7 @@ import { Badge } from "../ui/badge";
 import { Input } from "../ui/input";
 import { ScrollArea } from "../ui/scroll-area";
 // 🔥 REALTIME: Import real-time messaging hook
-import { broadcastMessageUpdate } from "../../utils/supabaseRealtimeSubscriptions";
+import { broadcastMessageUpdate } from "../../utils/realtimeSubscriptions";
 import {
   X,
   Send,

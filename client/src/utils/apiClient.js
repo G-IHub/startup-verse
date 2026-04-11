@@ -1,9 +1,7 @@
 /**
  * API client with backend detection and graceful fallback.
  */
-
-const API_BASE_URL =
-  import.meta.env.VITE_API_URL || "http://localhost:8000/api/v1";
+import { API_BASE_URL } from "./backendClient";
 
 class ApiClient {
   isBackendOnline = null;
@@ -93,12 +91,25 @@ class ApiClient {
           },
         });
 
+        const payload = await response.json().catch(() => null);
+        if (!payload || typeof payload !== "object") {
+          throw new Error("Invalid JSON response");
+        }
         if (!response.ok) {
-          throw new Error(`HTTP ${response.status}: ${await response.text()}`);
+          throw new Error(
+            payload.message ||
+              payload.error ||
+              `HTTP ${response.status}: ${response.statusText}`,
+          );
+        }
+        if (
+          payload.success !== true ||
+          !Object.prototype.hasOwnProperty.call(payload, "data")
+        ) {
+          throw new Error("Invalid API envelope");
         }
 
-        const data = await response.json();
-        return { data, error: null, usingFallback: false };
+        return { data: payload, error: null, usingFallback: false };
       } catch (error) {
         this.isBackendOnline = false;
         if (this.config.enableFallback) {

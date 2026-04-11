@@ -1,104 +1,83 @@
+import { getAccessToken } from "../app/session";
+
 /**
- * Simple Backend Client
- * Provides basic HTTP methods for API calls
+ * Canonical backend client for Phase 1 contract lock.
  */
 
-const BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:8000/api/v1";
+export const API_BASE_URL =
+  import.meta.env.VITE_API_URL || "http://localhost:8000/api/v1";
 
-export async function get(endpoint) {
-  try {
-    const response = await fetch(`${BASE_URL}${endpoint}`, {
-      method: "GET",
-      headers: {
-        Authorization: `Bearer ${localStorage.getItem("startupverse_token") || ""}`,
-        "Content-Type": "application/json",
-      },
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error(`Backend GET error (${endpoint}):`, errorText);
-      return { success: false, error: errorText };
-    }
-
-    const data = await response.json();
-    return data;
-  } catch (error) {
-    console.error(`Backend GET exception (${endpoint}):`, error);
-    return { success: false, error: error.message };
-  }
+function getAuthToken() {
+  return getAccessToken();
 }
 
-export async function post(endpoint, body) {
-  try {
-    const response = await fetch(`${BASE_URL}${endpoint}`, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${localStorage.getItem("startupverse_token") || ""}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(body),
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error(`Backend POST error (${endpoint}):`, errorText);
-      return { success: false, error: errorText };
-    }
-
-    const data = await response.json();
-    return data;
-  } catch (error) {
-    console.error(`Backend POST exception (${endpoint}):`, error);
-    return { success: false, error: error.message };
-  }
+function buildUrl(endpoint) {
+  return `${API_BASE_URL}${endpoint}`;
 }
 
-export async function put(endpoint, body) {
-  try {
-    const response = await fetch(`${BASE_URL}${endpoint}`, {
-      method: "PUT",
-      headers: {
-        Authorization: `Bearer ${localStorage.getItem("startupverse_token") || ""}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(body),
-    });
+async function parseEnvelope(response, endpoint) {
+  const payload = await response.json().catch(() => null);
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error(`Backend PUT error (${endpoint}):`, errorText);
-      return { success: false, error: errorText };
-    }
-
-    const data = await response.json();
-    return data;
-  } catch (error) {
-    console.error(`Backend PUT exception (${endpoint}):`, error);
-    return { success: false, error: error.message };
+  if (!payload || typeof payload !== "object") {
+    throw new Error(`Invalid JSON response from ${endpoint}`);
   }
+
+  if (!response.ok) {
+    const message =
+      payload.message ||
+      payload.error ||
+      `HTTP ${response.status} ${response.statusText}`;
+    throw new Error(message);
+  }
+
+  if (payload.success !== true || !Object.prototype.hasOwnProperty.call(payload, "data")) {
+    throw new Error(`Invalid API envelope from ${endpoint}`);
+  }
+
+  return payload;
 }
 
-export async function del(endpoint) {
-  try {
-    const response = await fetch(`${BASE_URL}${endpoint}`, {
-      method: "DELETE",
-      headers: {
-        Authorization: `Bearer ${localStorage.getItem("startupverse_token") || ""}`,
-        "Content-Type": "application/json",
-      },
-    });
+export async function request(endpoint, options = {}) {
+  const response = await fetch(buildUrl(endpoint), {
+    ...options,
+    headers: {
+      Authorization: `Bearer ${getAuthToken()}`,
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
+  });
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error(`Backend DELETE error (${endpoint}):`, errorText);
-      return { success: false, error: errorText };
-    }
+  return parseEnvelope(response, endpoint);
+}
 
-    const data = await response.json();
-    return data;
-  } catch (error) {
-    console.error(`Backend DELETE exception (${endpoint}):`, error);
-    return { success: false, error: error.message };
-  }
+export async function get(endpoint, options = {}) {
+  return request(endpoint, { ...options, method: "GET" });
+}
+
+export async function post(endpoint, body, options = {}) {
+  return request(endpoint, {
+    ...options,
+    method: "POST",
+    body: body !== undefined ? JSON.stringify(body) : undefined,
+  });
+}
+
+export async function put(endpoint, body, options = {}) {
+  return request(endpoint, {
+    ...options,
+    method: "PUT",
+    body: body !== undefined ? JSON.stringify(body) : undefined,
+  });
+}
+
+export async function patch(endpoint, body, options = {}) {
+  return request(endpoint, {
+    ...options,
+    method: "PATCH",
+    body: body !== undefined ? JSON.stringify(body) : undefined,
+  });
+}
+
+export async function del(endpoint, options = {}) {
+  return request(endpoint, { ...options, method: "DELETE" });
 }

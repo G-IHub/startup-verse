@@ -27,7 +27,7 @@ import {
   Check,
   AlertCircle,
 } from "lucide-react";
-// Supabase imports removed
+// Legacy BaaS imports removed; organization flows use REST API helpers.
 
 export default function OrganizationSettings({
   organizationId,

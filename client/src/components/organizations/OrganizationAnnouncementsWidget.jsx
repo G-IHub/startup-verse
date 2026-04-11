@@ -21,6 +21,11 @@ import {
   CheckCircle,
   ExternalLink,
 } from "lucide-react";
+import { getAccessToken } from "../../app/session";
+import { unwrapData } from "../../utils/apiEnvelope";
+
+const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:8000/api/v1";
+
 export default function OrganizationAnnouncementsWidget({ founderId }) {
   const [announcements, setAnnouncements] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -30,11 +35,12 @@ export default function OrganizationAnnouncementsWidget({ founderId }) {
   const loadFounderAnnouncements = async () => {
     try {
       setLoading(true);
+      const token = getAccessToken();
       const response = await fetch(
-        `${import.meta.env.VITE_API_URL || "http://localhost:8000/api/v1"}/founder/${founderId}/announcements`,
+        `${API_BASE}/founder/${founderId}/announcements`,
         {
           headers: {
-            Authorization: `Bearer ${localStorage.getItem("startupverse_token") || ""}`,
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
           },
         },
       );
@@ -43,8 +49,9 @@ export default function OrganizationAnnouncementsWidget({ founderId }) {
         setAnnouncements([]);
         return;
       }
-      const data = await response.json();
-      setAnnouncements(data.announcements || []);
+      const raw = unwrapData(await response.json());
+      const list = Array.isArray(raw) ? raw : raw.announcements || [];
+      setAnnouncements(list);
     } catch (error) {
       console.error("Error loading announcements:", error);
       setAnnouncements([]);
@@ -54,12 +61,13 @@ export default function OrganizationAnnouncementsWidget({ founderId }) {
   };
   const markAsRead = async (announcementId) => {
     try {
+      const token = getAccessToken();
       const response = await fetch(
-        `${import.meta.env.VITE_API_URL || "http://localhost:8000/api/v1"}/announcements/${announcementId}/mark-read`,
+        `${API_BASE}/announcements/${announcementId}/mark-read`,
         {
           method: "POST",
           headers: {
-            Authorization: `Bearer ${localStorage.getItem("startupverse_token") || ""}`,
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
@@ -68,12 +76,15 @@ export default function OrganizationAnnouncementsWidget({ founderId }) {
         },
       );
       if (!response.ok) throw new Error("Failed to mark as read");
-      const data = await response.json();
+      const inner = unwrapData(await response.json());
+      const updated = inner.announcement;
 
       // Update local state
       setAnnouncements((prev) =>
         prev.map((ann) =>
-          ann.id === announcementId ? data.announcement : ann,
+          String(ann.id) === String(announcementId) && updated
+            ? { ...ann, ...updated, id: updated.id || updated._id || ann.id }
+            : ann,
         ),
       );
     } catch (error) {
@@ -81,7 +92,8 @@ export default function OrganizationAnnouncementsWidget({ founderId }) {
     }
   };
   const isUnread = (announcement) => {
-    return !announcement.readBy.includes(founderId);
+    const readers = announcement.readBy || [];
+    return !readers.map(String).includes(String(founderId));
   };
   const getPriorityIcon = (priority) => {
     switch (priority) {

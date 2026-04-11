@@ -27,6 +27,11 @@ import { notifyEventCreated } from "../../utils/eventNotifications";
 import { toast } from "sonner";
 import MiniCalendar from "../calendar/MiniCalendar";
 import { getOrganizationCalendarEvents } from "../../utils/calendarIntegration";
+import { getAccessToken } from "../../app/session";
+import { unwrapData } from "../../utils/apiEnvelope";
+
+const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:8000/api/v1";
+
 export default function EventManager({
   cohortId,
   organizationId,
@@ -66,17 +71,16 @@ export default function EventManager({
   const loadEvents = async () => {
     try {
       setLoading(true);
-      const response = await fetch(
-        `${import.meta.env.VITE_API_URL || "http://localhost:8000/api/v1"}/events/${cohortId}`,
-        {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem("startupverse_token") || ""}`,
-          },
+      const token = getAccessToken();
+      const response = await fetch(`${API_BASE}/cohorts/${cohortId}/events`, {
+        headers: {
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
-      );
+      });
       if (!response.ok) throw new Error("Failed to fetch events");
-      const data = await response.json();
-      setEvents(data.events);
+      const payload = await response.json();
+      const inner = unwrapData(payload);
+      setEvents(inner.events || []);
     } catch (error) {
       console.error("Error loading events:", error);
     } finally {
@@ -93,36 +97,34 @@ export default function EventManager({
         // Generate Jitsi meeting room
         meetingUrl = `${window.location.origin}/join/Event-${eventId}`;
       }
-      const response = await fetch(
-        `${import.meta.env.VITE_API_URL || "http://localhost:8000/api/v1"}/events/create`,
-        {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem("startupverse_token") || ""}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            cohortId,
-            organizationId,
-            title: formData.title,
-            description: formData.description,
-            eventType: formData.eventType,
-            startTime: formData.startTime,
-            endTime: formData.endTime || null,
-            location: formData.location,
-            isVirtual: formData.isVirtual,
-            meetingUrl: meetingUrl,
-            capacity: formData.capacity ? parseInt(formData.capacity) : null,
-            createdBy: userId,
-          }),
+      const token = getAccessToken();
+      const response = await fetch(`${API_BASE}/cohorts/${cohortId}/events`, {
+        method: "POST",
+        headers: {
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          "Content-Type": "application/json",
         },
-      );
+        body: JSON.stringify({
+          organizationId,
+          title: formData.title,
+          description: formData.description,
+          eventType: formData.eventType,
+          startTime: formData.startTime,
+          endTime: formData.endTime || null,
+          location: formData.location,
+          isVirtual: formData.isVirtual,
+          meetingUrl: meetingUrl,
+          capacity: formData.capacity ? parseInt(formData.capacity) : null,
+          createdBy: userId,
+        }),
+      });
       if (!response.ok) throw new Error("Failed to create event");
-      const { event } = await response.json();
+      const created = unwrapData(await response.json());
+      const event = created.event;
 
       // Send notifications to all cohort members
       await notifyEventCreated(cohortId, organizationId, {
-        id: event.id,
+        id: event?.id || event?._id,
         title: formData.title,
         startTime: formData.startTime,
         eventType: formData.eventType,

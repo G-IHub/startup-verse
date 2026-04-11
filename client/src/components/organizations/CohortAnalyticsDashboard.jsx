@@ -18,6 +18,11 @@ import {
   Activity,
   FileText,
 } from "lucide-react";
+import { getAccessToken } from "../../app/session";
+import { unwrapData } from "../../utils/apiEnvelope";
+
+const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:8000/api/v1";
+
 export default function CohortAnalyticsDashboard({ cohortId }) {
   const [analytics, setAnalytics] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -27,17 +32,18 @@ export default function CohortAnalyticsDashboard({ cohortId }) {
   const loadAnalytics = async () => {
     try {
       setLoading(true);
+      const token = getAccessToken();
       const response = await fetch(
-        `${import.meta.env.VITE_API_URL || "http://localhost:8000/api/v1"}/analytics/${cohortId}/overview`,
+        `${API_BASE}/cohorts/${cohortId}/analytics/overview`,
         {
           headers: {
-            Authorization: `Bearer ${localStorage.getItem("startupverse_token") || ""}`,
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
           },
         },
       );
       if (!response.ok) throw new Error("Failed to fetch analytics");
-      const data = await response.json();
-      setAnalytics(data.analytics);
+      const inner = unwrapData(await response.json());
+      setAnalytics(inner.analytics);
     } catch (error) {
       console.error("Error loading analytics:", error);
     } finally {

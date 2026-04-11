@@ -1,3 +1,5 @@
+import { getAccessToken } from "../app/session";
+
 const API_BASE_URL =
   import.meta.env.VITE_API_URL || "http://localhost:8000/api/v1";
 
@@ -6,29 +8,35 @@ export const authApi = {
    * Sign up a new user
    */
   signup: async (data) => {
+    const payloadData = {
+      ...data,
+      // Backend contract expects `name`; keep compatibility with UI `fullName`.
+      name: data?.name || data?.fullName || "",
+    };
     console.log("📝 [AuthAPI] Signing up:", {
-      email: data.email,
-      role: data.role,
+      email: payloadData.email,
+      role: payloadData.role,
     });
 
     const response = await fetch(`${API_BASE_URL}/auth/signup`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${localStorage.getItem("startupverse_token") || ""}`,
+        Authorization: `Bearer ${getAccessToken()}`,
       },
-      body: JSON.stringify(data),
+      body: JSON.stringify(payloadData),
     });
 
-    const result = await response.json();
+    const payload = await response.json();
+    const result = payload?.data || {};
 
     if (!response.ok) {
-      console.error("❌ [AuthAPI] Signup failed:", result.error);
-      throw new Error(result.error || "Signup failed");
+      console.error("❌ [AuthAPI] Signup failed:", payload?.message);
+      throw new Error(payload?.message || "Signup failed");
     }
 
-    console.log("✅ [AuthAPI] Signup successful:", result.user.email);
-    return result.user;
+    console.log("✅ [AuthAPI] Signup successful:", result.user?.email);
+    return { user: result.user, token: result.token || "" };
   },
 
   /**
@@ -41,20 +49,21 @@ export const authApi = {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${localStorage.getItem("startupverse_token") || ""}`,
+        Authorization: `Bearer ${getAccessToken()}`,
       },
       body: JSON.stringify(data),
     });
 
-    const result = await response.json();
+    const payload = await response.json();
+    const result = payload?.data || {};
 
     if (!response.ok) {
-      console.error("❌ [AuthAPI] Signin failed:", result.error);
-      throw new Error(result.error || "Signin failed");
+      console.error("❌ [AuthAPI] Signin failed:", payload?.message);
+      throw new Error(payload?.message || "Signin failed");
     }
 
-    console.log("✅ [AuthAPI] Signin successful:", result.user.email);
-    return result.user;
+    console.log("✅ [AuthAPI] Signin successful:", result.user?.email);
+    return { user: result.user, token: result.token || "" };
   },
 
   /**
@@ -67,19 +76,20 @@ export const authApi = {
       method: "PUT",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${localStorage.getItem("startupverse_token") || ""}`,
+        Authorization: `Bearer ${getAccessToken()}`,
       },
       body: JSON.stringify(updates),
     });
 
-    const result = await response.json();
+    const payload = await response.json();
+    const result = payload?.data || {};
 
     if (!response.ok) {
-      console.error("❌ [AuthAPI] Update failed:", result.error);
-      throw new Error(result.error || "Update failed");
+      console.error("❌ [AuthAPI] Update failed:", payload?.message);
+      throw new Error(payload?.message || "Update failed");
     }
 
-    console.log("✅ [AuthAPI] Profile updated:", result.user.email);
-    return result.user;
+    console.log("✅ [AuthAPI] Profile updated:", result?.email);
+    return result;
   },
 };

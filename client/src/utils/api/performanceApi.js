@@ -1,5 +1,6 @@
 // Performance API wrapper for backend-first performance metrics
 import { offlineStorage } from "../offlineStorage";
+import { getAccessToken } from "../../app/session";
 
 const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:8000/api/v1";
 
@@ -24,7 +25,7 @@ export async function getPerformanceMetrics(
         {
           method: "GET",
           headers: {
-            Authorization: `Bearer ${localStorage.getItem("startupverse_token") || ""}`,
+            Authorization: `Bearer ${getAccessToken()}`,
             "Content-Type": "application/json",
           },
         },
@@ -71,7 +72,7 @@ export async function invalidatePerformanceCache(teamMemberId) {
     await fetch(`${API_BASE}/performance/invalidate/${teamMemberId}`, {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${localStorage.getItem("startupverse_token") || ""}`,
+        Authorization: `Bearer ${getAccessToken()}`,
         "Content-Type": "application/json",
       },
     });

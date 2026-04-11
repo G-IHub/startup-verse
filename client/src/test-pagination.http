@@ -1,11 +1,11 @@
 ###
 # StartupVerse Backend Pagination Test Suite
 # Use with REST Client extension in VS Code
-# Replace {{projectId}} and {{publicAnonKey}} with actual values from /utils/supabase/info.tsx
+# Set @baseUrl to your Express API (same as VITE_API_URL) and @authToken to a valid JWT.
 ###
 
-@baseUrl = https://{{projectId}}.supabase.co/functions/v1/make-server-78157e08
-@authToken = Bearer {{publicAnonKey}}
+@baseUrl = http://localhost:5000/api/v1
+@authToken = Bearer YOUR_JWT
 
 ### ============================================
 ### HEALTH CHECK

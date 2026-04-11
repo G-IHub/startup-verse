@@ -11,7 +11,7 @@ import { Input } from "../ui/input";
 import { Label } from "../ui/label";
 import { Textarea } from "../ui/textarea";
 import { Users, CheckCircle2 } from "lucide-react";
-import { createCohort } from "../../utils/organizationHelpersSupabase";
+import { createCohort } from "../../utils/organizationHelpersBackend";
 export default function CreateCohortModal({
   isOpen,
   onClose,

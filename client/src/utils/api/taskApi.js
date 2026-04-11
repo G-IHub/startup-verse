@@ -1,4 +1,5 @@
 // Task API wrapper for backend-first task management
+import { getAccessToken } from "../../app/session";
 
 const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:8000/api/v1";
 
@@ -12,7 +13,7 @@ export async function getFounderTasks(founderId) {
     const response = await fetch(`${API_BASE}/founders/${founderId}/tasks`, {
       method: "GET",
       headers: {
-        Authorization: `Bearer ${localStorage.getItem("startupverse_token") || ""}`,
+        Authorization: `Bearer ${getAccessToken()}`,
         "Content-Type": "application/json",
       },
     });
@@ -43,7 +44,7 @@ export async function getTeamMemberTasks(teamMemberId) {
       {
         method: "GET",
         headers: {
-          Authorization: `Bearer ${localStorage.getItem("startupverse_token") || ""}`,
+          Authorization: `Bearer ${getAccessToken()}`,
           "Content-Type": "application/json",
         },
       },
@@ -77,7 +78,7 @@ export async function saveTask(founderId, task) {
     const response = await fetch(`${API_BASE}/founders/${founderId}/tasks`, {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${localStorage.getItem("startupverse_token") || ""}`,
+        Authorization: `Bearer ${getAccessToken()}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({ task }),
@@ -109,7 +110,7 @@ export async function updateTaskStatus(
       {
         method: "PATCH",
         headers: {
-          Authorization: `Bearer ${localStorage.getItem("startupverse_token") || ""}`,
+          Authorization: `Bearer ${getAccessToken()}`,
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
@@ -141,7 +142,7 @@ export async function deleteTask(founderId, taskId) {
       {
         method: "DELETE",
         headers: {
-          Authorization: `Bearer ${localStorage.getItem("startupverse_token") || ""}`,
+          Authorization: `Bearer ${getAccessToken()}`,
           "Content-Type": "application/json",
         },
       },
@@ -168,7 +169,7 @@ export async function assignTask(founderId, taskId, assigneeId, assigneeName) {
       {
         method: "PATCH",
         headers: {
-          Authorization: `Bearer ${localStorage.getItem("startupverse_token") || ""}`,
+          Authorization: `Bearer ${getAccessToken()}`,
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
@@ -210,7 +211,7 @@ export async function getTasks(founderId, params) {
     const response = await fetch(url, {
       method: "GET",
       headers: {
-        Authorization: `Bearer ${localStorage.getItem("startupverse_token") || ""}`,
+        Authorization: `Bearer ${getAccessToken()}`,
         "Content-Type": "application/json",
       },
     });
@@ -246,7 +247,7 @@ export async function getTasksByAssignee(assigneeId, params) {
     const response = await fetch(url, {
       method: "GET",
       headers: {
-        Authorization: `Bearer ${localStorage.getItem("startupverse_token") || ""}`,
+        Authorization: `Bearer ${getAccessToken()}`,
         "Content-Type": "application/json",
       },
     });

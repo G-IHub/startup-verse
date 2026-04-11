@@ -5,7 +5,11 @@
   "main": "src/index.js",
   "scripts": {
     "dev": "nodemon --watch src --ext js,json src/index.js",
-    "start": "node src/index.js"
+    "start": "node src/index.js",
+    "test:phase1-contract": "node scripts/phase1-contract-smoke.mjs",
+    "test:phase2-auth": "node scripts/phase2-auth-regression-smoke.mjs",
+    "test:phase3-loop": "node scripts/phase3-weekly-loop-smoke.mjs",
+    "test:phase3.1-behavior": "node scripts/phase3-1-behavior-smoke.mjs"
   },
   "keywords": [],
   "author": "",

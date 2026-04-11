@@ -5,6 +5,7 @@
 
 import { offlineStorage } from "../offlineStorage";
 import { executeWithOfflineSupport } from "../syncManager";
+import { getAccessToken } from "../../app/session";
 
 const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:8000/api/v1";
 
@@ -20,7 +21,7 @@ export async function getTeamMemberTasks(teamMemberId, isOnline) {
         {
           method: "GET",
           headers: {
-            Authorization: `Bearer ${localStorage.getItem("startupverse_token") || ""}`,
+            Authorization: `Bearer ${getAccessToken()}`,
             "Content-Type": "application/json",
           },
         },

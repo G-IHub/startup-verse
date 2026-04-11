@@ -3,210 +3,105 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Organization Backend Test</title>
+  <title>Organization API test</title>
   <style>
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      max-width: 800px;
-      margin: 50px auto;
-      padding: 20px;
-      background: #f5f5f5;
-    }
-    .container {
-      background: white;
-      padding: 30px;
-      border-radius: 12px;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-    }
-    h1 {
-      color: #3A5AFE;
-      margin-top: 0;
-    }
-    button {
-      background: #3A5AFE;
-      color: white;
-      border: none;
-      padding: 12px 24px;
-      border-radius: 6px;
-      cursor: pointer;
-      font-size: 16px;
-      margin: 10px 10px 10px 0;
-    }
-    button:hover {
-      background: #2845E8;
-    }
-    .result {
-      margin-top: 20px;
-      padding: 15px;
-      background: #f8f9fa;
-      border-radius: 6px;
-      border-left: 4px solid #3A5AFE;
-      white-space: pre-wrap;
-      font-family: monospace;
-      font-size: 13px;
-      max-height: 400px;
-      overflow-y: auto;
-    }
-    .success {
-      border-left-color: #2ECC71;
-    }
-    .error {
-      border-left-color: #e74c3c;
-    }
-    .status {
-      display: inline-block;
-      padding: 4px 12px;
-      border-radius: 4px;
-      font-size: 14px;
-      font-weight: 600;
-      margin-left: 10px;
-    }
-    .status.ok {
-      background: #d4edda;
-      color: #155724;
-    }
-    .status.fail {
-      background: #f8d7da;
-      color: #721c24;
-    }
+    body { font-family: system-ui, sans-serif; max-width: 800px; margin: 40px auto; padding: 20px; background: #f5f5f5; }
+    .container { background: white; padding: 28px; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+    h1 { color: #3A5AFE; margin-top: 0; }
+    button { background: #3A5AFE; color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; margin: 8px 8px 8px 0; }
+    button:hover { background: #2845E8; }
+    .result { margin-top: 16px; padding: 12px; background: #f8f9fa; border-radius: 6px; border-left: 4px solid #3A5AFE; white-space: pre-wrap; font-family: ui-monospace, monospace; font-size: 12px; max-height: 420px; overflow-y: auto; }
+    .success { border-left-color: #2ECC71; }
+    .error { border-left-color: #e74c3c; }
+    label { display: block; font-size: 13px; margin: 12px 0 4px; }
+    input { width: 100%; padding: 8px; box-sizing: border-box; font-size: 13px; }
+    code { background: #eee; padding: 2px 6px; border-radius: 4px; }
   </style>
 </head>
 <body>
   <div class="container">
-    <h1>🚀 Organization Backend Test</h1>
-    <p>Test your deployed Supabase backend for Organizations & Accelerators</p>
-    
+    <h1>Organization API test</h1>
+    <p>Point at your Express API (same base as <code>VITE_API_URL</code>). Authenticated calls need a JWT.</p>
+
+    <label>API base</label>
+    <input id="apiBase" type="text" value="http://localhost:5000/api/v1" />
+
+    <label>Bearer JWT (for create + search)</label>
+    <input id="jwt" type="password" placeholder="Paste token from a signed-in session" />
+
     <div>
-      <button onclick="testHealthCheck()">1. Test Health Check</button>
-      <button onclick="testCreateOrganization()">2. Create Test Organization</button>
-      <button onclick="testSearchUser()">3. Search User by Email</button>
+      <button type="button" onclick="testHealthCheck()">1. Health</button>
+      <button type="button" onclick="testCreateOrganization()">2. Create test org</button>
+      <button type="button" onclick="testSearchUser()">3. Search user by email</button>
     </div>
-    
-    <div id="result"></div>
+
+    <div id="result" class="result"></div>
   </div>
 
   <script>
-    const projectId = 'zuvrtclwxqycfskgtpbs';
-    const publicAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inp1dnJ0Y2x3eHF5Y2Zza2d0cGJzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjgzNzA4NTcsImV4cCI6MjA4Mzk0Njg1N30.4QY7N-tAXL9LNzK5_c9WGF1UPbezNaWABkV7n29bM1M';
-    const API_BASE = `https://${projectId}.supabase.co/functions/v1/make-server-78157e08`;
-
-    function showResult(data, isSuccess = true) {
-      const resultDiv = document.getElementById('result');
-      resultDiv.className = `result ${isSuccess ? 'success' : 'error'}`;
-      resultDiv.textContent = JSON.stringify(data, null, 2);
+    function api() {
+      return document.getElementById("apiBase").value.replace(/\/$/, "");
+    }
+    function authHeader() {
+      const t = document.getElementById("jwt").value.trim();
+      return t ? { Authorization: `Bearer ${t}` } : {};
+    }
+    function showResult(data, ok) {
+      const el = document.getElementById("result");
+      el.className = "result " + (ok ? "success" : "error");
+      el.textContent = JSON.stringify(data, null, 2);
     }
 
     async function testHealthCheck() {
       try {
-        const response = await fetch(`${API_BASE}/health`);
-        const data = await response.json();
-        
-        if (data.status === 'ok') {
-          showResult({
-            status: '✅ SUCCESS',
-            message: 'Backend is healthy and responding!',
-            data
-          }, true);
+        const response = await fetch(`${api()}/health`);
+        const data = await response.json().catch(() => ({}));
+        if (response.ok && (data.status === "ok" || data.success === true)) {
+          showResult({ ok: true, data }, true);
         } else {
-          showResult({
-            status: '❌ FAILED',
-            message: 'Unexpected response',
-            data
-          }, false);
+          showResult({ ok: false, status: response.status, data }, false);
         }
-      } catch (error) {
-        showResult({
-          status: '❌ ERROR',
-          message: error.message,
-          error: error.toString()
-        }, false);
+      } catch (e) {
+        showResult({ ok: false, error: String(e) }, false);
       }
     }
 
     async function testCreateOrganization() {
       try {
-        const testOrg = {
-          name: 'Test Accelerator ' + Date.now(),
-          type: 'accelerator',
-          description: 'This is a test organization created via API',
-          website: 'https://test.com',
-          creatorId: 'test-user-' + Date.now(),
-          creatorEmail: 'test@example.com',
-          creatorName: 'Test User'
+        const body = {
+          name: "Test Accelerator " + Date.now(),
+          type: "accelerator",
+          description: "Test organization via HTML harness",
+          website: "https://example.com",
+          creatorId: "test-user-" + Date.now(),
+          creatorEmail: "test@example.com",
+          creatorName: "Test User",
         };
-
-        const response = await fetch(`${API_BASE}/organizations/create`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${publicAnonKey}`
-          },
-          body: JSON.stringify(testOrg)
+        const response = await fetch(`${api()}/organizations/create`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", ...authHeader() },
+          body: JSON.stringify(body),
         });
-
         const data = await response.json();
-        
-        if (data.success && data.organization) {
-          showResult({
-            status: '✅ SUCCESS',
-            message: 'Organization created successfully!',
-            organization: data.organization
-          }, true);
-        } else {
-          showResult({
-            status: '❌ FAILED',
-            message: 'Failed to create organization',
-            data
-          }, false);
-        }
-      } catch (error) {
-        showResult({
-          status: '❌ ERROR',
-          message: error.message,
-          error: error.toString()
-        }, false);
+        showResult({ status: response.status, data }, response.ok && data.success);
+      } catch (e) {
+        showResult({ ok: false, error: String(e) }, false);
       }
     }
 
     async function testSearchUser() {
       try {
-        const response = await fetch(`${API_BASE}/users/search-by-email`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${publicAnonKey}`
-          },
-          body: JSON.stringify({ email: 'test@example.com' })
+        const response = await fetch(`${api()}/users/search-by-email`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", ...authHeader() },
+          body: JSON.stringify({ email: "test@example.com" }),
         });
-
         const data = await response.json();
-        
-        if (data.success !== undefined) {
-          showResult({
-            status: '✅ SUCCESS',
-            message: 'User search endpoint working!',
-            result: data
-          }, true);
-        } else {
-          showResult({
-            status: '❌ FAILED',
-            message: 'Unexpected response',
-            data
-          }, false);
-        }
-      } catch (error) {
-        showResult({
-          status: '❌ ERROR',
-          message: error.message,
-          error: error.toString()
-        }, false);
+        showResult({ status: response.status, data }, response.ok);
+      } catch (e) {
+        showResult({ ok: false, error: String(e) }, false);
       }
     }
-
-    // Auto-run health check on load
-    window.onload = () => {
-      setTimeout(testHealthCheck, 500);
-    };
   </script>
 </body>
 </html>

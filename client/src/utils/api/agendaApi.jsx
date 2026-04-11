@@ -1,6 +1,7 @@
 /**
  * Agenda API - Frontend client for unified calendar/agenda system
  */
+import { getAccessToken } from "../../app/session";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8000/api/v1";
 
@@ -19,7 +20,7 @@ export async function getStartupAgenda(startupId, options) {
 
     const response = await fetch(url, {
       headers: {
-        Authorization: `Bearer ${localStorage.getItem("startupverse_token") || ""}`,
+        Authorization: `Bearer ${getAccessToken()}`,
         "Content-Type": "application/json",
       },
     });
@@ -54,7 +55,7 @@ export async function getUserAgenda(userId, options) {
 
     const response = await fetch(url, {
       headers: {
-        Authorization: `Bearer ${localStorage.getItem("startupverse_token") || ""}`,
+        Authorization: `Bearer ${getAccessToken()}`,
         "Content-Type": "application/json",
       },
     });
@@ -84,7 +85,7 @@ export async function getUpcomingAgenda(startupId, days = 7) {
 
     const response = await fetch(url, {
       headers: {
-        Authorization: `Bearer ${localStorage.getItem("startupverse_token") || ""}`,
+        Authorization: `Bearer ${getAccessToken()}`,
         "Content-Type": "application/json",
       },
     });

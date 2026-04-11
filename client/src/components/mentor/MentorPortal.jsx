@@ -28,6 +28,11 @@ import {
   isGoogleConnected,
   createInstantGoogleMeet,
 } from "../../utils/googleMeet";
+import { getAccessToken } from "../../app/session";
+import { unwrapData } from "../../utils/apiEnvelope";
+
+const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:8000/api/v1";
+
 export default function MentorPortal({ mentor, onLogout }) {
   const [founders, setFounders] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -43,17 +48,18 @@ export default function MentorPortal({ mentor, onLogout }) {
   const loadFounders = async () => {
     try {
       setLoading(true);
+      const token = getAccessToken();
       const response = await fetch(
-        `${import.meta.env.VITE_API_URL || "http://localhost:8000/api/v1"}/mentors/${mentor.id}/assigned-founders`,
+        `${API_BASE}/mentors/${mentor.id}/assigned-founders`,
         {
           headers: {
-            Authorization: `Bearer ${localStorage.getItem("startupverse_token") || ""}`,
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
           },
         },
       );
       if (!response.ok) throw new Error("Failed to fetch founders");
-      const data = await response.json();
-      setFounders(data.founders);
+      const inner = unwrapData(await response.json());
+      setFounders(inner.founders || []);
     } catch (error) {
       console.error("Error loading founders:", error);
       toast.error("Failed to load founders");
