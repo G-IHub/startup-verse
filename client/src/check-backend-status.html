@@ -19,11 +19,7 @@
       border-radius: 16px;
       box-shadow: 0 20px 60px rgba(0,0,0,0.3);
     }
-    h1 {
-      color: #3A5AFE;
-      margin-top: 0;
-      font-size: 32px;
-    }
+    h1 { color: #3A5AFE; margin-top: 0; font-size: 32px; }
     .status-box {
       padding: 20px;
       border-radius: 12px;
@@ -32,21 +28,9 @@
       font-weight: 600;
       text-align: center;
     }
-    .status-checking {
-      background: #fff3cd;
-      color: #856404;
-      border: 2px solid #ffc107;
-    }
-    .status-online {
-      background: #d4edda;
-      color: #155724;
-      border: 2px solid #28a745;
-    }
-    .status-offline {
-      background: #f8d7da;
-      color: #721c24;
-      border: 2px solid #dc3545;
-    }
+    .status-checking { background: #fff3cd; color: #856404; border: 2px solid #ffc107; }
+    .status-online { background: #d4edda; color: #155724; border: 2px solid #28a745; }
+    .status-offline { background: #f8d7da; color: #721c24; border: 2px solid #dc3545; }
     .info {
       background: #e7f3ff;
       padding: 20px;
@@ -72,38 +56,7 @@
       font-weight: 600;
       margin: 10px 5px;
     }
-    button:hover {
-      background: #2845E8;
-      transform: translateY(-2px);
-      box-shadow: 0 4px 12px rgba(58, 90, 254, 0.4);
-    }
-    .instructions {
-      background: #f8f9fa;
-      padding: 20px;
-      border-radius: 8px;
-      margin: 20px 0;
-    }
-    .instructions h3 {
-      margin-top: 0;
-      color: #3A5AFE;
-    }
-    .instructions ol {
-      line-height: 1.8;
-    }
-    .instructions code {
-      background: #e9ecef;
-      padding: 2px 8px;
-      border-radius: 4px;
-      font-family: monospace;
-    }
-    pre {
-      background: #2d2d2d;
-      color: #f8f8f2;
-      padding: 20px;
-      border-radius: 8px;
-      overflow-x: auto;
-      font-size: 14px;
-    }
+    button:hover { background: #2845E8; }
     .endpoint {
       font-family: monospace;
       background: #e9ecef;
@@ -112,158 +65,100 @@
       margin: 10px 0;
       display: inline-block;
     }
+    code { background: #e9ecef; padding: 2px 8px; border-radius: 4px; }
   </style>
 </head>
 <body>
   <div class="container">
-    <h1>🔍 Backend Deployment Status</h1>
-    
-    <div id="status" class="status-box status-checking">
-      🔄 Checking backend status...
-    </div>
+    <h1>Backend deployment status</h1>
 
+    <div id="status" class="status-box status-checking">Checking API…</div>
     <div id="details"></div>
-
     <div>
-      <button onclick="checkStatus()">🔄 Recheck Status</button>
-      <button onclick="testCreate()">🧪 Test Create Organization</button>
+      <button type="button" onclick="checkStatus()">Recheck</button>
+      <button type="button" onclick="testCreate()">Test create organization (needs JWT)</button>
     </div>
 
     <div class="info">
-      <strong>🎯 Expected Endpoint:</strong>
-      <div class="endpoint">https://zuvrtclwxqycfskgtpbs.supabase.co/functions/v1/make-server-78157e08/health</div>
+      <p><strong>API base</strong> (override with <code>?api=https://host/api/v1</code>):</p>
+      <div class="endpoint" id="apiDisplay"></div>
+      <p class="text-sm text-muted-foreground">Run the Express server from <code>/server</code> and align the client <code>VITE_API_URL</code> with this base.</p>
     </div>
-
     <div id="instructions"></div>
   </div>
 
   <script>
-    const API_BASE = 'https://zuvrtclwxqycfskgtpbs.supabase.co/functions/v1/make-server-78157e08';
-    const PUBLIC_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inp1dnJ0Y2x3eHF5Y2Zza2d0cGJzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjgzNzA4NTcsImV4cCI6MjA4Mzk0Njg1N30.4QY7N-tAXL9LNzK5_c9WGF1UPbezNaWABkV7n29bM1M';
+    const API_BASE = (() => {
+      const q = new URLSearchParams(window.location.search).get("api");
+      return (q && q.trim()) || "http://localhost:5000/api/v1";
+    })().replace(/\/$/, "");
+
+    document.getElementById("apiDisplay").textContent = API_BASE;
 
     async function checkStatus() {
-      const statusDiv = document.getElementById('status');
-      const detailsDiv = document.getElementById('details');
-      const instructionsDiv = document.getElementById('instructions');
-
-      statusDiv.className = 'status-box status-checking';
-      statusDiv.innerHTML = '🔄 Checking backend status...';
-      detailsDiv.innerHTML = '';
-      instructionsDiv.innerHTML = '';
+      const statusDiv = document.getElementById("status");
+      const detailsDiv = document.getElementById("details");
+      const instructionsDiv = document.getElementById("instructions");
+      statusDiv.className = "status-box status-checking";
+      statusDiv.textContent = "Checking API…";
+      detailsDiv.innerHTML = "";
+      instructionsDiv.innerHTML = "";
 
       try {
         const response = await fetch(`${API_BASE}/health`);
-        const data = await response.json();
-
-        if (data.status === 'ok') {
-          statusDiv.className = 'status-box status-online';
-          statusDiv.innerHTML = '✅ BACKEND IS ONLINE AND WORKING!';
-          
-          detailsDiv.innerHTML = `
-            <div class="info">
-              <h3>🎉 Success! Your backend is deployed!</h3>
-              <p><strong>Status:</strong> ${data.status}</p>
-              <p><strong>Response Time:</strong> ${response.headers.get('x-response-time') || 'Fast'}</p>
-              <p>Your Organizations & Accelerators feature is ready to use!</p>
-            </div>
-          `;
+        const data = await response.json().catch(() => ({}));
+        if (response.ok && (data.status === "ok" || data.success === true)) {
+          statusDiv.className = "status-box status-online";
+          statusDiv.textContent = "API is reachable";
+          detailsDiv.innerHTML = `<div class="info"><pre>${JSON.stringify(data, null, 2)}</pre></div>`;
         } else {
-          throw new Error('Unexpected response');
+          throw new Error(`HTTP ${response.status}`);
         }
       } catch (error) {
-        statusDiv.className = 'status-box status-offline';
-        statusDiv.innerHTML = '❌ BACKEND IS NOT DEPLOYED';
-        
-        detailsDiv.innerHTML = `
-          <div class="error">
-            <h3>⚠️ Error Details:</h3>
-            <p><strong>Error:</strong> ${error.message}</p>
-            <p>This means the Supabase Edge Function is not deployed or not responding.</p>
-          </div>
-        `;
-
+        statusDiv.className = "status-box status-offline";
+        statusDiv.textContent = "API is not reachable";
+        detailsDiv.innerHTML = `<div class="error"><p><strong>Error:</strong> ${error.message}</p></div>`;
         instructionsDiv.innerHTML = `
-          <div class="instructions">
-            <h3>📋 How to Deploy:</h3>
-            <ol>
-              <li>Go to <strong>Supabase Dashboard</strong>:
-                <br><code>https://supabase.com/dashboard/project/zuvrtclwxqycfskgtpbs/functions</code>
-              </li>
-              <li>Look for function named: <code>make-server-78157e08</code></li>
-              <li>If it doesn't exist, click <strong>"Create new function"</strong></li>
-              <li>Upload or paste the <code>/supabase/functions/server/index.tsx</code> file</li>
-              <li>Click <strong>"Deploy"</strong> button</li>
-              <li>Wait 30-60 seconds for deployment</li>
-              <li>Click "Recheck Status" button above</li>
-            </ol>
-
-            <h3>🔧 Alternative: Supabase CLI</h3>
-            <pre>npm install -g supabase
-supabase login
-supabase link --project-ref zuvrtclwxqycfskgtpbs
-supabase functions deploy make-server-78157e08</pre>
-
-            <h3>❓ Still Not Working?</h3>
-            <ul>
-              <li>Check if you're logged into the correct Supabase account</li>
-              <li>Verify the project ID is: <code>zuvrtclwxqycfskgtpbs</code></li>
-              <li>Make sure the function name is exactly: <code>make-server-78157e08</code></li>
-              <li>Wait a full minute after deployment</li>
-              <li>Clear your browser cache</li>
-            </ul>
-          </div>
-        `;
+          <div class="info">
+            <p>Start the API (from repo root):</p>
+            <pre>cd server && npm install && npm run dev</pre>
+            <p>Then open this page with <code>?api=</code> pointing at your API base if not on localhost.</p>
+          </div>`;
       }
     }
 
     async function testCreate() {
-      const detailsDiv = document.getElementById('details');
-      
-      detailsDiv.innerHTML = '<div class="info">🧪 Testing organization creation...</div>';
-
+      const detailsDiv = document.getElementById("details");
+      const token = window.prompt("Paste a Bearer JWT (signed-in user)") || "";
+      detailsDiv.innerHTML = '<div class="info">Testing organization creation…</div>';
       try {
         const response = await fetch(`${API_BASE}/organizations/create`, {
-          method: 'POST',
+          method: "POST",
           headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${PUBLIC_KEY}`
+            "Content-Type": "application/json",
+            Authorization: token ? `Bearer ${token}` : "",
           },
           body: JSON.stringify({
-            name: 'Test Org ' + Date.now(),
-            type: 'accelerator',
-            description: 'Test organization',
-            creatorId: 'test-user',
-            creatorEmail: 'test@test.com',
-            creatorName: 'Test User'
-          })
+            name: "Test Org " + Date.now(),
+            type: "accelerator",
+            description: "Test organization",
+            creatorId: "test-user",
+            creatorEmail: "test@test.com",
+            creatorName: "Test User",
+          }),
         });
-
         const data = await response.json();
-
-        if (data.success && data.organization) {
-          detailsDiv.innerHTML = `
-            <div class="info">
-              <h3>✅ Organization Created Successfully!</h3>
-              <pre>${JSON.stringify(data.organization, null, 2)}</pre>
-            </div>
-          `;
+        if (data.success && data.data) {
+          detailsDiv.innerHTML = `<div class="info"><h3>Created</h3><pre>${JSON.stringify(data.data, null, 2)}</pre></div>`;
         } else {
           throw new Error(JSON.stringify(data));
         }
       } catch (error) {
-        detailsDiv.innerHTML = `
-          <div class="error">
-            <h3>❌ Test Failed</h3>
-            <p>${error.message}</p>
-          </div>
-        `;
+        detailsDiv.innerHTML = `<div class="error"><h3>Test failed</h3><p>${error.message}</p></div>`;
       }
     }
 
-    // Auto-check on load
-    window.onload = () => {
-      setTimeout(checkStatus, 500);
-    };
+    window.onload = () => setTimeout(checkStatus, 300);
   </script>
 </body>
 </html>

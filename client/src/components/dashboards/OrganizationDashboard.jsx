@@ -39,7 +39,7 @@ import {
   getOrganizationCohorts,
   isOrganizationAdmin,
   deleteCohort,
-} from "../../utils/organizationHelpersSupabase";
+} from "../../utils/organizationHelpersBackend";
 import CreateOrganizationModal from "../organizations/CreateOrganizationModal";
 import CreateCohortModal from "../organizations/CreateCohortModal";
 import CohortDashboardWithSidebar from "../organizations/CohortDashboardWithSidebar";

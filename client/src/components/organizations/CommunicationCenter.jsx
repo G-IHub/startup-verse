@@ -27,6 +27,11 @@ import {
   MailOpen,
   Reply,
 } from "lucide-react";
+import { getAccessToken } from "../../app/session";
+import { unwrapData } from "../../utils/apiEnvelope";
+
+const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:8000/api/v1";
+
 export default function CommunicationCenter({
   cohortId,
   organizationId,
@@ -59,17 +64,15 @@ export default function CommunicationCenter({
   const loadAnnouncements = async () => {
     try {
       setLoading(true);
-      const response = await fetch(
-        `${import.meta.env.VITE_API_URL || "http://localhost:8000/api/v1"}/announcements/${cohortId}`,
-        {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem("startupverse_token") || ""}`,
-          },
+      const token = getAccessToken();
+      const response = await fetch(`${API_BASE}/cohorts/${cohortId}/announcements`, {
+        headers: {
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
-      );
+      });
       if (!response.ok) throw new Error("Failed to fetch announcements");
-      const data = await response.json();
-      setAnnouncements(data.announcements);
+      const inner = unwrapData(await response.json());
+      setAnnouncements(inner.announcements || []);
     } catch (error) {
       console.error("Error loading announcements:", error);
     } finally {
@@ -100,26 +103,20 @@ export default function CommunicationCenter({
   const handleCreateAnnouncement = async (e) => {
     e.preventDefault();
     try {
-      const response = await fetch(
-        `${import.meta.env.VITE_API_URL || "http://localhost:8000/api/v1"}/announcements/create`,
-        {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem("startupverse_token") || ""}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            cohortId,
-            organizationId,
-            title: announcementData.title,
-            content: announcementData.content,
-            priority: announcementData.priority,
-            attachments: [],
-            createdBy: userId,
-            createdByName: userName,
-          }),
+      const token = getAccessToken();
+      const response = await fetch(`${API_BASE}/cohorts/${cohortId}/announcements`, {
+        method: "POST",
+        headers: {
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          "Content-Type": "application/json",
         },
-      );
+        body: JSON.stringify({
+          organizationId,
+          title: announcementData.title,
+          body: announcementData.content,
+          founderId: userId,
+        }),
+      });
       if (!response.ok) throw new Error("Failed to create announcement");
 
       // Reset form and reload
@@ -380,7 +377,7 @@ export default function CommunicationCenter({
                           </Badge>
                         </div>
                         <p className="text-[9px] text-muted-foreground whitespace-pre-wrap">
-                          {announcement.content}
+                          {announcement.body || announcement.content}
                         </p>
                       </div>
                     </div>

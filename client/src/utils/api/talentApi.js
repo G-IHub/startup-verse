@@ -4,6 +4,7 @@
  * Handles all API calls for Talent users to the backend.
  * Follows the same pattern as founderApi and teamMemberApi.
  */
+import { getAccessToken } from "../../app/session";
 
 const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:8000/api/v1";
 
@@ -17,7 +18,7 @@ async function apiCall(endpoint, options = {}) {
     ...options,
     headers: {
       "Content-Type": "application/json",
-      Authorization: `Bearer ${localStorage.getItem("startupverse_token") || ""}`,
+      Authorization: `Bearer ${getAccessToken()}`,
       ...options.headers,
     },
   });

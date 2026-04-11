@@ -13,7 +13,7 @@ import {
   respondToInvitation,
   getOrganization,
   getCohort,
-} from "../../utils/organizationHelpersSupabase";
+} from "../../utils/organizationHelpersBackend";
 export default function CohortInvitationCard({ invitation, onRespond }) {
   const [isResponding, setIsResponding] = useState(false);
   const [showDetails, setShowDetails] = useState(false);

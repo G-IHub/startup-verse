@@ -38,7 +38,7 @@ export function AdminMegaNuclear() {
       alert(
         `💀 MEGA NUCLEAR COMPLETE!\n\n` +
           `DELETED:\n` +
-          `  • ${resetData.deletedAuthUsers || 0} Supabase Auth users\n` +
+          `  • ${resetData.deletedAuthUsers || 0} remote auth user records\n` +
           `  • ${resetData.totalKeysDeleted} total keys\n\n` +
           `VERIFICATION:\n` +
           `  • Remaining users: ${resetData.verification?.remainingUsers || 0}\n` +

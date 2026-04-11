@@ -1,3 +1,5 @@
+import { getAccessToken } from "../../app/session";
+
 const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:8000/api/v1";
 
 export async function createMeeting(meeting) {
@@ -6,7 +8,7 @@ export async function createMeeting(meeting) {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${localStorage.getItem("startupverse_token") || ""}`,
+        Authorization: `Bearer ${getAccessToken()}`,
       },
       body: JSON.stringify(meeting),
     });
@@ -29,7 +31,7 @@ export async function getStartupMeetings(startupId) {
   try {
     const response = await fetch(`${API_BASE}/meetings/startup/${startupId}`, {
       headers: {
-        Authorization: `Bearer ${localStorage.getItem("startupverse_token") || ""}`,
+        Authorization: `Bearer ${getAccessToken()}`,
       },
     });
 
@@ -51,7 +53,7 @@ export async function updateMeeting(meetingId, updates) {
       method: "PUT",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${localStorage.getItem("startupverse_token") || ""}`,
+        Authorization: `Bearer ${getAccessToken()}`,
       },
       body: JSON.stringify(updates),
     });
@@ -74,7 +76,7 @@ export async function deleteMeeting(meetingId) {
     const response = await fetch(`${API_BASE}/meetings/${meetingId}`, {
       method: "DELETE",
       headers: {
-        Authorization: `Bearer ${localStorage.getItem("startupverse_token") || ""}`,
+        Authorization: `Bearer ${getAccessToken()}`,
       },
     });
 
@@ -94,7 +96,7 @@ export async function getUserMeetings(userId) {
   try {
     const response = await fetch(`${API_BASE}/meetings/user/${userId}`, {
       headers: {
-        Authorization: `Bearer ${localStorage.getItem("startupverse_token") || ""}`,
+        Authorization: `Bearer ${getAccessToken()}`,
       },
     });
 

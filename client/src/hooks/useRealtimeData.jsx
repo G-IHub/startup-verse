@@ -12,7 +12,7 @@ import {
   subscribeToAnnouncements,
   subscribeToWins,
   subscribeToUnreadCount,
-} from "../utils/supabaseRealtimeSubscriptions";
+} from "../utils/realtimeSubscriptions";
 
 /**
  * Hook for real-time team members
@@ -269,7 +269,12 @@ export function useRealtimeUnreadCount(startupId, userId, initialCount = 0) {
 
     const unsubscribe = subscribeToUnreadCount(startupId, userId, (update) => {
       console.log("🔄 [useRealtimeUnreadCount] Received update:", update);
-      setCount(update.count);
+      setCount((prev) => {
+        if (typeof update?.count === "number") return update.count;
+        if (typeof update?.countDelta === "number")
+          return Math.max(0, prev + update.countDelta);
+        return prev;
+      });
     });
 
     return unsubscribe;
@@ -301,11 +306,12 @@ export function useRealtimeMessages(
       console.log("🔄 [useRealtimeMessages] Received update:", update);
 
       if (update.action === "new_message") {
-        // Only add message if it's for the current conversation
-        if (
-          update.message &&
-          (!conversationId || update.conversationId === conversationId)
-        ) {
+        const peerMatch =
+          !conversationId ||
+          update.conversationId === conversationId ||
+          update.fromUserId === conversationId ||
+          update.toUserId === conversationId;
+        if (update.message && peerMatch) {
           setMessages((currentMessages) => {
             // Check if message already exists (prevent duplicates)
             const exists = currentMessages.some(

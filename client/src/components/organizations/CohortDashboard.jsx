@@ -31,7 +31,7 @@ import {
   getCohortMembers,
   generateCohortExport,
   downloadCSV,
-} from "../../utils/organizationHelpersSupabase";
+} from "../../utils/organizationHelpersBackend";
 import InviteStartupModal from "./InviteStartupModal";
 import StartupSnapshotModal from "./StartupSnapshotModal";
 import PortfolioOverview from "./PortfolioOverview";

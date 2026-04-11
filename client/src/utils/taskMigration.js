@@ -1,7 +1,7 @@
 /**
  * Task Migration Utility
  *
- * Syncs tasks from localStorage to Supabase backend
+ * Syncs tasks from localStorage to the Express backend
  * This is needed for users who have tasks created before backend integration
  */
 

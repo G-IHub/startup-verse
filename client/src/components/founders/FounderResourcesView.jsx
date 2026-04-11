@@ -14,6 +14,11 @@ import {
   FolderOpen,
   Link as LinkIcon,
 } from "lucide-react";
+import { getAccessToken } from "../../app/session";
+import { unwrapData } from "../../utils/apiEnvelope";
+
+const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:8000/api/v1";
+
 export default function FounderResourcesView({ founderId }) {
   const [resources, setResources] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -24,17 +29,15 @@ export default function FounderResourcesView({ founderId }) {
   const loadResources = async () => {
     try {
       setLoading(true);
-      const response = await fetch(
-        `${import.meta.env.VITE_API_URL || "http://localhost:8000/api/v1"}/resources/founder/${founderId}`,
-        {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem("startupverse_token") || ""}`,
-          },
+      const token = getAccessToken();
+      const response = await fetch(`${API_BASE}/founders/${founderId}/resources`, {
+        headers: {
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
-      );
+      });
       if (!response.ok) throw new Error("Failed to fetch resources");
-      const data = await response.json();
-      setResources(data.resources);
+      const inner = unwrapData(await response.json());
+      setResources(inner.resources || []);
     } catch (error) {
       console.error("Error loading resources:", error);
     } finally {

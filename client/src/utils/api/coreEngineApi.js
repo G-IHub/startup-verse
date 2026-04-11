@@ -1,6 +1,14 @@
 // Async API wrapper for Core Engine with backend-first approach
+import { request } from "../backendClient";
 
-const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:8000/api/v1";
+async function apiRequest(endpoint, options = {}) {
+  const payload = await request(endpoint, options);
+  return payload.data;
+}
+
+function asList(value) {
+  return Array.isArray(value) ? value : [];
+}
 
 // ==========================================
 // TYPES
@@ -15,32 +23,20 @@ const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:8000/api/v1";
  */
 export async function getWeeklyOutcomes(founderId) {
   try {
-    const response = await fetch(
-      `${API_BASE}/founders/${founderId}/weekly-outcomes`,
-      {
-        method: "GET",
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem("startupverse_token") || ""}`,
-          "Content-Type": "application/json",
-        },
-      },
-    );
-
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-    }
-
-    const data = await response.json();
+    const data = await apiRequest(`/founders/${founderId}/weekly-outcomes`, {
+      method: "GET",
+    });
+    const outcomes = Array.isArray(data) ? data : asList(data?.outcomes);
 
     // ✅ BACKEND-FIRST: Cache in localStorage for offline access
-    if (data.outcomes && data.outcomes.length > 0) {
+    if (outcomes.length > 0) {
       localStorage.setItem(
         `weekly_outcomes_${founderId}`,
-        JSON.stringify(data.outcomes),
+        JSON.stringify(outcomes),
       );
     }
 
-    return data.outcomes || [];
+    return outcomes;
   } catch (error) {
     // Silent fallback - don't spam console in production
     const errorMessage = error.message;
@@ -80,21 +76,10 @@ export async function getCurrentWeeklyOutcome(founderId) {
  */
 export async function saveWeeklyOutcome(founderId, outcome) {
   try {
-    const response = await fetch(
-      `${API_BASE}/founders/${founderId}/weekly-outcomes`,
-      {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem("startupverse_token") || ""}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ outcome }),
-      },
-    );
-
-    if (!response.ok) {
-      throw new Error(`Failed to save weekly outcome: ${response.statusText}`);
-    }
+    await apiRequest(`/founders/${founderId}/weekly-outcomes`, {
+      method: "POST",
+      body: JSON.stringify({ outcome }),
+    });
 
     console.log("✅ Weekly outcome saved to backend");
 
@@ -188,26 +173,17 @@ export async function updateWeeklyOutcome(founderId, outcomeId, updates) {
  */
 export async function getTasks(founderId) {
   try {
-    const response = await fetch(`${API_BASE}/founders/${founderId}/tasks`, {
+    const data = await apiRequest(`/founders/${founderId}/tasks`, {
       method: "GET",
-      headers: {
-        Authorization: `Bearer ${localStorage.getItem("startupverse_token") || ""}`,
-        "Content-Type": "application/json",
-      },
     });
-
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-    }
-
-    const data = await response.json();
+    const tasks = Array.isArray(data) ? data : asList(data?.tasks);
 
     // ✅ BACKEND-FIRST: Cache in localStorage for offline access
-    if (data.tasks && data.tasks.length > 0) {
-      localStorage.setItem(`tasks_${founderId}`, JSON.stringify(data.tasks));
+    if (tasks.length > 0) {
+      localStorage.setItem(`tasks_${founderId}`, JSON.stringify(tasks));
     }
 
-    return data.tasks || [];
+    return tasks;
   } catch (error) {
     // Silent fallback - don't spam console in production
     const errorMessage = error.message;
@@ -239,18 +215,10 @@ export async function getTasks(founderId) {
  */
 export async function saveTask(founderId, task) {
   try {
-    const response = await fetch(`${API_BASE}/founders/${founderId}/tasks`, {
+    await apiRequest(`/founders/${founderId}/tasks`, {
       method: "POST",
-      headers: {
-        Authorization: `Bearer ${localStorage.getItem("startupverse_token") || ""}`,
-        "Content-Type": "application/json",
-      },
       body: JSON.stringify({ task }),
     });
-
-    if (!response.ok) {
-      throw new Error(`Failed to save task: ${response.statusText}`);
-    }
 
     console.log(`✅ Task ${task.id} saved to backend`);
 
@@ -303,28 +271,20 @@ export async function updateTaskStatus(
   additionalData,
 ) {
   try {
-    const response = await fetch(
-      `${API_BASE}/founders/${founderId}/tasks/${taskId}/status`,
-      {
-        method: "PATCH",
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem("startupverse_token") || ""}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          status,
-          ...additionalData,
-          updatedAt: new Date().toISOString(),
-        }),
-      },
-    );
-
-    if (!response.ok) {
-      throw new Error(`Failed to update task status: ${response.statusText}`);
-    }
+    await apiRequest(`/founders/${founderId}/tasks/${taskId}/status`, {
+      method: "PUT",
+      body: JSON.stringify({
+        status,
+        ...additionalData,
+        updatedAt: new Date().toISOString(),
+      }),
+    });
 
     console.log(`✅ Task ${taskId} status updated to ${status}`);
   } catch (error) {
+    if (String(error?.message || "").toLowerCase().includes("blocked tasks require")) {
+      throw new Error("Blocked tasks require both a blocker reason and blocker note.");
+    }
     console.error("Error updating task status:", error);
     throw error;
   }
@@ -335,20 +295,9 @@ export async function updateTaskStatus(
  */
 export async function deleteTask(founderId, taskId) {
   try {
-    const response = await fetch(
-      `${API_BASE}/founders/${founderId}/tasks/${taskId}`,
-      {
-        method: "DELETE",
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem("startupverse_token") || ""}`,
-          "Content-Type": "application/json",
-        },
-      },
-    );
-
-    if (!response.ok) {
-      throw new Error(`Failed to delete task: ${response.statusText}`);
-    }
+    await apiRequest(`/founders/${founderId}/tasks/${taskId}`, {
+      method: "DELETE",
+    });
 
     console.log(`✅ Task ${taskId} deleted from backend`);
   } catch (error) {
@@ -363,26 +312,15 @@ export async function deleteTask(founderId, taskId) {
 export async function assignTask(founderId, taskId, assigneeId, assigneeName) {
   try {
     // Call the backend's /assign endpoint which triggers notifications
-    const response = await fetch(
-      `${API_BASE}/founders/${founderId}/tasks/${taskId}/assign`,
-      {
-        method: "PATCH",
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem("startupverse_token") || ""}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          assigneeId,
-          assigneeName,
-          assignedTo: assigneeId,
-          assignedToName: assigneeName,
-        }),
-      },
-    );
-
-    if (!response.ok) {
-      throw new Error(`Failed to assign task: ${response.statusText}`);
-    }
+    await apiRequest(`/founders/${founderId}/tasks/${taskId}/assign`, {
+      method: "PUT",
+      body: JSON.stringify({
+        assigneeId,
+        assigneeName,
+        assignedTo: assigneeId,
+        assignedToName: assigneeName,
+      }),
+    });
 
     console.log(
       `✅ Task ${taskId} assigned to ${assigneeName} (with notification)`,
@@ -590,23 +528,10 @@ export async function getStreakStats(founderId) {
  */
 export async function getMilestones(founderId) {
   try {
-    const response = await fetch(
-      `${API_BASE}/founders/${founderId}/milestones`,
-      {
-        method: "GET",
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem("startupverse_token") || ""}`,
-          "Content-Type": "application/json",
-        },
-      },
-    );
-
-    if (!response.ok) {
-      throw new Error(`Failed to fetch milestones: ${response.statusText}`);
-    }
-
-    const data = await response.json();
-    return data.milestones || [];
+    const data = await apiRequest(`/founders/${founderId}/milestones`, {
+      method: "GET",
+    });
+    return Array.isArray(data) ? data : asList(data?.milestones);
   } catch (error) {
     console.error("Error fetching milestones:", error);
     throw error;
@@ -618,21 +543,10 @@ export async function getMilestones(founderId) {
  */
 export async function saveMilestone(founderId, milestone) {
   try {
-    const response = await fetch(
-      `${API_BASE}/founders/${founderId}/milestones`,
-      {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem("startupverse_token") || ""}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ milestone }),
-      },
-    );
-
-    if (!response.ok) {
-      throw new Error(`Failed to save milestone: ${response.statusText}`);
-    }
+    await apiRequest(`/founders/${founderId}/milestones`, {
+      method: "POST",
+      body: JSON.stringify({ milestone }),
+    });
 
     console.log(`✅ Milestone ${milestone.id} saved to backend`);
   } catch (error) {
@@ -653,20 +567,10 @@ export async function getExecutionData(founderId) {
     // 🎯 PRIORITY 1: Try to load execution data directly from backend
     // This includes currentOutcome set by organizations via auto-population
     try {
-      const response = await fetch(
-        `${API_BASE}/founders/${founderId}/execution-data`,
-        {
-          method: "GET",
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem("startupverse_token") || ""}`,
-            "Content-Type": "application/json",
-          },
-        },
-      );
-
-      if (response.ok) {
-        const data = await response.json();
-        if (data.executionData) {
+      const data = await apiRequest(`/founders/${founderId}/execution-data`, {
+        method: "GET",
+      });
+      if (data.executionData) {
           console.log(
             "✅ Loaded execution data directly from backend (includes org milestones):",
             data.executionData,
@@ -679,7 +583,6 @@ export async function getExecutionData(founderId) {
           );
 
           return data.executionData;
-        }
       }
     } catch (directFetchError) {
       console.debug(

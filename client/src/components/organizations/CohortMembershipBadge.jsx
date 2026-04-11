@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { Badge } from "../ui/badge";
 import { Card, CardContent } from "../ui/card";
 import { Users, Eye, X } from "lucide-react";
-import { getStartupMemberships } from "../../utils/organizationHelpersSupabase";
+import { getStartupMemberships } from "../../utils/organizationHelpersBackend";
 export default function CohortMembershipBadge({ startupId }) {
   const [memberships, setMemberships] = useState([]);
   const [showDetails, setShowDetails] = useState(false);

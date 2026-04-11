@@ -796,7 +796,7 @@ Read the full story: [link to blog post]
 **Topics:**
 
 - "How we built the Smart Team Matching algorithm"
-- "Why we chose Supabase over Firebase"
+- "Why we chose MongoDB + Express for our API"
 - "Our design system: Material Design for startups"
 - "Keyboard shortcuts: How we made StartupVerse 10x faster"
 - "Dark mode: The technical challenges we faced"

@@ -18,7 +18,7 @@ import {
   SelectValue,
 } from "../ui/select";
 import { Building2, CheckCircle2 } from "lucide-react";
-import { createOrganization } from "../../utils/organizationHelpersSupabase";
+import { createOrganization } from "../../utils/organizationHelpersBackend";
 export default function CreateOrganizationModal({
   isOpen,
   onClose,

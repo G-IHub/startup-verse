@@ -5,13 +5,13 @@ const organizationAdminSchema = new mongoose.Schema(
     organizationId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Organization",
-      required: true,
+      required: [true, "organizationId is required"],
       index: true,
     },
     userId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
-      required: true,
+      required: [true, "userId is required"],
       index: true,
     },
   },
@@ -25,4 +25,3 @@ const OrganizationAdmin =
   mongoose.model("OrganizationAdmin", organizationAdminSchema);
 
 export default OrganizationAdmin;
-

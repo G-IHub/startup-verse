@@ -19,10 +19,12 @@ export const APP_VIEWS = Object.freeze({
 export const STORAGE_KEYS = Object.freeze({
   authMigrationCompleted: "auth_migration_v1_completed",
   currentUser: "startupverse_user",
+  legacyToken: "startupverse_token",
   founderProfiles: "startupverse_founder_profiles",
   registeredUsers: "startupverse_registered_users",
   talentProfiles: "startupverse_talent_profiles",
   teamMembers: "startupverse_users",
+  sessionV2: "sv:session:v2",
 });
 
 export function safeParseJson(raw, fallback) {
@@ -63,15 +65,90 @@ export function writeStoredList(key, value) {
 }
 
 export function persistCurrentUser(user) {
-  localStorage.setItem(STORAGE_KEYS.currentUser, JSON.stringify(user));
+  const current = loadAuthSession();
+  persistAuthSession({
+    ...current,
+    user,
+  });
 }
 
 export function clearCurrentUser() {
+  const current = loadAuthSession();
+  persistAuthSession({
+    ...current,
+    user: null,
+  });
   localStorage.removeItem(STORAGE_KEYS.currentUser);
 }
 
 export function loadCurrentUser() {
-  return safeParseJson(localStorage.getItem(STORAGE_KEYS.currentUser), null);
+  const session = loadAuthSession();
+  return session?.user || safeParseJson(localStorage.getItem(STORAGE_KEYS.currentUser), null);
+}
+
+export function loadAuthSession() {
+  return safeParseJson(localStorage.getItem(STORAGE_KEYS.sessionV2), null);
+}
+
+export function persistAuthSession(session) {
+  localStorage.setItem(STORAGE_KEYS.sessionV2, JSON.stringify(session));
+  if (session?.user) {
+    localStorage.setItem(STORAGE_KEYS.currentUser, JSON.stringify(session.user));
+  } else {
+    localStorage.removeItem(STORAGE_KEYS.currentUser);
+  }
+
+  if (session?.accessToken) {
+    localStorage.setItem(STORAGE_KEYS.legacyToken, session.accessToken);
+  } else {
+    localStorage.removeItem(STORAGE_KEYS.legacyToken);
+  }
+}
+
+export function clearAuthSession() {
+  localStorage.removeItem(STORAGE_KEYS.sessionV2);
+  localStorage.removeItem(STORAGE_KEYS.currentUser);
+  localStorage.removeItem(STORAGE_KEYS.legacyToken);
+}
+
+export function getAccessToken() {
+  const session = loadAuthSession();
+  return session?.accessToken || localStorage.getItem(STORAGE_KEYS.legacyToken) || "";
+}
+
+export function setAccessToken(accessToken) {
+  const session = loadAuthSession() || { version: 2, user: null };
+  persistAuthSession({
+    ...session,
+    accessToken: accessToken || "",
+  });
+}
+
+export function setSessionUser(user) {
+  const session = loadAuthSession() || { version: 2, accessToken: "" };
+  persistAuthSession({
+    ...session,
+    user: user || null,
+  });
+}
+
+export function ensureSessionMigration() {
+  const existing = loadAuthSession();
+  if (existing) {
+    return existing;
+  }
+
+  const legacyUser = safeParseJson(localStorage.getItem(STORAGE_KEYS.currentUser), null);
+  const legacyToken = localStorage.getItem(STORAGE_KEYS.legacyToken) || "";
+  const migrated = {
+    version: 2,
+    user: legacyUser,
+    accessToken: legacyToken,
+    migratedFromLegacy: true,
+    updatedAt: new Date().toISOString(),
+  };
+  persistAuthSession(migrated);
+  return migrated;
 }
 
 export function upsertStoredRecord(key, record) {

@@ -93,14 +93,7 @@ export default function LoginPage({ onRoleSelect, onNavigateToSignup }) {
     };
   }, [currentSlide, features.length]);
   const handleGoogleLogin = () => {
-    setLoading(true);
-    // Simulate Google auth
-    setTimeout(() => {
-      // Google auth will handle role detection
-      onRoleSelect("founder", {
-        method: "google",
-      });
-    }, 500);
+    toast.info("Google sign-in is temporarily unavailable. Please use email sign-in.");
   };
   const handleEmailLogin = async (e) => {
     e.preventDefault();
@@ -108,10 +101,11 @@ export default function LoginPage({ onRoleSelect, onNavigateToSignup }) {
     setLoading(true);
     try {
       // Call backend signin API
-      const user = await authApi.signin({
+      const authResult = await authApi.signin({
         email,
         password,
       });
+      const user = authResult.user;
       console.log("✅ [LoginPage] Backend signin successful:", user);
 
       // Pass user data back to App.tsx
@@ -122,6 +116,7 @@ export default function LoginPage({ onRoleSelect, onNavigateToSignup }) {
         password,
         userId: user.id,
         backendUser: user,
+        backendToken: authResult.token,
       });
     } catch (error) {
       const errorMessage = error.message;

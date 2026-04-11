@@ -289,7 +289,7 @@ export function formatMessageTimestamp(timestamp) {
   return `${date.toLocaleDateString()} at ${timeStr}`;
 }
 
-// Upload file to Supabase Storage
+// Upload file to the messaging API (multipart)
 export async function uploadMessageFile(file, startupId, senderId) {
   try {
     const formData = new FormData();

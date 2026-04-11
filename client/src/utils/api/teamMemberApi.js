@@ -5,30 +5,15 @@
  * All functions handle errors gracefully and provide detailed logging.
  */
 
-const BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:8000/api/v1";
+import { request } from "../backendClient";
 
 // Pagination types
 
 // Helper function for API requests
 async function apiRequest(endpoint, options = {}) {
   try {
-    const response = await fetch(`${BASE_URL}${endpoint}`, {
-      ...options,
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${localStorage.getItem("startupverse_token") || ""}`,
-        ...options.headers,
-      },
-    });
-
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(
-        errorData.error || `HTTP ${response.status}: ${response.statusText}`,
-      );
-    }
-
-    return await response.json();
+    const payload = await request(endpoint, options);
+    return payload.data;
   } catch (error) {
     // Silently fail in development mode (expected when backend isn't running)
     if (import.meta.env.DEV) {
@@ -92,7 +77,7 @@ export async function getTeamMemberProfile(userId) {
   });
 
   console.log(`✅ Team member profile fetched: ${userId}`);
-  return result.profile;
+  return result.profile || result;
 }
 
 /**
@@ -112,7 +97,7 @@ export async function getStartupTeamMembers(startupId, params = {}) {
   console.log(
     `✅ Team members fetched: ${result.pagination?.total || result.count} members`,
   );
-  return result.teamMembers || result.items;
+  return result.teamMembers || result.items || [];
 }
 
 // ==========================================
@@ -136,7 +121,7 @@ export async function getTeamMemberTasks(teamMemberId, params = {}) {
   console.log(
     `✅ Tasks fetched: ${result.pagination?.total || result.count} tasks assigned`,
   );
-  return result.tasks || result.items;
+  return result.tasks || result.items || [];
 }
 
 /**
@@ -168,7 +153,7 @@ export async function updateTaskStatus(teamMemberId, taskId, updates) {
     console.log(
       `📬 [NOTIFICATION SYSTEM] Notification should be created for founder ${updates.founderId}`,
     );
-    return result.task;
+    return result.task || result;
   } catch (error) {
     console.error(`❌ [NOTIFICATION SYSTEM] Failed to update task:`, error);
     throw error;
@@ -190,7 +175,7 @@ export async function addTaskComment(teamMemberId, taskId, comment, userName) {
   );
 
   console.log(`✅ Comment added to task: ${taskId}`);
-  return result.comment;
+  return result.comment || result;
 }
 
 // ==========================================
@@ -214,7 +199,7 @@ export async function getTeamMemberActivity(teamMemberId, params = {}) {
   console.log(
     `✅ Activity fetched: ${result.pagination?.total || result.count} activities`,
   );
-  return result.activities || result.items;
+  return result.activities || result.items || [];
 }
 
 // ==========================================
@@ -233,7 +218,7 @@ export async function saveTeamMemberStatus(teamMemberId, statusText, mood) {
   });
 
   console.log(`✅ Status saved: ${teamMemberId}`);
-  return result.status;
+  return result.status || result;
 }
 
 /**
@@ -247,7 +232,7 @@ export async function getTeamMemberStatus(teamMemberId) {
   });
 
   console.log(`✅ Status fetched: ${teamMemberId}`);
-  return result.status;
+  return result.status || result;
 }
 
 // ==========================================

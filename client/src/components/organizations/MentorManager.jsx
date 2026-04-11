@@ -22,6 +22,11 @@ import {
   Clock,
 } from "lucide-react";
 import { toast } from "sonner";
+import { getAccessToken } from "../../app/session";
+import { unwrapData } from "../../utils/apiEnvelope";
+
+const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:8000/api/v1";
+
 export default function MentorManager({ organizationId, cohorts, isAdmin }) {
   const [mentors, setMentors] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -39,17 +44,18 @@ export default function MentorManager({ organizationId, cohorts, isAdmin }) {
   const loadMentors = async () => {
     try {
       setLoading(true);
+      const token = getAccessToken();
       const response = await fetch(
-        `${import.meta.env.VITE_API_URL || "http://localhost:8000/api/v1"}/mentors/organization/${organizationId}`,
+        `${API_BASE}/organizations/${organizationId}/mentors`,
         {
           headers: {
-            Authorization: `Bearer ${localStorage.getItem("startupverse_token") || ""}`,
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
           },
         },
       );
       if (!response.ok) throw new Error("Failed to fetch mentors");
-      const data = await response.json();
-      setMentors(data.mentors);
+      const inner = unwrapData(await response.json());
+      setMentors(inner.mentors || []);
     } catch (error) {
       console.error("Error loading mentors:", error);
       toast.error("Failed to load mentors");
@@ -65,22 +71,23 @@ export default function MentorManager({ organizationId, cohorts, isAdmin }) {
     }
     try {
       setInviting(true);
+      const token = getAccessToken();
       const response = await fetch(
-        `${import.meta.env.VITE_API_URL || "http://localhost:8000/api/v1"}/mentors/invite`,
+        `${API_BASE}/organizations/${organizationId}/mentors`,
         {
           method: "POST",
           headers: {
-            Authorization: `Bearer ${localStorage.getItem("startupverse_token") || ""}`,
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
-            organizationId,
-            ...formData,
+            email: formData.email,
+            expertise: formData.expertise,
           }),
         },
       );
       if (!response.ok) throw new Error("Failed to invite mentor");
-      const { mentor, magicLink } = await response.json();
+      unwrapData(await response.json());
       toast.success(
         "Mentor invited successfully! Magic link sent to their email.",
       );
@@ -106,15 +113,13 @@ export default function MentorManager({ organizationId, cohorts, isAdmin }) {
   const handleDeleteMentor = async (mentorId) => {
     if (!confirm("Are you sure you want to remove this mentor?")) return;
     try {
-      const response = await fetch(
-        `${import.meta.env.VITE_API_URL || "http://localhost:8000/api/v1"}/mentors/${mentorId}`,
-        {
-          method: "DELETE",
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem("startupverse_token") || ""}`,
-          },
+      const token = getAccessToken();
+      const response = await fetch(`${API_BASE}/mentors/${mentorId}`, {
+        method: "DELETE",
+        headers: {
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
-      );
+      });
       if (!response.ok) throw new Error("Failed to delete mentor");
       toast.success("Mentor removed successfully");
       loadMentors();

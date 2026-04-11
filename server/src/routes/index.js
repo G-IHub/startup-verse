@@ -1,9 +1,46 @@
 import { Router } from "express";
+import agendaRouter from "./agenda.routes.js";
+import authRouter from "./auth.routes.js";
+import compatibilityRouter from "./compatibility.routes.js";
+import eventsRouter from "./events.routes.js";
+import mentorsRouter from "./mentors.routes.js";
+import announcementsRouter from "./announcements.routes.js";
+import cronRouter from "./cron.routes.js";
+import deliverablesRouter from "./deliverables.routes.js";
+import executionScoreRouter from "./executionScore.routes.js";
+import foundersRouter from "./founders.routes.js";
+import googleRouter from "./google.routes.js";
 import healthRouter from "./health.routes.js";
+import invitationsRouter from "./invitations.routes.js";
+import messagesRouter from "./messages.routes.js";
+import notificationsRouter from "./notifications.routes.js";
+import organizationsRouter from "./organizations.routes.js";
+import presenceRouter from "./presence.routes.js";
+import talentRouter from "./talent.routes.js";
+import teamMembersRouter from "./teamMembers.routes.js";
+import usersRouter from "./users.routes.js";
 
 const apiRouter = Router();
 
 apiRouter.use(healthRouter);
+apiRouter.use(authRouter);
+apiRouter.use(usersRouter);
+apiRouter.use(foundersRouter);
+apiRouter.use(organizationsRouter);
+apiRouter.use(invitationsRouter);
+apiRouter.use(deliverablesRouter);
+apiRouter.use(messagesRouter);
+apiRouter.use(notificationsRouter);
+apiRouter.use(agendaRouter);
+apiRouter.use(executionScoreRouter);
+apiRouter.use(presenceRouter);
+apiRouter.use(googleRouter);
+apiRouter.use(talentRouter);
+apiRouter.use(teamMembersRouter);
+apiRouter.use(cronRouter);
+apiRouter.use(eventsRouter);
+apiRouter.use(mentorsRouter);
+apiRouter.use(announcementsRouter);
+apiRouter.use(compatibilityRouter);
 
 export default apiRouter;
-

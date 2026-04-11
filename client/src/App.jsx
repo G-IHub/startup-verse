@@ -8,6 +8,7 @@ import { Toaster } from "./components/ui/sonner";
 import { toast } from "sonner";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import { AuthProvider } from "./contexts/AuthContext";
+import { useAuth } from "./contexts/AuthContext";
 import { NotificationProvider } from "./contexts/NotificationContext";
 import * as founderApi from "./utils/api/founderApi";
 import * as teamMemberApi from "./utils/api/teamMemberApi";
@@ -19,21 +20,15 @@ import {
   STORAGE_KEYS,
   buildFounderProfile,
   buildTalentProfile,
-  clearCurrentUser,
+  getAccessToken,
   loadCurrentUser,
   resolveInitialView,
   safeParseJson,
   upsertStoredRecord,
-  persistCurrentUser,
 } from "./app/session";
 
 // Lazy-loaded route components
 const DashboardHybrid = lazy(() => import("./components/DashboardHybrid"));
-const BackendStatusIndicator = lazy(() =>
-  import("./components/BackendStatusIndicator").then((m) => ({
-    default: m.BackendStatusIndicator,
-  })),
-);
 const ProfileCompletionModal = lazy(
   () => import("./components/ProfileCompletionModal"),
 );
@@ -78,7 +73,6 @@ const NotificationCronTrigger = lazy(
   () => import("./components/NotificationCronTrigger"),
 );
 const EventReminderCron = lazy(() => import("./components/EventReminderCron"));
-const OfflineBanner = lazy(() => import("./components/offline/OfflineBanner"));
 
 // Admin tools (development only)
 // Deferred module references (populated after first paint)
@@ -125,8 +119,8 @@ const LoadingSpinner = () => (
 // ---------------------------------------------------------------------------
 
 function AppContent() {
+  const { user, setUser, login, logout } = useAuth();
   const [currentView, setCurrentView] = useState(APP_VIEWS.landing);
-  const [user, setUser] = useState(null);
   const [invitationToken, setInvitationToken] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -147,7 +141,7 @@ function AppContent() {
       if (urlView === APP_VIEWS.admin) {
         const savedUser = loadCurrentUser();
         if (savedUser) {
-          setUser(savedUser);
+          login({ user: savedUser, accessToken: getAccessToken() });
           setCurrentView(APP_VIEWS.admin);
         } else {
           setCurrentView(APP_VIEWS.landing);
@@ -196,7 +190,7 @@ function AppContent() {
       // Restore existing session
       const savedUser = loadCurrentUser();
       if (savedUser) {
-        setUser(savedUser);
+        login({ user: savedUser, accessToken: getAccessToken() });
 
         // Non-blocking backend refresh
         if (refreshCurrentUser) {
@@ -204,7 +198,6 @@ function AppContent() {
             .then((freshUser) => {
               if (!freshUser) return;
               setUser(freshUser);
-              persistCurrentUser(freshUser);
               if (freshUser.role !== savedUser.role) {
                 toast.success(
                   `Your role has been updated to ${freshUser.role}!`,
@@ -251,8 +244,10 @@ function AppContent() {
     // Backend auth path
     if (signupData?.backendUser) {
       const currentUser = signupData.backendUser;
-      setUser(currentUser);
-      persistCurrentUser(currentUser);
+      login({
+        user: currentUser,
+        accessToken: signupData.backendToken || getAccessToken(),
+      });
       if (currentUser.onboardingComplete) {
         toast.success(`Welcome back, ${currentUser.name}!`);
         setCurrentView(APP_VIEWS.dashboard);
@@ -261,59 +256,15 @@ function AppContent() {
       }
       return;
     }
-
-    // localStorage fallback (Google auth or offline)
-    const registeredUsers = safeParseJson(
-      localStorage.getItem(STORAGE_KEYS.registeredUsers),
-      [],
-    );
-    const existing = registeredUsers.find((u) => u.email === signupData?.email);
-
-    if (existing) {
-      setUser(existing);
-      persistCurrentUser(existing);
-      if (existing.onboardingComplete) {
-        toast.success(`Welcome back, ${existing.name}!`);
-        setCurrentView(APP_VIEWS.dashboard);
-      } else {
-        setCurrentView(APP_VIEWS.profileSetup);
-      }
-      return;
-    }
-
-    const newUser = {
-      id: `user-${Date.now()}`,
-      name:
-        signupData?.fullName || signupData?.email?.split("@")[0] || "New User",
-      email: signupData?.email || "",
-      role,
-      onboardingComplete: false,
-      createdAt: new Date().toISOString(),
-      profile: {},
-    };
-
-    upsertStoredRecord(STORAGE_KEYS.registeredUsers, newUser);
-    upsertStoredRecord(STORAGE_KEYS.teamMembers, newUser);
-    setUser(newUser);
-    persistCurrentUser(newUser);
-
-    if (role === "founder") {
-      founderApi.saveFounderProfile(newUser.id, newUser).catch(() => {});
-    } else if (role === "talent") {
-      upsertStoredRecord(STORAGE_KEYS.talentProfiles, {
-        id: newUser.id,
-        ...newUser,
-      });
-      talentApi.saveTalentProfile(newUser.id, newUser).catch(() => {});
-    }
-
-    setCurrentView(APP_VIEWS.profileSetup);
+    toast.error("Authentication failed. Please sign in or sign up with email.");
   };
 
   const handleInvitationAccepted = async (userData) => {
     const completedUser = { ...userData, onboardingComplete: true };
-    setUser(completedUser);
-    persistCurrentUser(completedUser);
+    login({
+      user: completedUser,
+      accessToken: userData?.backendToken || getAccessToken(),
+    });
     upsertStoredRecord(STORAGE_KEYS.registeredUsers, completedUser);
     upsertStoredRecord(STORAGE_KEYS.teamMembers, completedUser);
 
@@ -328,21 +279,18 @@ function AppContent() {
   };
 
   const handleLogout = () => {
-    clearCurrentUser();
-    setUser(null);
+    logout();
     setCurrentView(APP_VIEWS.landing);
   };
 
   const handleUpdateUser = async (updatedUser) => {
     if (!updatedUser) {
-      clearCurrentUser();
-      setUser(null);
+      logout();
       setCurrentView(APP_VIEWS.landing);
       return;
     }
 
     setUser(updatedUser);
-    persistCurrentUser(updatedUser);
     upsertStoredRecord(STORAGE_KEYS.registeredUsers, updatedUser);
 
     authApi.updateProfile(updatedUser.id, updatedUser).catch(() => {});
@@ -516,12 +464,6 @@ function AppContent() {
       )}
 
       <Toaster />
-      <Suspense fallback={null}>
-        <BackendStatusIndicator />
-      </Suspense>
-      <Suspense fallback={null}>
-        <OfflineBanner />
-      </Suspense>
     </div>
   );
 }
