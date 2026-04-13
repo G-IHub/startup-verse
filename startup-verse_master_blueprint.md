@@ -283,6 +283,7 @@ Computed on request from a Founder's Tasks and Weekly Outcomes. Never stored as 
 **Returns:** score (0–100), streak count, total tasks, completed tasks, total outcomes, completed outcomes
 
 > The Execution Score is public within the ecosystem. It is a founder's proof of execution discipline. Treat it like a credit score — it is a real signal that matters.
+> Implementation note (2026-04-13): API now returns score composition metrics (`taskCompletionScore`, `outcomeHistoryScore`, `streakBonusScore`) and outcome breakdown (`completedOutcomes`, `partialOutcomes`, `missedOutcomes`) alongside aggregate totals.
 
 ---
 
@@ -559,6 +560,7 @@ A **core ecosystem feature**. Free for all users. Permanently. Do not gate any p
 ### The Talent → Team Member Transition (Atomic Operation)
 
 This is one of the most important flows in the ecosystem. It must be atomic — if any step fails, all steps must roll back.
+Implementation note (2026-04-13): onboarding is executed in a Mongo transaction in `POST /api/v1/interests/:interestId/onboard` to guarantee all-or-nothing updates.
 
 ```
 1. Interest.onboarded = true
@@ -939,7 +941,7 @@ StartupVerse uses **Socket.IO on the Express server** for optional real-time upd
 
 ### Real-time Conventions
 - All socket subscriptions must be cleaned up on component unmount
-- Presence data is always ephemeral — never stored as persistent DB records
+- Presence data is ephemeral by product contract. Current implementation uses short-lived TTL-backed records (24h expiry) to preserve degraded-mode resilience while preventing long-term persistence.
 - Optimistic UI updates where appropriate before server confirmation
 
 ---

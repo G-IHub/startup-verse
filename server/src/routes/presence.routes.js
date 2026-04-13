@@ -1,13 +1,14 @@
 import { Router } from "express";
 import asyncHandler from "../utils/asyncHandler.js";
 import requireAuth from "../middleware/requireAuth.js";
-import { success as apiSuccess } from "../utils/apiResponse.js";
+import { error as apiError, success as apiSuccess } from "../utils/apiResponse.js";
 import Presence from "../models/Presence.js";
 import { emitRealtime } from "../services/realtime.service.js";
 import { SOCKET_EVENTS } from "../realtime/events.js";
 import { startupRoom } from "../realtime/rooms.js";
 
 const presenceRouter = Router();
+const isSelfOrAdmin = (req, userId) => req.user?.isAdmin === true || req.user?.id === String(userId);
 
 presenceRouter.post(
   "/presence/update",
@@ -22,6 +23,9 @@ presenceRouter.post(
       metadata = {},
       activity,
     } = req.body || {};
+    if (!isSelfOrAdmin(req, userId)) {
+      return apiError(res, "Forbidden.", 403);
+    }
 
     const mergedMetadata =
       activity && typeof activity === "object"
@@ -37,6 +41,7 @@ presenceRouter.post(
         role,
         isOnline: Boolean(isOnline),
         lastSeenAt: new Date(),
+        expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
         metadata: mergedMetadata,
       },
       { upsert: true, new: true, runValidators: true },
@@ -78,6 +83,9 @@ presenceRouter.delete(
   "/presence/:startupId/:userId",
   requireAuth,
   asyncHandler(async (req, res) => {
+    if (!isSelfOrAdmin(req, req.params.userId)) {
+      return apiError(res, "Forbidden.", 403);
+    }
     await Presence.findOneAndDelete({
       startupId: req.params.startupId,
       userId: req.params.userId,

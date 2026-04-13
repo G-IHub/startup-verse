@@ -1,15 +1,34 @@
 import crypto from "crypto";
+import mongoose from "mongoose";
 import FounderTalentInvitation from "../models/FounderTalentInvitation.js";
 import Interest from "../models/Interest.js";
 import CohortMembership from "../models/CohortMembership.js";
 import Startup from "../models/Startup.js";
 import User from "../models/User.js";
+import TeamMemberProfile from "../models/TeamMemberProfile.js";
+import Presence from "../models/Presence.js";
+import Activity from "../models/Activity.js";
 import { error as apiError, success as apiSuccess } from "../utils/apiResponse.js";
 import { sendTokenResponse } from "../utils/sendToken.js";
 
+const isAdmin = (req) => req.user?.isAdmin === true;
+const isSelfOrAdmin = (req, userId) => isAdmin(req) || req.user?.id === String(userId);
+const canAccessInvitation = (req, invitation) =>
+  isAdmin(req) ||
+  req.user?.id === String(invitation?.founderId || "") ||
+  req.user?.id === String(invitation?.talentId || "");
+const canAccessInterest = (req, interest) =>
+  isAdmin(req) ||
+  req.user?.id === String(interest?.founderId || "") ||
+  req.user?.id === String(interest?.talentId || "");
+
 export const createInvitation = async (req, res) => {
+  const requestedFounderId = req.body?.founderId || req.user.id;
+  if (!isSelfOrAdmin(req, requestedFounderId)) {
+    return apiError(res, "Forbidden.", 403);
+  }
   const invitation = await FounderTalentInvitation.create({
-    founderId: req.body?.founderId,
+    founderId: requestedFounderId,
     talentId: req.body?.talentId || null,
     startupId: req.body?.startupId || null,
     email: req.body?.email || "",
@@ -23,6 +42,9 @@ export const createInvitation = async (req, res) => {
 };
 
 export const getFounderInvitations = async (req, res) => {
+  if (!isSelfOrAdmin(req, req.params.founderId)) {
+    return apiError(res, "Forbidden.", 403);
+  }
   const invitations = await FounderTalentInvitation.find({ founderId: req.params.founderId }).sort({ createdAt: -1 });
   return apiSuccess(res, invitations);
 };
@@ -100,13 +122,14 @@ export const acceptInvitationByToken = async (req, res) => {
 };
 
 export const respondToInvitation = async (req, res) => {
-  const invitation = await FounderTalentInvitation.findByIdAndUpdate(
-    req.params.invitationId,
-    { status: req.body?.status || "accepted" },
-    { new: true },
-  );
-
+  const invitation = await FounderTalentInvitation.findById(req.params.invitationId);
   if (!invitation) return apiError(res, "Invitation not found.", 404);
+  if (!canAccessInvitation(req, invitation)) {
+    return apiError(res, "Forbidden.", 403);
+  }
+  invitation.status = req.body?.status || "accepted";
+  await invitation.save();
+
 
   if (invitation.status === "accepted" && invitation.startupId && invitation.founderId) {
     await CohortMembership.findOneAndUpdate(
@@ -125,8 +148,12 @@ export const respondToInvitation = async (req, res) => {
 };
 
 export const sendFounderTalentInvitation = async (req, res) => {
+  const founderId = req.body?.founderId || req.user.id;
+  if (!isSelfOrAdmin(req, founderId)) {
+    return apiError(res, "Forbidden.", 403);
+  }
   const invitation = await FounderTalentInvitation.create({
-    founderId: req.body?.founderId || req.user.id,
+    founderId,
     talentId: req.body?.talentId || null,
     startupId: req.body?.startupId || null,
     email: req.body?.email || "",
@@ -139,28 +166,38 @@ export const sendFounderTalentInvitation = async (req, res) => {
 };
 
 export const getSentFounderTalentInvitations = async (req, res) => {
+  if (!isSelfOrAdmin(req, req.params.founderId)) {
+    return apiError(res, "Forbidden.", 403);
+  }
   const invitations = await FounderTalentInvitation.find({ founderId: req.params.founderId }).sort({ createdAt: -1 });
   return apiSuccess(res, invitations);
 };
 
 export const getReceivedFounderTalentInvitations = async (req, res) => {
+  if (!isSelfOrAdmin(req, req.params.talentId)) {
+    return apiError(res, "Forbidden.", 403);
+  }
   const invitations = await FounderTalentInvitation.find({ talentId: req.params.talentId }).sort({ createdAt: -1 });
   return apiSuccess(res, invitations);
 };
 
 export const updateFounderTalentInvitationStatus = async (req, res) => {
-  const invitation = await FounderTalentInvitation.findByIdAndUpdate(
-    req.params.invitationId,
-    { status: req.body?.status || "pending" },
-    { new: true },
-  );
+  const invitation = await FounderTalentInvitation.findById(req.params.invitationId);
   if (!invitation) return apiError(res, "Invitation not found.", 404);
+  if (!canAccessInvitation(req, invitation)) {
+    return apiError(res, "Forbidden.", 403);
+  }
+  invitation.status = req.body?.status || "pending";
+  await invitation.save();
   return apiSuccess(res, invitation);
 };
 
 export const addMessageToFounderTalentInvitation = async (req, res) => {
   const invitation = await FounderTalentInvitation.findById(req.params.invitationId);
   if (!invitation) return apiError(res, "Invitation not found.", 404);
+  if (!canAccessInvitation(req, invitation)) {
+    return apiError(res, "Forbidden.", 403);
+  }
 
   const existing = Array.isArray(invitation.metadata?.messages) ? invitation.metadata.messages : [];
   invitation.metadata = {
@@ -176,8 +213,12 @@ export const addMessageToFounderTalentInvitation = async (req, res) => {
 };
 
 export const createInterest = async (req, res) => {
+  const talentId = req.body?.talentId || req.user.id;
+  if (!isSelfOrAdmin(req, talentId)) {
+    return apiError(res, "Forbidden.", 403);
+  }
   const interest = await Interest.create({
-    talentId: req.body?.talentId || req.user.id,
+    talentId,
     founderId: req.body?.founderId,
     startupId: req.body?.startupId || null,
     message: req.body?.message || "",
@@ -188,11 +229,17 @@ export const createInterest = async (req, res) => {
 };
 
 export const getReceivedInterests = async (req, res) => {
+  if (!isSelfOrAdmin(req, req.params.founderId)) {
+    return apiError(res, "Forbidden.", 403);
+  }
   const interests = await Interest.find({ founderId: req.params.founderId }).sort({ createdAt: -1 });
   return apiSuccess(res, interests);
 };
 
 export const getSentInterests = async (req, res) => {
+  if (!isSelfOrAdmin(req, req.params.talentId)) {
+    return apiError(res, "Forbidden.", 403);
+  }
   const interests = await Interest.find({ talentId: req.params.talentId }).sort({ createdAt: -1 });
   return apiSuccess(res, interests);
 };
@@ -200,22 +247,29 @@ export const getSentInterests = async (req, res) => {
 export const getInterestById = async (req, res) => {
   const interest = await Interest.findById(req.params.interestId);
   if (!interest) return apiError(res, "Interest not found.", 404);
+  if (!canAccessInterest(req, interest)) {
+    return apiError(res, "Forbidden.", 403);
+  }
   return apiSuccess(res, interest);
 };
 
 export const updateInterestStatus = async (req, res) => {
-  const interest = await Interest.findByIdAndUpdate(
-    req.params.interestId,
-    { status: req.body?.status || "pending" },
-    { new: true },
-  );
+  const interest = await Interest.findById(req.params.interestId);
   if (!interest) return apiError(res, "Interest not found.", 404);
+  if (!canAccessInterest(req, interest)) {
+    return apiError(res, "Forbidden.", 403);
+  }
+  interest.status = req.body?.status || "pending";
+  await interest.save();
   return apiSuccess(res, interest);
 };
 
 export const addMessageToInterest = async (req, res) => {
   const interest = await Interest.findById(req.params.interestId);
   if (!interest) return apiError(res, "Interest not found.", 404);
+  if (!canAccessInterest(req, interest)) {
+    return apiError(res, "Forbidden.", 403);
+  }
 
   interest.messages = [
     ...(interest.messages || []),
@@ -227,7 +281,96 @@ export const addMessageToInterest = async (req, res) => {
 };
 
 export const onboardInterest = async (req, res) => {
-  const interest = await Interest.findByIdAndUpdate(req.params.interestId, { status: "accepted" }, { new: true });
-  if (!interest) return apiError(res, "Interest not found.", 404);
-  return apiSuccess(res, { onboarded: true, interest });
+  const session = await mongoose.startSession();
+  try {
+    let responsePayload = null;
+    await session.withTransaction(async () => {
+      const interest = await Interest.findById(req.params.interestId).session(session);
+      if (!interest) {
+        throw new Error("Interest not found.");
+      }
+      if (!canAccessInterest(req, interest)) {
+        const forbidden = new Error("Forbidden.");
+        forbidden.statusCode = 403;
+        throw forbidden;
+      }
+
+      const startupId =
+        interest.startupId ||
+        (await Startup.findOne({ founderId: interest.founderId }, { _id: 1 }).session(session))?._id;
+
+      if (!startupId) {
+        const err = new Error("Unable to resolve startup for onboarding.");
+        err.statusCode = 422;
+        throw err;
+      }
+
+      const talent = await User.findById(interest.talentId).session(session);
+      if (!talent) {
+        throw new Error("Talent user not found.");
+      }
+
+      interest.status = "accepted";
+      interest.onboarded = true;
+      await interest.save({ session });
+
+      talent.role = "team-member";
+      talent.startupId = startupId;
+      talent.founderId = interest.founderId;
+      talent.onboardingComplete = true;
+      await talent.save({ session });
+
+      await TeamMemberProfile.findOneAndUpdate(
+        { userId: talent._id },
+        {
+          userId: talent._id,
+          founderId: interest.founderId,
+          startupId,
+        },
+        { upsert: true, new: true, runValidators: true, session },
+      );
+
+      await Presence.findOneAndUpdate(
+        { startupId: String(startupId), userId: String(talent._id) },
+        {
+          startupId: String(startupId),
+          userId: String(talent._id),
+          userName: talent.name || "",
+          role: "team-member",
+          isOnline: false,
+          lastSeenAt: new Date(),
+          expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
+          metadata: { source: "interest-onboarding" },
+        },
+        { upsert: true, new: true, runValidators: true, session },
+      );
+
+      await Activity.create(
+        [{
+          startupId,
+          userId: talent._id,
+          type: "join",
+          text: "Team member onboarded from accepted interest.",
+          metadata: { interestId: interest._id, founderId: interest.founderId },
+        }],
+        { session },
+      );
+
+      responsePayload = { onboarded: true, interest };
+    });
+    return apiSuccess(res, responsePayload);
+  } catch (error) {
+    if (error.message === "Interest not found.") {
+      return apiError(res, "Interest not found.", 404);
+    }
+    if (error.statusCode === 403) {
+      return apiError(res, "Forbidden.", 403);
+    }
+    if (error.statusCode === 422) {
+      return apiError(res, error.message, 422);
+    }
+    return apiError(res, "Unable to onboard interest atomically.", 500, [error.message]);
+  } finally {
+    await session.endSession();
+  }
 };

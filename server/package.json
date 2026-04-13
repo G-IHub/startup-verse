@@ -27,7 +27,8 @@
     "test:phase5-legacy-hosted": "node scripts/phase5-legacy-hosted-smoke.mjs",
     "test:phase5-compat-zero": "node scripts/phase5-compat-zero-smoke.mjs",
     "test:phase6-blueprint": "node scripts/phase6-blueprint-gap-smoke.mjs",
-    "test:phase8-security": "node scripts/phase8-security-alignment-smoke.mjs"
+    "test:phase8-security": "node scripts/phase8-security-alignment-smoke.mjs",
+    "test:phase9-remediation": "node scripts/phase9-remediation-readiness-smoke.mjs"
   },
   "keywords": [],
   "author": "",

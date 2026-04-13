@@ -20,12 +20,19 @@ async function main() {
   const messagesRoutes = await read("routes/messages.routes.js");
   const deliverablesRoutes = await read("routes/deliverables.routes.js");
   const authRoutes = await read("routes/auth.routes.js");
+  const foundersController = await read("controllers/founders.controller.js");
+  const invitationsController = await read("controllers/invitations.controller.js");
+  const notificationsRoutes = await read("routes/notifications.routes.js");
 
   assertContains(usersController, "sanitizeUser", "users controller sanitizes user payloads", failures);
   assertContains(orgRoutes, "requireOrgAdmin", "organizations routes use org admin guard", failures);
   assertContains(messagesRoutes, "requireOrgAdmin", "messages org-admin paths guarded", failures);
   assertContains(deliverablesRoutes, "requireOrgAdmin", "deliverables org-admin paths guarded", failures);
   assertContains(authRoutes, "requireAuth", "auth routes module present", failures);
+  assertContains(foundersController, "founderGuard(req, req.params.founderId)", "founders ownership guard", failures);
+  assertContains(invitationsController, "canAccessInterest", "interests authorization helper", failures);
+  assertContains(invitationsController, "canAccessInvitation", "invitations authorization helper", failures);
+  assertContains(notificationsRoutes, "isSelfOrAdmin", "notifications ownership guard", failures);
 
   if (failures.length) {
     console.error("Phase 8 security alignment smoke FAILED");

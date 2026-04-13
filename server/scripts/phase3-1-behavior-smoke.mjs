@@ -49,11 +49,15 @@ function testMilestoneCounters() {
 function testExecutionScoreDerivation() {
   const metrics = computeExecutionScoreMetrics(
     [{ status: "completed" }, { status: "pending" }],
-    [{ score: 80 }, { score: 100 }],
+    [{ status: "completed" }, { status: "partial" }, { status: "missed" }],
   );
   assert.equal(metrics.totalTasks, 2);
   assert.equal(metrics.completedTasks, 1);
-  assert.equal(metrics.averageWeeklyScore, 90);
+  assert.equal(metrics.totalOutcomes, 3);
+  assert.equal(metrics.completedOutcomes, 1);
+  assert.equal(metrics.partialOutcomes, 1);
+  assert.equal(metrics.missedOutcomes, 1);
+  assert.equal(typeof metrics.streakCount, "number");
   assert.equal(typeof metrics.executionScore, "number");
 }
 

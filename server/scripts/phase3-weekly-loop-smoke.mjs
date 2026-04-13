@@ -51,6 +51,12 @@ async function main() {
   );
   assertContains(
     foundersController,
+    "const existingTask = await Task.findOne({ _id: req.params.taskId, founderId });",
+    "updateTaskStatus loads task before side-effects",
+    failures,
+  );
+  assertContains(
+    foundersController,
     "validateBlockedTaskPayload",
     "founders controller imports weeklyLoopRules blocked-task validator",
     failures,
@@ -71,6 +77,18 @@ async function main() {
     milestonesModel,
     "totalTasks",
     "milestone totalTasks counter field",
+    failures,
+  );
+  assertContains(
+    weeklyLoopRules,
+    "streakCount",
+    "execution score streak metric",
+    failures,
+  );
+  assertContains(
+    weeklyLoopRules,
+    "outcomeHistoryScore",
+    "execution score outcome-history metric",
     failures,
   );
   assertContains(

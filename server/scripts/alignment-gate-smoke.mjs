@@ -22,6 +22,7 @@ let scripts = [
   "scripts/phase5-compat-zero-smoke.mjs",
   "scripts/phase6-blueprint-gap-smoke.mjs",
   "scripts/phase8-security-alignment-smoke.mjs",
+  "scripts/phase9-remediation-readiness-smoke.mjs",
 ];
 
 if (process.env.RUN_CONTRACT_HTTP_FLOWS === "1") {

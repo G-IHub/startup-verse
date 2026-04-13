@@ -20,6 +20,7 @@ const interestSchema = new mongoose.Schema(
       default: "pending", 
       index: true 
     },
+    onboarded: { type: Boolean, default: false, index: true },
     messages: { type: [mongoose.Schema.Types.Mixed], default: [] },
   },
   { timestamps: true },

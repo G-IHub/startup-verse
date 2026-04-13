@@ -45,20 +45,48 @@ export function computeMilestoneCounters(tasks = []) {
 export function computeExecutionScoreMetrics(tasks = [], outcomes = []) {
   const totalTasks = tasks.length;
   const completedTasks = tasks.filter((task) => task.status === "completed").length;
-  const taskCompletionScore = totalTasks ? completedTasks / totalTasks : 0;
-  const averageWeeklyScore = outcomes.length
-    ? outcomes.reduce((sum, item) => sum + Number(item.score || 0), 0) / outcomes.length
+  const taskCompletionPct = totalTasks ? (completedTasks / totalTasks) * 100 : 0;
+  const completedOutcomes = outcomes.filter((o) => o.status === "completed").length;
+  const partialOutcomes = outcomes.filter((o) => o.status === "partial").length;
+  const missedOutcomes = outcomes.filter((o) => o.status === "missed").length;
+  const outcomeCount = outcomes.length;
+  const outcomeHistoryPct = outcomeCount
+    ? ((completedOutcomes + partialOutcomes * 0.5) / outcomeCount) * 100
     : 0;
+
+  const orderedOutcomes = [...outcomes].sort(
+    (a, b) => new Date(b.weekOf || b.createdAt || 0) - new Date(a.weekOf || a.createdAt || 0),
+  );
+  let streakCount = 0;
+  for (const outcome of orderedOutcomes) {
+    if (outcome.status === "completed") {
+      streakCount += 1;
+      continue;
+    }
+    if (outcome.status === "partial") {
+      continue;
+    }
+    if (outcome.status === "missed") {
+      streakCount = 0;
+    }
+    break;
+  }
+  const streakBonusPct = Math.min(streakCount * 5, 25);
   const executionScore = Number(
-    ((taskCompletionScore * 70 + Math.min(averageWeeklyScore, 100) * 0.3) * 100 / 100).toFixed(2),
+    (taskCompletionPct * 0.5 + outcomeHistoryPct * 0.35 + streakBonusPct * 0.15).toFixed(2),
   );
 
   return {
     executionScore,
-    taskCompletionScore: Number((taskCompletionScore * 100).toFixed(2)),
-    averageWeeklyScore: Number(averageWeeklyScore.toFixed(2)),
+    streakCount,
+    taskCompletionScore: Number(taskCompletionPct.toFixed(2)),
+    outcomeHistoryScore: Number(outcomeHistoryPct.toFixed(2)),
+    streakBonusScore: Number(streakBonusPct.toFixed(2)),
     totalTasks,
     completedTasks,
-    outcomeCount: outcomes.length,
+    totalOutcomes: outcomeCount,
+    completedOutcomes,
+    partialOutcomes,
+    missedOutcomes,
   };
 }

@@ -6,6 +6,8 @@ This file turns [`startup-verse_master_blueprint.md`](startup-verse_master_bluep
 
 **Quality bar on every merge:** `cd server && npm run test:alignment-gate`; before release, [`MANUAL_QA_GATE_CHECKLIST.md`](MANUAL_QA_GATE_CHECKLIST.md) (especially Virtual Office). After client API path changes: `npm run export:client-api-call-catalog` and `npm run export:client-api-inventory` from `server/` so committed artifacts stay in sync.
 
+**Remediation lock (2026-04-13):** before any net-new feature work, keep these enforced in code and gate checks: (1) founder/invitation/notification ownership checks, (2) atomic `POST /api/v1/interests/:interestId/onboard` transaction with rollback semantics, (3) weekly loop status update stability + execution-score streak contract, (4) immutable `Activity` records, and (5) short-lived presence records (TTL-backed persistence for realtime resilience).
+
 ---
 
 ## How each feature should be built (repeatable pattern)

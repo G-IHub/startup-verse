@@ -1,6 +1,6 @@
 # API Parity Matrix (Client Runtime -> Express API)
 
-Last updated: 2026-04-11
+Last updated: 2026-04-13
 
 Envelope standard:
 - Success: `{ "success": true, "data": ... }`
@@ -23,6 +23,7 @@ Envelope standard:
   - `phase5-compat-zero-smoke` — `compatibility.routes.js` removed; `emails` / `admin` / `migrations` routers mounted from `routes/index.js`.
   - `phase6-blueprint-gap-smoke` — Google placeholders, unified `GET /calendar/:userId`, notifications emit + reminder queue wiring, password `select: false`.
   - `phase8-security-alignment-smoke` — static checks for `sanitizeUser`, `requireOrgAdmin` on sensitive routers.
+  - `phase9-remediation-readiness-smoke` — weekly-loop status stability, onboarding transaction, ownership guards, score/streak contract, activity immutability, presence TTL.
 - **Artifacts:** `API_CLIENT_CALL_CATALOG.json`, `API_ROUTE_MAPPING.generated.md`, `API_SERVER_ROUTE_MANIFEST.generated.md` (regenerate via `npm run export:*` in `server/`).
 
 ## Matrix
@@ -46,7 +47,7 @@ Envelope standard:
 | `/notifications/*` | Canonical | Yes | notification payloads | notification records | Implemented |
 | `/agenda/*` + `/calendar/:userId` | Canonical | Yes | startup/user context | `calendar`: events + deliverables + `programMilestones` + sorted `timeline` (`meetings: []` until modeled) | Implemented |
 | `/execution-score/:userId` | Canonical | Yes | none | derived execution score | Implemented |
-| `/presence/*` | Canonical | Yes | presence update payload | presence records | Implemented |
+| `/presence/*` | Canonical | Yes | presence update payload | short-lived presence records (TTL-evicted) | Implemented |
 | `/google/*` | Canonical placeholder | Yes/Mixed | oauth/meeting payloads | placeholder integration data | Placeholder |
 | `/cron/*` | Canonical | Yes | trigger payloads | trigger acknowledgement | Implemented |
 | `/mentors/*` | Canonical | Mixed | mentor/token/assignment payloads | mentor/assignment records | Implemented |
