@@ -1,5 +1,6 @@
 import MentorProfile from "../models/MentorProfile.js";
 import User from "../models/User.js";
+import { assertFounderInMentorOrganization } from "../utils/mentorFounderAssignment.js";
 import { error as apiError, success as apiSuccess } from "../utils/apiResponse.js";
 
 export const verifyMentorToken = async (req, res) => {
@@ -90,12 +91,28 @@ export const getMentorAssignedFounders = async (req, res) => {
 
 export const assignFounderToMentor = async (req, res) => {
   const founderId = String(req.body?.founderId || "").trim();
+  const cohortId = req.body?.cohortId ? String(req.body.cohortId).trim() : "";
+
+  if (!founderId) {
+    return apiError(res, "founderId is required.", 400);
+  }
+
   const mentor = await MentorProfile.findById(req.params.mentorId);
   if (!mentor) {
     return apiError(res, "Mentor not found.", 404);
   }
 
-  const founders = new Set(mentor.assignedFounders || []);
+  const mentorOrgId = mentor.organizationId;
+  if (!mentorOrgId) {
+    return apiError(res, "Mentor is not linked to an organization.", 400);
+  }
+
+  const scope = await assertFounderInMentorOrganization(founderId, mentorOrgId, cohortId || null);
+  if (!scope.ok) {
+    return apiError(res, scope.message, 400);
+  }
+
+  const founders = new Set((mentor.assignedFounders || []).map((id) => String(id)));
   if (founderId) founders.add(founderId);
   mentor.assignedFounders = Array.from(founders);
   await mentor.save();

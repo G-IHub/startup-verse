@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { getAccessToken } from "../app/session";
 
 /**
  * MEGA NUCLEAR ADMIN COMPONENT
@@ -23,7 +24,7 @@ export function AdminMegaNuclear() {
         {
           method: "POST",
           headers: {
-            Authorization: `Bearer ${localStorage.getItem("startupverse_token") || ""}`,
+            Authorization: `Bearer ${getAccessToken()}`,
             "Content-Type": "application/json",
           },
         },

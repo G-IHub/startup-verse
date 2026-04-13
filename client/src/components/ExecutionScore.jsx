@@ -28,6 +28,8 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "./ui/tooltip";
+import { getAccessToken } from "../app/session";
+
 export default function ExecutionScore({
   userId,
   variant = "full",
@@ -48,7 +50,7 @@ export default function ExecutionScore({
         `${import.meta.env.VITE_API_URL || "http://localhost:8000/api/v1"}/execution-score/${userId}`,
         {
           headers: {
-            Authorization: `Bearer ${localStorage.getItem("startupverse_token") || ""}`,
+            Authorization: `Bearer ${getAccessToken()}`,
           },
         },
       );

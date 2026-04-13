@@ -1,3 +1,5 @@
+import { getAccessToken } from "../app/session";
+
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8000/api/v1";
 
 // Update user presence
@@ -16,7 +18,7 @@ export async function updatePresence(
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${localStorage.getItem("startupverse_token") || ""}`,
+        Authorization: `Bearer ${getAccessToken()}`,
       },
       body: JSON.stringify({
         userId,
@@ -62,7 +64,7 @@ export async function getActiveUsers(startupId) {
     const response = await fetch(`${API_URL}/presence/${startupId}`, {
       method: "GET",
       headers: {
-        Authorization: `Bearer ${localStorage.getItem("startupverse_token") || ""}`,
+        Authorization: `Bearer ${getAccessToken()}`,
       },
       signal: controller.signal,
     });
@@ -106,7 +108,7 @@ export async function removePresence(userId, startupId) {
     const response = await fetch(`${API_URL}/presence/${startupId}/${userId}`, {
       method: "DELETE",
       headers: {
-        Authorization: `Bearer ${localStorage.getItem("startupverse_token") || ""}`,
+        Authorization: `Bearer ${getAccessToken()}`,
       },
       signal: controller.signal,
     });

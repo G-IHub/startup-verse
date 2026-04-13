@@ -32,6 +32,8 @@ async function main() {
   assertContains(teamRoutes, 'requireSelfOrAdmin("teamMemberId")', "team-member self-or-admin checks", failures);
   assertContains(talentRoutes, 'requireSelfOrAdmin("talentId")', "talent self-or-admin checks", failures);
   assertContains(orgRoutes, 'requireSelfOrAdmin("userId")', "org user scoping checks", failures);
+  assertContains(orgRoutes, "/cohorts/:cohortId/program-milestones", "cohort program milestones route", failures);
+  assertContains(orgRoutes, '"/organizations/:orgId/mentors"', "org mentors invite route", failures);
 
   assertContains(cronRoutes, 'requireRole("admin")', "cron admin guard", failures);
   assertContains(compatRoutes, 'requireRole("admin")', "compat admin guard", failures);

@@ -17,6 +17,9 @@ import OrganizationAdmin from "../models/OrganizationAdmin.js";
 import Startup from "../models/Startup.js";
 import User from "../models/User.js";
 import Task from "../models/Task.js";
+import { assertFounderInMentorOrganization } from "../utils/mentorFounderAssignment.js";
+import requireMentorProfileAccess from "../middleware/requireMentorProfileAccess.js";
+import requireMentorProfileOrgAdmin from "../middleware/requireMentorProfileOrgAdmin.js";
 
 const compatibilityRouter = Router();
 
@@ -84,6 +87,7 @@ compatibilityRouter.post(
 compatibilityRouter.get(
   "/mentors/:mentorId",
   requireAuth,
+  requireMentorProfileAccess,
   asyncHandler(async (req, res) => {
     const mentor = await MentorProfile.findById(req.params.mentorId);
     if (!mentor) {
@@ -97,6 +101,7 @@ compatibilityRouter.get(
 compatibilityRouter.delete(
   "/mentors/:mentorId",
   requireAuth,
+  requireMentorProfileOrgAdmin,
   asyncHandler(async (req, res) => {
     await MentorProfile.findByIdAndDelete(req.params.mentorId);
     return apiSuccess(res, compatPayload("mentors.delete", { deleted: true }));
@@ -106,6 +111,7 @@ compatibilityRouter.delete(
 compatibilityRouter.get(
   "/mentors/:mentorId/assigned-founders",
   requireAuth,
+  requireMentorProfileAccess,
   asyncHandler(async (req, res) => {
     const mentor = await MentorProfile.findById(req.params.mentorId);
     if (!mentor) {
@@ -125,18 +131,33 @@ compatibilityRouter.get(
 compatibilityRouter.post(
   "/mentors/:mentorId/assign-founder",
   requireAuth,
+  requireMentorProfileAccess,
   asyncHandler(async (req, res) => {
     const founderId = String(req.body?.founderId || "").trim();
+    const cohortId = req.body?.cohortId ? String(req.body.cohortId).trim() : "";
+    if (!founderId) {
+      return apiError(res, "founderId is required.", 400);
+    }
+
     const mentor = await MentorProfile.findById(req.params.mentorId);
     if (!mentor) {
       return apiError(res, "Mentor not found.", 404);
     }
-
-    const founders = new Set(mentor.assignedFounders || []);
-    if (founderId) {
-      founders.add(founderId);
+    if (!mentor.organizationId) {
+      return apiError(res, "Mentor is not linked to an organization.", 400);
     }
 
+    const scope = await assertFounderInMentorOrganization(
+      founderId,
+      mentor.organizationId,
+      cohortId || null,
+    );
+    if (!scope.ok) {
+      return apiError(res, scope.message, 400);
+    }
+
+    const founders = new Set((mentor.assignedFounders || []).map((id) => String(id)));
+    founders.add(founderId);
     mentor.assignedFounders = Array.from(founders);
     await mentor.save();
 
@@ -147,6 +168,7 @@ compatibilityRouter.post(
 compatibilityRouter.delete(
   "/mentors/:mentorId/unassign-founder/:founderId",
   requireAuth,
+  requireMentorProfileAccess,
   asyncHandler(async (req, res) => {
     const mentor = await MentorProfile.findById(req.params.mentorId);
     if (!mentor) {

@@ -27,7 +27,10 @@ import {
   Check,
   AlertCircle,
 } from "lucide-react";
-// Legacy BaaS imports removed; organization flows use REST API helpers.
+import { getAccessToken } from "../../app/session";
+import { unwrapData } from "../../utils/apiEnvelope";
+
+const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:8000/api/v1";
 
 export default function OrganizationSettings({
   organizationId,
@@ -78,42 +81,40 @@ export default function OrganizationSettings({
       // Create new abort controller for this request
       abortControllerRef.current = new AbortController();
 
+      const token = getAccessToken();
+      const auth = token ? { Authorization: `Bearer ${token}` } : {};
+
       // Load organization data
-      const orgResponse = await fetch(
-        `${import.meta.env.VITE_API_URL || "http://localhost:8000"}/api/v1/organizations/${organizationId}`,
-        {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem("startupverse_token") || ""}`,
-          },
-          signal: abortControllerRef.current.signal,
-        },
-      );
+      const orgResponse = await fetch(`${API_BASE}/organizations/${organizationId}`, {
+        headers: { ...auth },
+        signal: abortControllerRef.current.signal,
+      });
       if (!isMountedRef.current) return;
       if (orgResponse.ok) {
-        const orgData = await orgResponse.json();
+        const org = unwrapData(await orgResponse.json());
         if (!isMountedRef.current) return;
-        setOrganization(orgData.organization);
-        setName(orgData.organization.name);
-        setDescription(orgData.organization.description || "");
-        setWebsite(orgData.organization.website || "");
-        setLogo(orgData.organization.logo || "");
+        if (org && typeof org === "object") {
+          setOrganization(org);
+          setName(org.name || "");
+          setDescription(org.description || "");
+          setWebsite(org.website || "");
+          setLogo(org.logo || "");
+        }
       }
 
       // Load admins
       const adminsResponse = await fetch(
-        `${import.meta.env.VITE_API_URL || "http://localhost:8000"}/api/v1/organizations/${organizationId}/admins`,
+        `${API_BASE}/organizations/${organizationId}/admins`,
         {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem("startupverse_token") || ""}`,
-          },
+          headers: { ...auth },
           signal: abortControllerRef.current.signal,
         },
       );
       if (!isMountedRef.current) return;
       if (adminsResponse.ok) {
-        const adminsData = await adminsResponse.json();
+        const raw = unwrapData(await adminsResponse.json());
         if (!isMountedRef.current) return;
-        setAdmins(adminsData.admins || []);
+        setAdmins(Array.isArray(raw) ? raw : raw.admins || []);
       }
     } catch (error) {
       if (error.name === "AbortError") {
@@ -136,12 +137,13 @@ export default function OrganizationSettings({
       setSaving(true);
       setErrorMessage("");
       setSuccessMessage("");
+      const token = getAccessToken();
       const response = await fetch(
-        `${import.meta.env.VITE_API_URL || "http://localhost:8000"}/api/v1/organizations/${organizationId}/update`,
+        `${API_BASE}/organizations/${organizationId}/update`,
         {
           method: "PUT",
           headers: {
-            Authorization: `Bearer ${localStorage.getItem("startupverse_token") || ""}`,
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
@@ -193,24 +195,31 @@ export default function OrganizationSettings({
     try {
       setUploadingLogo(true);
       setErrorMessage("");
-      const formData = new FormData();
-      formData.append("logo", file);
+      const token = getAccessToken();
+      const dataUrl = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = () => reject(new Error("Failed to read file"));
+        reader.readAsDataURL(file);
+      });
       const response = await fetch(
-        `${import.meta.env.VITE_API_URL || "http://localhost:8000"}/api/v1/organizations/${organizationId}/logo`,
+        `${API_BASE}/organizations/${organizationId}/logo`,
         {
-          method: "POST",
+          method: "PUT",
           headers: {
-            Authorization: `Bearer ${localStorage.getItem("startupverse_token") || ""}`,
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+            "Content-Type": "application/json",
           },
-          body: formData,
+          body: JSON.stringify({ logo: dataUrl }),
         },
       );
       if (!response.ok) {
         throw new Error("Failed to upload logo");
       }
-      const urlData = await response.json();
-      if (urlData && urlData.url) {
-        setLogo(urlData.url);
+      const inner = unwrapData(await response.json());
+      const nextLogo = inner?.logo || inner?.url;
+      if (nextLogo) {
+        setLogo(nextLogo);
         setSuccessMessage("Logo uploaded successfully!");
         setTimeout(() => setSuccessMessage(""), 3000);
       }
@@ -230,12 +239,13 @@ export default function OrganizationSettings({
       setAddingAdmin(true);
       setErrorMessage("");
       setSuccessMessage("");
+      const token = getAccessToken();
       const response = await fetch(
-        `${import.meta.env.VITE_API_URL || "http://localhost:8000"}/api/v1/organizations/${organizationId}/admins/add`,
+        `${API_BASE}/organizations/${organizationId}/admins/add`,
         {
           method: "POST",
           headers: {
-            Authorization: `Bearer ${localStorage.getItem("startupverse_token") || ""}`,
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
@@ -246,7 +256,7 @@ export default function OrganizationSettings({
       );
       const data = await response.json();
       if (!response.ok) {
-        throw new Error(data.error || "Failed to add admin");
+        throw new Error(data.message || data.error || "Failed to add admin");
       }
       setSuccessMessage("Admin added successfully!");
       setTimeout(() => setSuccessMessage(""), 3000);
@@ -269,12 +279,13 @@ export default function OrganizationSettings({
     try {
       setErrorMessage("");
       setSuccessMessage("");
+      const token = getAccessToken();
       const response = await fetch(
-        `${import.meta.env.VITE_API_URL || "http://localhost:8000"}/api/v1/organizations/${organizationId}/admins/${adminUserId}/remove`,
+        `${API_BASE}/organizations/${organizationId}/admins/${adminUserId}/remove`,
         {
           method: "DELETE",
           headers: {
-            Authorization: `Bearer ${localStorage.getItem("startupverse_token") || ""}`,
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
@@ -284,7 +295,7 @@ export default function OrganizationSettings({
       );
       if (!response.ok) {
         const data = await response.json();
-        throw new Error(data.error || "Failed to remove admin");
+        throw new Error(data.message || data.error || "Failed to remove admin");
       }
       setSuccessMessage("Admin removed successfully!");
       setTimeout(() => setSuccessMessage(""), 3000);

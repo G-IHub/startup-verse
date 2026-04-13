@@ -1,4 +1,5 @@
 import React, { useEffect } from "react";
+import { loadCurrentUser, persistCurrentUser } from "../../app/session";
 import { Button } from "../ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "../ui/avatar";
 import { Badge } from "../ui/badge";
@@ -75,13 +76,11 @@ export default function AppLayout({
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [onPageChange]);
   const switchRole = (newRole) => {
-    // Get current user from localStorage to ensure we have the latest data
-    const currentUser = localStorage.getItem("startupverse_user");
-    if (!currentUser) {
+    const parsedUser = loadCurrentUser();
+    if (!parsedUser) {
       toast.error("User data not found");
       return;
     }
-    const parsedUser = JSON.parse(currentUser);
 
     // Update user role while preserving all other data
     const updatedUser = {
@@ -89,7 +88,7 @@ export default function AppLayout({
       role: newRole,
       onboardingComplete: true, // Ensure onboarding is marked complete
     };
-    localStorage.setItem("startupverse_user", JSON.stringify(updatedUser));
+    persistCurrentUser(updatedUser);
     const roleEmoji = {
       founder: "🚀",
       talent: "⭐",

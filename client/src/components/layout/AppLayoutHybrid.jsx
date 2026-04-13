@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { loadCurrentUser, persistCurrentUser } from "../../app/session";
 import { Button } from "../ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "../ui/avatar";
 import { toast } from "sonner";
@@ -28,6 +29,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "../ui/dropdown-menu";
+import { getAccessToken } from "../../app/session";
 export default function AppLayoutHybrid({
   user,
   children,
@@ -50,7 +52,7 @@ export default function AppLayoutHybrid({
             `${import.meta.env.VITE_API_URL || "http://localhost:8000/api/v1"}/invitations/received/${user.id}`,
             {
               headers: {
-                Authorization: `Bearer ${localStorage.getItem("startupverse_token") || ""}`,
+                Authorization: `Bearer ${getAccessToken()}`,
                 "Content-Type": "application/json",
               },
             },
@@ -79,7 +81,7 @@ export default function AppLayoutHybrid({
             `${import.meta.env.VITE_API_URL || "http://localhost:8000/api/v1"}/interests/received/${user.id}`,
             {
               headers: {
-                Authorization: `Bearer ${localStorage.getItem("startupverse_token") || ""}`,
+                Authorization: `Bearer ${getAccessToken()}`,
                 "Content-Type": "application/json",
               },
             },
@@ -107,7 +109,7 @@ export default function AppLayoutHybrid({
             `${import.meta.env.VITE_API_URL || "http://localhost:8000/api/v1"}/invitations/founder/${user.id}`,
             {
               headers: {
-                Authorization: `Bearer ${localStorage.getItem("startupverse_token") || ""}`,
+                Authorization: `Bearer ${getAccessToken()}`,
                 "Content-Type": "application/json",
               },
             },
@@ -149,7 +151,7 @@ export default function AppLayoutHybrid({
             `${import.meta.env.VITE_API_URL || "http://localhost:8000/api/v1"}/invitations/received/${user.id}`,
             {
               headers: {
-                Authorization: `Bearer ${localStorage.getItem("startupverse_token") || ""}`,
+                Authorization: `Bearer ${getAccessToken()}`,
                 "Content-Type": "application/json",
               },
             },
@@ -225,18 +227,17 @@ export default function AppLayoutHybrid({
   };
   const notificationCount = getNotificationCount();
   const switchRole = (newRole) => {
-    const currentUser = localStorage.getItem("startupverse_user");
-    if (!currentUser) {
+    const parsedUser = loadCurrentUser();
+    if (!parsedUser) {
       toast.error("User data not found");
       return;
     }
-    const parsedUser = JSON.parse(currentUser);
     const updatedUser = {
       ...parsedUser,
       role: newRole,
       onboardingComplete: true,
     };
-    localStorage.setItem("startupverse_user", JSON.stringify(updatedUser));
+    persistCurrentUser(updatedUser);
     const roleName = {
       founder: "Founder",
       talent: "Talent",

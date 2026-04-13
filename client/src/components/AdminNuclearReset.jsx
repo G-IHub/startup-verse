@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { getAccessToken } from "../app/session";
 
 /**
  * ADMIN NUCLEAR RESET COMPONENT
@@ -27,7 +28,7 @@ export function AdminNuclearReset() {
         {
           method: "POST",
           headers: {
-            Authorization: `Bearer ${localStorage.getItem("startupverse_token") || ""}`,
+            Authorization: `Bearer ${getAccessToken()}`,
             "Content-Type": "application/json",
           },
         },

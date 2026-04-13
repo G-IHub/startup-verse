@@ -7,6 +7,7 @@ import React, {
 } from "react";
 import { toast } from "sonner";
 import { useAuth } from "./AuthContext";
+import { getAccessToken } from "../app/session";
 
 const NotificationContext = createContext(undefined);
 
@@ -26,7 +27,7 @@ const API_BASE_URL =
 
 function getAuthHeaders() {
   return {
-    Authorization: `Bearer ${localStorage.getItem("startupverse_token") || ""}`,
+    Authorization: `Bearer ${getAccessToken()}`,
     "Content-Type": "application/json",
   };
 }

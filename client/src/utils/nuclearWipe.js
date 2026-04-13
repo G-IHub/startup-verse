@@ -3,6 +3,8 @@
  * Completely wipes ALL data from frontend and backend
  */
 
+import { getAccessToken } from "../app/session";
+
 export async function executeNuclearWipe() {
   console.log("🔥🔥🔥 STARTING MEGA NUCLEAR WIPE 🔥🔥🔥");
 
@@ -16,7 +18,7 @@ export async function executeNuclearWipe() {
       {
         method: "DELETE",
         headers: {
-          Authorization: `Bearer ${localStorage.getItem("startupverse_token") || ""}`,
+          Authorization: `Bearer ${getAccessToken()}`,
           "Content-Type": "application/json",
         },
       },

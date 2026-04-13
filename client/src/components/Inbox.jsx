@@ -36,6 +36,7 @@ import { convertTalentToTeamMember } from "../utils/api/compensationApi";
 import CompensationSetupWizard from "./compensation/CompensationSetupWizard";
 import InboxDebugPanel from "./debug/InboxDebugPanel";
 import { getStartupId } from "../utils/startupId";
+import { getAccessToken } from "../app/session";
 
 // Track read messages with timestamps in localStorage
 const READ_MESSAGES_KEY = "startupverse_read_messages_timestamps";
@@ -221,7 +222,7 @@ export default function Inbox({ user, onBack, initialTab = "received" }) {
             `${import.meta.env.VITE_API_URL || "http://localhost:8000/api/v1"}/messages/${user.id}`,
             {
               headers: {
-                Authorization: `Bearer ${localStorage.getItem("startupverse_token") || ""}`,
+                Authorization: `Bearer ${getAccessToken()}`,
               },
             },
           );
@@ -499,7 +500,7 @@ export default function Inbox({ user, onBack, initialTab = "received" }) {
         {
           method: "POST",
           headers: {
-            Authorization: `Bearer ${localStorage.getItem("startupverse_token") || ""}`,
+            Authorization: `Bearer ${getAccessToken()}`,
             "Content-Type": "application/json",
           },
           body: JSON.stringify({

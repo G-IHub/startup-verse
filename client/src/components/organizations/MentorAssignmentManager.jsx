@@ -140,6 +140,7 @@ export default function MentorAssignmentManager({
           },
           body: JSON.stringify({
             founderId,
+            cohortId,
           }),
         },
       );

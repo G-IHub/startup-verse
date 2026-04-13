@@ -13,6 +13,8 @@ import {
 import { Button } from "../ui/button";
 import { Check, X, Loader2 } from "lucide-react";
 import { toast } from "sonner";
+import { getAccessToken } from "../../app/session";
+
 export default function GoogleAccountConnect({ userId, userType }) {
   const [connected, setConnected] = useState(false);
   const [email, setEmail] = useState("");
@@ -28,7 +30,7 @@ export default function GoogleAccountConnect({ userId, userType }) {
         `${import.meta.env.VITE_API_URL || "http://localhost:8000/api/v1"}/google/status/${userId}`,
         {
           headers: {
-            Authorization: `Bearer ${localStorage.getItem("startupverse_token") || ""}`,
+            Authorization: `Bearer ${getAccessToken()}`,
           },
         },
       );
@@ -51,7 +53,7 @@ export default function GoogleAccountConnect({ userId, userType }) {
         `${import.meta.env.VITE_API_URL || "http://localhost:8000/api/v1"}/google/oauth/authorize?userId=${userId}&userType=${userType}`,
         {
           headers: {
-            Authorization: `Bearer ${localStorage.getItem("startupverse_token") || ""}`,
+            Authorization: `Bearer ${getAccessToken()}`,
           },
         },
       );
@@ -121,7 +123,7 @@ export default function GoogleAccountConnect({ userId, userType }) {
         {
           method: "DELETE",
           headers: {
-            Authorization: `Bearer ${localStorage.getItem("startupverse_token") || ""}`,
+            Authorization: `Bearer ${getAccessToken()}`,
           },
         },
       );

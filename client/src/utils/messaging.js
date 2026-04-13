@@ -1,5 +1,7 @@
 // Team Messaging Utilities - Real Backend Integration
 
+import { getAccessToken } from "../app/session";
+
 const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:8000/api/v1";
 
 // Send a new message
@@ -67,7 +69,7 @@ export async function sendMessage(
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${localStorage.getItem("startupverse_token") || ""}`,
+        Authorization: `Bearer ${getAccessToken()}`,
       },
       body: JSON.stringify({
         senderId,
@@ -118,7 +120,7 @@ export async function getConversation(userId, otherUserId, startupId) {
       `${API_BASE}/messages/conversation/${startupId}/${userId}/${otherUserId}`,
       {
         headers: {
-          Authorization: `Bearer ${localStorage.getItem("startupverse_token") || ""}`,
+          Authorization: `Bearer ${getAccessToken()}`,
         },
       },
     );
@@ -141,6 +143,7 @@ export async function getConversation(userId, otherUserId, startupId) {
     }
 
     const data = await response.json();
+    if (Array.isArray(data.data)) return data.data;
     return data.messages || [];
   } catch (error) {
     // 🔧 FIX: Silent fallback - no need to spam console
@@ -158,7 +161,7 @@ export async function getUserConversations(userId, startupId, teamMembers) {
       `${API_BASE}/messages/conversations/${startupId}/${userId}`,
       {
         headers: {
-          Authorization: `Bearer ${localStorage.getItem("startupverse_token") || ""}`,
+          Authorization: `Bearer ${getAccessToken()}`,
         },
       },
     );
@@ -181,6 +184,7 @@ export async function getUserConversations(userId, startupId, teamMembers) {
     }
 
     const data = await response.json();
+    if (Array.isArray(data.data)) return data.data;
     return data.conversations || [];
   } catch (error) {
     // 🔧 FIX: Silent fallback - no console spam
@@ -198,7 +202,7 @@ export async function markMessagesAsRead(userId, otherUserId, startupId) {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${localStorage.getItem("startupverse_token") || ""}`,
+        Authorization: `Bearer ${getAccessToken()}`,
       },
       body: JSON.stringify({
         userId,
@@ -226,7 +230,7 @@ export async function getUnreadCount(userId, startupId) {
       `${API_BASE}/messages/unread-count/${startupId}/${userId}`,
       {
         headers: {
-          Authorization: `Bearer ${localStorage.getItem("startupverse_token") || ""}`,
+          Authorization: `Bearer ${getAccessToken()}`,
         },
       },
     );
@@ -300,7 +304,7 @@ export async function uploadMessageFile(file, startupId, senderId) {
     const response = await fetch(`${API_BASE}/messages/upload-file`, {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${localStorage.getItem("startupverse_token") || ""}`,
+        Authorization: `Bearer ${getAccessToken()}`,
       },
       body: formData,
     });

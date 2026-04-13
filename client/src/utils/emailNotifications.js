@@ -3,6 +3,8 @@
  * Frontend utility to trigger email notifications via backend
  */
 
+import { getAccessToken } from "../app/session";
+
 const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:8000/api/v1";
 
 /**
@@ -20,7 +22,7 @@ export async function sendWeeklyOutcomeReminder(
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${localStorage.getItem("startupverse_token") || ""}`,
+          Authorization: `Bearer ${getAccessToken()}`,
         },
         body: JSON.stringify({
           founderEmail,
@@ -54,7 +56,7 @@ export async function sendTaskAssignedNotification(
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${localStorage.getItem("startupverse_token") || ""}`,
+        Authorization: `Bearer ${getAccessToken()}`,
       },
       body: JSON.stringify({
         teamMemberEmail,
@@ -90,7 +92,7 @@ export async function sendTaskBlockedNotification(
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${localStorage.getItem("startupverse_token") || ""}`,
+        Authorization: `Bearer ${getAccessToken()}`,
       },
       body: JSON.stringify({
         founderEmail,
@@ -127,7 +129,7 @@ export async function sendWeeklyReviewReminder(
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${localStorage.getItem("startupverse_token") || ""}`,
+          Authorization: `Bearer ${getAccessToken()}`,
         },
         body: JSON.stringify({
           founderEmail,
@@ -160,7 +162,7 @@ export async function sendStreakAtRiskNotification(
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${localStorage.getItem("startupverse_token") || ""}`,
+        Authorization: `Bearer ${getAccessToken()}`,
       },
       body: JSON.stringify({
         founderEmail,

@@ -8,6 +8,8 @@
  * in the "Sent" tab instead of only in the "Received" tab.
  */
 
+import { getAccessToken } from "../../app/session";
+
 const BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:8000/api/v1";
 
 export async function runOrgInvitationMigration() {
@@ -18,7 +20,7 @@ export async function runOrgInvitationMigration() {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${localStorage.getItem("startupverse_token") || ""}`,
+        Authorization: `Bearer ${getAccessToken()}`,
       },
     });
 

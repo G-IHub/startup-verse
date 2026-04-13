@@ -33,6 +33,7 @@ import Phase3Welcome from "../execution-engine/Phase3Welcome";
 import StageLearningModal from "../learning/StageLearningModal";
 import StageRoadmapModal from "../roadmap/StageRoadmapModal";
 import CohortMembershipBadge from "../organizations/CohortMembershipBadge";
+import { getAccessToken } from "../../app/session";
 
 // 🔥 REMOVED: OrganizationEventsWidget and OrganizationAnnouncementsWidget
 // Events appear in Virtual Office updates/calendar, announcements in inbox
@@ -304,7 +305,7 @@ function ExecutionScoreInlineCard({ userId }) {
           `${import.meta.env.VITE_API_URL || "http://localhost:8000/api/v1"}/execution-score/${userId}`,
           {
             headers: {
-              Authorization: `Bearer ${localStorage.getItem("startupverse_token") || ""}`,
+              Authorization: `Bearer ${getAccessToken()}`,
             },
           },
         );
@@ -861,7 +862,7 @@ export default function FounderDashboard({
         `${import.meta.env.VITE_API_URL || "http://localhost:8000/api/v1"}/deliverables/founder/${user.id}`,
         {
           headers: {
-            Authorization: `Bearer ${localStorage.getItem("startupverse_token") || ""}`,
+            Authorization: `Bearer ${getAccessToken()}`,
           },
         },
       );
@@ -2272,7 +2273,7 @@ export default function FounderDashboard({
                                                   {
                                                     method: "POST",
                                                     headers: {
-                                                      Authorization: `Bearer ${localStorage.getItem("startupverse_token") || ""}`,
+                                                      Authorization: `Bearer ${getAccessToken()}`,
                                                       "Content-Type":
                                                         "application/json",
                                                     },

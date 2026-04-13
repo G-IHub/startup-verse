@@ -291,6 +291,7 @@ export function useRealtimeMessages(
   startupId,
   conversationId,
   initialMessages = [],
+  currentUserId = "",
 ) {
   const [messages, setMessages] = useState(initialMessages);
   const [typingUsers, setTypingUsers] = useState([]);
@@ -302,7 +303,14 @@ export function useRealtimeMessages(
   useEffect(() => {
     if (!startupId) return;
 
-    const unsubscribe = subscribeToMessages(startupId, (update) => {
+    const pollContext =
+      currentUserId && conversationId
+        ? { userId: currentUserId, peerUserId: conversationId }
+        : null;
+
+    const unsubscribe = subscribeToMessages(
+      startupId,
+      (update) => {
       console.log("🔄 [useRealtimeMessages] Received update:", update);
 
       if (update.action === "new_message") {
@@ -342,10 +350,12 @@ export function useRealtimeMessages(
           }, 3000);
         }
       }
-    });
+    },
+      pollContext,
+    );
 
     return unsubscribe;
-  }, [startupId, conversationId]);
+  }, [startupId, conversationId, currentUserId]);
 
   return { messages, typingUsers };
 }

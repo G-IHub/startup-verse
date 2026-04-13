@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { getAccessToken } from "../app/session";
 
 /**
  * ADMIN DEBUG DATABASE COMPONENT
@@ -24,7 +25,7 @@ export function AdminDebugDatabase() {
         {
           method: "GET",
           headers: {
-            Authorization: `Bearer ${localStorage.getItem("startupverse_token") || ""}`,
+            Authorization: `Bearer ${getAccessToken()}`,
           },
         },
       );

@@ -3,12 +3,14 @@
  * Sends notifications to founders 1 hour before events start.
  */
 
+import { getAccessToken } from "../app/session";
+
 const API_BASE_URL =
   import.meta.env.VITE_API_URL || "http://localhost:8000/api/v1";
 
 function getAuthHeaders() {
   return {
-    Authorization: `Bearer ${localStorage.getItem("startupverse_token") || ""}`,
+    Authorization: `Bearer ${getAccessToken()}`,
     "Content-Type": "application/json",
   };
 }

@@ -45,6 +45,18 @@ async function main() {
     failures,
   );
   assertContains(
+    foundersController,
+    "validateBlockedTaskPayload",
+    "founders controller imports weeklyLoopRules blocked-task validator",
+    failures,
+  );
+  assertContains(
+    foundersController,
+    "weeklyLoopRules",
+    "founders controller wired to weekly loop rules module",
+    failures,
+  );
+  assertContains(
     milestonesModel,
     "tasksCompleted",
     "milestone tasksCompleted counter field",

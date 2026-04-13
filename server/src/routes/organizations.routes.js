@@ -2,6 +2,8 @@ import { Router } from "express";
 import asyncHandler from "../utils/asyncHandler.js";
 import requireAuth from "../middleware/requireAuth.js";
 import requireOrgAdmin from "../middleware/requireOrgAdmin.js";
+import requireCohortReadAccess from "../middleware/requireCohortReadAccess.js";
+import requireOrganizationScope from "../middleware/requireOrganizationScope.js";
 import requireSelfOrAdmin from "../middleware/requireSelfOrAdmin.js";
 import * as organizationsController from "../controllers/organizations.controller.js";
 import * as cohortWorkspaceController from "../controllers/cohortWorkspace.controller.js";
@@ -12,7 +14,12 @@ const organizationsRouter = Router();
 organizationsRouter.post("/organizations/create", requireAuth, asyncHandler(organizationsController.createOrganization));
 organizationsRouter.get("/organizations/user/:userId", requireAuth, requireSelfOrAdmin("userId"), asyncHandler(organizationsController.getOrganizationsByUser));
 organizationsRouter.get("/organizations/:orgId/mentors", requireAuth, asyncHandler(mentorsController.listOrganizationMentors));
-organizationsRouter.post("/organizations/:orgId/mentors", requireAuth, asyncHandler(mentorsController.inviteOrganizationMentor));
+organizationsRouter.post(
+  "/organizations/:orgId/mentors",
+  requireAuth,
+  requireOrgAdmin,
+  asyncHandler(mentorsController.inviteOrganizationMentor),
+);
 organizationsRouter.get("/organizations/:orgId", requireAuth, asyncHandler(organizationsController.getOrganizationById));
 organizationsRouter.put("/organizations/:orgId/update", requireAuth, requireOrgAdmin, asyncHandler(organizationsController.updateOrganization));
 organizationsRouter.put("/organizations/:orgId/logo", requireAuth, requireOrgAdmin, asyncHandler(organizationsController.updateOrganizationLogo));
@@ -24,7 +31,12 @@ organizationsRouter.delete("/organizations/:orgId/admins/:adminUserId", requireA
 organizationsRouter.delete("/organizations/:orgId/admins/:adminUserId/remove", requireAuth, requireOrgAdmin, asyncHandler(organizationsController.removeOrganizationAdmin));
 
 organizationsRouter.post("/cohorts/create", requireAuth, requireOrgAdmin, asyncHandler(organizationsController.createCohort));
-organizationsRouter.get("/cohorts/organization/:orgId", requireAuth, asyncHandler(organizationsController.getCohortsByOrganization));
+organizationsRouter.get(
+  "/cohorts/organization/:orgId",
+  requireAuth,
+  requireOrganizationScope,
+  asyncHandler(organizationsController.getCohortsByOrganization),
+);
 organizationsRouter.get(
   "/cohorts/founder/:founderId",
   requireAuth,
@@ -34,49 +46,77 @@ organizationsRouter.get(
 organizationsRouter.get(
   "/cohorts/:cohortId/program-milestones",
   requireAuth,
+  requireCohortReadAccess,
   asyncHandler(organizationsController.getProgramMilestonesByCohort),
 );
 organizationsRouter.post(
   "/cohorts/:cohortId/program-milestones",
   requireAuth,
+  requireOrgAdmin,
   asyncHandler(organizationsController.createProgramMilestone),
 );
-organizationsRouter.get("/cohorts/:cohortId/events", requireAuth, asyncHandler(cohortWorkspaceController.listCohortEvents));
-organizationsRouter.post("/cohorts/:cohortId/events", requireAuth, asyncHandler(cohortWorkspaceController.createCohortEvent));
+organizationsRouter.get(
+  "/cohorts/:cohortId/events",
+  requireAuth,
+  requireCohortReadAccess,
+  asyncHandler(cohortWorkspaceController.listCohortEvents),
+);
+organizationsRouter.post(
+  "/cohorts/:cohortId/events",
+  requireAuth,
+  requireOrgAdmin,
+  asyncHandler(cohortWorkspaceController.createCohortEvent),
+);
 organizationsRouter.get(
   "/cohorts/:cohortId/announcements",
   requireAuth,
+  requireCohortReadAccess,
   asyncHandler(cohortWorkspaceController.listCohortAnnouncements),
 );
 organizationsRouter.post(
   "/cohorts/:cohortId/announcements",
   requireAuth,
+  requireOrgAdmin,
   asyncHandler(cohortWorkspaceController.createCohortAnnouncement),
 );
 organizationsRouter.get(
   "/cohorts/:cohortId/resources",
   requireAuth,
+  requireCohortReadAccess,
   asyncHandler(cohortWorkspaceController.listCohortResources),
 );
 organizationsRouter.post(
   "/cohorts/:cohortId/resources",
   requireAuth,
+  requireOrgAdmin,
   asyncHandler(cohortWorkspaceController.createCohortResource),
 );
 organizationsRouter.get(
   "/cohorts/:cohortId/analytics/overview",
   requireAuth,
+  requireCohortReadAccess,
   asyncHandler(cohortWorkspaceController.getCohortAnalyticsOverview),
 );
 organizationsRouter.get(
   "/cohorts/:cohortId/portfolio-health",
   requireAuth,
+  requireCohortReadAccess,
   asyncHandler(cohortWorkspaceController.getCohortPortfolioHealth),
 );
-organizationsRouter.get("/cohorts/:cohortId", requireAuth, asyncHandler(organizationsController.getCohortById));
+organizationsRouter.get(
+  "/cohorts/:cohortId",
+  requireAuth,
+  requireCohortReadAccess,
+  asyncHandler(organizationsController.getCohortById),
+);
 organizationsRouter.delete("/cohorts/:cohortId", requireAuth, requireOrgAdmin, asyncHandler(organizationsController.deleteCohort));
 
-organizationsRouter.get("/cohorts/:cohortId/members", requireAuth, asyncHandler(organizationsController.getCohortMembers));
+organizationsRouter.get(
+  "/cohorts/:cohortId/members",
+  requireAuth,
+  requireCohortReadAccess,
+  asyncHandler(organizationsController.getCohortMembers),
+);
 organizationsRouter.post("/cohorts/:cohortId/members", requireAuth, requireOrgAdmin, asyncHandler(organizationsController.manageCohortMember));
 
 export default organizationsRouter;

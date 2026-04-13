@@ -9,6 +9,7 @@
  */
 
 import React, { useState } from "react";
+import { getAccessToken } from "../app/session";
 import { Button } from "./ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
@@ -261,7 +262,7 @@ export default function TeamMatching({ user, onNavigate }) {
       `${import.meta.env.VITE_API_URL || "http://localhost:8000/api/v1"}/talent/profiles`,
       {
         headers: {
-          Authorization: `Bearer ${localStorage.getItem("startupverse_token") || ""}`,
+          Authorization: `Bearer ${getAccessToken()}`,
         },
       },
     )

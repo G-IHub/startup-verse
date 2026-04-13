@@ -13,6 +13,11 @@ import {
   getAllCohorts,
   getAllCohortInvitations,
 } from "./organizationHelpers";
+import {
+  STORAGE_KEYS,
+  persistCurrentUser,
+  writeStoredList,
+} from "../app/session";
 
 export function generateOrganizationDemo() {
   console.log("🏗️  Generating Organization Demo Data...\n");
@@ -40,8 +45,8 @@ export function generateOrganizationDemo() {
   };
 
   allUsers.push(orgAdmin);
-  localStorage.setItem("startupverse_users", JSON.stringify(allUsers));
-  localStorage.setItem("startupverse_user", JSON.stringify(orgAdmin)); // Set as current user
+  writeStoredList(STORAGE_KEYS.teamMembers, allUsers);
+  persistCurrentUser(orgAdmin);
 
   console.log("✅ Created Organization Admin:", orgAdmin.name);
   console.log("   Email:", orgAdmin.email);

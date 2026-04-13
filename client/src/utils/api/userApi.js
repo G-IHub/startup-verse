@@ -1,4 +1,4 @@
-import { getAccessToken } from "../../app/session";
+import { getAccessToken, persistCurrentUser } from "../../app/session";
 const API_BASE_URL =
   import.meta.env.VITE_API_URL || "http://localhost:8000/api/v1";
 
@@ -37,8 +37,7 @@ export async function refreshCurrentUser(userId) {
     const result = await getUserById(userId);
 
     if (result.success && result.user) {
-      // Update localStorage
-      localStorage.setItem("startupverse_user", JSON.stringify(result.user));
+      persistCurrentUser(result.user);
       return result.user;
     }
 

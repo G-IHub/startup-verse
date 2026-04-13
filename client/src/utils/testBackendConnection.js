@@ -3,6 +3,8 @@
  * Run this from browser console to verify backend deployment
  */
 
+import { getAccessToken } from "../app/session";
+
 const BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:8000/api/v1";
 
 export async function testBackendConnection() {
@@ -55,7 +57,7 @@ export async function testBackendConnection() {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${localStorage.getItem("startupverse_token") || ""}`,
+        Authorization: `Bearer ${getAccessToken()}`,
       },
       body: JSON.stringify(testData),
     });
@@ -85,7 +87,7 @@ export async function testBackendConnection() {
     const response = await fetch(`${BASE_URL}/presence/test-startup`, {
       method: "GET",
       headers: {
-        Authorization: `Bearer ${localStorage.getItem("startupverse_token") || ""}`,
+        Authorization: `Bearer ${getAccessToken()}`,
       },
     });
 

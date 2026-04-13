@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { Button } from "./ui/button";
 import { Card } from "./ui/card";
 import { useAuth } from "../contexts/AuthContext";
+import { getAccessToken } from "../app/session";
 import { Bell, Zap, Bug } from "lucide-react";
 import { toast } from "sonner";
 export default function NotificationDebugPanel() {
@@ -22,7 +23,7 @@ export default function NotificationDebugPanel() {
         {
           method: "POST",
           headers: {
-            Authorization: `Bearer ${localStorage.getItem("startupverse_token") || ""}`,
+            Authorization: `Bearer ${getAccessToken()}`,
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
@@ -68,7 +69,7 @@ export default function NotificationDebugPanel() {
         {
           method: "GET",
           headers: {
-            Authorization: `Bearer ${localStorage.getItem("startupverse_token") || ""}`,
+            Authorization: `Bearer ${getAccessToken()}`,
             "Content-Type": "application/json",
           },
         },

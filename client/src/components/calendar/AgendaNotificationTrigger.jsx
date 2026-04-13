@@ -18,6 +18,7 @@ import {
 } from "../ui/card";
 import { Bell, Calendar, Send } from "lucide-react";
 import { toast } from "sonner";
+import { getAccessToken } from "../../app/session";
 export default function AgendaNotificationTrigger({ startupId }) {
   const [loading, setLoading] = useState(false);
   const [summary, setSummary] = useState(null);
@@ -29,7 +30,7 @@ export default function AgendaNotificationTrigger({ startupId }) {
         {
           method: "POST",
           headers: {
-            Authorization: `Bearer ${localStorage.getItem("startupverse_token") || ""}`,
+            Authorization: `Bearer ${getAccessToken()}`,
             "Content-Type": "application/json",
           },
         },
@@ -57,7 +58,7 @@ export default function AgendaNotificationTrigger({ startupId }) {
         `${import.meta.env.VITE_API_URL || "http://localhost:8000/api/v1"}/agenda/${startupId}/weekly-summary`,
         {
           headers: {
-            Authorization: `Bearer ${localStorage.getItem("startupverse_token") || ""}`,
+            Authorization: `Bearer ${getAccessToken()}`,
           },
         },
       );

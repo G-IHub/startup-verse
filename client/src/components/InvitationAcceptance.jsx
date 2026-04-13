@@ -23,6 +23,8 @@ import {
   UserPlus,
 } from "lucide-react";
 import { toast } from "sonner";
+import { getAccessToken } from "../app/session";
+
 export default function InvitationAcceptance({ token, onAccept, onCancel }) {
   const [invitation, setInvitation] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -45,7 +47,7 @@ export default function InvitationAcceptance({ token, onAccept, onCancel }) {
           import.meta.env.VITE_API_URL || "http://localhost:8000/api/v1";
         const response = await fetch(`${API_URL}/invitations/token/${token}`, {
           headers: {
-            Authorization: `Bearer ${localStorage.getItem("startupverse_token") || ""}`,
+            Authorization: `Bearer ${getAccessToken()}`,
           },
         });
         if (!response.ok) {

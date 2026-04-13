@@ -81,21 +81,20 @@ export default function CommunicationCenter({
   };
   const loadMessages = async () => {
     try {
+      const token = getAccessToken();
       const response = await fetch(
-        `${import.meta.env.VITE_API_URL || "http://localhost:8000/api/v1"}/messages/organization/${organizationId}`,
+        `${API_BASE}/messages/organization/${organizationId}`,
         {
           headers: {
-            Authorization: `Bearer ${localStorage.getItem("startupverse_token") || ""}`,
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
           },
         },
       );
       if (!response.ok) throw new Error("Failed to fetch messages");
-      const data = await response.json();
-      setMessages(data.messages || []);
-      console.log(
-        "📨 Loaded organization messages:",
-        data.messages?.length || 0,
-      );
+      const raw = unwrapData(await response.json());
+      const list = Array.isArray(raw) ? raw : raw.messages || [];
+      setMessages(list);
+      console.log("📨 Loaded organization messages:", list.length);
     } catch (error) {
       console.error("Error loading messages:", error);
     }
@@ -168,20 +167,21 @@ export default function CommunicationCenter({
               sentBy: userId,
               sentByName: userName,
             };
-      const response = await fetch(
-        `${import.meta.env.VITE_API_URL || "http://localhost:8000/api/v1"}/${endpoint}`,
-        {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem("startupverse_token") || ""}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(body),
+      const token = getAccessToken();
+      const response = await fetch(`${API_BASE}/${endpoint}`, {
+        method: "POST",
+        headers: {
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          "Content-Type": "application/json",
         },
-      );
+        body: JSON.stringify(body),
+      });
       if (!response.ok) throw new Error("Failed to send message");
-      const data = await response.json();
-      const recipientCount = messageMode === "bulk" ? data.recipientCount : 1;
+      const inner = unwrapData(await response.json());
+      const recipientCount =
+        messageMode === "bulk"
+          ? inner.recipientCount ?? inner.recipients?.length ?? 1
+          : 1;
       alert(
         `Message sent to ${recipientCount} startup${recipientCount > 1 ? "s" : ""}!`,
       );

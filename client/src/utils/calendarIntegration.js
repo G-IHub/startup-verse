@@ -308,7 +308,7 @@ export async function getOrganizationCalendarEvents(organizationId) {
       }
 
       const deliverablesResponse = await fetch(
-        `${API_BASE}/deliverables/${cohortId}`,
+        `${API_BASE}/cohorts/${cohortId}/deliverables`,
         { headers: authHeaders() },
       );
 

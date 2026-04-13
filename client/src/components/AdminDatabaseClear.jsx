@@ -17,6 +17,8 @@ import {
   DialogTitle,
 } from "./ui/dialog";
 import { toast } from "sonner";
+import { getAccessToken } from "../app/session";
+
 export function AdminDatabaseClear() {
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const [isClearing, setIsClearing] = useState(false);
@@ -30,7 +32,7 @@ export function AdminDatabaseClear() {
         {
           method: "GET",
           headers: {
-            Authorization: `Bearer ${localStorage.getItem("startupverse_token") || ""}`,
+            Authorization: `Bearer ${getAccessToken()}`,
             "Content-Type": "application/json",
           },
         },
@@ -59,7 +61,7 @@ export function AdminDatabaseClear() {
         {
           method: "DELETE",
           headers: {
-            Authorization: `Bearer ${localStorage.getItem("startupverse_token") || ""}`,
+            Authorization: `Bearer ${getAccessToken()}`,
             "Content-Type": "application/json",
           },
         },

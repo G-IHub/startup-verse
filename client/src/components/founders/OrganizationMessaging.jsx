@@ -14,6 +14,8 @@ import { Input } from "../ui/input";
 import { Textarea } from "../ui/textarea";
 import { Badge } from "../ui/badge";
 import { Plus, MessageSquare, Send, Mail, MailOpen } from "lucide-react";
+import { getAccessToken } from "../../app/session";
+
 export default function OrganizationMessaging({
   founderId,
   founderName,
@@ -38,7 +40,7 @@ export default function OrganizationMessaging({
         `${import.meta.env.VITE_API_URL || "http://localhost:8000/api/v1"}/messages/${founderId}`,
         {
           headers: {
-            Authorization: `Bearer ${localStorage.getItem("startupverse_token") || ""}`,
+            Authorization: `Bearer ${getAccessToken()}`,
           },
         },
       );
@@ -69,7 +71,7 @@ export default function OrganizationMessaging({
         {
           method: "POST",
           headers: {
-            Authorization: `Bearer ${localStorage.getItem("startupverse_token") || ""}`,
+            Authorization: `Bearer ${getAccessToken()}`,
             "Content-Type": "application/json",
           },
           body: JSON.stringify({

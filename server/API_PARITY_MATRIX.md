@@ -1,6 +1,6 @@
 # API Parity Matrix (Client Runtime -> Express API)
 
-Last updated: 2026-04-03
+Last updated: 2026-04-11
 
 Envelope standard:
 - Success: `{ "success": true, "data": ... }`
@@ -45,6 +45,24 @@ Envelope standard:
 | `/admin/mega-nuclear-reset` | Compatibility alias | Yes | none | deterministic 501 with `COMPAT_NOT_IMPLEMENTED` | Implemented |
 | `/emails/*` | Compatibility alias | Yes | email payloads | placeholder send ack | Implemented |
 | `/migrate/*` + `/migrations/*` | Compatibility alias | Yes | migration payloads | deterministic 501 with `COMPAT_NOT_IMPLEMENTED` | Implemented |
+
+## Compat routes still mounted (client inventory)
+
+Grep of `client/src` (2026-04-11) against paths served from `compatibility.routes.js` and other compatibility-style prefixes. **Required** = production UI still calls the path; **candidate** = dev-only, deep links, or comments only.
+
+| Path / family | Client references | Required / candidate |
+|---------------|-------------------|----------------------|
+| `/founder/:id/events` | `calendarIntegration.js`, `eventReminders.js`, `OrganizationEventsWidget.jsx` | Required |
+| `/founder/:id/announcements` | `OrganizationAnnouncementsWidget.jsx`, `VirtualStartupOfficeWorkspace.jsx` | Required |
+| `/announcements/:id/mark-read` | `OrganizationAnnouncementsWidget.jsx` | Required |
+| `/events/*` (e.g. RSVP, upcoming) | `OrganizationEventsWidget.jsx`, `eventNotifications.js` | Required |
+| `/mentors/*` (assign, list, profile) | `MentorAssignmentManager.jsx`, `MentorManager.jsx`, `MentorPortal.jsx`, `MentorLogin.jsx` (`mentors/public/*`) | Required |
+| `/cron/*` | `NotificationCronTrigger.jsx` | Candidate (manual / admin trigger UI) |
+| `/founders/:id/resources` | `FounderResourcesView.jsx` | Required (canonical `founders.routes.js`; duplicate compat shape exists under `/resources/founder/:id`) |
+| `/deliverables/founder/:id` | `FounderDeliverablesView.jsx`, `FounderDashboard.jsx`, `calendarIntegration.js` | Required |
+| `/founders/:id/analytics` | `AnalyticsDashboard.jsx` | Required |
+
+Other “compat” mentions in the client are **code comments** only (`backward compatibility`, field aliases), not HTTP routes to `compatibility.routes.js`.
 
 ## Notes
 

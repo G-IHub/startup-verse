@@ -5,6 +5,7 @@ import compatibilityRouter from "./compatibility.routes.js";
 import eventsRouter from "./events.routes.js";
 import mentorsRouter from "./mentors.routes.js";
 import announcementsRouter from "./announcements.routes.js";
+import debugRouter from "./debug.routes.js";
 import cronRouter from "./cron.routes.js";
 import deliverablesRouter from "./deliverables.routes.js";
 import executionScoreRouter from "./executionScore.routes.js";
@@ -41,6 +42,7 @@ apiRouter.use(cronRouter);
 apiRouter.use(eventsRouter);
 apiRouter.use(mentorsRouter);
 apiRouter.use(announcementsRouter);
+apiRouter.use(debugRouter);
 apiRouter.use(compatibilityRouter);
 
 export default apiRouter;

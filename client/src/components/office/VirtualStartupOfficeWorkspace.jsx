@@ -963,18 +963,19 @@ export default function VirtualStartupOffice({
         "🐛 [DEBUG] Checking database for startup:",
         startupIdForDebug,
       );
+      const token = getAccessToken();
       const response = await fetch(
-        `${import.meta.env.VITE_API_URL || "http://localhost:8000/api/v1"}/debug/startup/${startupIdForDebug}`,
+        `${import.meta.env.VITE_API_URL || "http://localhost:8000/api/v1"}/debug/startups/${startupIdForDebug}`,
         {
           method: "GET",
           headers: {
-            Authorization: `Bearer ${localStorage.getItem("startupverse_token") || ""}`,
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
             "Content-Type": "application/json",
           },
         },
       );
       const data = await response.json();
-      console.log("🐛 [DEBUG] Database state:", data);
+      console.log("🐛 [DEBUG] Database state:", unwrapData(data));
       // Removed debug toast notification for production
     } catch (error) {
       console.error("❌ [DEBUG] Error:", error);

@@ -3,6 +3,7 @@
  * Helper functions for Google Meet integration
  */
 import { toast } from "sonner";
+import { getAccessToken } from "../app/session";
 
 /**
  * Check if user has connected their Google account
@@ -13,7 +14,7 @@ export async function isGoogleConnected(userId) {
       `${import.meta.env.VITE_API_URL || "http://localhost:8000/api/v1"}/google/status/${userId}`,
       {
         headers: {
-          Authorization: `Bearer ${localStorage.getItem("startupverse_token") || ""}`,
+          Authorization: `Bearer ${getAccessToken()}`,
         },
       },
     );
@@ -37,7 +38,7 @@ export async function getGoogleConnectionStatus(userId) {
       `${import.meta.env.VITE_API_URL || "http://localhost:8000/api/v1"}/google/status/${userId}`,
       {
         headers: {
-          Authorization: `Bearer ${localStorage.getItem("startupverse_token") || ""}`,
+          Authorization: `Bearer ${getAccessToken()}`,
         },
       },
     );
@@ -62,7 +63,7 @@ export async function createGoogleMeet(params) {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${localStorage.getItem("startupverse_token") || ""}`,
+          Authorization: `Bearer ${getAccessToken()}`,
         },
         body: JSON.stringify(params),
       },
@@ -95,7 +96,7 @@ export async function createInstantGoogleMeet(userId, roomName) {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${localStorage.getItem("startupverse_token") || ""}`,
+          Authorization: `Bearer ${getAccessToken()}`,
         },
         body: JSON.stringify({ roomName }),
       },

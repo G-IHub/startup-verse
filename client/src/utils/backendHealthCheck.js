@@ -3,6 +3,8 @@
  * Tests if the backend API is reachable and responding.
  */
 
+import { getAccessToken } from "../app/session";
+
 const API_BASE_URL =
   import.meta.env.VITE_API_URL || "http://localhost:8000/api/v1";
 
@@ -19,7 +21,7 @@ export async function checkBackendHealth(silent = false) {
     const response = await fetch(`${API_BASE_URL}/health`, {
       method: "GET",
       headers: {
-        Authorization: `Bearer ${localStorage.getItem("startupverse_token") || ""}`,
+        Authorization: `Bearer ${getAccessToken()}`,
         "Content-Type": "application/json",
       },
       signal: controller.signal,
@@ -197,7 +199,7 @@ export async function runAuthMappingMigration(silent = false) {
     const response = await fetch(`${API_BASE_URL}/migrate/auth-mappings`, {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${localStorage.getItem("startupverse_token") || ""}`,
+        Authorization: `Bearer ${getAccessToken()}`,
         "Content-Type": "application/json",
       },
     });
