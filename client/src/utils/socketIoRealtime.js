@@ -298,11 +298,13 @@ export function subscribeToPresence(startupId, _userId, _userName, onPresenceCha
   const onUpdated = (p) => {
     if (!p || String(p.startupId) !== String(startupId)) return;
     const uid = String(p.userId);
-    if (p.isOnline) {
-      byUser.set(uid, p);
-    } else {
-      byUser.delete(uid);
-    }
+    byUser.set(uid, {
+      ...p,
+      userId: uid,
+      startupId: String(p.startupId),
+      isOnline: Boolean(p.isOnline),
+      lastSeenAt: p.lastSeenAt || p.updatedAt || new Date().toISOString(),
+    });
     pushList();
   };
 

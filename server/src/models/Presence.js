@@ -7,6 +7,8 @@ const presenceSchema = new mongoose.Schema(
     userName: { type: String, default: "" },
     role: { type: String, default: "" },
     isOnline: { type: Boolean, default: true },
+    statusText: { type: String, default: "", maxlength: 300 },
+    mood: { type: String, default: "", maxlength: 64 },
     lastSeenAt: { type: Date, default: Date.now },
     expiresAt: { type: Date, default: () => new Date(Date.now() + 24 * 60 * 60 * 1000) },
     metadata: { type: mongoose.Schema.Types.Mixed, default: {} },

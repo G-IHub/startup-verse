@@ -60,9 +60,11 @@ import { useNotifications } from "../../contexts/NotificationContext";
 import * as presenceApi from "../../utils/presenceApi";
 import {
   subscribeToActivities,
+  subscribeToPresence,
   broadcastActivity,
   isRealtimeConnected,
 } from "../../utils/realtimeSubscriptions";
+import { PresenceBar } from "../presence/PresenceBar";
 // 🔥 NEW: Real-time hooks for seamless updates without polling
 
 import {
@@ -127,6 +129,8 @@ export default function VirtualStartupOffice({
 }) {
   // Presence features - Real backend data
   const [onlineUsers, setOnlineUsers] = useState([]);
+  const presencePollIntervalRef = useRef(null);
+  const presenceFallbackTimeoutRef = useRef(null);
 
   // Notifications
   const { addNotification, notifications } = useNotifications();
@@ -988,25 +992,82 @@ export default function VirtualStartupOffice({
   // PRESENCE MANAGEMENT - Real Backend Integration
   // ==========================================
 
+  const deriveMoodFromStatus = (status) => {
+    if (status === "focus-mode") return "focused";
+    if (status === "on-break") return "relaxed";
+    if (status === "away") return "away";
+    if (status === "in-meeting") return "busy";
+    return "ready";
+  };
+
+  const normalizePresenceUsers = (presenceRows) =>
+    (Array.isArray(presenceRows) ? presenceRows : []).map((p) => {
+      const member = teamMembers.find((tm) => String(tm.id) === String(p.userId || p.id));
+      return {
+        id: String(p.userId || p.id || ""),
+        name: p.name || p.userName || member?.name || `User ${String(p.userId || p.id || "")}`,
+        avatar: member?.avatar,
+        status: p.status || (p.isOnline ? "available" : "away"),
+        statusText: p.statusText || "",
+        mood: p.mood || "",
+        activity: p.activity?.type || p.activity || "working",
+        role: p.role || member?.role || "team-member",
+        cameraEnabled: Boolean(p.cameraEnabled),
+        lastSeenAt:
+          p.lastSeenAt instanceof Date
+            ? p.lastSeenAt
+            : new Date(p.lastSeenAt || Date.now()),
+        isOnline: typeof p.isOnline === "boolean" ? p.isOnline : p.status !== "away",
+      };
+    });
+
+  const mergePresenceUsers = (incomingRows) =>
+    setOnlineUsers((prev) => {
+      const currentById = new Map((prev || []).map((u) => [String(u.id), u]));
+      for (const row of normalizePresenceUsers(incomingRows)) {
+        currentById.set(String(row.id), {
+          ...(currentById.get(String(row.id)) || {}),
+          ...row,
+        });
+      }
+      return Array.from(currentById.values());
+    });
+
   // Send presence heartbeat and fetch active users
   useEffect(() => {
     const startupId = user.companyId || user.startupId || "default-startup";
+    let stopped = false;
 
     // Function to get current status
     const getCurrentStatus = () => {
-      let status = "active";
+      let status = "available";
       let activity = "working";
-      if (myStatus === "do-not-disturb" || myStatus === "away") {
+      if (myStatus === "away") {
         status = "away";
         activity = "idle";
       } else if (isVideoCallActive) {
-        status = "in-call";
+        status = "in-meeting";
         activity = "in-call";
       } else if (isMessagePanelOpen) {
         activity = "messaging";
       }
       return {
+        userName: user.name || "",
+        role: user.role || "",
+        isOnline: status !== "away",
         status,
+        statusText:
+          myStatusMessage ||
+          (status === "available"
+            ? "Available"
+            : status === "in-meeting"
+              ? "In meeting"
+              : status === "focus-mode"
+                ? "In focus mode"
+                : status === "on-break"
+                  ? "On break"
+                  : "Away"),
+        mood: deriveMoodFromStatus(myStatus),
         activity,
         cameraEnabled: isVideoCallActive && !isVideoMinimized,
       };
@@ -1019,41 +1080,81 @@ export default function VirtualStartupOffice({
       getCurrentStatus,
     );
 
-    // Fetch active users periodically
     const fetchActiveUsers = async () => {
       const result = await presenceApi.getActiveUsers(startupId);
-      if (result.success && result.presence) {
-        // Convert backend presence to UserPresence format
-        const users = result.presence.map((p) => {
-          // Find corresponding team member for additional info
-          const member = teamMembers.find((tm) => tm.id === p.userId);
-          return {
-            id: p.userId,
-            name: member?.name || `User ${p.userId}`,
-            avatar: member?.avatar,
-            status: p.status,
-            activity: p.activity,
-            role: member?.role,
-            cameraEnabled: p.cameraEnabled,
-            lastActive: new Date(p.lastActive),
-          };
-        });
-        setOnlineUsers(users);
+      if (!stopped && result.success && result.presence) {
+        setOnlineUsers(normalizePresenceUsers(result.presence));
       }
     };
 
-    // Initial fetch
-    fetchActiveUsers();
+    const stopPresenceSubscription = subscribeToPresence(
+      startupId,
+      user.id,
+      user.name || "",
+      (presenceRows) => {
+        if (!stopped) {
+          mergePresenceUsers(presenceRows);
+        }
+      },
+    );
 
-    // ✅ REALTIME: Removed active users polling (was every 15s) - using presence subscription below
+    const startPresenceFallbackPolling = () => {
+      if (presencePollIntervalRef.current) return;
+      const tick = async () => {
+        await fetchActiveUsers();
+      };
+      void tick();
+      presencePollIntervalRef.current = setInterval(() => {
+        void tick();
+      }, 30000);
+    };
+
+    const stopPresenceFallbackPolling = () => {
+      if (presencePollIntervalRef.current) {
+        clearInterval(presencePollIntervalRef.current);
+        presencePollIntervalRef.current = null;
+      }
+      if (presenceFallbackTimeoutRef.current) {
+        clearTimeout(presenceFallbackTimeoutRef.current);
+        presenceFallbackTimeoutRef.current = null;
+      }
+    };
+
+    const evaluateConnectionFallback = () => {
+      if (isRealtimeConnected()) {
+        stopPresenceFallbackPolling();
+        return;
+      }
+      if (presenceFallbackTimeoutRef.current) return;
+      presenceFallbackTimeoutRef.current = setTimeout(() => {
+        presenceFallbackTimeoutRef.current = null;
+        if (!isRealtimeConnected()) {
+          startPresenceFallbackPolling();
+        }
+      }, 3000);
+    };
+
+    void fetchActiveUsers();
+    evaluateConnectionFallback();
+    const connectionProbe = setInterval(() => {
+      evaluateConnectionFallback();
+      if (isRealtimeConnected()) {
+        void fetchActiveUsers();
+      }
+    }, 10000);
 
     // Cleanup on unmount
     return () => {
+      stopped = true;
       stopHeartbeat();
-      // Real-time subscription cleanup handled separately
+      stopPresenceSubscription();
+      clearInterval(connectionProbe);
+      stopPresenceFallbackPolling();
     };
   }, [
     user.id,
+    user.name,
+    user.role,
     user.companyId,
     user.startupId,
     myStatus,
@@ -1061,6 +1162,7 @@ export default function VirtualStartupOffice({
     isVideoMinimized,
     isMessagePanelOpen,
     teamMembers,
+    myStatusMessage,
   ]);
   const [meetingRooms] = useState([
     {
@@ -1416,10 +1518,17 @@ export default function VirtualStartupOffice({
     if (diffHours < 24) return `${diffHours}h ago`;
     return `${diffDays}d ago`;
   };
-  const updateMyStatus = (newStatus, message) => {
+  const updateMyStatus = async (newStatus, message) => {
     setMyStatus(newStatus);
     setMyStatusMessage(message || "");
     setShowStatusDialog(false);
+    const startupId = user.companyId || user.startupId || "default-startup";
+    await presenceApi.updateMyPresenceStatus(
+      user.id,
+      startupId,
+      message || "",
+      deriveMoodFromStatus(newStatus),
+    );
     addActivity(
       "status-change",
       `switched to ${newStatus.replace("-", " ")}`,
@@ -3543,7 +3652,48 @@ export default function VirtualStartupOffice({
                 </CardContent>
               </Card>
             </div>
-            <div className="lg:col-span-1 lg:row-start-1">
+            <div className="lg:col-span-1 lg:row-start-1 space-y-2">
+              <Card className="overflow-hidden">
+                <CardHeader className="py-2 px-3 border-b">
+                  <CardTitle className="text-xs font-semibold">
+                    Live Presence
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="py-2 px-3 space-y-2">
+                  <PresenceBar users={onlineUsers} />
+                  <div className="max-h-[160px] overflow-auto space-y-1">
+                    {onlineUsers.map((member) => (
+                      <div
+                        key={`presence-${member.id}`}
+                        className="rounded-md border p-2 text-[10px] space-y-0.5"
+                      >
+                        <div className="flex items-center justify-between">
+                          <span className="font-medium">{member.name}</span>
+                          <Badge variant="secondary" className="text-[9px] h-4">
+                            {member.status.replace("-", " ")}
+                          </Badge>
+                        </div>
+                        <div className="text-muted-foreground">
+                          {member.role || "team-member"}
+                        </div>
+                        <div className="text-muted-foreground">
+                          Last seen {formatTimeAgo(member.lastSeenAt)}
+                        </div>
+                        {member.statusText && (
+                          <div className="italic text-muted-foreground">
+                            "{member.statusText}"
+                          </div>
+                        )}
+                        {member.mood && (
+                          <div className="text-muted-foreground">
+                            Mood: {getMoodEmoji(member.mood)} {member.mood}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
               <TeamEnergyPulse users={onlineUsers} />
             </div>
             <div className="lg:col-span-3 lg:row-start-2">
@@ -3864,7 +4014,7 @@ export default function VirtualStartupOffice({
                       key="status-available"
                       variant={myStatus === "available" ? "default" : "outline"}
                       size="sm"
-                      onClick={() => updateMyStatus("available")}
+                      onClick={() => updateMyStatus("available", myStatusMessage)}
                       className="justify-start"
                     >
                       <Circle className="w-2 h-2 mr-2 bg-green-500" />
@@ -3876,7 +4026,7 @@ export default function VirtualStartupOffice({
                         myStatus === "in-meeting" ? "default" : "outline"
                       }
                       size="sm"
-                      onClick={() => updateMyStatus("in-meeting")}
+                      onClick={() => updateMyStatus("in-meeting", myStatusMessage)}
                       className="justify-start"
                     >
                       <Circle className="w-2 h-2 mr-2 bg-red-500" />
@@ -3888,7 +4038,7 @@ export default function VirtualStartupOffice({
                         myStatus === "focus-mode" ? "default" : "outline"
                       }
                       size="sm"
-                      onClick={() => updateMyStatus("focus-mode")}
+                      onClick={() => updateMyStatus("focus-mode", myStatusMessage)}
                       className="justify-start"
                     >
                       <Circle className="w-2 h-2 mr-2 bg-purple-500" />
@@ -3898,7 +4048,7 @@ export default function VirtualStartupOffice({
                       key="status-on-break"
                       variant={myStatus === "on-break" ? "default" : "outline"}
                       size="sm"
-                      onClick={() => updateMyStatus("on-break")}
+                      onClick={() => updateMyStatus("on-break", myStatusMessage)}
                       className="justify-start"
                     >
                       <Circle className="w-2 h-2 mr-2 bg-yellow-500" />
@@ -3908,7 +4058,7 @@ export default function VirtualStartupOffice({
                       key="status-away"
                       variant={myStatus === "away" ? "default" : "outline"}
                       size="sm"
-                      onClick={() => updateMyStatus("away")}
+                      onClick={() => updateMyStatus("away", myStatusMessage)}
                       className="justify-start col-span-2"
                     >
                       <Circle className="w-2 h-2 mr-2 bg-gray-400" />
