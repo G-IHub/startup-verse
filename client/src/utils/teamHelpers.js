@@ -3,6 +3,8 @@
  * Centralized functions for loading and managing team data across the platform
  */
 
+import { STORAGE_KEYS } from "../app/session";
+
 /**
  * Get all team members for a specific company
  * This is the single source of truth for team data across the platform
@@ -13,7 +15,7 @@ export const getTeamMembers = (companyId, excludeUserId) => {
   }
 
   const allUsers = JSON.parse(
-    localStorage.getItem("startupverse_users") || "[]",
+    localStorage.getItem(STORAGE_KEYS.teamMembers) || "[]",
   );
 
   return allUsers
@@ -43,7 +45,7 @@ export const getAllCompanyMembers = (companyId) => {
   }
 
   const allUsers = JSON.parse(
-    localStorage.getItem("startupverse_users") || "[]",
+    localStorage.getItem(STORAGE_KEYS.teamMembers) || "[]",
   );
 
   return allUsers
@@ -67,7 +69,7 @@ export const getAllCompanyMembers = (companyId) => {
  */
 export const getTeamMemberById = (userId) => {
   const allUsers = JSON.parse(
-    localStorage.getItem("startupverse_users") || "[]",
+    localStorage.getItem(STORAGE_KEYS.teamMembers) || "[]",
   );
   const user = allUsers.find((u) => u.id === userId);
 
@@ -118,7 +120,7 @@ export const getCompanyInfo = (companyId) => {
  */
 export const isUserInCompany = (userId, companyId) => {
   const allUsers = JSON.parse(
-    localStorage.getItem("startupverse_users") || "[]",
+    localStorage.getItem(STORAGE_KEYS.teamMembers) || "[]",
   );
   const user = allUsers.find((u) => u.id === userId);
   return user?.companyId === companyId;

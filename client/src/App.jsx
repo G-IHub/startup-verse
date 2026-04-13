@@ -20,12 +20,15 @@ import {
   STORAGE_KEYS,
   buildFounderProfile,
   buildTalentProfile,
+  ensureSessionMigration,
   getAccessToken,
   loadCurrentUser,
   resolveInitialView,
   safeParseJson,
   upsertStoredRecord,
 } from "./app/session";
+
+ensureSessionMigration();
 
 // Lazy-loaded route components
 const DashboardHybrid = lazy(() => import("./components/DashboardHybrid"));

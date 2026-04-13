@@ -4,6 +4,7 @@
 
 import { io } from "socket.io-client";
 import { getSocketBaseUrl } from "./socketBaseUrl.js";
+import { getConversation } from "./messaging.js";
 
 /** Mirrors server/src/realtime/rooms.js */
 export function startupSocketRoom(startupId) {
@@ -130,12 +131,95 @@ export async function broadcastTaskUpdate() {
 // MESSAGES — server emits message:created
 // ========================================
 
-export function subscribeToMessages(startupId, onUpdate) {
-  return createSubscription(
+const MESSAGE_POLL_MS = 50_000;
+const MESSAGE_POLL_GRACE_MS = 4_000;
+
+/**
+ * @param {string} startupId
+ * @param {(update: object) => void} onUpdate
+ * @param {{ userId?: string, peerUserId?: string } | null} [pollContext] Optional REST fallback while the socket is offline (bounded interval).
+ */
+export function subscribeToMessages(startupId, onUpdate, pollContext = null) {
+  let pollTimer = null;
+  let graceTimer = null;
+  let stopped = false;
+  const seenIds = new Set();
+
+  const clearTimers = () => {
+    if (pollTimer != null) {
+      clearInterval(pollTimer);
+      pollTimer = null;
+    }
+    if (graceTimer != null) {
+      clearTimeout(graceTimer);
+      graceTimer = null;
+    }
+  };
+
+  const armPollingIfNeeded = () => {
+    if (
+      stopped ||
+      !pollContext?.userId ||
+      !pollContext?.peerUserId ||
+      isRealtimeConnected()
+    ) {
+      return;
+    }
+    if (pollTimer != null || graceTimer != null) return;
+
+    graceTimer = setTimeout(() => {
+      graceTimer = null;
+      if (stopped || isRealtimeConnected()) return;
+
+      const tick = async () => {
+        if (stopped || isRealtimeConnected()) {
+          clearTimers();
+          return;
+        }
+        try {
+          const rows = await getConversation(
+            pollContext.userId,
+            pollContext.peerUserId,
+            startupId,
+          );
+          if (!Array.isArray(rows)) return;
+          for (const row of rows) {
+            const mapped = mapServerMessageToClient(row);
+            if (!mapped?.id || seenIds.has(mapped.id)) continue;
+            seenIds.add(mapped.id);
+            onUpdate({
+              action: "new_message",
+              message: mapped,
+              fromUserId: mapped.senderId,
+              toUserId: mapped.recipientId,
+            });
+          }
+        } catch {
+          /* transient fetch errors */
+        }
+      };
+
+      void tick();
+      pollTimer = setInterval(() => void tick(), MESSAGE_POLL_MS);
+    }, MESSAGE_POLL_GRACE_MS);
+  };
+
+  const socket = SocketEngine.getSocket();
+  const onConnect = () => {
+    clearTimers();
+  };
+  const onDisconnect = () => {
+    armPollingIfNeeded();
+  };
+  socket.on("connect", onConnect);
+  socket.on("disconnect", onDisconnect);
+
+  const coreUnsub = createSubscription(
     startupSocketRoom(startupId),
     "message:created",
     (message) => {
       const mapped = mapServerMessageToClient(message);
+      if (mapped?.id) seenIds.add(mapped.id);
       onUpdate({
         action: "new_message",
         message: mapped,
@@ -144,6 +228,16 @@ export function subscribeToMessages(startupId, onUpdate) {
       });
     },
   );
+
+  armPollingIfNeeded();
+
+  return () => {
+    stopped = true;
+    socket.off("connect", onConnect);
+    socket.off("disconnect", onDisconnect);
+    clearTimers();
+    coreUnsub();
+  };
 }
 
 export async function broadcastMessageUpdate() {

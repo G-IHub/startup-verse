@@ -1,7 +1,9 @@
 import React, { useState } from "react";
+import { API_BASE_URL } from "../config/apiBase.js";
 import { Button } from "./ui/button";
 import { Card } from "./ui/card";
 import { useAuth } from "../contexts/AuthContext";
+import { getAccessToken } from "../app/session";
 import { Bell, Zap, Bug } from "lucide-react";
 import { toast } from "sonner";
 export default function NotificationDebugPanel() {
@@ -18,11 +20,11 @@ export default function NotificationDebugPanel() {
     try {
       console.log("🧪 [DEBUG] Creating test notification for user:", user.id);
       const response = await fetch(
-        `${import.meta.env.VITE_API_URL || "http://localhost:8000/api/v1"}/notifications/test`,
+        `${API_BASE_URL}/notifications/test`,
         {
           method: "POST",
           headers: {
-            Authorization: `Bearer ${localStorage.getItem("startupverse_token") || ""}`,
+            Authorization: `Bearer ${getAccessToken()}`,
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
@@ -64,11 +66,11 @@ export default function NotificationDebugPanel() {
     try {
       console.log("🧪 [DEBUG] Fetching notifications for user:", user.id);
       const response = await fetch(
-        `${import.meta.env.VITE_API_URL || "http://localhost:8000/api/v1"}/users/${user.id}/notifications`,
+        `${API_BASE_URL}/users/${user.id}/notifications`,
         {
           method: "GET",
           headers: {
-            Authorization: `Bearer ${localStorage.getItem("startupverse_token") || ""}`,
+            Authorization: `Bearer ${getAccessToken()}`,
             "Content-Type": "application/json",
           },
         },

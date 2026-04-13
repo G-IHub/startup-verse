@@ -3,6 +3,8 @@
  * Helper functions for Google Meet integration
  */
 import { toast } from "sonner";
+import { API_BASE_URL } from "../config/apiBase.js";
+import { getAccessToken } from "../app/session";
 
 /**
  * Check if user has connected their Google account
@@ -10,10 +12,10 @@ import { toast } from "sonner";
 export async function isGoogleConnected(userId) {
   try {
     const response = await fetch(
-      `${import.meta.env.VITE_API_URL || "http://localhost:8000/api/v1"}/google/status/${userId}`,
+      `${API_BASE_URL}/google/status/${userId}`,
       {
         headers: {
-          Authorization: `Bearer ${localStorage.getItem("startupverse_token") || ""}`,
+          Authorization: `Bearer ${getAccessToken()}`,
         },
       },
     );
@@ -34,10 +36,10 @@ export async function isGoogleConnected(userId) {
 export async function getGoogleConnectionStatus(userId) {
   try {
     const response = await fetch(
-      `${import.meta.env.VITE_API_URL || "http://localhost:8000/api/v1"}/google/status/${userId}`,
+      `${API_BASE_URL}/google/status/${userId}`,
       {
         headers: {
-          Authorization: `Bearer ${localStorage.getItem("startupverse_token") || ""}`,
+          Authorization: `Bearer ${getAccessToken()}`,
         },
       },
     );
@@ -57,12 +59,12 @@ export async function getGoogleConnectionStatus(userId) {
 export async function createGoogleMeet(params) {
   try {
     const response = await fetch(
-      `${import.meta.env.VITE_API_URL || "http://localhost:8000/api/v1"}/google/create-meeting`,
+      `${API_BASE_URL}/google/create-meeting`,
       {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${localStorage.getItem("startupverse_token") || ""}`,
+          Authorization: `Bearer ${getAccessToken()}`,
         },
         body: JSON.stringify(params),
       },
@@ -90,12 +92,12 @@ export async function createGoogleMeet(params) {
 export async function createInstantGoogleMeet(userId, roomName) {
   try {
     const response = await fetch(
-      `${import.meta.env.VITE_API_URL || "http://localhost:8000/api/v1"}/google/instant-meeting/${userId}`,
+      `${API_BASE_URL}/google/instant-meeting/${userId}`,
       {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${localStorage.getItem("startupverse_token") || ""}`,
+          Authorization: `Bearer ${getAccessToken()}`,
         },
         body: JSON.stringify({ roomName }),
       },

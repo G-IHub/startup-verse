@@ -3,15 +3,15 @@
  * These functions call the backend to create notifications for various platform events
  */
 
-const API_BASE_URL =
-  import.meta.env.VITE_API_URL || "http://localhost:8000/api/v1";
+import { getAccessToken } from "../app/session";
+import { API_BASE_URL } from "../config/apiBase.js";
 
 async function createNotification(payload) {
   try {
     const response = await fetch(`${API_BASE_URL}/notifications`, {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${localStorage.getItem("startupverse_token") || ""}`,
+        Authorization: `Bearer ${getAccessToken()}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify(payload),

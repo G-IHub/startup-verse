@@ -2,6 +2,7 @@
  * MENTOR ASSIGNMENT MANAGER - Flexible Mentorship Management
  */
 import React, { useState, useEffect } from "react";
+import { API_BASE_URL } from "../../config/apiBase.js";
 import {
   Card,
   CardContent,
@@ -30,7 +31,7 @@ import { Dialog, DialogContent } from "../ui/dialog";
 import { getAccessToken } from "../../app/session";
 import { unwrapData } from "../../utils/apiEnvelope";
 
-const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:8000/api/v1";
+const API_BASE = API_BASE_URL;
 
 export default function MentorAssignmentManager({
   cohortId,
@@ -140,6 +141,7 @@ export default function MentorAssignmentManager({
           },
           body: JSON.stringify({
             founderId,
+            cohortId,
           }),
         },
       );

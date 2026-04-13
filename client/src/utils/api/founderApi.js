@@ -185,7 +185,25 @@ export async function getFounderPosts(founderId, params = {}) {
 
 export async function getAllPosts(params = {}) {
   const queryString = buildQueryString(params);
-  return apiCall(`/posts${queryString}`);
+  const data = await apiCall(`/talent/startup-posts${queryString}`);
+  const posts = data.posts || [];
+  const page = data.page || 1;
+  const pageSize = data.pageSize || 50;
+  const total = typeof data.total === "number" ? data.total : posts.length;
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
+  return {
+    success: true,
+    posts,
+    opportunities: posts,
+    pagination: {
+      page,
+      pageSize,
+      total,
+      totalPages,
+      hasNext: page < totalPages,
+      hasPrev: page > 1,
+    },
+  };
 }
 
 export async function deletePost(founderId, postId) {

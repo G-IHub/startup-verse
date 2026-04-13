@@ -3,7 +3,10 @@
  * Monitors Express API availability and response time.
  */
 
-const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8000/api/v1";
+import { getAccessToken } from "../app/session";
+import { API_BASE_URL } from "../config/apiBase.js";
+
+const API_URL = API_BASE_URL;
 const HEALTH_TIMEOUT = 10000; // 10 seconds
 
 /**
@@ -25,7 +28,7 @@ export async function checkBackendHealth(silent = true) {
     const response = await fetch(`${API_URL}/health`, {
       method: "GET",
       headers: {
-        Authorization: `Bearer ${localStorage.getItem("startupverse_token") || ""}`,
+        Authorization: `Bearer ${getAccessToken()}`,
       },
       signal: controller.signal,
     });
@@ -109,7 +112,7 @@ export async function runBackendDiagnostics() {
       const response = await fetch(`${API_URL}${endpoint}`, {
         method: "GET",
         headers: {
-          Authorization: `Bearer ${localStorage.getItem("startupverse_token") || ""}`,
+          Authorization: `Bearer ${getAccessToken()}`,
         },
         signal: AbortSignal.timeout(5000),
       });

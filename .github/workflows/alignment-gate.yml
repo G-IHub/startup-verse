@@ -1,0 +1,50 @@
+# Alignment gate: static smokes + client build + optional Mongo-backed HTTP flow smoke.
+# Uses an ephemeral Mongo service and non-production JWT secret for CI only.
+
+name: alignment-gate
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main, master]
+    paths:
+      - "server/**"
+      - "client/**"
+      - ".github/workflows/alignment-gate.yml"
+
+jobs:
+  gate:
+    runs-on: ubuntu-latest
+    services:
+      mongo:
+        image: mongo:7
+        ports:
+          - 27017:27017
+    env:
+      NODE_ENV: test
+      PORT: "8000"
+      CORS_ORIGIN: "http://localhost:5173"
+      JWT_SECRET: "ci-test-jwt-secret-at-least-32-characters-long"
+      JWT_EXPIRES_IN: "7d"
+      MONGODB_CONNECTION_URI: "mongodb://127.0.0.1:27017"
+      MONGODB_DB_NAME: startupverse_ci
+      RUN_CONTRACT_HTTP_FLOWS: "1"
+    defaults:
+      run:
+        working-directory: server
+    steps:
+      - uses: actions/checkout@v4
+      - name: Wait for Mongo
+        run: sleep 8
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: server/package-lock.json
+      - run: npm ci
+      - run: npm run export:client-api-call-catalog
+      - run: npm run export:client-api-inventory
+      - run: npm run test:alignment-gate
+      - name: Client build
+        working-directory: client
+        run: npm ci && npm run build

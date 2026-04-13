@@ -3,12 +3,14 @@
  * Queues actions when offline and syncs when back online
  */
 
+import { getAccessToken } from "../app/session";
+import { API_BASE_URL } from "../config/apiBase.js";
 import { offlineStorage } from "./offlineStorage";
 
-const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:8000/api/v1";
+const API_BASE = API_BASE_URL;
 
 function getAuthHeaderValue() {
-  const token = localStorage.getItem("startupverse_token") || "";
+  const token = getAccessToken();
   return `Bearer ${token}`;
 }
 
@@ -45,7 +47,7 @@ class SyncManager {
       method: action.method,
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${localStorage.getItem("startupverse_token") || ""}`,
+        Authorization: `Bearer ${getAccessToken()}`,
       },
       body: action.method !== "GET" ? JSON.stringify(action.data) : undefined,
     });

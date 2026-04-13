@@ -59,6 +59,8 @@ import {
 } from "../../utils/notificationHelpers";
 import * as teamMemberApi from "../../utils/api/teamMemberApi";
 import * as taskApi from "../../utils/api/taskApi";
+import { STORAGE_KEYS } from "../../app/session";
+
 export function TaskManagementPanel({
   open,
   onClose,
@@ -94,7 +96,7 @@ export function TaskManagementPanel({
 
       // Get all users from localStorage
       const allUsers = JSON.parse(
-        localStorage.getItem("startupverse_users") || "[]",
+        localStorage.getItem(STORAGE_KEYS.teamMembers) || "[]",
       );
 
       // Determine the founder ID (we don't need the full founder object)

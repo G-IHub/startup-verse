@@ -3,7 +3,10 @@
  * Helper functions for sending emails via backend
  */
 
-const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8000/api/v1";
+import { getAccessToken } from "../app/session";
+import { API_BASE_URL } from "../config/apiBase.js";
+
+const API_URL = API_BASE_URL;
 
 /**
  * Check if email service is configured
@@ -12,7 +15,7 @@ export async function checkEmailConfiguration() {
   try {
     const response = await fetch(`${API_URL}/emails/test`, {
       headers: {
-        Authorization: `Bearer ${localStorage.getItem("startupverse_token") || ""}`,
+        Authorization: `Bearer ${getAccessToken()}`,
       },
     });
     const data = await response.json();
@@ -34,7 +37,7 @@ export async function sendTeamInvitationEmail(params) {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${localStorage.getItem("startupverse_token") || ""}`,
+        Authorization: `Bearer ${getAccessToken()}`,
       },
       body: JSON.stringify(params),
     });
@@ -68,7 +71,7 @@ export async function sendNotificationEmail(params) {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${localStorage.getItem("startupverse_token") || ""}`,
+        Authorization: `Bearer ${getAccessToken()}`,
       },
       body: JSON.stringify(params),
     });
@@ -102,7 +105,7 @@ export async function sendWelcomeEmail(params) {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${localStorage.getItem("startupverse_token") || ""}`,
+        Authorization: `Bearer ${getAccessToken()}`,
       },
       body: JSON.stringify(params),
     });

@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { API_BASE_URL } from "../config/apiBase.js";
 import { Trash2, AlertTriangle, Database, BarChart3 } from "lucide-react";
 import { Button } from "./ui/button";
 import {
@@ -17,6 +18,8 @@ import {
   DialogTitle,
 } from "./ui/dialog";
 import { toast } from "sonner";
+import { getAccessToken } from "../app/session";
+
 export function AdminDatabaseClear() {
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const [isClearing, setIsClearing] = useState(false);
@@ -26,19 +29,20 @@ export function AdminDatabaseClear() {
     setIsLoadingStats(true);
     try {
       const response = await fetch(
-        `${import.meta.env.VITE_API_URL || "http://localhost:8000/api/v1"}/admin/stats`,
+        `${API_BASE_URL}/admin/stats`,
         {
           method: "GET",
           headers: {
-            Authorization: `Bearer ${localStorage.getItem("startupverse_token") || ""}`,
+            Authorization: `Bearer ${getAccessToken()}`,
             "Content-Type": "application/json",
           },
         },
       );
       const data = await response.json();
       if (data.success) {
-        setStats(data.stats);
-        console.log("📊 Database stats:", data.stats);
+        const payload = data.data ?? data;
+        setStats(payload.stats ?? payload);
+        console.log("📊 Database stats:", payload.stats ?? payload);
       } else {
         toast.error("Failed to fetch database stats");
         console.error("❌ Stats error:", data);
@@ -55,11 +59,11 @@ export function AdminDatabaseClear() {
     try {
       console.log("🗑️ Starting database clear...");
       const response = await fetch(
-        `${import.meta.env.VITE_API_URL || "http://localhost:8000/api/v1"}/admin/clear-all-data`,
+        `${API_BASE_URL}/admin/clear-all-data`,
         {
           method: "DELETE",
           headers: {
-            Authorization: `Bearer ${localStorage.getItem("startupverse_token") || ""}`,
+            Authorization: `Bearer ${getAccessToken()}`,
             "Content-Type": "application/json",
           },
         },

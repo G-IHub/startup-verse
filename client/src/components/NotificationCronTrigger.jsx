@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
-
-const API_BASE_URL =
-  import.meta.env.VITE_API_URL || "http://localhost:8000/api/v1";
+import { API_BASE_URL } from "../config/apiBase.js";
+import { getAccessToken } from "../app/session";
 
 async function isBackendOnline() {
   try {
@@ -25,7 +24,7 @@ export default function NotificationCronTrigger() {
   const [backendAvailable, setBackendAvailable] = useState(false);
 
   useEffect(() => {
-    const token = localStorage.getItem("startupverse_token");
+    const token = getAccessToken();
     if (!token) {
       return undefined;
     }
@@ -42,7 +41,7 @@ export default function NotificationCronTrigger() {
         await fetch(`${API_BASE_URL}/cron/check-deadlines`, {
           method: "POST",
           headers: {
-            Authorization: `Bearer ${localStorage.getItem("startupverse_token") || ""}`,
+            Authorization: `Bearer ${getAccessToken()}`,
             "Content-Type": "application/json",
           },
           signal: controller.signal,
@@ -64,7 +63,7 @@ export default function NotificationCronTrigger() {
         await fetch(`${API_BASE_URL}/cron/check-weekly-reviews`, {
           method: "POST",
           headers: {
-            Authorization: `Bearer ${localStorage.getItem("startupverse_token") || ""}`,
+            Authorization: `Bearer ${getAccessToken()}`,
             "Content-Type": "application/json",
           },
           signal: controller.signal,

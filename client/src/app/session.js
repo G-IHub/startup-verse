@@ -16,6 +16,7 @@ export const APP_VIEWS = Object.freeze({
   waitlist: "waitlist",
 });
 
+/** Canonical localStorage keys; read/write session via loadAuthSession / persistAuthSession. */
 export const STORAGE_KEYS = Object.freeze({
   authMigrationCompleted: "auth_migration_v1_completed",
   currentUser: "startupverse_user",

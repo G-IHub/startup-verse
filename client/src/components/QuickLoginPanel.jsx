@@ -16,6 +16,11 @@ import { Button } from "./ui/button";
 import { Badge } from "./ui/badge";
 import { toast } from "sonner";
 import { clearMockData, initializeMockData } from "../utils/mockData";
+import {
+  STORAGE_KEYS,
+  persistCurrentUser,
+  writeStoredList,
+} from "../app/session";
 export default function QuickLoginPanel({ onLogin }) {
   const [isExpanded, setIsExpanded] = useState(false);
   const mockUsers = [
@@ -153,10 +158,9 @@ export default function QuickLoginPanel({ onLogin }) {
       createdAt: new Date().toISOString(),
     };
 
-    // Save current user
-    localStorage.setItem("startupverse_user", JSON.stringify(user));
+    persistCurrentUser(user);
 
-    // Also save all mock users to startupverse_users so TaskManagementPanel can find the founder
+    // Also save all mock users to STORAGE_KEYS.teamMembers so TaskManagementPanel can find the founder
     const allUsers = mockUsers.map((mu) => ({
       id: mu.id,
       name: mu.name,
@@ -169,7 +173,7 @@ export default function QuickLoginPanel({ onLogin }) {
       profile: mu.profile,
       createdAt: new Date().toISOString(),
     }));
-    localStorage.setItem("startupverse_users", JSON.stringify(allUsers));
+    writeStoredList(STORAGE_KEYS.teamMembers, allUsers);
     onLogin(user);
   };
   const handleResetMockData = () => {

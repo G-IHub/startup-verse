@@ -2,6 +2,7 @@
  * FOUNDER RESOURCES VIEW - Browse resources from cohorts
  */
 import React, { useState, useEffect } from "react";
+import { API_BASE_URL } from "../../config/apiBase.js";
 import { Card, CardContent } from "../ui/card";
 import { Badge } from "../ui/badge";
 import { Input } from "../ui/input";
@@ -17,7 +18,7 @@ import {
 import { getAccessToken } from "../../app/session";
 import { unwrapData } from "../../utils/apiEnvelope";
 
-const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:8000/api/v1";
+const API_BASE = API_BASE_URL;
 
 export default function FounderResourcesView({ founderId }) {
   const [resources, setResources] = useState([]);

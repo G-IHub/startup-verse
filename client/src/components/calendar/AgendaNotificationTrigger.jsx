@@ -8,6 +8,7 @@
  */
 
 import React, { useState } from "react";
+import { API_BASE_URL } from "../../config/apiBase.js";
 import { Button } from "../ui/button";
 import {
   Card,
@@ -18,6 +19,7 @@ import {
 } from "../ui/card";
 import { Bell, Calendar, Send } from "lucide-react";
 import { toast } from "sonner";
+import { getAccessToken } from "../../app/session";
 export default function AgendaNotificationTrigger({ startupId }) {
   const [loading, setLoading] = useState(false);
   const [summary, setSummary] = useState(null);
@@ -25,11 +27,11 @@ export default function AgendaNotificationTrigger({ startupId }) {
     setLoading(true);
     try {
       const response = await fetch(
-        `${import.meta.env.VITE_API_URL || "http://localhost:8000/api/v1"}/agenda/notifications/daily`,
+        `${API_BASE_URL}/agenda/notifications/daily`,
         {
           method: "POST",
           headers: {
-            Authorization: `Bearer ${localStorage.getItem("startupverse_token") || ""}`,
+            Authorization: `Bearer ${getAccessToken()}`,
             "Content-Type": "application/json",
           },
         },
@@ -54,10 +56,10 @@ export default function AgendaNotificationTrigger({ startupId }) {
     setLoading(true);
     try {
       const response = await fetch(
-        `${import.meta.env.VITE_API_URL || "http://localhost:8000/api/v1"}/agenda/${startupId}/weekly-summary`,
+        `${API_BASE_URL}/agenda/${startupId}/weekly-summary`,
         {
           headers: {
-            Authorization: `Bearer ${localStorage.getItem("startupverse_token") || ""}`,
+            Authorization: `Bearer ${getAccessToken()}`,
           },
         },
       );

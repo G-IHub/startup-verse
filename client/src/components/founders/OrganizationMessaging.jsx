@@ -2,6 +2,7 @@
  * ORGANIZATION MESSAGING - For founders to communicate with their organizations
  */
 import React, { useState, useEffect } from "react";
+import { API_BASE_URL } from "../../config/apiBase.js";
 import {
   Card,
   CardContent,
@@ -14,6 +15,8 @@ import { Input } from "../ui/input";
 import { Textarea } from "../ui/textarea";
 import { Badge } from "../ui/badge";
 import { Plus, MessageSquare, Send, Mail, MailOpen } from "lucide-react";
+import { getAccessToken } from "../../app/session";
+
 export default function OrganizationMessaging({
   founderId,
   founderName,
@@ -35,10 +38,10 @@ export default function OrganizationMessaging({
     try {
       setLoading(true);
       const response = await fetch(
-        `${import.meta.env.VITE_API_URL || "http://localhost:8000/api/v1"}/messages/${founderId}`,
+        `${API_BASE_URL}/messages/${founderId}`,
         {
           headers: {
-            Authorization: `Bearer ${localStorage.getItem("startupverse_token") || ""}`,
+            Authorization: `Bearer ${getAccessToken()}`,
           },
         },
       );
@@ -65,11 +68,11 @@ export default function OrganizationMessaging({
     }
     try {
       const response = await fetch(
-        `${import.meta.env.VITE_API_URL || "http://localhost:8000/api/v1"}/messages/send-from-founder`,
+        `${API_BASE_URL}/messages/send-from-founder`,
         {
           method: "POST",
           headers: {
-            Authorization: `Bearer ${localStorage.getItem("startupverse_token") || ""}`,
+            Authorization: `Bearer ${getAccessToken()}`,
             "Content-Type": "application/json",
           },
           body: JSON.stringify({

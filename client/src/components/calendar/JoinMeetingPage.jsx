@@ -8,6 +8,8 @@ import { Card } from "../ui/card";
 import { Button } from "../ui/button";
 import { Video, Loader2, AlertCircle, CheckCircle2 } from "lucide-react";
 import { GoogleMeetCall } from "../office/GoogleMeetCall";
+import { STORAGE_KEYS } from "../../app/session";
+
 export default function JoinMeetingPage({ roomName }) {
   const [isLoading, setIsLoading] = useState(true);
   const [meeting, setMeeting] = useState(null);
@@ -34,7 +36,7 @@ export default function JoinMeetingPage({ roomName }) {
     }
   };
   const loadUserName = () => {
-    const user = localStorage.getItem("startupverse_user");
+    const user = localStorage.getItem(STORAGE_KEYS.currentUser);
     if (user) {
       const userData = JSON.parse(user);
       setUserName(userData.name || "Guest");

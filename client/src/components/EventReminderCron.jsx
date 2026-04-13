@@ -4,13 +4,14 @@
  */
 
 import { useEffect, useRef } from "react";
+import { getAccessToken } from "../app/session";
 import { checkAndSendEventReminders } from "../utils/eventNotifications";
 
 export default function EventReminderCron() {
   const intervalRef = useRef(null);
 
   useEffect(() => {
-    const token = localStorage.getItem("startupverse_token");
+    const token = getAccessToken();
     if (!token) {
       return undefined;
     }

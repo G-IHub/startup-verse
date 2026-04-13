@@ -3,7 +3,10 @@
  * Frontend utility to trigger email notifications via backend
  */
 
-const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:8000/api/v1";
+import { getAccessToken } from "../app/session";
+import { API_BASE_URL } from "../config/apiBase.js";
+
+const API_BASE = API_BASE_URL;
 
 /**
  * Send weekly outcome reminder to founder
@@ -20,7 +23,7 @@ export async function sendWeeklyOutcomeReminder(
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${localStorage.getItem("startupverse_token") || ""}`,
+          Authorization: `Bearer ${getAccessToken()}`,
         },
         body: JSON.stringify({
           founderEmail,
@@ -54,7 +57,7 @@ export async function sendTaskAssignedNotification(
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${localStorage.getItem("startupverse_token") || ""}`,
+        Authorization: `Bearer ${getAccessToken()}`,
       },
       body: JSON.stringify({
         teamMemberEmail,
@@ -90,7 +93,7 @@ export async function sendTaskBlockedNotification(
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${localStorage.getItem("startupverse_token") || ""}`,
+        Authorization: `Bearer ${getAccessToken()}`,
       },
       body: JSON.stringify({
         founderEmail,
@@ -127,7 +130,7 @@ export async function sendWeeklyReviewReminder(
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${localStorage.getItem("startupverse_token") || ""}`,
+          Authorization: `Bearer ${getAccessToken()}`,
         },
         body: JSON.stringify({
           founderEmail,
@@ -160,7 +163,7 @@ export async function sendStreakAtRiskNotification(
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${localStorage.getItem("startupverse_token") || ""}`,
+        Authorization: `Bearer ${getAccessToken()}`,
       },
       body: JSON.stringify({
         founderEmail,

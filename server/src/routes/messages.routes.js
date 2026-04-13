@@ -1,6 +1,8 @@
 import { Router } from "express";
 import asyncHandler from "../utils/asyncHandler.js";
 import requireAuth from "../middleware/requireAuth.js";
+import requireOrgAdmin from "../middleware/requireOrgAdmin.js";
+import * as organizationMessagesController from "../controllers/organizationMessages.controller.js";
 import { error as apiError, success as apiSuccess } from "../utils/apiResponse.js";
 import Message from "../models/Message.js";
 import { emitRealtime } from "../services/realtime.service.js";
@@ -46,6 +48,19 @@ messagesRouter.post(
 
     return apiSuccess(res, message, 201);
   }),
+);
+
+messagesRouter.post(
+  "/messages/bulk-send",
+  requireAuth,
+  requireOrgAdmin,
+  asyncHandler(organizationMessagesController.bulkSendOrgMessages),
+);
+messagesRouter.post(
+  "/messages/send-individual",
+  requireAuth,
+  requireOrgAdmin,
+  asyncHandler(organizationMessagesController.sendIndividualOrgMessage),
 );
 
 messagesRouter.post(
@@ -161,11 +176,7 @@ messagesRouter.post(
 messagesRouter.get(
   "/messages/organization/:organizationId",
   requireAuth,
-  asyncHandler(async (req, res) => {
-    const messages = await Message.find({ organizationId: req.params.organizationId }).sort({ createdAt: -1 });
-
-    return apiSuccess(res, messages);
-  }),
+  asyncHandler(organizationMessagesController.listOrganizationMessages),
 );
 
 export default messagesRouter;

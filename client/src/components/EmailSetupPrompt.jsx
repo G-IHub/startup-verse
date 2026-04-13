@@ -10,6 +10,7 @@ import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Alert, AlertDescription, AlertTitle } from "./ui/alert";
 import { Mail, CheckCircle2, AlertCircle, ExternalLink } from "lucide-react";
+import { post } from "../utils/backendClient.js";
 
 /**
  * Email Setup Prompt
@@ -26,9 +27,8 @@ export default function EmailSetupPrompt() {
   }, []);
   const checkConfiguration = async () => {
     try {
-      const response = await fetch("/make-server-78157e08/emails/test");
-      const data = await response.json();
-      setIsConfigured(data.configured);
+      const envelope = await post("/emails/test", {});
+      setIsConfigured(Boolean(envelope?.data?.sent));
     } catch (error) {
       console.error("Failed to check email configuration:", error);
     }

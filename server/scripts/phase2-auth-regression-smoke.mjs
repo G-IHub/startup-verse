@@ -21,7 +21,7 @@ async function main() {
   const talentRoutes = await read("routes/talent.routes.js");
   const orgRoutes = await read("routes/organizations.routes.js");
   const cronRoutes = await read("routes/cron.routes.js");
-  const compatRoutes = await read("routes/compatibility.routes.js");
+  const adminRoutes = await read("routes/admin.routes.js");
   const invitationRoutes = await read("routes/invitations.routes.js");
 
   assertContains(authController, "isAdmin: false", "signup admin hardening", failures);
@@ -32,9 +32,11 @@ async function main() {
   assertContains(teamRoutes, 'requireSelfOrAdmin("teamMemberId")', "team-member self-or-admin checks", failures);
   assertContains(talentRoutes, 'requireSelfOrAdmin("talentId")', "talent self-or-admin checks", failures);
   assertContains(orgRoutes, 'requireSelfOrAdmin("userId")', "org user scoping checks", failures);
+  assertContains(orgRoutes, "/cohorts/:cohortId/program-milestones", "cohort program milestones route", failures);
+  assertContains(orgRoutes, '"/organizations/:orgId/mentors"', "org mentors invite route", failures);
 
   assertContains(cronRoutes, 'requireRole("admin")', "cron admin guard", failures);
-  assertContains(compatRoutes, 'requireRole("admin")', "compat admin guard", failures);
+  assertContains(adminRoutes, 'requireRole("admin")', "admin routes admin guard", failures);
   assertContains(
     invitationRoutes,
     '"/invitations/token/:token/accept"',

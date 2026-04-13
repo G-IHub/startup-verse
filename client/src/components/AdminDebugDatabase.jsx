@@ -1,4 +1,6 @@
 import React, { useState } from "react";
+import { API_BASE_URL } from "../config/apiBase.js";
+import { getAccessToken } from "../app/session";
 
 /**
  * ADMIN DEBUG DATABASE COMPONENT
@@ -20,11 +22,11 @@ export function AdminDebugDatabase() {
         return;
       }
       const response = await fetch(
-        `${import.meta.env.VITE_API_URL || "http://localhost:8000/api/v1"}/team-members/${currentUser.id}`,
+        `${API_BASE_URL}/team-members/${currentUser.id}`,
         {
           method: "GET",
           headers: {
-            Authorization: `Bearer ${localStorage.getItem("startupverse_token") || ""}`,
+            Authorization: `Bearer ${getAccessToken()}`,
           },
         },
       );

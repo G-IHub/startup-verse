@@ -4,8 +4,9 @@
  */
 
 import { getAccessToken } from "../app/session";
+import { API_BASE_URL } from "../config/apiBase.js";
 
-const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:8000/api/v1";
+const API_BASE = API_BASE_URL;
 
 function authHeaders() {
   const token = getAccessToken();
@@ -308,7 +309,7 @@ export async function getOrganizationCalendarEvents(organizationId) {
       }
 
       const deliverablesResponse = await fetch(
-        `${API_BASE}/deliverables/${cohortId}`,
+        `${API_BASE}/cohorts/${cohortId}/deliverables`,
         { headers: authHeaders() },
       );
 

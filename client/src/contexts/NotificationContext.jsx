@@ -5,8 +5,10 @@ import React, {
   useEffect,
   useState,
 } from "react";
+import { API_BASE_URL } from "../config/apiBase.js";
 import { toast } from "sonner";
 import { useAuth } from "./AuthContext";
+import { getAccessToken } from "../app/session";
 
 const NotificationContext = createContext(undefined);
 
@@ -21,12 +23,9 @@ const DEFAULT_PREFERENCES = {
   teamUpdates: true,
 };
 
-const API_BASE_URL =
-  import.meta.env.VITE_API_URL || "http://localhost:8000/api/v1";
-
 function getAuthHeaders() {
   return {
-    Authorization: `Bearer ${localStorage.getItem("startupverse_token") || ""}`,
+    Authorization: `Bearer ${getAccessToken()}`,
     "Content-Type": "application/json",
   };
 }

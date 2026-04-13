@@ -2,6 +2,7 @@
  * RESOURCE LIBRARY - Upload and organize templates, guides, and resources
  */
 import React, { useState, useEffect } from "react";
+import { API_BASE_URL } from "../../config/apiBase.js";
 import {
   Card,
   CardContent,
@@ -28,7 +29,7 @@ import {
 import { getAccessToken } from "../../app/session";
 import { unwrapData } from "../../utils/apiEnvelope";
 
-const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:8000/api/v1";
+const API_BASE = API_BASE_URL;
 
 export default function ResourceLibrary({
   cohortId,

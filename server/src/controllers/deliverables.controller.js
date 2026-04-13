@@ -1,6 +1,7 @@
 import Deliverable from "../models/Deliverable.js";
 import DeliverableSubmission from "../models/DeliverableSubmission.js";
 import CohortMembership from "../models/CohortMembership.js";
+import User from "../models/User.js";
 import { error as apiError, success as apiSuccess } from "../utils/apiResponse.js";
 
 export const getFounderDeliverables = async (req, res) => {
@@ -29,13 +30,35 @@ export const createDeliverable = async (req, res) => {
   return apiSuccess(res, deliverable, 201);
 };
 
+/** POST /cohorts/:cohortId/deliverables — cohortId from URL */
+export const createCohortDeliverable = async (req, res) => {
+  const deliverable = await Deliverable.create({
+    cohortId: req.params.cohortId,
+    organizationId: req.body?.organizationId || null,
+    title: req.body?.title || "Deliverable",
+    description: req.body?.description || "",
+    dueDate: req.body?.dueDate || null,
+    createdBy: req.user.id,
+  });
+
+  return apiSuccess(res, deliverable, 201);
+};
+
 export const submitDeliverable = async (req, res) => {
+  const actor = await User.findById(req.user.id).select("role founderId startupId").lean();
+  let effectiveFounderId = req.user.id;
+  if (actor?.role === "team-member" && actor.founderId) {
+    effectiveFounderId = String(actor.founderId);
+  }
+
+  const startupId = actor?.startupId || null;
+
   const submission = await DeliverableSubmission.findOneAndUpdate(
-    { deliverableId: req.params.deliverableId, founderId: req.body?.founderId || req.user.id },
+    { deliverableId: req.params.deliverableId, founderId: effectiveFounderId },
     {
       deliverableId: req.params.deliverableId,
-      founderId: req.body?.founderId || req.user.id,
-      startupId: req.body?.startupId || null,
+      founderId: effectiveFounderId,
+      startupId,
       content: req.body?.content || "",
       links: req.body?.links || [],
       status: req.body?.status || "submitted",

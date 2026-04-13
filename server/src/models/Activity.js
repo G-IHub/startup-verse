@@ -26,6 +26,17 @@ const activitySchema = new mongoose.Schema(
 
 activitySchema.index({ startupId: 1, createdAt: -1 });
 
+function rejectMutation(next) {
+  next(new Error("Activity records are immutable and cannot be modified or deleted."));
+}
+
+activitySchema.pre("updateOne", rejectMutation);
+activitySchema.pre("updateMany", rejectMutation);
+activitySchema.pre("findOneAndUpdate", rejectMutation);
+activitySchema.pre("deleteOne", rejectMutation);
+activitySchema.pre("deleteMany", rejectMutation);
+activitySchema.pre("findOneAndDelete", rejectMutation);
+
 const Activity =
   mongoose.models.Activity || mongoose.model("Activity", activitySchema);
 

@@ -21,6 +21,9 @@ async function main() {
   const founderRoutes = await read("routes/founders.routes.js");
   const orgRoutes = await read("routes/organizations.routes.js");
   const invitationRoutes = await read("routes/invitations.routes.js");
+  const talentRoutes = await read("routes/talent.routes.js");
+  const deliverablesRoutes = await read("routes/deliverables.routes.js");
+  const messagesRoutes = await read("routes/messages.routes.js");
   const responseUtils = await read("utils/apiResponse.js");
   const requireAuth = await read("middleware/requireAuth.js");
   const requireOrgAdmin = await read("middleware/requireOrgAdmin.js");
@@ -31,7 +34,19 @@ async function main() {
   assertContains(founderRoutes, '"/founders/:founderId/tasks/:taskId/status"', "founder task status route", failures);
   assertContains(founderRoutes, "foundersRouter.patch(", "founder PATCH compatibility", failures);
   assertContains(orgRoutes, '"/organizations/:orgId/admins"', "org admins canonical route", failures);
+  assertContains(orgRoutes, "requireCohortReadAccess", "org cohort read guard on workspace GETs", failures);
+  assertContains(orgRoutes, "/cohorts/organization/:orgId", "org cohort list route", failures);
+  assertContains(orgRoutes, "requireOrganizationScope", "org cohort list scope guard", failures);
   assertContains(invitationRoutes, '"/invitations/:invitationId/respond"', "invitation respond route", failures);
+  assertContains(deliverablesRoutes, "/cohorts/:cohortId/deliverables", "cohort deliverables route", failures);
+  assertContains(deliverablesRoutes, "requireOrgAdmin", "deliverables org-admin guard", failures);
+  assertContains(deliverablesRoutes, "requireCohortReadAccess", "deliverables cohort read guard", failures);
+  assertContains(deliverablesRoutes, "requireDeliverableReviewAccess", "deliverables review authority guard", failures);
+  assertContains(deliverablesRoutes, "requireDeliverableSubmitAccess", "deliverables submit participant guard", failures);
+  assertContains(messagesRoutes, '"/messages/bulk-send"', "org bulk message route", failures);
+  assertContains(messagesRoutes, '"/messages/send-individual"', "org individual message route", failures);
+  assertContains(messagesRoutes, '"/messages/organization/:organizationId"', "org message list route", failures);
+  assertContains(talentRoutes, '"/talent/startup-posts"', "talent startup posts feed route", failures);
 
   // Envelope smoke checks
   assertContains(responseUtils, "success: true", "success envelope", failures);

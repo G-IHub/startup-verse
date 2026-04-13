@@ -1,0 +1,795 @@
+{
+  "generatedAt": "2026-04-11T13:13:05.718Z",
+  "calls": [
+    {
+      "path": "/admin",
+      "method": "GET",
+      "files": [
+        "components/AdminDatabaseClear.jsx",
+        "components/AdminMegaNuclear.jsx",
+        "components/AdminNuclearReset.jsx",
+        "components/AdminSuperNuclear.jsx",
+        "utils/nuclearWipe.js"
+      ]
+    },
+    {
+      "path": "/agenda",
+      "method": "GET",
+      "files": [
+        "components/calendar/AgendaNotificationTrigger.jsx",
+        "utils/api/agendaApi.jsx"
+      ]
+    },
+    {
+      "path": "/agenda/:param",
+      "method": "GET",
+      "files": [
+        "components/calendar/AgendaNotificationTrigger.jsx",
+        "utils/api/agendaApi.jsx"
+      ]
+    },
+    {
+      "path": "/announcements/:param",
+      "method": "GET",
+      "files": [
+        "components/organizations/OrganizationAnnouncementsWidget.jsx"
+      ]
+    },
+    {
+      "path": "/auth",
+      "method": "GET",
+      "files": [
+        "api/authApi.jsx",
+        "utils/api/authApi.js"
+      ]
+    },
+    {
+      "path": "/cohorts",
+      "method": "GET",
+      "files": [
+        "utils/calendarIntegration.js"
+      ]
+    },
+    {
+      "path": "/cohorts/:param",
+      "method": "GET",
+      "files": [
+        "components/organizations/CohortAnalyticsDashboard.jsx",
+        "components/organizations/CommunicationCenter.jsx",
+        "components/organizations/DeliverablesManager.jsx",
+        "components/organizations/EventManager.jsx",
+        "components/organizations/MentorAssignmentManager.jsx",
+        "components/organizations/OrganizationAgenda.jsx",
+        "components/organizations/PortfolioOverview.jsx",
+        "components/organizations/ProgramMilestones.jsx",
+        "components/organizations/ResourceLibrary.jsx",
+        "utils/api/organizationApi.js",
+        "utils/calendarIntegration.js",
+        "utils/eventNotifications.js"
+      ]
+    },
+    {
+      "path": "/cohorts/:param/members",
+      "method": "GET",
+      "files": [
+        "utils/api/organizationApi.js"
+      ]
+    },
+    {
+      "path": "/cohorts/create",
+      "method": "GET",
+      "files": [
+        "utils/api/organizationApi.js"
+      ]
+    },
+    {
+      "path": "/cohorts/organization/:param",
+      "method": "GET",
+      "files": [
+        "utils/api/organizationApi.js"
+      ]
+    },
+    {
+      "path": "/compensation",
+      "method": "GET",
+      "files": [
+        "utils/api/compensationApi.js"
+      ]
+    },
+    {
+      "path": "/compensation-contracts",
+      "method": "GET",
+      "files": [
+        "utils/api/compensationApi.js"
+      ]
+    },
+    {
+      "path": "/compensation-status/:param",
+      "method": "GET",
+      "files": [
+        "utils/api/compensationApi.js"
+      ]
+    },
+    {
+      "path": "/cron",
+      "method": "GET",
+      "files": [
+        "components/NotificationCronTrigger.jsx"
+      ]
+    },
+    {
+      "path": "/debug",
+      "method": "GET",
+      "files": [
+        "components/office/VirtualStartupOfficeWorkspace.jsx"
+      ]
+    },
+    {
+      "path": "/deliverables",
+      "method": "GET",
+      "files": [
+        "components/dashboards/FounderDashboard.jsx",
+        "components/founders/FounderDeliverablesView.jsx",
+        "components/organizations/DeliverablesManager.jsx",
+        "utils/calendarIntegration.js"
+      ]
+    },
+    {
+      "path": "/deliverables/:param",
+      "method": "GET",
+      "files": [
+        "components/dashboards/FounderDashboard.jsx",
+        "components/founders/FounderDeliverablesView.jsx",
+        "components/organizations/DeliverablesManager.jsx"
+      ]
+    },
+    {
+      "path": "/emails",
+      "method": "GET",
+      "files": [
+        "utils/emailHelpers.js"
+      ]
+    },
+    {
+      "path": "/emails/test",
+      "method": "GET",
+      "files": [
+        "components/EmailSetupPrompt.jsx"
+      ]
+    },
+    {
+      "path": "/events/:param",
+      "method": "GET",
+      "files": [
+        "components/organizations/OrganizationEventsWidget.jsx"
+      ]
+    },
+    {
+      "path": "/execution-score/:param",
+      "method": "GET",
+      "files": [
+        "components/ExecutionScore.jsx",
+        "components/dashboards/FounderDashboard.jsx"
+      ]
+    },
+    {
+      "path": "/founder/:param",
+      "method": "GET",
+      "files": [
+        "components/office/VirtualStartupOfficeWorkspace.jsx",
+        "components/organizations/OrganizationAnnouncementsWidget.jsx",
+        "components/organizations/OrganizationEventsWidget.jsx",
+        "utils/calendarIntegration.js",
+        "utils/eventReminders.js"
+      ]
+    },
+    {
+      "path": "/founders",
+      "method": "GET",
+      "files": [
+        "utils/api/founderApi.js"
+      ]
+    },
+    {
+      "path": "/founders/:param",
+      "method": "GET",
+      "files": [
+        "components/analytics/AnalyticsDashboard.jsx",
+        "components/founders/FounderResourcesView.jsx",
+        "utils/api/taskApi.js"
+      ]
+    },
+    {
+      "path": "/founders/:param/execution-data",
+      "method": "GET",
+      "files": [
+        "utils/api/coreEngineApi.js"
+      ]
+    },
+    {
+      "path": "/founders/:param/invitations",
+      "method": "GET",
+      "files": [
+        "utils/api/founderApi.js"
+      ]
+    },
+    {
+      "path": "/founders/:param/milestones",
+      "method": "GET",
+      "files": [
+        "utils/api/coreEngineApi.js",
+        "utils/api/founderApi.js"
+      ]
+    },
+    {
+      "path": "/founders/:param/milestones/:param",
+      "method": "GET",
+      "files": [
+        "utils/api/founderApi.js"
+      ]
+    },
+    {
+      "path": "/founders/:param/posts",
+      "method": "GET",
+      "files": [
+        "utils/api/founderApi.js"
+      ]
+    },
+    {
+      "path": "/founders/:param/posts/:param",
+      "method": "GET",
+      "files": [
+        "utils/api/founderApi.js"
+      ]
+    },
+    {
+      "path": "/founders/:param/startup",
+      "method": "GET",
+      "files": [
+        "utils/api/founderApi.js"
+      ]
+    },
+    {
+      "path": "/founders/:param/tasks",
+      "method": "GET",
+      "files": [
+        "utils/api/coreEngineApi.js",
+        "utils/api/founderApi.js"
+      ]
+    },
+    {
+      "path": "/founders/:param/tasks/:param",
+      "method": "GET",
+      "files": [
+        "utils/api/coreEngineApi.js",
+        "utils/api/founderApi.js"
+      ]
+    },
+    {
+      "path": "/founders/:param/tasks/:param/assign",
+      "method": "GET",
+      "files": [
+        "utils/api/coreEngineApi.js"
+      ]
+    },
+    {
+      "path": "/founders/:param/tasks/:param/status",
+      "method": "GET",
+      "files": [
+        "utils/api/coreEngineApi.js"
+      ]
+    },
+    {
+      "path": "/founders/:param/weekly-outcomes",
+      "method": "GET",
+      "files": [
+        "utils/api/coreEngineApi.js",
+        "utils/api/founderApi.js"
+      ]
+    },
+    {
+      "path": "/founders/invitations",
+      "method": "GET",
+      "files": [
+        "utils/api/founderApi.js"
+      ]
+    },
+    {
+      "path": "/founders/profile",
+      "method": "GET",
+      "files": [
+        "utils/api/founderApi.js"
+      ]
+    },
+    {
+      "path": "/founders/profile/:param",
+      "method": "GET",
+      "files": [
+        "utils/api/founderApi.js"
+      ]
+    },
+    {
+      "path": "/founders/startup",
+      "method": "GET",
+      "files": [
+        "utils/api/founderApi.js"
+      ]
+    },
+    {
+      "path": "/founders/startup/:param",
+      "method": "GET",
+      "files": [
+        "utils/api/founderApi.js"
+      ]
+    },
+    {
+      "path": "/google",
+      "method": "GET",
+      "files": [
+        "components/shared/GoogleAccountConnect.jsx",
+        "utils/googleMeet.js"
+      ]
+    },
+    {
+      "path": "/health",
+      "method": "GET",
+      "files": [
+        "components/NotificationCronTrigger.jsx",
+        "contexts/NotificationContext.jsx",
+        "utils/apiClient.js",
+        "utils/backendHealthCheck.js",
+        "utils/backendHealthCheck.jsx",
+        "utils/testBackendConnection.js"
+      ]
+    },
+    {
+      "path": "/interests",
+      "method": "GET",
+      "files": [
+        "components/layout/AppLayoutHybrid.jsx"
+      ]
+    },
+    {
+      "path": "/interests/:param/messages",
+      "method": "GET",
+      "files": [
+        "utils/api/inboxApi.js"
+      ]
+    },
+    {
+      "path": "/interests/:param/onboard",
+      "method": "GET",
+      "files": [
+        "utils/api/inboxApi.js"
+      ]
+    },
+    {
+      "path": "/interests/:param/status",
+      "method": "GET",
+      "files": [
+        "utils/api/inboxApi.js"
+      ]
+    },
+    {
+      "path": "/interests/received/:param",
+      "method": "GET",
+      "files": [
+        "utils/api/inboxApi.js"
+      ]
+    },
+    {
+      "path": "/interests/send",
+      "method": "GET",
+      "files": [
+        "utils/api/inboxApi.js"
+      ]
+    },
+    {
+      "path": "/interests/sent/:param",
+      "method": "GET",
+      "files": [
+        "utils/api/inboxApi.js"
+      ]
+    },
+    {
+      "path": "/invitations",
+      "method": "GET",
+      "files": [
+        "components/InvitationAcceptance.jsx",
+        "components/TeamMemberOnboarding.jsx",
+        "components/layout/AppLayoutHybrid.jsx",
+        "utils/api/inboxApi.js"
+      ]
+    },
+    {
+      "path": "/invitations/:param/messages",
+      "method": "GET",
+      "files": [
+        "utils/api/inboxApi.js"
+      ]
+    },
+    {
+      "path": "/invitations/:param/respond",
+      "method": "GET",
+      "files": [
+        "utils/api/inboxApi.js",
+        "utils/api/organizationApi.js"
+      ]
+    },
+    {
+      "path": "/invitations/:param/status",
+      "method": "GET",
+      "files": [
+        "utils/api/founderApi.js",
+        "utils/api/inboxApi.js"
+      ]
+    },
+    {
+      "path": "/invitations/create",
+      "method": "GET",
+      "files": [
+        "utils/api/organizationApi.js"
+      ]
+    },
+    {
+      "path": "/invitations/founder/:param",
+      "method": "GET",
+      "files": [
+        "utils/api/inboxApi.js",
+        "utils/api/organizationApi.js"
+      ]
+    },
+    {
+      "path": "/invitations/received/:param",
+      "method": "GET",
+      "files": [
+        "utils/api/inboxApi.js"
+      ]
+    },
+    {
+      "path": "/invitations/send",
+      "method": "GET",
+      "files": [
+        "utils/api/inboxApi.js"
+      ]
+    },
+    {
+      "path": "/invitations/sent/:param",
+      "method": "GET",
+      "files": [
+        "utils/api/inboxApi.js"
+      ]
+    },
+    {
+      "path": "/invitations/token/:param",
+      "method": "GET",
+      "files": [
+        "utils/api/founderApi.js"
+      ]
+    },
+    {
+      "path": "/meetings",
+      "method": "GET",
+      "files": [
+        "utils/api/meetingApi.js"
+      ]
+    },
+    {
+      "path": "/meetings/:param",
+      "method": "GET",
+      "files": [
+        "utils/api/meetingApi.js"
+      ]
+    },
+    {
+      "path": "/memberships/founder/:param",
+      "method": "GET",
+      "files": [
+        "utils/api/organizationApi.js"
+      ]
+    },
+    {
+      "path": "/mentors",
+      "method": "GET",
+      "files": [
+        "pages/MentorLogin.jsx"
+      ]
+    },
+    {
+      "path": "/mentors/:param",
+      "method": "GET",
+      "files": [
+        "components/mentor/MentorPortal.jsx",
+        "components/organizations/MentorAssignmentManager.jsx",
+        "components/organizations/MentorManager.jsx"
+      ]
+    },
+    {
+      "path": "/messages",
+      "method": "GET",
+      "files": [
+        "components/Inbox.jsx",
+        "components/founders/OrganizationMessaging.jsx",
+        "components/organizations/CommunicationCenter.jsx",
+        "utils/messaging.js"
+      ]
+    },
+    {
+      "path": "/messages/:param",
+      "method": "GET",
+      "files": [
+        "components/Inbox.jsx",
+        "components/founders/OrganizationMessaging.jsx"
+      ]
+    },
+    {
+      "path": "/migrate",
+      "method": "GET",
+      "files": [
+        "utils/backendHealthCheck.js"
+      ]
+    },
+    {
+      "path": "/migrations",
+      "method": "GET",
+      "files": [
+        "utils/migrations/orgInvitationMigration.js"
+      ]
+    },
+    {
+      "path": "/notifications",
+      "method": "GET",
+      "files": [
+        "components/NotificationDebugPanel.jsx",
+        "contexts/NotificationContext.jsx",
+        "utils/emailNotifications.js",
+        "utils/eventNotifications.js",
+        "utils/eventReminders.js",
+        "utils/notificationTriggers.js"
+      ]
+    },
+    {
+      "path": "/notifications/:param",
+      "method": "GET",
+      "files": [
+        "contexts/NotificationContext.jsx"
+      ]
+    },
+    {
+      "path": "/onboard-team-member",
+      "method": "GET",
+      "files": [
+        "utils/api/compensationApi.js"
+      ]
+    },
+    {
+      "path": "/organizations/:param",
+      "method": "GET",
+      "files": [
+        "components/organizations/MentorAssignmentManager.jsx",
+        "components/organizations/MentorManager.jsx",
+        "components/organizations/OrganizationSettings.jsx",
+        "utils/api/organizationApi.js",
+        "utils/eventNotifications.js"
+      ]
+    },
+    {
+      "path": "/organizations/:param/is-admin/:param",
+      "method": "GET",
+      "files": [
+        "utils/api/organizationApi.js"
+      ]
+    },
+    {
+      "path": "/organizations/create",
+      "method": "GET",
+      "files": [
+        "utils/api/organizationApi.js"
+      ]
+    },
+    {
+      "path": "/organizations/user/:param",
+      "method": "GET",
+      "files": [
+        "utils/api/organizationApi.js"
+      ]
+    },
+    {
+      "path": "/performance",
+      "method": "GET",
+      "files": [
+        "utils/api/performanceApi.js"
+      ]
+    },
+    {
+      "path": "/presence",
+      "method": "GET",
+      "files": [
+        "utils/activityApi.js",
+        "utils/presenceApi.js",
+        "utils/testBackendConnection.js"
+      ]
+    },
+    {
+      "path": "/presence/:param",
+      "method": "GET",
+      "files": [
+        "utils/activityApi.js",
+        "utils/presenceApi.js"
+      ]
+    },
+    {
+      "path": "/presence/:param/:param",
+      "method": "GET",
+      "files": [
+        "utils/presenceApi.js"
+      ]
+    },
+    {
+      "path": "/startups/:param/snapshot",
+      "method": "GET",
+      "files": [
+        "utils/api/organizationApi.js"
+      ]
+    },
+    {
+      "path": "/startups/:param/team-members",
+      "method": "GET",
+      "files": [
+        "utils/api/teamMemberApi.js"
+      ]
+    },
+    {
+      "path": "/talent",
+      "method": "GET",
+      "files": [
+        "components/TeamMatching.jsx"
+      ]
+    },
+    {
+      "path": "/talent/:param/applications",
+      "method": "GET",
+      "files": [
+        "utils/api/talentApi.js"
+      ]
+    },
+    {
+      "path": "/talent/:param/matches",
+      "method": "GET",
+      "files": [
+        "utils/api/talentApi.js"
+      ]
+    },
+    {
+      "path": "/talent/:param/saved",
+      "method": "GET",
+      "files": [
+        "utils/api/talentApi.js"
+      ]
+    },
+    {
+      "path": "/talent/:param/saved/:param/:param",
+      "method": "GET",
+      "files": [
+        "utils/api/talentApi.js"
+      ]
+    },
+    {
+      "path": "/talent/browse",
+      "method": "GET",
+      "files": [
+        "utils/api/talentApi.js"
+      ]
+    },
+    {
+      "path": "/talent/opportunities",
+      "method": "GET",
+      "files": [
+        "utils/api/talentApi.js"
+      ]
+    },
+    {
+      "path": "/talent/profile",
+      "method": "GET",
+      "files": [
+        "utils/api/talentApi.js"
+      ]
+    },
+    {
+      "path": "/talent/profile/:param",
+      "method": "GET",
+      "files": [
+        "utils/api/talentApi.js"
+      ]
+    },
+    {
+      "path": "/talent/startup-posts",
+      "method": "GET",
+      "files": [
+        "utils/api/founderApi.js"
+      ]
+    },
+    {
+      "path": "/team-members/:param",
+      "method": "GET",
+      "files": [
+        "components/AdminDebugDatabase.jsx",
+        "utils/api/offlineTaskApi.js",
+        "utils/api/performanceApi.js",
+        "utils/api/taskApi.js"
+      ]
+    },
+    {
+      "path": "/team-members/:param/activity",
+      "method": "GET",
+      "files": [
+        "utils/api/teamMemberApi.js"
+      ]
+    },
+    {
+      "path": "/team-members/:param/status",
+      "method": "GET",
+      "files": [
+        "utils/api/teamMemberApi.js"
+      ]
+    },
+    {
+      "path": "/team-members/:param/tasks",
+      "method": "GET",
+      "files": [
+        "utils/api/teamMemberApi.js"
+      ]
+    },
+    {
+      "path": "/team-members/:param/tasks/:param/comments",
+      "method": "GET",
+      "files": [
+        "utils/api/teamMemberApi.js"
+      ]
+    },
+    {
+      "path": "/team-members/profile",
+      "method": "GET",
+      "files": [
+        "utils/api/teamMemberApi.js"
+      ]
+    },
+    {
+      "path": "/team-members/profile/:param",
+      "method": "GET",
+      "files": [
+        "utils/api/teamMemberApi.js"
+      ]
+    },
+    {
+      "path": "/upload-avatar",
+      "method": "GET",
+      "files": [
+        "components/ProfileCompletionForm.jsx"
+      ]
+    },
+    {
+      "path": "/users",
+      "method": "GET",
+      "files": [
+        "components/ProfileCompletionModal.jsx"
+      ]
+    },
+    {
+      "path": "/users/:param",
+      "method": "GET",
+      "files": [
+        "components/NotificationDebugPanel.jsx",
+        "contexts/NotificationContext.jsx",
+        "utils/api/userApi.js"
+      ]
+    },
+    {
+      "path": "/users/search-by-email",
+      "method": "GET",
+      "files": [
+        "utils/api/organizationApi.js"
+      ]
+    }
+  ]
+}

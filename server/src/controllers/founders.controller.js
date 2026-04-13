@@ -88,6 +88,9 @@ export const createOrUpdateProfile = async (req, res) => {
 };
 
 export const getProfileByUserId = async (req, res) => {
+  if (!founderGuard(req, req.params.userId)) {
+    return apiError(res, "Forbidden.", 403);
+  }
   const profile = await FounderProfile.findOne({ userId: req.params.userId });
   if (!profile) {
     return apiError(res, "Founder profile not found.", 404);
@@ -128,6 +131,9 @@ export const createOrUpdateStartup = async (req, res) => {
 };
 
 export const getStartupByFounderId = async (req, res) => {
+  if (!founderGuard(req, req.params.founderId)) {
+    return apiError(res, "Forbidden.", 403);
+  }
   const startup = await Startup.findOne({ founderId: req.params.founderId });
   if (!startup) {
     return apiError(res, "Startup not found.", 404);
@@ -144,6 +150,9 @@ export const getStartupById = async (req, res) => {
 };
 
 export const getMilestones = async (req, res) => {
+  if (!founderGuard(req, req.params.founderId)) {
+    return apiError(res, "Forbidden.", 403);
+  }
   const milestones = await Milestone.find({ founderId: req.params.founderId }).sort({ sequence: 1 });
   const milestoneIds = milestones.map((m) => String(m._id));
   const tasks = milestoneIds.length
@@ -206,6 +215,9 @@ export const deleteMilestone = async (req, res) => {
 };
 
 export const getTasks = async (req, res) => {
+  if (!founderGuard(req, req.params.founderId)) {
+    return apiError(res, "Forbidden.", 403);
+  }
   const tasks = await Task.find({ founderId: req.params.founderId }).sort({ createdAt: -1 });
   return apiSuccess(res, tasks);
 };
@@ -323,16 +335,14 @@ export const updateTaskStatus = async (req, res) => {
     }
     updates.blockerReason = blockedValidation.blockerReason;
     updates.blockerNote = blockedValidation.blockerNote;
+  } else {
+    updates.blockerReason = "";
+    updates.blockerNote = "";
   }
-  await syncMilestoneCounters(updatedTask.milestoneId);
-  await appendLoopActivity({
-    founderId,
-    startupId: updatedTask.startupId,
-    type: status === "completed" ? "task-complete" : "status-change",
-    text: `Task status changed to ${status}: ${updatedTask.title}`,
-    metadata: { taskId: updatedTask._id, status },
-  });
-
+  const existingTask = await Task.findOne({ _id: req.params.taskId, founderId });
+  if (!existingTask) {
+    return apiError(res, "Task not found.", 404);
+  }
 
   const updatedTask = await Task.findOneAndUpdate(
     { _id: req.params.taskId, founderId },
@@ -343,6 +353,15 @@ export const updateTaskStatus = async (req, res) => {
   if (!updatedTask) {
     return apiError(res, "Task not found.", 404);
   }
+  await syncMilestoneCounters(existingTask.milestoneId);
+  await syncMilestoneCounters(updatedTask.milestoneId);
+  await appendLoopActivity({
+    founderId,
+    startupId: updatedTask.startupId,
+    type: status === "completed" ? "task-complete" : "status-change",
+    text: `Task status changed to ${status}: ${updatedTask.title}`,
+    metadata: { taskId: updatedTask._id, status },
+  });
 
   if (updatedTask.startupId) {
     emitRealtime(SOCKET_EVENTS.TASK_UPDATED, updatedTask, [startupRoom(updatedTask.startupId)]);
@@ -363,6 +382,9 @@ export const assignTask = async (req, res) => {
     { assignedTo: assignedTo || assigneeId || null },
     { new: true, runValidators: true },
   );
+  if (!task) {
+    return apiError(res, "Task not found.", 404);
+  }
   await appendLoopActivity({
     founderId,
     startupId: task.startupId,
@@ -370,11 +392,6 @@ export const assignTask = async (req, res) => {
     text: `Task assigned: ${task.title}`,
     metadata: { taskId: task._id, assignedTo: task.assignedTo || null },
   });
-
-
-  if (!task) {
-    return apiError(res, "Task not found.", 404);
-  }
 
   if (task.startupId) {
     emitRealtime(SOCKET_EVENTS.TASK_UPDATED, task, [startupRoom(task.startupId)]);
@@ -404,6 +421,9 @@ export const deleteTask = async (req, res) => {
 };
 
 export const getWeeklyOutcomes = async (req, res) => {
+  if (!founderGuard(req, req.params.founderId)) {
+    return apiError(res, "Forbidden.", 403);
+  }
   const outcomes = await WeeklyOutcome.find({ founderId: req.params.founderId }).sort({ weekOf: -1 });
   return apiSuccess(res, outcomes);
 };
@@ -459,12 +479,18 @@ export const createWeeklyOutcome = async (req, res) => {
 };
 
 export const getPosts = async (req, res) => {
+  if (!founderGuard(req, req.params.founderId)) {
+    return apiError(res, "Forbidden.", 403);
+  }
   const posts = await StartupPost.find({ founderId: req.params.founderId }).sort({ createdAt: -1 });
   return apiSuccess(res, posts);
 };
 
 export const createPost = async (req, res) => {
   const founderId = req.params.founderId;
+  if (!founderGuard(req, founderId)) {
+    return apiError(res, "Forbidden.", 403);
+  }
   const startup = await Startup.findOne({ founderId });
 
   const post = await StartupPost.create({
@@ -478,11 +504,17 @@ export const createPost = async (req, res) => {
 };
 
 export const deletePost = async (req, res) => {
+  if (!founderGuard(req, req.params.founderId)) {
+    return apiError(res, "Forbidden.", 403);
+  }
   await StartupPost.findOneAndDelete({ _id: req.params.postId, founderId: req.params.founderId });
   return apiSuccess(res, { deleted: true });
 };
 
 export const getInvitations = async (req, res) => {
+  if (!founderGuard(req, req.params.founderId)) {
+    return apiError(res, "Forbidden.", 403);
+  }
   const invitations = await FounderTalentInvitation.find({ founderId: req.params.founderId }).sort({ createdAt: -1 });
   return apiSuccess(res, invitations);
 };
@@ -505,11 +537,17 @@ export const createInvitation = async (req, res) => {
 };
 
 export const getEvents = async (req, res) => {
+  if (!founderGuard(req, req.params.founderId)) {
+    return apiError(res, "Forbidden.", 403);
+  }
   const events = await Event.find({ founderId: req.params.founderId }).sort({ startsAt: 1 });
   return apiSuccess(res, events);
 };
 
 export const getAnnouncements = async (req, res) => {
+  if (!founderGuard(req, req.params.founderId)) {
+    return apiError(res, "Forbidden.", 403);
+  }
   const announcements = await Announcement.find({ founderId: req.params.founderId }).sort({ createdAt: -1 });
   return apiSuccess(res, announcements);
 };

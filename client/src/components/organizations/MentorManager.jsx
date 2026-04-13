@@ -2,6 +2,7 @@
  * MENTOR MANAGER - Invite and manage mentors for cohorts
  */
 import React, { useState, useEffect } from "react";
+import { API_BASE_URL } from "../../config/apiBase.js";
 import {
   Card,
   CardContent,
@@ -25,7 +26,7 @@ import { toast } from "sonner";
 import { getAccessToken } from "../../app/session";
 import { unwrapData } from "../../utils/apiEnvelope";
 
-const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:8000/api/v1";
+const API_BASE = API_BASE_URL;
 
 export default function MentorManager({ organizationId, cohorts, isAdmin }) {
   const [mentors, setMentors] = useState([]);

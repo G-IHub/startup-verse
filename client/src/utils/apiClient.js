@@ -1,7 +1,8 @@
 /**
  * API client with backend detection and graceful fallback.
  */
-import { API_BASE_URL } from "./backendClient";
+import { getAccessToken } from "../app/session";
+import { API_BASE_URL } from "../config/apiBase.js";
 
 class ApiClient {
   isBackendOnline = null;
@@ -38,7 +39,7 @@ class ApiClient {
       const response = await fetch(`${API_BASE_URL}/health`, {
         method: "GET",
         headers: {
-          Authorization: `Bearer ${localStorage.getItem("startupverse_token") || ""}`,
+          Authorization: `Bearer ${getAccessToken()}`,
         },
         signal: controller.signal,
       });
@@ -86,7 +87,7 @@ class ApiClient {
           ...options,
           headers: {
             "Content-Type": "application/json",
-            Authorization: `Bearer ${localStorage.getItem("startupverse_token") || ""}`,
+            Authorization: `Bearer ${getAccessToken()}`,
             ...options.headers,
           },
         });

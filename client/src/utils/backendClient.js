@@ -1,11 +1,11 @@
 import { getAccessToken } from "../app/session";
+import { API_BASE_URL } from "../config/apiBase.js";
 
 /**
  * Canonical backend client for Phase 1 contract lock.
  */
 
-export const API_BASE_URL =
-  import.meta.env.VITE_API_URL || "http://localhost:8000/api/v1";
+export { API_BASE_URL };
 
 function getAuthToken() {
   return getAccessToken();
@@ -15,7 +15,7 @@ function buildUrl(endpoint) {
   return `${API_BASE_URL}${endpoint}`;
 }
 
-async function parseEnvelope(response, endpoint) {
+export async function parseEnvelopeResponse(response, endpoint) {
   const payload = await response.json().catch(() => null);
 
   if (!payload || typeof payload !== "object") {
@@ -35,6 +35,35 @@ async function parseEnvelope(response, endpoint) {
   }
 
   return payload;
+}
+
+async function parseEnvelope(response, endpoint) {
+  return parseEnvelopeResponse(response, endpoint);
+}
+
+/**
+ * Like `fetch(buildUrl(path), init)` but validates `{ success, data }` on HTTP success.
+ * Use when migrating off ad-hoc `fetch` + manual JSON handling.
+ */
+export async function fetchEnvelope(path, init = {}) {
+  const response = await fetch(buildUrl(path), {
+    ...init,
+    headers: {
+      Authorization: `Bearer ${getAuthToken()}`,
+      "Content-Type": "application/json",
+      ...init.headers,
+    },
+  });
+  return parseEnvelopeResponse(response, path);
+}
+
+/** Returns parsed envelope or `null` if network / non-envelope / HTTP error (no throw). */
+export async function tryRequest(endpoint, options = {}) {
+  try {
+    return await request(endpoint, options);
+  } catch {
+    return null;
+  }
 }
 
 export async function request(endpoint, options = {}) {

@@ -2,6 +2,7 @@
  * FOUNDER DELIVERABLES VIEW - View and submit deliverables
  */
 import React, { useState, useEffect } from "react";
+import { API_BASE_URL } from "../../config/apiBase.js";
 import {
   Card,
   CardContent,
@@ -21,6 +22,11 @@ import {
   Upload,
   ExternalLink,
 } from "lucide-react";
+import { getAccessToken } from "../../app/session";
+import { unwrapData } from "../../utils/apiEnvelope";
+
+const API_BASE = API_BASE_URL;
+
 export default function FounderDeliverablesView({ founderId, onBack }) {
   const [deliverables, setDeliverables] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -35,17 +41,18 @@ export default function FounderDeliverablesView({ founderId, onBack }) {
   const loadDeliverables = async () => {
     try {
       setLoading(true);
-      const response = await fetch(
-        `${import.meta.env.VITE_API_URL || "http://localhost:8000/api/v1"}/deliverables/founder/${founderId}`,
-        {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem("startupverse_token") || ""}`,
-          },
+      const token = getAccessToken();
+      const response = await fetch(`${API_BASE}/deliverables/founder/${founderId}`, {
+        headers: {
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
-      );
+      });
       if (!response.ok) throw new Error("Failed to fetch deliverables");
-      const data = await response.json();
-      setDeliverables(data.deliverables);
+      const raw = unwrapData(await response.json());
+      const list = Array.isArray(raw) ? raw : raw.deliverables || [];
+      setDeliverables(
+        list.map((d) => ({ ...d, id: d.id || d._id })),
+      );
     } catch (error) {
       console.error("Error loading deliverables:", error);
     } finally {
@@ -54,18 +61,25 @@ export default function FounderDeliverablesView({ founderId, onBack }) {
   };
   const handleSubmit = async (deliverableId) => {
     try {
+      const token = getAccessToken();
+      const links = submissionData.submissionUrl
+        ? [submissionData.submissionUrl]
+        : [];
+      const content = [submissionData.submissionUrl, submissionData.notes]
+        .filter(Boolean)
+        .join("\n");
       const response = await fetch(
-        `${import.meta.env.VITE_API_URL || "http://localhost:8000/api/v1"}/deliverables/${deliverableId}/submit`,
+        `${API_BASE}/deliverables/${deliverableId}/submit`,
         {
           method: "POST",
           headers: {
-            Authorization: `Bearer ${localStorage.getItem("startupverse_token") || ""}`,
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
             founderId,
-            submissionUrl: submissionData.submissionUrl,
-            notes: submissionData.notes,
+            content,
+            links,
             attachments: [],
           }),
         },

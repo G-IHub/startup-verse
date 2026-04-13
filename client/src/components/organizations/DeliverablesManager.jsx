@@ -2,6 +2,7 @@
  * DELIVERABLES MANAGER - Create, track, and review startup deliverables
  */
 import React, { useState, useEffect } from "react";
+import { API_BASE_URL } from "../../config/apiBase.js";
 import {
   Card,
   CardContent,
@@ -23,6 +24,16 @@ import {
   MessageSquare,
   Users,
 } from "lucide-react";
+import { getAccessToken } from "../../app/session";
+import { unwrapData } from "../../utils/apiEnvelope";
+
+const API_BASE = API_BASE_URL;
+
+function asDeliverableList(inner) {
+  if (Array.isArray(inner)) return inner;
+  return inner?.deliverables || [];
+}
+
 export default function DeliverablesManager({
   cohortId,
   organizationId,
@@ -50,27 +61,30 @@ export default function DeliverablesManager({
   }, [cohortId]);
   useEffect(() => {
     if (selectedDeliverable) {
-      loadSubmissions(selectedDeliverable.id);
+      const sid = selectedDeliverable.id || selectedDeliverable._id;
+      if (sid) loadSubmissions(sid);
     }
   }, [selectedDeliverable]);
   const loadDeliverables = async () => {
     try {
       setLoading(true);
-      const response = await fetch(
-        `${import.meta.env.VITE_API_URL || "http://localhost:8000/api/v1"}/deliverables/${cohortId}`,
-        {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem("startupverse_token") || ""}`,
-          },
+      const token = getAccessToken();
+      const response = await fetch(`${API_BASE}/cohorts/${cohortId}/deliverables`, {
+        headers: {
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
-      );
+      });
       if (!response.ok) throw new Error("Failed to fetch deliverables");
-      const data = await response.json();
-      setDeliverables(data.deliverables);
+      const list = asDeliverableList(unwrapData(await response.json()));
+      const normalized = list.map((d) => ({
+        ...d,
+        id: d.id || d._id,
+      }));
+      setDeliverables(normalized);
 
       // Auto-select first deliverable
-      if (data.deliverables.length > 0 && !selectedDeliverable) {
-        setSelectedDeliverable(data.deliverables[0]);
+      if (normalized.length > 0 && !selectedDeliverable) {
+        setSelectedDeliverable(normalized[0]);
       }
     } catch (error) {
       console.error("Error loading deliverables:", error);
@@ -80,17 +94,18 @@ export default function DeliverablesManager({
   };
   const loadSubmissions = async (deliverableId) => {
     try {
+      const token = getAccessToken();
       const response = await fetch(
-        `${import.meta.env.VITE_API_URL || "http://localhost:8000/api/v1"}/deliverables/${deliverableId}/submissions`,
+        `${API_BASE}/deliverables/${deliverableId}/submissions`,
         {
           headers: {
-            Authorization: `Bearer ${localStorage.getItem("startupverse_token") || ""}`,
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
           },
         },
       );
       if (!response.ok) throw new Error("Failed to fetch submissions");
-      const data = await response.json();
-      setSubmissions(data.submissions);
+      const raw = unwrapData(await response.json());
+      setSubmissions(Array.isArray(raw) ? raw : raw.submissions || []);
     } catch (error) {
       console.error("Error loading submissions:", error);
     }
@@ -102,25 +117,22 @@ export default function DeliverablesManager({
         .split("\n")
         .filter((r) => r.trim())
         .map((r) => r.trim());
-      const response = await fetch(
-        `${import.meta.env.VITE_API_URL || "http://localhost:8000/api/v1"}/deliverables/create`,
-        {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem("startupverse_token") || ""}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            cohortId,
-            organizationId,
-            title: formData.title,
-            description: formData.description,
-            dueDate: formData.dueDate,
-            requirements,
-            createdBy: userId,
-          }),
+      const token = getAccessToken();
+      const response = await fetch(`${API_BASE}/cohorts/${cohortId}/deliverables`, {
+        method: "POST",
+        headers: {
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          "Content-Type": "application/json",
         },
-      );
+        body: JSON.stringify({
+          organizationId,
+          title: formData.title,
+          description: formData.description,
+          dueDate: formData.dueDate,
+          requirements,
+          createdBy: userId,
+        }),
+      });
       if (!response.ok) throw new Error("Failed to create deliverable");
 
       // Reset form and reload
@@ -139,12 +151,13 @@ export default function DeliverablesManager({
   };
   const handleReviewSubmission = async (submissionId) => {
     try {
+      const token = getAccessToken();
       const response = await fetch(
-        `${import.meta.env.VITE_API_URL || "http://localhost:8000/api/v1"}/deliverables/submissions/${submissionId}/review`,
+        `${API_BASE}/deliverables/submissions/${submissionId}/review`,
         {
           method: "POST",
           headers: {
-            Authorization: `Bearer ${localStorage.getItem("startupverse_token") || ""}`,
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
@@ -163,7 +176,8 @@ export default function DeliverablesManager({
         feedback: "",
       });
       if (selectedDeliverable) {
-        loadSubmissions(selectedDeliverable.id);
+        const sid = selectedDeliverable.id || selectedDeliverable._id;
+        if (sid) loadSubmissions(sid);
       }
     } catch (error) {
       console.error("Error reviewing submission:", error);
@@ -323,8 +337,8 @@ export default function DeliverablesManager({
               const pastDue = isPastDue(deliverable.dueDate);
               return (
                 <Card
-                  key={deliverable.id}
-                  className={`cursor-pointer transition-all ${selectedDeliverable?.id === deliverable.id ? "ring-2 ring-primary" : "hover:shadow-md"}`}
+                  key={deliverable.id || deliverable._id}
+                  className={`cursor-pointer transition-all ${String(selectedDeliverable?.id || selectedDeliverable?._id) === String(deliverable.id || deliverable._id) ? "ring-2 ring-primary" : "hover:shadow-md"}`}
                   onClick={() => setSelectedDeliverable(deliverable)}
                 >
                   <CardContent className="p-3">
@@ -373,13 +387,13 @@ export default function DeliverablesManager({
                   <CardDescription className="text-[9px]">
                     {selectedDeliverable.description}
                   </CardDescription>
-                  {selectedDeliverable.requirements.length > 0 && (
+                  {(selectedDeliverable.requirements || []).length > 0 && (
                     <div className="mt-2 space-y-1">
                       <p className="text-[8px] text-muted-foreground font-medium">
                         Requirements:
                       </p>
                       <ul className="text-[8px] text-muted-foreground space-y-0.5">
-                        {selectedDeliverable.requirements.map((req, idx) => (
+                        {(selectedDeliverable.requirements || []).map((req, idx) => (
                           <li key={idx} className="flex items-start gap-1">
                             <span className="text-primary">•</span>
                             <span>{req}</span>
