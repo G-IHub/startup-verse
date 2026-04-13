@@ -3,14 +3,41 @@ import { API_BASE_URL } from "../config/apiBase.js";
 
 const API_URL = API_BASE_URL;
 
+function toClientPresence(raw) {
+  if (!raw || typeof raw !== "object") return null;
+  const statusText = String(raw.statusText || "");
+  const metadata = raw.metadata && typeof raw.metadata === "object" ? raw.metadata : {};
+  const activity = metadata.lastFeedActivity || null;
+  const status = raw.isOnline ? "available" : "away";
+  return {
+    id: String(raw.userId || raw.id || ""),
+    userId: String(raw.userId || raw.id || ""),
+    startupId: String(raw.startupId || ""),
+    name: String(raw.userName || ""),
+    role: String(raw.role || ""),
+    isOnline: Boolean(raw.isOnline),
+    status,
+    statusText,
+    mood: String(raw.mood || ""),
+    activity,
+    cameraEnabled: Boolean(metadata.cameraEnabled),
+    lastSeenAt: raw.lastSeenAt ? new Date(raw.lastSeenAt) : new Date(),
+  };
+}
+
 // Update user presence
-export async function updatePresence(
+export async function updatePresence({
   userId,
   startupId,
-  status,
-  activity,
-  cameraEnabled,
-) {
+  userName = "",
+  role = "",
+  isOnline = true,
+  status = "available",
+  statusText = "",
+  mood = "",
+  activity = null,
+  cameraEnabled = false,
+}) {
   try {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
@@ -24,9 +51,14 @@ export async function updatePresence(
       body: JSON.stringify({
         userId,
         startupId,
+        userName,
+        role,
+        isOnline,
         status,
+        statusText,
+        mood,
         activity,
-        cameraEnabled: cameraEnabled || false,
+        metadata: { cameraEnabled: Boolean(cameraEnabled) },
       }),
       signal: controller.signal,
     });
@@ -44,8 +76,8 @@ export async function updatePresence(
       };
     }
 
-    const data = await response.json();
-    return { success: true, presence: data.presence };
+    const payload = await response.json();
+    return { success: true, presence: toClientPresence(payload?.data) };
   } catch (error) {
     // Silently fail for presence updates - non-critical feature
     // Only log in development to avoid console spam
@@ -83,8 +115,10 @@ export async function getActiveUsers(startupId) {
       };
     }
 
-    const data = await response.json();
-    return { success: true, presence: data.presence, count: data.count };
+    const payload = await response.json();
+    const rows = Array.isArray(payload?.data) ? payload.data : [];
+    const mapped = rows.map((row) => toClientPresence(row)).filter(Boolean);
+    return { success: true, presence: mapped, count: mapped.length };
   } catch (error) {
     // Silently fail for presence fetching - non-critical feature
     if (error instanceof Error && error.name !== "AbortError") {
@@ -141,24 +175,12 @@ export async function removePresence(userId, startupId) {
 export function startPresenceHeartbeat(userId, startupId, getStatus) {
   // Send initial presence
   const statusData = getStatus();
-  updatePresence(
-    userId,
-    startupId,
-    statusData.status,
-    statusData.activity,
-    statusData.cameraEnabled,
-  );
+  updatePresence({ userId, startupId, ...statusData });
 
   // Set up heartbeat interval (every 30 seconds)
   const intervalId = setInterval(() => {
     const statusData = getStatus();
-    updatePresence(
-      userId,
-      startupId,
-      statusData.status,
-      statusData.activity,
-      statusData.cameraEnabled,
-    );
+    updatePresence({ userId, startupId, ...statusData });
   }, 30000); // 30 seconds
 
   // Return cleanup function
@@ -166,4 +188,13 @@ export function startPresenceHeartbeat(userId, startupId, getStatus) {
     clearInterval(intervalId);
     removePresence(userId, startupId);
   };
+}
+
+export async function updateMyPresenceStatus(userId, startupId, statusText, mood = "") {
+  return updatePresence({
+    userId,
+    startupId,
+    statusText,
+    mood,
+  });
 }

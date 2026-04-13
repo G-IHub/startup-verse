@@ -10,7 +10,7 @@ const USER_COLORS = {
 };
 function getStatusColor(status) {
   switch (status) {
-    case "active":
+    case "available":
       return "#2ECC71";
     case "away":
       return "#F39C12";
@@ -19,6 +19,16 @@ function getStatusColor(status) {
     default:
       return "#95A5A6";
   }
+}
+function formatLastSeen(lastSeenAt) {
+  if (!lastSeenAt) return "just now";
+  const date = lastSeenAt instanceof Date ? lastSeenAt : new Date(lastSeenAt);
+  const mins = Math.max(0, Math.floor((Date.now() - date.getTime()) / 60000));
+  if (mins < 1) return "just now";
+  if (mins < 60) return `${mins}m ago`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `${hours}h ago`;
+  return `${Math.floor(hours / 24)}d ago`;
 }
 function getActivityIcon(activity) {
   switch (activity) {
@@ -102,6 +112,10 @@ export function PresenceBar({ users, onUserClick }) {
             <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 bg-gray-900 dark:bg-gray-800 text-white px-3 py-2 rounded-lg text-xs whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none shadow-lg">
               <div>{user.name}</div>
               <div className="text-gray-300 capitalize">{user.status}</div>
+              <div className="text-gray-400">{user.role || "team-member"}</div>
+              <div className="text-gray-400">
+                Last seen {formatLastSeen(user.lastSeenAt)}
+              </div>
             </div>
           </motion.div>
         );

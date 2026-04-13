@@ -3,10 +3,10 @@ import { Users, Video, Phone, Zap, TrendingUp, Activity } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "../ui/card";
 import { Separator } from "../ui/separator";
 export function TeamEnergyPulse({ users }) {
-  const activeUsers = users.filter((u) => u.status === "active").length;
+  const activeUsers = users.filter((u) => u.status === "available").length;
   const inCallUsers = users.filter((u) => u.activity === "in-call").length;
   const cameraOnUsers = users.filter(
-    (u) => u.cameraEnabled && u.status === "active",
+    (u) => u.cameraEnabled && u.status === "available",
   ).length;
   const workingUsers = users.filter((u) => u.activity === "working").length;
   const awayUsers = users.filter((u) => u.status === "away").length;
