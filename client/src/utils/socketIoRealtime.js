@@ -5,6 +5,7 @@
 import { io } from "socket.io-client";
 import { getSocketBaseUrl } from "./socketBaseUrl.js";
 import { getConversation } from "./messaging.js";
+import { getStartupActivities } from "./activityApi.js";
 
 /** Mirrors server/src/realtime/rooms.js */
 export function startupSocketRoom(startupId) {
@@ -248,12 +249,82 @@ export async function broadcastMessageUpdate() {
 // ACTIVITIES — server emits activity:created
 // ========================================
 
+const ACTIVITY_POLL_MS = 35_000;
+const ACTIVITY_POLL_GRACE_MS = 3_000;
+
 export function subscribeToActivities(startupId, onNewActivity) {
-  return createSubscription(
+  let pollTimer = null;
+  let graceTimer = null;
+  let stopped = false;
+  const seenIds = new Set();
+  const socket = SocketEngine.getSocket();
+
+  const clearTimers = () => {
+    if (pollTimer != null) {
+      clearInterval(pollTimer);
+      pollTimer = null;
+    }
+    if (graceTimer != null) {
+      clearTimeout(graceTimer);
+      graceTimer = null;
+    }
+  };
+
+  const emitRows = (rows) => {
+    for (const row of rows) {
+      if (!row?.id) continue;
+      if (seenIds.has(row.id)) continue;
+      seenIds.add(row.id);
+      onNewActivity(row);
+    }
+  };
+
+  const armPollingIfNeeded = () => {
+    if (stopped || isRealtimeConnected()) return;
+    if (pollTimer != null || graceTimer != null) return;
+    graceTimer = setTimeout(() => {
+      graceTimer = null;
+      if (stopped || isRealtimeConnected()) return;
+      const tick = async () => {
+        if (stopped || isRealtimeConnected()) {
+          clearTimers();
+          return;
+        }
+        const response = await getStartupActivities(startupId, { limit: 50 });
+        if (!response?.success || !Array.isArray(response.activities)) return;
+        emitRows(response.activities);
+      };
+      void tick();
+      pollTimer = setInterval(() => void tick(), ACTIVITY_POLL_MS);
+    }, ACTIVITY_POLL_GRACE_MS);
+  };
+
+  const onConnect = () => {
+    clearTimers();
+  };
+  const onDisconnect = () => {
+    armPollingIfNeeded();
+  };
+  socket.on("connect", onConnect);
+  socket.on("disconnect", onDisconnect);
+
+  const coreUnsub = createSubscription(
     startupSocketRoom(startupId),
     "activity:created",
-    (payload) => onNewActivity(payload),
+    (payload) => {
+      if (payload?.id) seenIds.add(payload.id);
+      onNewActivity(payload);
+    },
   );
+
+  armPollingIfNeeded();
+  return () => {
+    stopped = true;
+    socket.off("connect", onConnect);
+    socket.off("disconnect", onDisconnect);
+    clearTimers();
+    coreUnsub();
+  };
 }
 
 export async function broadcastActivity() {

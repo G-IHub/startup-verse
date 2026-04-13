@@ -61,7 +61,6 @@ import * as presenceApi from "../../utils/presenceApi";
 import {
   subscribeToActivities,
   subscribeToPresence,
-  broadcastActivity,
   isRealtimeConnected,
 } from "../../utils/realtimeSubscriptions";
 import { PresenceBar } from "../presence/PresenceBar";
@@ -99,22 +98,23 @@ import {
 } from "lucide-react";
 
 function mergeActivityFeed(prev, incoming) {
-  const ids = new Set(prev.map((a) => a?.id).filter(Boolean));
-  const next = [...prev];
-  for (const raw of incoming) {
-    const id = raw?.id;
-    if (!id || ids.has(id)) continue;
-    ids.add(id);
-    next.unshift({
-      ...raw,
+  const normalized = [...prev, ...(incoming || [])]
+    .filter((row) => row && row.id)
+    .map((row) => ({
+      ...row,
       timestamp:
-        raw.timestamp instanceof Date
-          ? raw.timestamp
-          : new Date(raw.timestamp || Date.now()),
-      icon: typeof raw.icon === "string" ? raw.icon : "📋",
-    });
-  }
-  return next.slice(0, 50);
+        row.timestamp instanceof Date
+          ? row.timestamp
+          : new Date(row.timestamp || Date.now()),
+      icon: typeof row.icon === "string" ? row.icon : "📋",
+    }));
+  const deduped = Array.from(new Map(normalized.map((row) => [String(row.id), row])).values());
+  deduped.sort((a, b) => {
+    const timeDiff = b.timestamp.getTime() - a.timestamp.getTime();
+    if (timeDiff !== 0) return timeDiff;
+    return String(b.id).localeCompare(String(a.id));
+  });
+  return deduped.slice(0, 50);
 }
 
 // ActivityEvent type imported from LiveActivityFeed
@@ -212,6 +212,8 @@ export default function VirtualStartupOffice({
     }
     return [];
   });
+  const [activityLoading, setActivityLoading] = useState(true);
+  const [activityError, setActivityError] = useState("");
 
   // Wall of Wins state
   const [wins, setWins] = useState([]);
@@ -1300,45 +1302,25 @@ export default function VirtualStartupOffice({
         : user.startupId || user.founderId || "";
     if (!currentStartupId) {
       console.warn("⚠️ No startupId found, skipping activity sync");
+      setActivityLoading(false);
       return;
     }
-    let consecutiveErrors = 0;
     let isActive = true;
     const fetchActivities = async () => {
       if (!isActive) return;
+      setActivityLoading(true);
       const result = await activityApi.getStartupActivities(currentStartupId, {
         page: 1,
         pageSize: 50,
       });
-      if (result.success && result.activities && result.activities.length > 0) {
-        consecutiveErrors = 0; // Reset error counter on success
-
-        // Convert timestamp strings to Date objects and ensure icons are strings
-        const backendActivities = result.activities.map((activity) => ({
-          ...activity,
-          timestamp: new Date(activity.timestamp),
-          // Ensure icon is always a string (emoji), never an object
-          icon: typeof activity.icon === "string" ? activity.icon : "📋",
-        }));
-
-        // Merge with local activities, removing duplicates by ID
-        setActivityFeed((prev) => {
-          const allActivities = [...backendActivities, ...prev];
-          // Filter out any invalid activities before creating the map
-          const validActivities = allActivities.filter(
-            (a) => a && a.id && a.timestamp && typeof a.icon === "string",
-          );
-          const uniqueActivities = Array.from(
-            new Map(validActivities.map((a) => [a.id, a])).values(),
-          );
-          // Sort by timestamp descending and limit to 50
-          return uniqueActivities
-            .sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime())
-            .slice(0, 50);
-        });
-      } else if (!result.success && result.error) {
-        consecutiveErrors++;
-        // Error handling is done in activityApi.ts - no need to log again here
+      if (result.success) {
+        setActivityError("");
+        setActivityFeed((prev) => mergeActivityFeed(prev, result.activities || []));
+      } else if (result.error) {
+        setActivityError("Unable to sync activity feed right now.");
+      }
+      if (isActive) {
+        setActivityLoading(false);
       }
     };
 
@@ -1368,31 +1350,26 @@ export default function VirtualStartupOffice({
 
     // Subscribe to realtime activities
     const unsubscribe = subscribeToActivities(currentStartupId, (activity) => {
-      console.log("🔥 New activity received via realtime:", activity);
-
-      // Skip if it's from the current user (we already added it optimistically)
-      if (activity.userId === user.id) {
-        console.log("⏭️ Skipping own activity (already added optimistically)");
-        return;
-      }
-
-      // Add to activity feed if not already present
       setActivityFeed((prev) => {
-        // Check if activity already exists
-        if (prev.some((a) => a.id === activity.id)) {
-          return prev;
-        }
-
-        // Add new activity at the top, ensuring icon is a string
-        const newEvent = {
+        const incoming = {
           ...activity,
-          timestamp: new Date(activity.timestamp),
+          timestamp: new Date(activity.timestamp || Date.now()),
           icon: typeof activity.icon === "string" ? activity.icon : "📋",
         };
-        return [newEvent, ...prev].slice(0, 50);
+        const pruned = prev.filter((event) => {
+          if (!String(event.id || "").startsWith("optimistic-")) return true;
+          const withinWindow = Math.abs(
+            new Date(event.timestamp).getTime() - incoming.timestamp.getTime(),
+          ) < 10000;
+          const sameActor = String(event.userId || "") === String(incoming.userId || "");
+          const sameType = String(event.type || "") === String(incoming.type || "");
+          const sameMessage = String(event.message || "") === String(incoming.message || "");
+          return !(withinWindow && sameActor && sameType && sameMessage);
+        });
+        return mergeActivityFeed(pruned, [incoming]);
       });
 
-      // Play notification sound if it's not from current user
+      setActivityError("");
       if (activity.userId !== user.id && audio) {
         audio.playSound("notification");
       }
@@ -1405,26 +1382,6 @@ export default function VirtualStartupOffice({
     };
   }, [user.id, user.role, user.startupId, user.founderId, audio]);
 
-  // Polling fallback when the socket is offline (Phase 4 graceful degradation)
-  useEffect(() => {
-    const currentStartupId =
-      user.role === "founder"
-        ? user.id
-        : user.startupId || user.founderId || "";
-    if (!currentStartupId) return;
-
-    const tick = async () => {
-      if (isRealtimeConnected()) return;
-      const res = await activityApi.getStartupActivities(currentStartupId);
-      if (!res.success || !res.activities?.length) return;
-      setActivityFeed((prev) => mergeActivityFeed(prev, res.activities));
-    };
-
-    const intervalId = setInterval(tick, 35000);
-    void tick();
-    return () => clearInterval(intervalId);
-  }, [user.id, user.role, user.startupId, user.founderId]);
-
   const addActivity = async (type, message, icon) => {
     const currentStartupId =
       user.role === "founder"
@@ -1435,7 +1392,7 @@ export default function VirtualStartupOffice({
       return;
     }
     const newEvent = {
-      id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      id: `optimistic-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
       type,
       userId: user.id,
       userName: user.name,
@@ -1446,9 +1403,9 @@ export default function VirtualStartupOffice({
     };
 
     // Optimistically update UI
-    setActivityFeed((prev) => [newEvent, ...prev].slice(0, 50));
+    setActivityFeed((prev) => mergeActivityFeed(prev, [newEvent]));
 
-    // Post to backend and broadcast to realtime
+    // Post to backend; server emits canonical realtime event
     try {
       const result = await activityApi.postActivity({
         userId: user.id,
@@ -1459,26 +1416,15 @@ export default function VirtualStartupOffice({
         icon,
       });
       if (result.success) {
-        // Broadcast to connected clients (Socket.IO when available)
-        const broadcasted = await broadcastActivity(currentStartupId, {
-          id: newEvent.id,
-          userId: user.id,
-          userName: user.name,
-          startupId: currentStartupId,
-          type,
-          message,
-          icon,
-          timestamp: newEvent.timestamp.toISOString(),
+        setActivityFeed((prev) => {
+          const withoutOptimistic = prev.filter((event) => event.id !== newEvent.id);
+          return mergeActivityFeed(withoutOptimistic, [result.activity]);
         });
-
-        // 🔧 FIX: Silent handling - only log success, not failures
-        if (broadcasted) {
-          console.log("✅ Activity posted and broadcasted");
-        }
-        // If broadcast fails, it's already logged at debug level - don't spam console
+        setActivityError("");
       }
     } catch (error) {
       console.error("Failed to post activity to backend:", error);
+      setActivityError("Unable to post activity update.");
     }
   };
   const getStatusColor = (status) => {
@@ -2550,7 +2496,37 @@ export default function VirtualStartupOffice({
               </CardHeader>
               <CardContent className="p-3">
                 <div className="space-y-2">
-                  {activityFeed.length === 0 ? (
+                  {activityLoading ? (
+                    <div className="text-center py-8">
+                      <Radio className="w-8 h-8 text-muted-foreground mx-auto mb-2 opacity-50 animate-pulse" />
+                      <p className="text-xs text-muted-foreground">Loading activity...</p>
+                    </div>
+                  ) : activityError ? (
+                    <div className="text-center py-8">
+                      <p className="text-xs text-red-500">{activityError}</p>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="mt-2 h-7 text-[10px]"
+                        onClick={async () => {
+                          const startupId =
+                            user.role === "founder"
+                              ? user.id
+                              : user.startupId || user.founderId || "";
+                          if (!startupId) return;
+                          setActivityLoading(true);
+                          const result = await activityApi.getStartupActivities(startupId, { pageSize: 50 });
+                          if (result.success) {
+                            setActivityFeed((prev) => mergeActivityFeed(prev, result.activities || []));
+                            setActivityError("");
+                          }
+                          setActivityLoading(false);
+                        }}
+                      >
+                        Retry
+                      </Button>
+                    </div>
+                  ) : activityFeed.length === 0 ? (
                     <div className="text-center py-8">
                       <Radio className="w-8 h-8 text-muted-foreground mx-auto mb-2 opacity-50" />
                       <p className="text-xs text-muted-foreground">
@@ -3479,7 +3455,18 @@ export default function VirtualStartupOffice({
                 </CardHeader>
                 <CardContent className="p-1.5 flex-1 overflow-hidden">
                   <ScrollArea className="h-full pr-1.5">
-                    {activityFeed.length === 0 ? (
+                    {activityLoading ? (
+                      <div className="flex flex-col items-center justify-center h-full text-center">
+                        <Radio className="w-6 h-6 text-muted-foreground mb-1.5 opacity-50 animate-pulse" />
+                        <p className="text-[9px] text-muted-foreground">
+                          Loading activity...
+                        </p>
+                      </div>
+                    ) : activityError ? (
+                      <div className="flex flex-col items-center justify-center h-full text-center">
+                        <p className="text-[9px] text-red-500">{activityError}</p>
+                      </div>
+                    ) : activityFeed.length === 0 ? (
                       <div className="flex flex-col items-center justify-center h-full text-center">
                         <Radio className="w-6 h-6 text-muted-foreground mb-1.5 opacity-50" />
                         <p className="text-[9px] text-muted-foreground">

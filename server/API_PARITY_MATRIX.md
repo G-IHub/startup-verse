@@ -48,6 +48,7 @@ Envelope standard:
 | `/agenda/*` + `/calendar/:userId` | Canonical | Yes | startup/user context | `calendar`: events + deliverables + `programMilestones` + sorted `timeline` (`meetings: []` until modeled) | Implemented |
 | `/execution-score/:userId` | Canonical | Yes | none | derived execution score | Implemented |
 | `/presence/*` | Canonical | Yes | presence update payload | short-lived presence records (TTL-evicted) | Implemented |
+| `/startups/:startupId/activities` | Canonical | Yes | startup-scoped activity create/list (`message`, `type`, optional metadata) | canonical activity DTO (`id`,`startupId`,`userId`,`userName`,`type`,`message`,`icon`,`timestamp`,`metadata`) | Implemented |
 | `/google/*` | Canonical placeholder | Yes/Mixed | oauth/meeting payloads | placeholder integration data | Placeholder |
 | `/cron/*` | Canonical | Yes | trigger payloads | trigger acknowledgement | Implemented |
 | `/mentors/*` | Canonical | Mixed | mentor/token/assignment payloads | mentor/assignment records | Implemented |

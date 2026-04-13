@@ -16,6 +16,7 @@ import {
   ensureOutcomeMutable,
   validateBlockedTaskPayload,
 } from "../domain/weeklyLoopRules.js";
+import { mapActivityToDto } from "../utils/activityDto.js";
 import { error as apiError, success as apiSuccess } from "../utils/apiResponse.js";
 import { emitRealtime } from "../services/realtime.service.js";
 import { SOCKET_EVENTS } from "../realtime/events.js";
@@ -52,21 +53,12 @@ async function appendLoopActivity({ founderId, startupId, type, text, metadata =
     userId: founderId,
     type,
     text,
-    metadata,
+    metadata: { ...metadata, userName: metadata?.userName || "" },
   });
   const sid = String(startupId);
   emitRealtime(
     SOCKET_EVENTS.ACTIVITY_CREATED,
-    {
-      id: String(doc._id),
-      userId: String(founderId),
-      userName: "",
-      type: String(type || "update"),
-      message: String(text || ""),
-      icon: "📋",
-      timestamp: (doc.createdAt || new Date()).toISOString(),
-      startupId: sid,
-    },
+    mapActivityToDto(doc),
     [startupRoom(sid)],
   );
 }

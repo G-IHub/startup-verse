@@ -3,11 +3,13 @@ import asyncHandler from "../utils/asyncHandler.js";
 import requireAuth from "../middleware/requireAuth.js";
 import { error as apiError, success as apiSuccess } from "../utils/apiResponse.js";
 import Presence from "../models/Presence.js";
+import Activity from "../models/Activity.js";
 import User from "../models/User.js";
 import Startup from "../models/Startup.js";
 import { emitRealtime } from "../services/realtime.service.js";
 import { SOCKET_EVENTS } from "../realtime/events.js";
 import { startupRoom } from "../realtime/rooms.js";
+import { mapActivityToDto } from "../utils/activityDto.js";
 
 const presenceRouter = Router();
 const isSelfOrAdmin = (req, userId) => req.user?.isAdmin === true || req.user?.id === String(userId);
@@ -99,18 +101,20 @@ presenceRouter.post(
     emitRealtime(SOCKET_EVENTS.PRESENCE_UPDATED, normalizedPresence, [startupRoom(startupId)]);
 
     if (activity && typeof activity === "object" && startupId) {
+      const activityDoc = await Activity.create({
+        startupId: String(startupId),
+        userId: String(userId),
+        type: String(activity.type || "update"),
+        text: String(activity.message || ""),
+        metadata: {
+          ...mergedMetadata,
+          userName: String(activity.userName || userName || ""),
+          icon: String(activity.icon || "📋"),
+        },
+      });
       emitRealtime(
         SOCKET_EVENTS.ACTIVITY_CREATED,
-        {
-          id: `${String(userId)}-${Date.now()}`,
-          userId: String(userId),
-          userName: String(activity.userName || userName || ""),
-          type: String(activity.type || "update"),
-          message: String(activity.message || ""),
-          icon: String(activity.icon || "📋"),
-          timestamp: String(activity.timestamp || new Date().toISOString()),
-          startupId: String(startupId),
-        },
+        mapActivityToDto(activityDoc),
         [startupRoom(startupId)],
       );
     }
