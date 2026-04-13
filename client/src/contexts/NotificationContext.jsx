@@ -5,6 +5,7 @@ import React, {
   useEffect,
   useState,
 } from "react";
+import { API_BASE_URL } from "../config/apiBase.js";
 import { toast } from "sonner";
 import { useAuth } from "./AuthContext";
 import { getAccessToken } from "../app/session";
@@ -21,9 +22,6 @@ const DEFAULT_PREFERENCES = {
   streakMilestones: true,
   teamUpdates: true,
 };
-
-const API_BASE_URL =
-  import.meta.env.VITE_API_URL || "http://localhost:8000/api/v1";
 
 function getAuthHeaders() {
   return {

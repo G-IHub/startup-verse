@@ -1,8 +1,9 @@
 // Performance API wrapper for backend-first performance metrics
 import { offlineStorage } from "../offlineStorage";
+import { API_BASE_URL } from "../../config/apiBase.js";
 import { getAccessToken } from "../../app/session";
 
-const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:8000/api/v1";
+const API_BASE = API_BASE_URL;
 
 /**
  * Get performance metrics for a team member (with contribution graph)

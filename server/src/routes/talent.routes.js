@@ -11,6 +11,7 @@ talentRouter.get("/talent/profile/:userId", requireAuth, requireSelfOrAdmin("use
 talentRouter.get("/talent/profiles", requireAuth, asyncHandler(talentController.getProfiles));
 talentRouter.get("/talent/browse", requireAuth, asyncHandler(talentController.browseTalent));
 talentRouter.get("/talent/opportunities", requireAuth, asyncHandler(talentController.getOpportunities));
+talentRouter.get("/talent/startup-posts", requireAuth, asyncHandler(talentController.getStartupPostsFeed));
 
 talentRouter.post("/talent/:talentId/applications", requireAuth, requireSelfOrAdmin("talentId"), asyncHandler(talentController.applyForPosition));
 talentRouter.get("/talent/:talentId/applications", requireAuth, requireSelfOrAdmin("talentId"), asyncHandler(talentController.getApplications));

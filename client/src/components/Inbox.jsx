@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { API_BASE_URL } from "../config/apiBase.js";
 import { Card, CardContent } from "./ui/card";
 import { Button } from "./ui/button";
 import { Badge } from "./ui/badge";
@@ -219,7 +220,7 @@ export default function Inbox({ user, onBack, initialTab = "received" }) {
         // Load organization messages for founder
         try {
           const messagesResponse = await fetch(
-            `${import.meta.env.VITE_API_URL || "http://localhost:8000/api/v1"}/messages/${user.id}`,
+            `${API_BASE_URL}/messages/${user.id}`,
             {
               headers: {
                 Authorization: `Bearer ${getAccessToken()}`,
@@ -496,7 +497,7 @@ export default function Inbox({ user, onBack, initialTab = "received" }) {
     setIsSending(true);
     try {
       const response = await fetch(
-        `${import.meta.env.VITE_API_URL || "http://localhost:8000/api/v1"}/messages/send-from-founder`,
+        `${API_BASE_URL}/messages/send-from-founder`,
         {
           method: "POST",
           headers: {

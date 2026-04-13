@@ -3,9 +3,8 @@
  */
 
 import { getAccessToken } from "../app/session";
-
-const API_BASE_URL =
-  import.meta.env.VITE_API_URL || "http://localhost:8000/api/v1";
+import { API_BASE_URL } from "../config/apiBase.js";
+import { get as backendGet } from "./backendClient.js";
 
 function getAuthHeaders() {
   return {
@@ -278,18 +277,17 @@ export async function checkAndSendEventReminders() {
       Date.now() + 15 * 60 * 1000,
     ).toISOString();
 
-    const response = await fetch(
-      `${API_BASE_URL}/events/upcoming?start=${fifteenMinutesFromNow}&end=${oneHourFromNow}`,
-      {
-        headers: getAuthHeaders(),
-      },
-    );
-
-    if (!response.ok) {
+    const path = `/events/upcoming?start=${encodeURIComponent(fifteenMinutesFromNow)}&end=${encodeURIComponent(oneHourFromNow)}`;
+    let events;
+    try {
+      const envelope = await backendGet(path);
+      events = envelope?.data?.events;
+    } catch {
       return { success: false, count: 0 };
     }
-
-    const { events } = await response.json();
+    if (!Array.isArray(events)) {
+      return { success: false, count: 0 };
+    }
 
     let totalSent = 0;
     for (const event of events) {

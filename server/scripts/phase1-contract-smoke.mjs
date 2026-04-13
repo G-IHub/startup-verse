@@ -21,6 +21,7 @@ async function main() {
   const founderRoutes = await read("routes/founders.routes.js");
   const orgRoutes = await read("routes/organizations.routes.js");
   const invitationRoutes = await read("routes/invitations.routes.js");
+  const talentRoutes = await read("routes/talent.routes.js");
   const deliverablesRoutes = await read("routes/deliverables.routes.js");
   const messagesRoutes = await read("routes/messages.routes.js");
   const responseUtils = await read("utils/apiResponse.js");
@@ -45,6 +46,7 @@ async function main() {
   assertContains(messagesRoutes, '"/messages/bulk-send"', "org bulk message route", failures);
   assertContains(messagesRoutes, '"/messages/send-individual"', "org individual message route", failures);
   assertContains(messagesRoutes, '"/messages/organization/:organizationId"', "org message list route", failures);
+  assertContains(talentRoutes, '"/talent/startup-posts"', "talent startup posts feed route", failures);
 
   // Envelope smoke checks
   assertContains(responseUtils, "success: true", "success envelope", failures);

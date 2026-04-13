@@ -2,6 +2,7 @@
  * StartupVerse Founder Dashboard
  */
 import React, { useState, useEffect } from "react";
+import { API_BASE_URL } from "../../config/apiBase.js";
 import { Button } from "../ui/button";
 import {
   Card,
@@ -33,7 +34,7 @@ import Phase3Welcome from "../execution-engine/Phase3Welcome";
 import StageLearningModal from "../learning/StageLearningModal";
 import StageRoadmapModal from "../roadmap/StageRoadmapModal";
 import CohortMembershipBadge from "../organizations/CohortMembershipBadge";
-import { getAccessToken } from "../../app/session";
+import { getAccessToken, STORAGE_KEYS } from "../../app/session";
 
 // 🔥 REMOVED: OrganizationEventsWidget and OrganizationAnnouncementsWidget
 // Events appear in Virtual Office updates/calendar, announcements in inbox
@@ -302,7 +303,7 @@ function ExecutionScoreInlineCard({ userId }) {
     const loadScore = async () => {
       try {
         const response = await fetch(
-          `${import.meta.env.VITE_API_URL || "http://localhost:8000/api/v1"}/execution-score/${userId}`,
+          `${API_BASE_URL}/execution-score/${userId}`,
           {
             headers: {
               Authorization: `Bearer ${getAccessToken()}`,
@@ -782,7 +783,7 @@ export default function FounderDashboard({
       try {
         // 1. Load from localStorage first (fast initial render)
         const allUsersFromMultipleSources = [
-          ...JSON.parse(localStorage.getItem("startupverse_users") || "[]"),
+          ...JSON.parse(localStorage.getItem(STORAGE_KEYS.teamMembers) || "[]"),
           ...JSON.parse(
             localStorage.getItem("startupverse_registered_users") || "[]",
           ),
@@ -859,7 +860,7 @@ export default function FounderDashboard({
   const loadDeliverables = async () => {
     try {
       const response = await fetch(
-        `${import.meta.env.VITE_API_URL || "http://localhost:8000/api/v1"}/deliverables/founder/${user.id}`,
+        `${API_BASE_URL}/deliverables/founder/${user.id}`,
         {
           headers: {
             Authorization: `Bearer ${getAccessToken()}`,
@@ -2269,7 +2270,7 @@ export default function FounderDashboard({
                                             onClick={async () => {
                                               try {
                                                 const response = await fetch(
-                                                  `${import.meta.env.VITE_API_URL || "http://localhost:8000/api/v1"}/deliverables/${deliverable.id}/submit`,
+                                                  `${API_BASE_URL}/deliverables/${deliverable.id}/submit`,
                                                   {
                                                     method: "POST",
                                                     headers: {

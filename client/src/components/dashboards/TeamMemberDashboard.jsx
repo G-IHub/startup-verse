@@ -11,6 +11,7 @@ import * as meetingApi from "../../utils/api/meetingApi";
 // ✅ Added pagination hook
 // ✅ Added pagination controls
 import { getInitials } from "../../utils/nameHelpers"; // ✅ Safe name handling
+import { STORAGE_KEYS } from "../../app/session";
 import PendingCompensationBanner from "../compensation/PendingCompensationBanner";
 import {
   CheckCircle2,
@@ -57,7 +58,7 @@ export default function TeamMemberDashboard({ user, onNavigate }) {
     try {
       // 1. Load from localStorage FIRST (instant display)
       const allUsers = JSON.parse(
-        localStorage.getItem("startupverse_users") || "[]",
+        localStorage.getItem(STORAGE_KEYS.teamMembers) || "[]",
       );
 
       // Find founder
@@ -203,7 +204,7 @@ export default function TeamMemberDashboard({ user, onNavigate }) {
   const generateRecentActivity = () => {
     const activities = [];
     const allUsers = JSON.parse(
-      localStorage.getItem("startupverse_users") || "[]",
+      localStorage.getItem(STORAGE_KEYS.teamMembers) || "[]",
     );
 
     // Get all tasks from founder

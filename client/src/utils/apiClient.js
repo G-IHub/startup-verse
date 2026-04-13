@@ -2,7 +2,7 @@
  * API client with backend detection and graceful fallback.
  */
 import { getAccessToken } from "../app/session";
-import { API_BASE_URL } from "./backendClient";
+import { API_BASE_URL } from "../config/apiBase.js";
 
 class ApiClient {
   isBackendOnline = null;

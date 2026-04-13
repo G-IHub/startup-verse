@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { API_BASE_URL } from "../config/apiBase.js";
 import { getAccessToken } from "../app/session";
 
 /**
@@ -20,11 +21,11 @@ export function AdminNuclearReset() {
     console.log("🔥🔥🔥 [NUCLEAR RESET] Starting from frontend...");
     console.log(
       "🔥 [NUCLEAR RESET] Endpoint:",
-      `${import.meta.env.VITE_API_URL || "http://localhost:8000/api/v1"}/admin/nuclear-reset`,
+      `${API_BASE_URL}/admin/nuclear-reset`,
     );
     try {
       const response = await fetch(
-        `${import.meta.env.VITE_API_URL || "http://localhost:8000/api/v1"}/admin/nuclear-reset`,
+        `${API_BASE_URL}/admin/nuclear-reset`,
         {
           method: "POST",
           headers: {

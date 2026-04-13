@@ -1,25 +1,11 @@
-import { getAccessToken, persistCurrentUser } from "../../app/session";
-const API_BASE_URL =
-  import.meta.env.VITE_API_URL || "http://localhost:8000/api/v1";
+import { persistCurrentUser } from "../../app/session";
+import { get } from "../backendClient.js";
 
 // Get user by ID (to refresh user data from backend)
 export async function getUserById(userId) {
   try {
-    const response = await fetch(`${API_BASE_URL}/users/${userId}`, {
-      method: "GET",
-      headers: {
-        "Content-Type": "application/json",
-      Authorization: `Bearer ${getAccessToken()}`,
-      },
-    });
-
-    const data = await response.json();
-
-    if (!response.ok) {
-      throw new Error(data.error || "Failed to fetch user");
-    }
-
-    return data;
+    const payload = await get(`/users/${userId}`);
+    return { success: true, user: payload.data };
   } catch (error) {
     // Silently fail in development mode (expected when backend isn't running)
     if (process.env.NODE_ENV === "development") {

@@ -1,7 +1,9 @@
 import { Router } from "express";
 import agendaRouter from "./agenda.routes.js";
 import authRouter from "./auth.routes.js";
-import compatibilityRouter from "./compatibility.routes.js";
+import adminRouter from "./admin.routes.js";
+import emailsRouter from "./emails.routes.js";
+import migrationsRouter from "./migrations.routes.js";
 import eventsRouter from "./events.routes.js";
 import mentorsRouter from "./mentors.routes.js";
 import announcementsRouter from "./announcements.routes.js";
@@ -42,7 +44,9 @@ apiRouter.use(cronRouter);
 apiRouter.use(eventsRouter);
 apiRouter.use(mentorsRouter);
 apiRouter.use(announcementsRouter);
+apiRouter.use(emailsRouter);
+apiRouter.use(adminRouter);
+apiRouter.use(migrationsRouter);
 apiRouter.use(debugRouter);
-apiRouter.use(compatibilityRouter);
 
 export default apiRouter;

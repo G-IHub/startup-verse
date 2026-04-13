@@ -1,8 +1,6 @@
 import { useEffect, useState } from "react";
+import { API_BASE_URL } from "../config/apiBase.js";
 import { getAccessToken } from "../app/session";
-
-const API_BASE_URL =
-  import.meta.env.VITE_API_URL || "http://localhost:8000/api/v1";
 
 async function isBackendOnline() {
   try {

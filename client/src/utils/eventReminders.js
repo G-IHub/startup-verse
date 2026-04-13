@@ -4,9 +4,7 @@
  */
 
 import { getAccessToken } from "../app/session";
-
-const API_BASE_URL =
-  import.meta.env.VITE_API_URL || "http://localhost:8000/api/v1";
+import { API_BASE_URL } from "../config/apiBase.js";
 
 function getAuthHeaders() {
   return {

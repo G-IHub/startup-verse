@@ -24,7 +24,7 @@ export function generateOrganizationDemo() {
 
   // Get all existing users
   const allUsers = JSON.parse(
-    localStorage.getItem("startupverse_users") || "[]",
+    localStorage.getItem(STORAGE_KEYS.teamMembers) || "[]",
   );
   const founders = allUsers.filter((u) => u.role === "founder");
 

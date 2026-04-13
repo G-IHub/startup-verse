@@ -4,8 +4,9 @@
  */
 
 import { getAccessToken } from "../app/session";
+import { API_BASE_URL } from "../config/apiBase.js";
 
-const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8000/api/v1";
+const API_URL = API_BASE_URL;
 
 /**
  * Check if email service is configured

@@ -9,8 +9,9 @@
  */
 
 import { getAccessToken } from "../../app/session";
+import { API_BASE_URL } from "../../config/apiBase.js";
 
-const BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:8000/api/v1";
+const BASE_URL = API_BASE_URL;
 
 export async function runOrgInvitationMigration() {
   try {

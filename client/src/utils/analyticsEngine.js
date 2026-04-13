@@ -1,5 +1,7 @@
 // Analytics Engine - Calculate metrics and insights from execution data
 
+import { STORAGE_KEYS } from "../app/session";
+
 // Calculate team velocity over time
 export function calculateTeamVelocity(executionData, allTasks) {
   const velocity = [];
@@ -250,7 +252,7 @@ function calculateFocusScore(tasks) {
 // Get team performance data
 export function getTeamPerformance(founderId, allTasks) {
   const allUsers = JSON.parse(
-    localStorage.getItem("startupverse_users") || "[]",
+    localStorage.getItem(STORAGE_KEYS.teamMembers) || "[]",
   );
   const founder = allUsers.find((u) => u.id === founderId);
   // 🔒 SECURITY FIX: Use startupId/founderId ONLY, removed companyId matching

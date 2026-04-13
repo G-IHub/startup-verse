@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { API_BASE_URL } from "../config/apiBase.js";
 import { getAccessToken } from "../app/session";
 
 /**
@@ -20,7 +21,7 @@ export function AdminSuperNuclear() {
       // Step 1: Call nuclear reset FIRST
       console.log("🔥 [SUPER NUCLEAR] Calling nuclear reset...");
       const resetResponse = await fetch(
-        `${import.meta.env.VITE_API_URL || "http://localhost:8000/api/v1"}/admin/nuclear-reset`,
+        `${API_BASE_URL}/admin/nuclear-reset`,
         {
           method: "POST",
           headers: {

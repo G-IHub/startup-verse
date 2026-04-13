@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { API_BASE_URL } from "../config/apiBase.js";
 import { Button } from "./ui/button";
 import {
   Card,
@@ -44,7 +45,7 @@ export default function InvitationAcceptance({ token, onAccept, onCancel }) {
 
         // Fetch invitation from backend
         const API_URL =
-          import.meta.env.VITE_API_URL || "http://localhost:8000/api/v1";
+          API_BASE_URL;
         const response = await fetch(`${API_URL}/invitations/token/${token}`, {
           headers: {
             Authorization: `Bearer ${getAccessToken()}`,

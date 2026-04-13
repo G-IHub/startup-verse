@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { API_BASE_URL } from "../config/apiBase.js";
 import { Button } from "./ui/button";
 import { Card } from "./ui/card";
 import { useAuth } from "../contexts/AuthContext";
@@ -19,7 +20,7 @@ export default function NotificationDebugPanel() {
     try {
       console.log("🧪 [DEBUG] Creating test notification for user:", user.id);
       const response = await fetch(
-        `${import.meta.env.VITE_API_URL || "http://localhost:8000/api/v1"}/notifications/test`,
+        `${API_BASE_URL}/notifications/test`,
         {
           method: "POST",
           headers: {
@@ -65,7 +66,7 @@ export default function NotificationDebugPanel() {
     try {
       console.log("🧪 [DEBUG] Fetching notifications for user:", user.id);
       const response = await fetch(
-        `${import.meta.env.VITE_API_URL || "http://localhost:8000/api/v1"}/users/${user.id}/notifications`,
+        `${API_BASE_URL}/users/${user.id}/notifications`,
         {
           method: "GET",
           headers: {

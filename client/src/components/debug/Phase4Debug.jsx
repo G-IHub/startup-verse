@@ -2,10 +2,12 @@ import React from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "../ui/card";
 import { Badge } from "../ui/badge";
 import { getTasks } from "../../utils/executionEngine";
+import { STORAGE_KEYS } from "../../app/session";
+
 export default function Phase4Debug({ user }) {
   // Get all users to find founder
   const allUsers = JSON.parse(
-    localStorage.getItem("startupverse_users") || "[]",
+    localStorage.getItem(STORAGE_KEYS.teamMembers) || "[]",
   );
   const founder = allUsers.find(
     (u) => u.id === user.startupId && u.role === "founder",

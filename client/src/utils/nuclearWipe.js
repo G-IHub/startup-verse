@@ -4,6 +4,7 @@
  */
 
 import { getAccessToken } from "../app/session";
+import { API_BASE_URL } from "../config/apiBase.js";
 
 export async function executeNuclearWipe() {
   console.log("🔥🔥🔥 STARTING MEGA NUCLEAR WIPE 🔥🔥🔥");
@@ -14,7 +15,7 @@ export async function executeNuclearWipe() {
   console.log("🔥 Step 1: Clearing ALL database records...");
   try {
     const response = await fetch(
-      `${import.meta.env.VITE_API_URL || "http://localhost:8000/api/v1"}/admin/clear-all-data`,
+      `${API_BASE_URL}/admin/clear-all-data`,
       {
         method: "DELETE",
         headers: {

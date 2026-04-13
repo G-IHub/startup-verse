@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { API_BASE_URL } from "../config/apiBase.js";
 import { Trash2, AlertTriangle, Database, BarChart3 } from "lucide-react";
 import { Button } from "./ui/button";
 import {
@@ -28,7 +29,7 @@ export function AdminDatabaseClear() {
     setIsLoadingStats(true);
     try {
       const response = await fetch(
-        `${import.meta.env.VITE_API_URL || "http://localhost:8000/api/v1"}/admin/stats`,
+        `${API_BASE_URL}/admin/stats`,
         {
           method: "GET",
           headers: {
@@ -39,8 +40,9 @@ export function AdminDatabaseClear() {
       );
       const data = await response.json();
       if (data.success) {
-        setStats(data.stats);
-        console.log("📊 Database stats:", data.stats);
+        const payload = data.data ?? data;
+        setStats(payload.stats ?? payload);
+        console.log("📊 Database stats:", payload.stats ?? payload);
       } else {
         toast.error("Failed to fetch database stats");
         console.error("❌ Stats error:", data);
@@ -57,7 +59,7 @@ export function AdminDatabaseClear() {
     try {
       console.log("🗑️ Starting database clear...");
       const response = await fetch(
-        `${import.meta.env.VITE_API_URL || "http://localhost:8000/api/v1"}/admin/clear-all-data`,
+        `${API_BASE_URL}/admin/clear-all-data`,
         {
           method: "DELETE",
           headers: {

@@ -9,6 +9,7 @@
  */
 
 import React, { useState } from "react";
+import { API_BASE_URL } from "../config/apiBase.js";
 import { getAccessToken } from "../app/session";
 import { Button } from "./ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
@@ -259,7 +260,7 @@ export default function TeamMatching({ user, onNavigate }) {
     // **NEW: Fetch fresh data from backend**
     console.log("🌐 [TeamMatching] Fetching talent profiles from backend...");
     fetch(
-      `${import.meta.env.VITE_API_URL || "http://localhost:8000/api/v1"}/talent/profiles`,
+      `${API_BASE_URL}/talent/profiles`,
       {
         headers: {
           Authorization: `Bearer ${getAccessToken()}`,

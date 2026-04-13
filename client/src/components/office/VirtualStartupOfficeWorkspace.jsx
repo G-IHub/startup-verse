@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
+import { API_BASE_URL } from "../../config/apiBase.js";
 import { Button } from "../ui/button";
 import { toast } from "sonner";
 import { Card, CardContent, CardHeader, CardTitle } from "../ui/card";
@@ -52,7 +53,7 @@ import { useAudioManager } from "../../hooks/useAudioManager";
 import { useOfficeSettings } from "../../hooks/useOfficeSettings";
 import { LiveActivityFeed } from "../presence/LiveActivityFeed";
 import { getStartupId } from "../../utils/startupId";
-import { getAccessToken } from "../../app/session";
+import { getAccessToken, STORAGE_KEYS } from "../../app/session";
 import { unwrapData } from "../../utils/apiEnvelope";
 import { TeamEnergyPulse } from "../presence/TeamEnergyPulse";
 import { useNotifications } from "../../contexts/NotificationContext";
@@ -306,7 +307,7 @@ export default function VirtualStartupOffice({
     try {
       // Get all users to find the founder
       const allUsers = JSON.parse(
-        localStorage.getItem("startupverse_users") || "[]",
+        localStorage.getItem(STORAGE_KEYS.teamMembers) || "[]",
       );
 
       // Determine the founder ID (we don't need the full founder object)
@@ -504,7 +505,7 @@ export default function VirtualStartupOffice({
     try {
       const token = getAccessToken();
       const response = await fetch(
-        `${import.meta.env.VITE_API_URL || "http://localhost:8000/api/v1"}/founder/${user.id}/announcements`,
+        `${API_BASE_URL}/founder/${user.id}/announcements`,
         {
           headers: {
             ...(token ? { Authorization: `Bearer ${token}` } : {}),
@@ -623,7 +624,7 @@ export default function VirtualStartupOffice({
       try {
         // 1. Load from localStorage FIRST for instant display
         const allUsers = JSON.parse(
-          localStorage.getItem("startupverse_users") || "[]",
+          localStorage.getItem(STORAGE_KEYS.teamMembers) || "[]",
         );
         console.log("🔍 [VirtualOffice] Loading team members...");
         console.log("🔍 [VirtualOffice] Current user:", {
@@ -874,7 +875,7 @@ export default function VirtualStartupOffice({
               // 🔥 CRITICAL FIX: Update localStorage with fresh backend data
               // This ensures deleted users are removed from localStorage
               const existingUsers = JSON.parse(
-                localStorage.getItem("startupverse_users") || "[]",
+                localStorage.getItem(STORAGE_KEYS.teamMembers) || "[]",
               );
 
               // Remove deleted team members from localStorage
@@ -896,7 +897,7 @@ export default function VirtualStartupOffice({
                 return backendMemberIds.has(u.id);
               });
               localStorage.setItem(
-                "startupverse_users",
+                STORAGE_KEYS.teamMembers,
                 JSON.stringify(updatedUsers),
               );
               console.log(
@@ -965,7 +966,7 @@ export default function VirtualStartupOffice({
       );
       const token = getAccessToken();
       const response = await fetch(
-        `${import.meta.env.VITE_API_URL || "http://localhost:8000/api/v1"}/debug/startups/${startupIdForDebug}`,
+        `${API_BASE_URL}/debug/startups/${startupIdForDebug}`,
         {
           method: "GET",
           headers: {

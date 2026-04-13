@@ -3,6 +3,7 @@
  * Shows founder's execution score (0-100) with percentile ranking
  */
 import React, { useState, useEffect } from "react";
+import { API_BASE_URL } from "../config/apiBase.js";
 import {
   Card,
   CardContent,
@@ -47,7 +48,7 @@ export default function ExecutionScore({
       setLoading(true);
       setError(null);
       const response = await fetch(
-        `${import.meta.env.VITE_API_URL || "http://localhost:8000/api/v1"}/execution-score/${userId}`,
+        `${API_BASE_URL}/execution-score/${userId}`,
         {
           headers: {
             Authorization: `Bearer ${getAccessToken()}`,

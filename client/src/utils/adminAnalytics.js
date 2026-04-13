@@ -4,6 +4,8 @@
  * Collects real-time platform data from ALL localStorage sources
  */
 
+import { STORAGE_KEYS } from "../app/session";
+
 /**
  * Helper: Check if role is team member (handles variations)
  */
@@ -37,7 +39,7 @@ export async function getAllUsers() {
   // Source 1: registered_users (PRIMARY SOURCE - most current data)
   try {
     const registeredUsers = JSON.parse(
-      localStorage.getItem("startupverse_registered_users") || "[]",
+      localStorage.getItem(STORAGE_KEYS.registeredUsers) || "[]",
     );
     console.log(
       "📊 [Analytics] Found registered_users:",
@@ -64,7 +66,7 @@ export async function getAllUsers() {
   // Source 2: startupverse_users (legacy/compatibility)
   try {
     const allUsers = JSON.parse(
-      localStorage.getItem("startupverse_users") || "[]",
+      localStorage.getItem(STORAGE_KEYS.teamMembers) || "[]",
     );
     console.log("📊 [Analytics] Found startupverse_users:", allUsers.length);
     allUsers.forEach((user) => {
@@ -97,7 +99,7 @@ export async function getAllUsers() {
   // Source 3: Current user
   try {
     const currentUser = JSON.parse(
-      localStorage.getItem("startupverse_user") || "null",
+      localStorage.getItem(STORAGE_KEYS.currentUser) || "null",
     );
     if (currentUser && currentUser.id && currentUser.email) {
       const existing = userMap.get(currentUser.id);

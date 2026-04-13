@@ -25,6 +25,7 @@ import {
   CheckCircle2,
   ArrowLeft,
 } from "lucide-react";
+import { STORAGE_KEYS } from "../../app/session";
 import { OutcomeDebugPanel } from "../debug/OutcomeDebugPanel";
 import NotificationDebugPanel from "../NotificationDebugPanel";
 import { Alert, AlertDescription, AlertTitle } from "../ui/alert";
@@ -359,7 +360,7 @@ export default function AdminDashboard() {
                     variant="outline"
                     onClick={() => {
                       const data = {
-                        user: localStorage.getItem("startupverse_user"),
+                        user: localStorage.getItem(STORAGE_KEYS.currentUser),
                         tasks: Object.keys(localStorage).filter((k) =>
                           k.startsWith("tasks_"),
                         ),

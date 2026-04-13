@@ -2,6 +2,7 @@
  * PROGRAM MILESTONES - Set weekly goals for entire cohort
  */
 import React, { useState, useEffect } from "react";
+import { API_BASE_URL } from "../../config/apiBase.js";
 import {
   Card,
   CardContent,
@@ -15,7 +16,7 @@ import { Calendar, Target, Clock, AlertCircle, Sparkles } from "lucide-react";
 import StructuredMilestoneCreator from "./StructuredMilestoneCreator";
 import { getAccessToken } from "../../app/session";
 
-const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:8000/api/v1";
+const API_BASE = API_BASE_URL;
 
 export default function ProgramMilestones({
   cohortId,

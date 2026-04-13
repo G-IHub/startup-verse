@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from "react";
+import { API_BASE_URL } from "../config/apiBase.js";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
@@ -490,7 +491,7 @@ export default function ProfileCompletionModal({
       formData.append("avatar", avatarFile);
       formData.append("userId", user.id);
       const response = await fetch(
-        `${import.meta.env.VITE_API_URL || "http://localhost:8000/api/v1"}/users/upload-avatar`,
+        `${API_BASE_URL}/users/upload-avatar`,
         {
           method: "POST",
           headers: {

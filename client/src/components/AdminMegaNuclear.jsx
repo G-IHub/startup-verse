@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { API_BASE_URL } from "../config/apiBase.js";
 import { getAccessToken } from "../app/session";
 
 /**
@@ -20,7 +21,7 @@ export function AdminMegaNuclear() {
       // Call mega nuclear reset
       console.log("💀 [MEGA NUCLEAR] Calling mega nuclear reset...");
       const resetResponse = await fetch(
-        `${import.meta.env.VITE_API_URL || "http://localhost:8000/api/v1"}/admin/mega-nuclear-reset`,
+        `${API_BASE_URL}/admin/mega-nuclear-reset`,
         {
           method: "POST",
           headers: {

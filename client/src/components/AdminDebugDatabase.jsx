@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { API_BASE_URL } from "../config/apiBase.js";
 import { getAccessToken } from "../app/session";
 
 /**
@@ -21,7 +22,7 @@ export function AdminDebugDatabase() {
         return;
       }
       const response = await fetch(
-        `${import.meta.env.VITE_API_URL || "http://localhost:8000/api/v1"}/team-members/${currentUser.id}`,
+        `${API_BASE_URL}/team-members/${currentUser.id}`,
         {
           method: "GET",
           headers: {

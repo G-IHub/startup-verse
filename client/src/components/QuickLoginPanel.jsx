@@ -160,7 +160,7 @@ export default function QuickLoginPanel({ onLogin }) {
 
     persistCurrentUser(user);
 
-    // Also save all mock users to startupverse_users so TaskManagementPanel can find the founder
+    // Also save all mock users to STORAGE_KEYS.teamMembers so TaskManagementPanel can find the founder
     const allUsers = mockUsers.map((mu) => ({
       id: mu.id,
       name: mu.name,

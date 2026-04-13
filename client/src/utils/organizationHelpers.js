@@ -4,6 +4,8 @@
  * v0.1 - localStorage-based (will migrate to backend later)
  */
 
+import { STORAGE_KEYS } from "../app/session";
+
 const ORGS_KEY = "startupverse_organizations";
 const ORG_MEMBERS_KEY = "startupverse_org_members";
 const COHORTS_KEY = "startupverse_cohorts";
@@ -480,7 +482,7 @@ export function calculateStartupStatus(startupId, organizationId) {
 
 export function getStartupSnapshot(startupId) {
   const allUsers = JSON.parse(
-    localStorage.getItem("startupverse_users") || "[]",
+    localStorage.getItem(STORAGE_KEYS.teamMembers) || "[]",
   );
   const founder = allUsers.find(
     (u) => u.id === startupId && u.role === "founder",
@@ -623,7 +625,7 @@ function calculateOutcomeProgress(outcome) {
 function calculateContributorBalance(startupId) {
   // Simplified version - will enhance later with actual task data
   const allUsers = JSON.parse(
-    localStorage.getItem("startupverse_users") || "[]",
+    localStorage.getItem(STORAGE_KEYS.teamMembers) || "[]",
   );
   const teamMembers = allUsers.filter(
     (u) =>
@@ -722,7 +724,7 @@ export function downloadCSV(data, filename) {
  */
 export async function searchUserByEmail(email) {
   // Get all users from localStorage
-  const USERS_KEY = "startupverse_users";
+  const USERS_KEY = STORAGE_KEYS.teamMembers;
   const stored = localStorage.getItem(USERS_KEY);
 
   if (!stored) {

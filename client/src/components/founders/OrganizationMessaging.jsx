@@ -2,6 +2,7 @@
  * ORGANIZATION MESSAGING - For founders to communicate with their organizations
  */
 import React, { useState, useEffect } from "react";
+import { API_BASE_URL } from "../../config/apiBase.js";
 import {
   Card,
   CardContent,
@@ -37,7 +38,7 @@ export default function OrganizationMessaging({
     try {
       setLoading(true);
       const response = await fetch(
-        `${import.meta.env.VITE_API_URL || "http://localhost:8000/api/v1"}/messages/${founderId}`,
+        `${API_BASE_URL}/messages/${founderId}`,
         {
           headers: {
             Authorization: `Bearer ${getAccessToken()}`,
@@ -67,7 +68,7 @@ export default function OrganizationMessaging({
     }
     try {
       const response = await fetch(
-        `${import.meta.env.VITE_API_URL || "http://localhost:8000/api/v1"}/messages/send-from-founder`,
+        `${API_BASE_URL}/messages/send-from-founder`,
         {
           method: "POST",
           headers: {

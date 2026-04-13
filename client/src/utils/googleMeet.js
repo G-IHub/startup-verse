@@ -3,6 +3,7 @@
  * Helper functions for Google Meet integration
  */
 import { toast } from "sonner";
+import { API_BASE_URL } from "../config/apiBase.js";
 import { getAccessToken } from "../app/session";
 
 /**
@@ -11,7 +12,7 @@ import { getAccessToken } from "../app/session";
 export async function isGoogleConnected(userId) {
   try {
     const response = await fetch(
-      `${import.meta.env.VITE_API_URL || "http://localhost:8000/api/v1"}/google/status/${userId}`,
+      `${API_BASE_URL}/google/status/${userId}`,
       {
         headers: {
           Authorization: `Bearer ${getAccessToken()}`,
@@ -35,7 +36,7 @@ export async function isGoogleConnected(userId) {
 export async function getGoogleConnectionStatus(userId) {
   try {
     const response = await fetch(
-      `${import.meta.env.VITE_API_URL || "http://localhost:8000/api/v1"}/google/status/${userId}`,
+      `${API_BASE_URL}/google/status/${userId}`,
       {
         headers: {
           Authorization: `Bearer ${getAccessToken()}`,
@@ -58,7 +59,7 @@ export async function getGoogleConnectionStatus(userId) {
 export async function createGoogleMeet(params) {
   try {
     const response = await fetch(
-      `${import.meta.env.VITE_API_URL || "http://localhost:8000/api/v1"}/google/create-meeting`,
+      `${API_BASE_URL}/google/create-meeting`,
       {
         method: "POST",
         headers: {
@@ -91,7 +92,7 @@ export async function createGoogleMeet(params) {
 export async function createInstantGoogleMeet(userId, roomName) {
   try {
     const response = await fetch(
-      `${import.meta.env.VITE_API_URL || "http://localhost:8000/api/v1"}/google/instant-meeting/${userId}`,
+      `${API_BASE_URL}/google/instant-meeting/${userId}`,
       {
         method: "POST",
         headers: {

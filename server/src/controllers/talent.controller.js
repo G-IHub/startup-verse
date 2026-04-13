@@ -2,6 +2,7 @@ import TalentProfile from "../models/TalentProfile.js";
 import TalentApplication from "../models/TalentApplication.js";
 import SavedItem from "../models/SavedItem.js";
 import Startup from "../models/Startup.js";
+import StartupPost from "../models/StartupPost.js";
 import FounderTalentInvitation from "../models/FounderTalentInvitation.js";
 import { error as apiError, success as apiSuccess } from "../utils/apiResponse.js";
 
@@ -49,6 +50,18 @@ export const browseTalent = async (req, res) => {
 export const getOpportunities = async (req, res) => {
   const startups = await Startup.find({}).sort({ createdAt: -1 }).limit(100);
   return apiSuccess(res, startups);
+};
+
+/** Paginated feed of all startup posts (talent matching / browse). */
+export const getStartupPostsFeed = async (req, res) => {
+  const page = Math.max(1, Number(req.query.page) || 1);
+  const pageSize = Math.min(100, Math.max(1, Number(req.query.pageSize) || 50));
+  const skip = (page - 1) * pageSize;
+  const [posts, total] = await Promise.all([
+    StartupPost.find({}).sort({ createdAt: -1 }).skip(skip).limit(pageSize).lean(),
+    StartupPost.countDocuments({}),
+  ]);
+  return apiSuccess(res, { posts, total, page, pageSize });
 };
 
 export const applyForPosition = async (req, res) => {

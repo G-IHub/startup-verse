@@ -20,6 +20,8 @@ import {
   Target,
   Crown,
 } from "lucide-react";
+import { STORAGE_KEYS } from "../../app/session";
+
 export function StreakLeaderboard({ currentUser, onClose }) {
   const [globalLeaders, setGlobalLeaders] = useState([]);
   const [teamLeaders, setTeamLeaders] = useState([]);
@@ -51,10 +53,10 @@ export function StreakLeaderboard({ currentUser, onClose }) {
 
     // Load all users for global leaderboard
     const allUsers = JSON.parse(
-      localStorage.getItem("startupverse_users") || "[]",
+      localStorage.getItem(STORAGE_KEYS.teamMembers) || "[]",
     );
     const registeredUsers = JSON.parse(
-      localStorage.getItem("startupverse_registered_users") || "[]",
+      localStorage.getItem(STORAGE_KEYS.registeredUsers) || "[]",
     );
     const combinedUsers = [...allUsers, ...registeredUsers];
 

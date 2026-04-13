@@ -4,6 +4,7 @@ import requireAuth from "../middleware/requireAuth.js";
 import { error as apiError, success as apiSuccess } from "../utils/apiResponse.js";
 import Notification from "../models/Notification.js";
 import { emitRealtime } from "../services/realtime.service.js";
+import { enqueueNotificationEmitRetry } from "../services/reminderDeliveryQueue.js";
 import { SOCKET_EVENTS } from "../realtime/events.js";
 import { userRoom } from "../realtime/rooms.js";
 
@@ -11,7 +12,16 @@ const notificationsRouter = Router();
 
 async function createAndEmitNotification(payload) {
   const notification = await Notification.create(payload);
-  emitRealtime(SOCKET_EVENTS.NOTIFICATION_CREATED, notification, [userRoom(notification.userId)]);
+  try {
+    const delivered = emitRealtime(SOCKET_EVENTS.NOTIFICATION_CREATED, notification, [
+      userRoom(notification.userId),
+    ]);
+    if (!delivered) {
+      await enqueueNotificationEmitRetry(notification._id, notification.type);
+    }
+  } catch {
+    await enqueueNotificationEmitRetry(notification._id, notification.type);
+  }
   return notification;
 }
 

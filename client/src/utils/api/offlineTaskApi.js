@@ -4,10 +4,11 @@
  */
 
 import { offlineStorage } from "../offlineStorage";
+import { API_BASE_URL } from "../../config/apiBase.js";
 import { executeWithOfflineSupport } from "../syncManager";
 import { getAccessToken } from "../../app/session";
 
-const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:8000/api/v1";
+const API_BASE = API_BASE_URL;
 
 /**
  * Get tasks for team member (with offline support)

@@ -8,6 +8,7 @@
  */
 
 import React, { useState } from "react";
+import { API_BASE_URL } from "../../config/apiBase.js";
 import { Button } from "../ui/button";
 import {
   Card,
@@ -26,7 +27,7 @@ export default function AgendaNotificationTrigger({ startupId }) {
     setLoading(true);
     try {
       const response = await fetch(
-        `${import.meta.env.VITE_API_URL || "http://localhost:8000/api/v1"}/agenda/notifications/daily`,
+        `${API_BASE_URL}/agenda/notifications/daily`,
         {
           method: "POST",
           headers: {
@@ -55,7 +56,7 @@ export default function AgendaNotificationTrigger({ startupId }) {
     setLoading(true);
     try {
       const response = await fetch(
-        `${import.meta.env.VITE_API_URL || "http://localhost:8000/api/v1"}/agenda/${startupId}/weekly-summary`,
+        `${API_BASE_URL}/agenda/${startupId}/weekly-summary`,
         {
           headers: {
             Authorization: `Bearer ${getAccessToken()}`,

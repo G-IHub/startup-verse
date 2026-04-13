@@ -3,9 +3,7 @@
  * All organization-related API calls
  */
 import { getAccessToken } from "../../app/session";
-
-const API_BASE_URL =
-  import.meta.env.VITE_API_URL || "http://localhost:8000/api/v1";
+import { API_BASE_URL } from "../../config/apiBase.js";
 
 async function apiCall(endpoint, options = {}, silent404 = false) {
   const url = `${API_BASE_URL}${endpoint}`;

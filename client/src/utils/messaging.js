@@ -1,8 +1,9 @@
 // Team Messaging Utilities - Real Backend Integration
 
 import { getAccessToken } from "../app/session";
+import { API_BASE_URL } from "../config/apiBase.js";
 
-const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:8000/api/v1";
+const API_BASE = API_BASE_URL;
 
 // Send a new message
 export async function sendMessage(
