@@ -45,6 +45,8 @@ const userSchema = new mongoose.Schema(
       index: true,
     },
     onboardingComplete: { type: Boolean, default: false },
+    /** Virtual Office Joyride tour; set true when user finishes the tour (server source of truth). */
+    virtualOfficeTourCompleted: { type: Boolean, default: false },
     isAdmin: { type: Boolean, default: false },
     profile: { type: mongoose.Schema.Types.Mixed, default: {} },
     notificationPreferences: { type: mongoose.Schema.Types.Mixed, default: {} },

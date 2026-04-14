@@ -12,6 +12,23 @@ import { startupRoom } from "../realtime/rooms.js";
 
 const activityRouter = Router();
 
+/** Server-trusted icon by activity type (client body icon is not honored). */
+const ACTIVITY_ICON_BY_TYPE = {
+  "check-in": "\u2705",
+  announcement: "\uD83D\uDCE2",
+  "announcement-comment": "\uD83D\uDCAC",
+  chat: "\uD83D\uDCAC",
+  "room-join": "\uD83D\uDEAA",
+  departure: "\uD83D\uDC4B",
+  "panel-open": "\uD83D\uDCCB",
+  update: "\uD83D\uDCCB",
+};
+
+function iconForActivityType(type) {
+  const key = String(type || "").trim();
+  return ACTIVITY_ICON_BY_TYPE[key] ?? "\uD83D\uDCCB";
+}
+
 const isSelfOrAdmin = (req, userId) =>
   req.user?.isAdmin === true || req.user?.id === String(userId);
 
@@ -59,7 +76,12 @@ activityRouter.get(
     const parsedLimit = Number.parseInt(String(req.query?.limit || "50"), 10);
     const safeLimit = Number.isFinite(parsedLimit) ? parsedLimit : 50;
     const limit = Math.max(1, Math.min(200, safeLimit));
-    const rows = await Activity.find({ startupId: canonicalStartupId })
+    const typeFilter = String(req.query?.type || "").trim();
+    const query = { startupId: canonicalStartupId };
+    if (typeFilter) {
+      query.type = typeFilter.slice(0, 100);
+    }
+    const rows = await Activity.find(query)
       .sort({ createdAt: -1, _id: -1 })
       .limit(limit);
     return apiSuccess(res, rows.map((row) => mapActivityToDto(row)));
@@ -112,7 +134,7 @@ activityRouter.post(
     const trustedUserName = String(
       actor?.displayName || actor?.name || req.user?.name || req.user?.email || "",
     );
-    const trustedIcon = "📋";
+    const trustedIcon = iconForActivityType(type);
     const doc = await Activity.create({
       startupId: canonicalStartupId,
       userId: String(userId),
@@ -156,7 +178,7 @@ activityRouter.post(
         userName: String(
           actor?.displayName || actor?.name || req.user?.name || req.user?.email || "",
         ),
-        icon: "🏆",
+        icon: "\uD83C\uDFC6",
         category: "wall-of-wins",
       },
     });
@@ -168,4 +190,3 @@ activityRouter.post(
 );
 
 export default activityRouter;
-

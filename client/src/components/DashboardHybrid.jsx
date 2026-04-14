@@ -353,6 +353,7 @@ export default function DashboardHybrid({ user, onLogout, onUpdateUser }) {
           <AdaptiveVirtualOffice
             user={user}
             onNavigate={handleNavigate}
+            onUpdateUser={onUpdateUser}
             view={virtualOfficeView}
             onViewChange={setVirtualOfficeView}
             taskToOpen={taskToOpen}

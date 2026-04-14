@@ -71,6 +71,11 @@ cd server && node scripts/phase3-weekly-loop-smoke.mjs
 - [ ] **Calendar/agenda:** As a **founder**, open `AgendaPanel` / office calendar; confirm items load via `GET /calendar/:userId` (same user id) and filters (upcoming / today / week / overdue) behave sensibly.
 - [ ] **Calendar/agenda:** As a **team member** linked to a startup with cohort membership, confirm the same calendar load shows cohort events/deliverables/milestones (not only founder-only membership rows).
 - [ ] **Calendar/agenda:** Optional — call `GET /calendar/:userId?start=…&end=…` with a narrow window and confirm results stay within the range.
+- [ ] **Check-ins:** Submit a daily check-in from Virtual Office; confirm it appears in the live activity feed with type `check-in` and that a second browser/session for another team member sees it (realtime or after refresh).
+- [ ] **Check-ins:** Confirm `GET /startups/:startupId/activities?type=check-in&limit=20` returns only check-in rows for an authorized member.
+- [ ] **Check-ins:** Disconnect or block the network briefly and submit a check-in; confirm the UI shows an error and does not claim success if the POST fails.
+- [ ] **Virtual Office tour (first visit):** Open Virtual Office as a user with `virtualOfficeTourCompleted` false; confirm the Joyride runs, **Skip Tour** is not shown, and finishing sets the flag (profile + no auto-restart on reload).
+- [ ] **Virtual Office tour (replay):** Use “Replay Tour” (or equivalent); confirm the tour runs again and Skip is available; after skip or finish, behavior matches expectations.
 - [ ] Navigate away and back without losing startup context (`startupId` / room join).
 - [ ] Trigger or simulate a notification with `actionUrl` and confirm navigation lands in the expected office tab or route.
 - [ ] Task panel lifecycle guardrails: invalid transitions (for example `completed -> pending`) are rejected with a visible validation error.

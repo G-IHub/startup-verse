@@ -209,7 +209,13 @@ export default function Dashboard({ user, onLogout, onUpdateUser }) {
       case "profile-setup":
         return <ProfileSetup />;
       case "startup-office":
-        return <VirtualStartupOffice user={user} onNavigate={setCurrentPage} />;
+        return (
+          <VirtualStartupOffice
+            user={user}
+            onNavigate={setCurrentPage}
+            onUpdateUser={onUpdateUser}
+          />
+        );
       case "team-matching":
         // If founder has a startup (has companyName, startupName, or startupId), show Team Management
         // Otherwise show Team Matching to find co-founders
@@ -259,7 +265,13 @@ export default function Dashboard({ user, onLogout, onUpdateUser }) {
           />
         );
       case "startup-office":
-        return <VirtualStartupOffice user={user} onNavigate={setCurrentPage} />;
+        return (
+          <VirtualStartupOffice
+            user={user}
+            onNavigate={setCurrentPage}
+            onUpdateUser={onUpdateUser}
+          />
+        );
       case "tasks":
         return <TaskBoard user={user} />;
       default:

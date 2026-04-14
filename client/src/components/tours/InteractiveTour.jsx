@@ -1,6 +1,14 @@
 import React, { useState, useEffect } from "react";
 import { Joyride, STATUS, ACTIONS, EVENTS } from "react-joyride";
 import { useTheme } from "../../contexts/ThemeContext";
+
+/**
+ * @param {object} props
+ * @param {boolean} [props.serverCompleted] When true, treat tour as completed for auto-start (with localStorage).
+ * @param {boolean} [props.bypassPersistedGate] When true (e.g. replay), auto-start even if server says completed.
+ * @param {boolean} [props.allowSkip=true] When false, first-visit: Skip does not persist completion.
+ * @param {() => Promise<void>} [props.onPersistComplete] Called on FINISHED after successful flow; set localStorage after this resolves.
+ */
 export default function InteractiveTour({
   steps,
   tourKey,
@@ -9,43 +17,71 @@ export default function InteractiveTour({
   continuous = true,
   showProgress = true,
   showSkipButton = true,
+  serverCompleted = false,
+  bypassPersistedGate = false,
+  allowSkip = true,
+  onPersistComplete,
 }) {
   const [runTour, setRunTour] = useState(false);
   const { theme } = useTheme();
+
   useEffect(() => {
-    // Check if user has completed this tour
-    const hasCompletedTour = localStorage.getItem(`tour_completed_${tourKey}`);
-    if (!hasCompletedTour && run) {
-      // Small delay to ensure DOM elements are rendered
-      setTimeout(() => {
+    const lsDone = localStorage.getItem(`tour_completed_${tourKey}`) === "true";
+    const persistedComplete = Boolean(serverCompleted) || lsDone;
+    const shouldAutoRun = run && (bypassPersistedGate || !persistedComplete);
+    if (shouldAutoRun) {
+      const t = setTimeout(() => {
         setRunTour(true);
       }, 500);
+      return () => clearTimeout(t);
     }
-  }, [tourKey, run]);
+    setRunTour(false);
+    return undefined;
+  }, [tourKey, run, serverCompleted, bypassPersistedGate]);
+
   const handleJoyrideCallback = (data) => {
-    const { status, action, index, type } = data;
-    if ([STATUS.FINISHED, STATUS.SKIPPED].includes(status)) {
-      // Mark tour as completed
-      localStorage.setItem(`tour_completed_${tourKey}`, "true");
-      setRunTour(false);
-      if (onComplete) {
-        onComplete();
-      }
+    const { status, type } = data;
+
+    if (status === STATUS.FINISHED) {
+      void (async () => {
+        try {
+          if (onPersistComplete) {
+            await onPersistComplete();
+          }
+          localStorage.setItem(`tour_completed_${tourKey}`, "true");
+          setRunTour(false);
+          onComplete?.();
+        } catch (err) {
+          console.error("[InteractiveTour] persist failed:", err);
+          setRunTour(false);
+        }
+      })();
+      return;
     }
 
-    // Handle specific events if needed
-    if (type === EVENTS.STEP_AFTER && action === ACTIONS.NEXT) {
-      // User clicked next
+    if (status === STATUS.SKIPPED) {
+      if (allowSkip) {
+        localStorage.setItem(`tour_completed_${tourKey}`, "true");
+      }
+      setRunTour(false);
+      onComplete?.();
+    }
+
+    if (type === EVENTS.STEP_AFTER && data.action === ACTIONS.NEXT) {
+      // reserved
     }
   };
+
   const isDark = theme === "dark";
+  const joyrideShowSkip = showSkipButton && allowSkip;
+
   return (
     <Joyride
       steps={steps}
       run={runTour}
       continuous={continuous}
       showProgress={showProgress}
-      showSkipButton={showSkipButton}
+      showSkipButton={joyrideShowSkip}
       callback={handleJoyrideCallback}
       scrollToFirstStep={true}
       scrollOffset={100}

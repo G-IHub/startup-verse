@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import { API_BASE_URL } from "../../config/apiBase.js";
 import { Button } from "../ui/button";
 import { toast } from "sonner";
@@ -49,6 +49,7 @@ import { TeamHubPanel } from "./TeamHubPanel";
 import MeetingScheduler from "../calendar/MeetingScheduler";
 import InteractiveTour from "../tours/InteractiveTour";
 import { virtualOfficeTourSteps } from "../tours/tourSteps";
+import { authApi } from "../../api/authApi.jsx";
 import { useAudioManager } from "../../hooks/useAudioManager";
 import { useOfficeSettings } from "../../hooks/useOfficeSettings";
 import { LiveActivityFeed } from "../presence/LiveActivityFeed";
@@ -117,11 +118,31 @@ function mergeActivityFeed(prev, incoming) {
   return deduped.slice(0, 50);
 }
 
+function isSameLocalCalendarDay(d1, d2) {
+  const a = d1 instanceof Date ? d1 : new Date(d1);
+  const b = d2 instanceof Date ? d2 : new Date(d2);
+  if (Number.isNaN(a.getTime()) || Number.isNaN(b.getTime())) return false;
+  return (
+    a.getFullYear() === b.getFullYear() &&
+    a.getMonth() === b.getMonth() &&
+    a.getDate() === b.getDate()
+  );
+}
+
+/** Strip the synthetic "checked in: \"…\"" wrapper for list display. */
+function formatCheckInBody(text) {
+  const s = String(text || "");
+  const m = s.match(/^checked in:\s*"([\s\S]*)"\s*$/i);
+  if (m) return m[1];
+  return s.replace(/^checked in:\s*/i, "").trim() || s;
+}
+
 // ActivityEvent type imported from LiveActivityFeed
 
 export default function VirtualStartupOffice({
   user,
   onNavigate,
+  onUpdateUser,
   taskToOpen,
   onTaskOpened,
   announcementToOpen,
@@ -236,7 +257,55 @@ export default function VirtualStartupOffice({
   // Check-in
   const [hasCheckedInToday, setHasCheckedInToday] = useState(false);
   const [checkInMessage, setCheckInMessage] = useState("");
-  const [teamCheckIns, setTeamCheckIns] = useState([]);
+
+  const teamCheckInsToday = useMemo(() => {
+    const now = new Date();
+    return activityFeed
+      .filter((a) => a.type === "check-in")
+      .filter((a) => isSameLocalCalendarDay(new Date(a.timestamp), now))
+      .sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime())
+      .slice(0, 20)
+      .map((a) => ({
+        id: a.id,
+        userId: a.userId,
+        userName: a.userName || "Team member",
+        message: formatCheckInBody(a.message),
+      }));
+  }, [activityFeed]);
+
+  useEffect(() => {
+    const now = new Date();
+    const checked = activityFeed.some(
+      (a) =>
+        a.type === "check-in" &&
+        String(a.userId) === String(user.id) &&
+        isSameLocalCalendarDay(new Date(a.timestamp), now),
+    );
+    setHasCheckedInToday(checked);
+  }, [activityFeed, user.id]);
+
+  useEffect(() => {
+    if (!showCheckInDialog || !user?.id) return;
+    const startupId =
+      user.role === "founder"
+        ? user.id
+        : user.startupId || user.founderId || "";
+    if (!startupId) return;
+    let cancelled = false;
+    (async () => {
+      const result = await activityApi.getStartupActivities(startupId, {
+        type: "check-in",
+        limit: 40,
+      });
+      if (cancelled || !result.success) return;
+      setActivityFeed((prev) =>
+        mergeActivityFeed(prev, result.activities || []),
+      );
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [showCheckInDialog, user.id, user.role, user.startupId, user.founderId]);
 
   // Announcements
   const [announcementText, setAnnouncementText] = useState("");
@@ -290,6 +359,28 @@ export default function VirtualStartupOffice({
   const [googleMeetLink, setGoogleMeetLink] = useState("");
   const [showGoogleConnectDialog, setShowGoogleConnectDialog] = useState(false);
   const [showOfficeTour, setShowOfficeTour] = useState(true);
+  const [officeTourReplay, setOfficeTourReplay] = useState(false);
+  const virtualOfficeTourLsKey = "tour_completed_virtual-office-tour";
+  const tourMigrationAttemptedRef = useRef(false);
+
+  // Sync legacy localStorage completion to server once (cross-device / fresh DB)
+  useEffect(() => {
+    if (!user?.id || user.virtualOfficeTourCompleted) return;
+    if (localStorage.getItem(virtualOfficeTourLsKey) !== "true") return;
+    if (tourMigrationAttemptedRef.current) return;
+    tourMigrationAttemptedRef.current = true;
+    void (async () => {
+      try {
+        await authApi.updateProfile(user.id, {
+          virtualOfficeTourCompleted: true,
+        });
+        onUpdateUser?.({ ...user, virtualOfficeTourCompleted: true });
+      } catch (err) {
+        console.error("[Virtual Office] Tour migration failed:", err);
+        tourMigrationAttemptedRef.current = false;
+      }
+    })();
+  }, [user, onUpdateUser]);
 
   // Announcement detail modal
   const [selectedAnnouncement, setSelectedAnnouncement] = useState(null);
@@ -1417,7 +1508,7 @@ export default function VirtualStartupOffice({
         : user.startupId || user.founderId || "";
     if (!currentStartupId) {
       console.warn("⚠️ No startupId found, skipping activity");
-      return;
+      return { success: false, error: "No startup context" };
     }
     const newEvent = {
       id: `optimistic-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
@@ -1449,15 +1540,20 @@ export default function VirtualStartupOffice({
           return mergeActivityFeed(withoutOptimistic, [result.activity]);
         });
         setActivityError("");
-      } else {
-        setActivityFeed((prev) => prev.filter((event) => event.id !== newEvent.id));
-        console.error("Failed to post activity to backend:", result.error);
-        setActivityError(result.error || "Unable to post activity update.");
+        return result;
       }
+      setActivityFeed((prev) => prev.filter((event) => event.id !== newEvent.id));
+      console.error("Failed to post activity to backend:", result.error);
+      setActivityError(result.error || "Unable to post activity update.");
+      return result;
     } catch (error) {
       console.error("Failed to post activity to backend:", error);
       setActivityFeed((prev) => prev.filter((event) => event.id !== newEvent.id));
       setActivityError("Unable to post activity update.");
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : "Unable to post activity update.",
+      };
     }
   };
   const getStatusColor = (status) => {
@@ -1945,27 +2041,26 @@ export default function VirtualStartupOffice({
     }, 30000);
   };
 
-  // Submit Check-in
-  const submitCheckIn = () => {
+  // Submit Check-in (persisted via Activity API; hasCheckedInToday follows activityFeed)
+  const submitCheckIn = async () => {
     if (!checkInMessage.trim()) {
       toast.error("Please enter what you're working on today");
       return;
     }
-    const checkIn = {
-      userId: user.id,
-      userName: user.name,
-      message: checkInMessage,
-      timestamp: new Date(),
-    };
-    setTeamCheckIns((prev) => [checkIn, ...prev]);
-    setHasCheckedInToday(true);
-    localStorage.setItem(`office_checkin_${new Date().toDateString()}`, "true");
-    addActivity("check-in", `checked in: "${checkInMessage}"`, "✅");
-    toast.success("✅ Checked in! Have a great day!");
-    setCheckInMessage("");
-    setShowCheckInDialog(false);
-    audio.playNotificationSound("success");
-    audio.playWhooshSound();
+    const result = await addActivity(
+      "check-in",
+      `checked in: "${checkInMessage}"`,
+      "\u2705",
+    );
+    if (result?.success) {
+      setCheckInMessage("");
+      setShowCheckInDialog(false);
+      toast.success("Checked in! Have a great day!");
+      audio.playNotificationSound("success");
+      audio.playWhooshSound();
+    } else {
+      toast.error(result?.error || "Could not save check-in. Try again.");
+    }
   };
 
   // Start Video Call
@@ -4238,16 +4333,16 @@ export default function VirtualStartupOffice({
                     className="mt-2"
                   />
                 </div>
-                {teamCheckIns.length > 0 && (
+                {teamCheckInsToday.length > 0 && (
                   <div>
                     <Label className="text-xs text-muted-foreground mb-2 block">
                       Team Check-ins Today
                     </Label>
                     <ScrollArea className="h-32">
                       <div className="space-y-2">
-                        {teamCheckIns.slice(0, 3).map((checkIn, idx) => (
+                        {teamCheckInsToday.slice(0, 3).map((checkIn) => (
                           <div
-                            key={`checkin-${checkIn.userId}-${idx}`}
+                            key={`checkin-${checkIn.id}`}
                             className="p-2 bg-muted/50 rounded-lg"
                           >
                             <p className="text-xs font-medium">
@@ -4494,10 +4589,9 @@ export default function VirtualStartupOffice({
                     variant="outline"
                     size="sm"
                     onClick={() => {
-                      localStorage.removeItem(
-                        "tour_completed_virtual-office-tour",
-                      );
+                      localStorage.removeItem(virtualOfficeTourLsKey);
                       setShowKeyboardShortcuts(false);
+                      setOfficeTourReplay(true);
                       setShowOfficeTour(true);
                     }}
                   >
@@ -4520,7 +4614,25 @@ export default function VirtualStartupOffice({
             steps={virtualOfficeTourSteps}
             tourKey="virtual-office-tour"
             run={showOfficeTour}
-            onComplete={() => setShowOfficeTour(false)}
+            serverCompleted={Boolean(user?.virtualOfficeTourCompleted)}
+            bypassPersistedGate={officeTourReplay}
+            allowSkip={
+              Boolean(user?.virtualOfficeTourCompleted) || officeTourReplay
+            }
+            onPersistComplete={async () => {
+              const next = { ...user, virtualOfficeTourCompleted: true };
+              if (onUpdateUser) {
+                onUpdateUser(next);
+                return;
+              }
+              await authApi.updateProfile(user.id, {
+                virtualOfficeTourCompleted: true,
+              });
+            }}
+            onComplete={() => {
+              setShowOfficeTour(false);
+              setOfficeTourReplay(false);
+            }}
           />
           <div className="hidden lg:block fixed bottom-6 right-6 z-40">
             <motion.button

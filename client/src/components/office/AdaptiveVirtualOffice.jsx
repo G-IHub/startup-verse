@@ -5,6 +5,7 @@ import TeamMatching from "../TeamMatching";
 export default function AdaptiveVirtualOffice({
   user,
   onNavigate,
+  onUpdateUser,
   view,
   onViewChange,
   taskToOpen,
@@ -23,6 +24,7 @@ export default function AdaptiveVirtualOffice({
           <VirtualStartupOffice
             user={user}
             onNavigate={onNavigate}
+            onUpdateUser={onUpdateUser}
             taskToOpen={taskToOpen}
             onTaskOpened={onTaskOpened}
             announcementToOpen={announcementToOpen}
