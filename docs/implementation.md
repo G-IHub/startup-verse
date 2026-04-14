@@ -10,6 +10,8 @@ This file turns [`startup-verse_master_blueprint.md`](startup-verse_master_bluep
 
 **Virtual Office Task Panel polish (2026-04-13):** task mutations now enforce a strict server-side lifecycle (`pending -> in-progress/blocked`, `in-progress -> pending/blocked/completed`, `blocked -> pending/in-progress`, `completed` terminal), blocked payloads always require canonical `blockerReason` + `blockerNote`, task updates emit consistent `task:updated` realtime events for founder and team-member paths, and client task subscriptions include bounded polling fallback when sockets disconnect.
 
+**Virtual Office Team Hub polish (2026-04-13):** Team Hub now uses canonical message/announcement contracts via backend APIs, message and announcement access is startup-scoped with ownership guards, notification deep-links can open Team Hub context (including targeted message threads), and realtime subscriptions (`message:created`, `announcement:created`) include bounded polling fallback so chat and announcement streams stay fresh during socket outages.
+
 ---
 
 ## How each feature should be built (repeatable pattern)

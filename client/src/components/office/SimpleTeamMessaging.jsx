@@ -6,7 +6,10 @@ import { Input } from "../ui/input";
 import { ScrollArea } from "../ui/scroll-area";
 // 🔥 REALTIME: Import real-time messaging hook
 
-import { broadcastMessageUpdate } from "../../utils/realtimeSubscriptions";
+import {
+  broadcastMessageUpdate,
+  subscribeToMessages,
+} from "../../utils/realtimeSubscriptions";
 import {
   X,
   Send,
@@ -100,6 +103,34 @@ export function SimpleTeamMessaging({
 
   // 🔥 REALTIME: Removed message polling (was every 2s) - messages now update via real-time subscription
   // Real-time updates are handled by the messaging system automatically
+  useEffect(() => {
+    if (!startupId || !selectedConversation) return;
+    const unsub = subscribeToMessages(
+      startupId,
+      (update) => {
+        const m = update?.message;
+        if (!m) return;
+        const touchesCurrentConversation =
+          String(m.senderId) === String(selectedConversation) ||
+          String(m.recipientId) === String(selectedConversation);
+        if (!touchesCurrentConversation) {
+          void loadConversations();
+          return;
+        }
+        setMessages((prev) => {
+          const byId = new Map(prev.map((row) => [String(row.id), row]));
+          byId.set(String(m.id), m);
+          return Array.from(byId.values()).sort((a, b) => a.timestamp - b.timestamp);
+        });
+        void loadConversations();
+      },
+      {
+        userId: currentUserId,
+        peerUserId: selectedConversation,
+      },
+    );
+    return () => unsub?.();
+  }, [startupId, selectedConversation, currentUserId]);
 
   const loadConversations = async () => {
     console.log(

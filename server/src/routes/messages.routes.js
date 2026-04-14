@@ -5,11 +5,44 @@ import requireOrgAdmin from "../middleware/requireOrgAdmin.js";
 import * as organizationMessagesController from "../controllers/organizationMessages.controller.js";
 import { error as apiError, success as apiSuccess } from "../utils/apiResponse.js";
 import Message from "../models/Message.js";
+import User from "../models/User.js";
+import Startup from "../models/Startup.js";
 import { emitRealtime } from "../services/realtime.service.js";
 import { SOCKET_EVENTS } from "../realtime/events.js";
 import { startupRoom, userRoom, organizationRoom } from "../realtime/rooms.js";
 
 const messagesRouter = Router();
+const isSelfOrAdmin = (req, userId) => req.user?.isAdmin === true || String(req.user?.id) === String(userId);
+
+function mapMessageDto(messageDoc) {
+  if (!messageDoc) return null;
+  const row = messageDoc.toObject ? messageDoc.toObject() : messageDoc;
+  return {
+    id: String(row._id || row.id || ""),
+    startupId: row.startupId ? String(row.startupId) : "",
+    organizationId: row.organizationId ? String(row.organizationId) : "",
+    fromUserId: row.fromUserId ? String(row.fromUserId) : "",
+    toUserId: row.toUserId ? String(row.toUserId) : "",
+    body: String(row.body || ""),
+    attachments: Array.isArray(row.attachments) ? row.attachments : [],
+    readAt: row.readAt || null,
+    createdAt: row.createdAt || null,
+    updatedAt: row.updatedAt || null,
+  };
+}
+
+async function canAccessStartupMessages(req, startupId) {
+  if (req.user?.isAdmin) return true;
+  const normalizedStartupId = String(startupId || "");
+  if (!normalizedStartupId) return false;
+  if (normalizedStartupId === String(req.user.id)) return true;
+  const me = await User.findById(req.user.id, { startupId: 1, founderId: 1 });
+  if (!me) return false;
+  if (String(me.founderId || "") === normalizedStartupId) return true;
+  if (String(me.startupId || "") === normalizedStartupId) return true;
+  const founded = await Startup.findOne({ founderId: req.user.id }, { _id: 1 });
+  return String(founded?._id || "") === normalizedStartupId;
+}
 
 async function createMessage(payload) {
   const message = await Message.create(payload);
@@ -23,7 +56,7 @@ async function createMessage(payload) {
   }
   rooms.push(userRoom(message.toUserId));
 
-  emitRealtime(SOCKET_EVENTS.MESSAGE_CREATED, message, rooms);
+  emitRealtime(SOCKET_EVENTS.MESSAGE_CREATED, mapMessageDto(message), rooms);
 
   return message;
 }
@@ -38,6 +71,9 @@ messagesRouter.post(
       return apiError(res, "toUserId and body are required.", 400);
     }
 
+    if (startupId && !(await canAccessStartupMessages(req, startupId))) {
+      return apiError(res, "Forbidden.", 403);
+    }
     const message = await createMessage({
       startupId,
       fromUserId: req.user.id,
@@ -46,7 +82,7 @@ messagesRouter.post(
       attachments,
     });
 
-    return apiSuccess(res, message, 201);
+    return apiSuccess(res, mapMessageDto(message), 201);
   }),
 );
 
@@ -67,16 +103,19 @@ messagesRouter.post(
   "/messages/send-from-founder",
   requireAuth,
   asyncHandler(async (req, res) => {
+    if (req.body?.startupId && !(await canAccessStartupMessages(req, req.body.startupId))) {
+      return apiError(res, "Forbidden.", 403);
+    }
     const message = await createMessage({
       startupId: req.body?.startupId || null,
       organizationId: req.body?.organizationId || null,
       fromUserId: req.user.id,
       toUserId: req.body?.toUserId,
-      body: req.body?.body || req.body?.message || "",
+      body: req.body?.body || req.body?.content || req.body?.message || "",
       attachments: req.body?.attachments || [],
     });
 
-    return apiSuccess(res, message, 201);
+    return apiSuccess(res, mapMessageDto(message), 201);
   }),
 );
 
@@ -84,11 +123,14 @@ messagesRouter.get(
   "/messages/:userId",
   requireAuth,
   asyncHandler(async (req, res) => {
+    if (!isSelfOrAdmin(req, req.params.userId)) {
+      return apiError(res, "Forbidden.", 403);
+    }
     const messages = await Message.find({
       $or: [{ fromUserId: req.params.userId }, { toUserId: req.params.userId }],
     }).sort({ createdAt: -1 });
 
-    return apiSuccess(res, messages);
+    return apiSuccess(res, messages.map(mapMessageDto));
   }),
 );
 
@@ -97,6 +139,12 @@ messagesRouter.get(
   requireAuth,
   asyncHandler(async (req, res) => {
     const { startupId, userId, otherUserId } = req.params;
+    if (!isSelfOrAdmin(req, userId)) {
+      return apiError(res, "Forbidden.", 403);
+    }
+    if (!(await canAccessStartupMessages(req, startupId))) {
+      return apiError(res, "Forbidden.", 403);
+    }
     const messages = await Message.find({
       startupId,
       $or: [
@@ -105,7 +153,7 @@ messagesRouter.get(
       ],
     }).sort({ createdAt: 1 });
 
-    return apiSuccess(res, messages);
+    return apiSuccess(res, messages.map(mapMessageDto));
   }),
 );
 
@@ -114,6 +162,12 @@ messagesRouter.get(
   requireAuth,
   asyncHandler(async (req, res) => {
     const { startupId, userId } = req.params;
+    if (!isSelfOrAdmin(req, userId)) {
+      return apiError(res, "Forbidden.", 403);
+    }
+    if (!(await canAccessStartupMessages(req, startupId))) {
+      return apiError(res, "Forbidden.", 403);
+    }
 
     const rows = await Message.find({ startupId, $or: [{ fromUserId: userId }, { toUserId: userId }] })
       .sort({ createdAt: -1 })
@@ -127,7 +181,7 @@ messagesRouter.get(
       }
     });
 
-    return apiSuccess(res, Array.from(map.values()));
+    return apiSuccess(res, Array.from(map.values()).map(mapMessageDto));
   }),
 );
 
@@ -135,14 +189,25 @@ messagesRouter.post(
   "/messages/mark-read",
   requireAuth,
   asyncHandler(async (req, res) => {
-    const { messageIds = [] } = req.body || {};
-
-    await Message.updateMany(
-      { _id: { $in: messageIds }, toUserId: req.user.id, readAt: null },
-      { $set: { readAt: new Date() } },
-    );
-
-    return apiSuccess(res, { markedRead: true, count: messageIds.length });
+    const { messageIds = [], userId, otherUserId, startupId } = req.body || {};
+    if (userId && !isSelfOrAdmin(req, userId)) {
+      return apiError(res, "Forbidden.", 403);
+    }
+    if (startupId && !(await canAccessStartupMessages(req, startupId))) {
+      return apiError(res, "Forbidden.", 403);
+    }
+    const targetUserId = userId || req.user.id;
+    let query = { _id: { $in: messageIds }, toUserId: targetUserId, readAt: null };
+    if ((!messageIds || messageIds.length === 0) && otherUserId && startupId) {
+      query = {
+        startupId,
+        toUserId: targetUserId,
+        fromUserId: otherUserId,
+        readAt: null,
+      };
+    }
+    const result = await Message.updateMany(query, { $set: { readAt: new Date() } });
+    return apiSuccess(res, { markedRead: true, count: Number(result.modifiedCount || 0) });
   }),
 );
 
@@ -150,13 +215,19 @@ messagesRouter.get(
   "/messages/unread-count/:startupId/:userId",
   requireAuth,
   asyncHandler(async (req, res) => {
+    if (!isSelfOrAdmin(req, req.params.userId)) {
+      return apiError(res, "Forbidden.", 403);
+    }
+    if (!(await canAccessStartupMessages(req, req.params.startupId))) {
+      return apiError(res, "Forbidden.", 403);
+    }
     const count = await Message.countDocuments({
       startupId: req.params.startupId,
       toUserId: req.params.userId,
       readAt: null,
     });
 
-    return apiSuccess(res, { unreadCount: count });
+    return apiSuccess(res, { unreadCount: count, count });
   }),
 );
 

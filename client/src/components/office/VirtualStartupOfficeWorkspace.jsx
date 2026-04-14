@@ -126,6 +126,8 @@ export default function VirtualStartupOffice({
   onTaskOpened,
   announcementToOpen,
   onAnnouncementOpened,
+  messageUserToOpen,
+  onMessageUserOpened,
 }) {
   // Presence features - Real backend data
   const [onlineUsers, setOnlineUsers] = useState([]);
@@ -441,6 +443,15 @@ export default function VirtualStartupOffice({
       }
     }
   }, [announcementToOpen, onAnnouncementOpened]);
+
+  useEffect(() => {
+    if (!messageUserToOpen) return;
+    setSelectedMessageUserId(String(messageUserToOpen));
+    setIsMessagePanelOpen(true);
+    if (onMessageUserOpened) {
+      onMessageUserOpened();
+    }
+  }, [messageUserToOpen, onMessageUserOpened]);
 
   // 🔥 CRITICAL: Listen for task-related notifications and refresh tasks
   useEffect(() => {
@@ -4664,6 +4675,7 @@ export default function VirtualStartupOffice({
             onClose={() => setIsTeamHubOpen(false)}
             currentUserId={user.id}
             currentUserName={user.name}
+            startupId={getStartupId(user)}
             onActivity={addActivity}
             organizationAnnouncements={orgAnnouncements}
           />
