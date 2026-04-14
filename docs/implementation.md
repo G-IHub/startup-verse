@@ -8,6 +8,8 @@ This file turns [`startup-verse_master_blueprint.md`](startup-verse_master_bluep
 
 **Remediation lock (2026-04-13):** before any net-new feature work, keep these enforced in code and gate checks: (1) founder/invitation/notification ownership checks, (2) atomic `POST /api/v1/interests/:interestId/onboard` transaction with rollback semantics, (3) weekly loop status update stability + execution-score streak contract, (4) immutable `Activity` records, and (5) short-lived presence records (TTL-backed persistence for realtime resilience).
 
+**Virtual Office Task Panel polish (2026-04-13):** task mutations now enforce a strict server-side lifecycle (`pending -> in-progress/blocked`, `in-progress -> pending/blocked/completed`, `blocked -> pending/in-progress`, `completed` terminal), blocked payloads always require canonical `blockerReason` + `blockerNote`, task updates emit consistent `task:updated` realtime events for founder and team-member paths, and client task subscriptions include bounded polling fallback when sockets disconnect.
+
 ---
 
 ## How each feature should be built (repeatable pattern)

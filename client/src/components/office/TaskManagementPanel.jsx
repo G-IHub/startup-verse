@@ -59,6 +59,7 @@ import {
 } from "../../utils/notificationHelpers";
 import * as teamMemberApi from "../../utils/api/teamMemberApi";
 import * as taskApi from "../../utils/api/taskApi";
+import { subscribeToTasks } from "../../utils/socketIoRealtime";
 import { STORAGE_KEYS } from "../../app/session";
 
 export function TaskManagementPanel({
@@ -80,6 +81,15 @@ export function TaskManagementPanel({
   const [filterStatus, setFilterStatus] = useState("all");
   const [draggedTask, setDraggedTask] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
+  const [taskNotFound, setTaskNotFound] = useState(false);
+
+  const normalizeTask = (task) => ({
+    ...task,
+    id: String(task?.id || task?._id || ""),
+    blockerReason: task?.blockerReason || task?.blockedReason || "",
+    blockerNote: task?.blockerNote || task?.blockedNote || "",
+  });
 
   // Sync openAddDialog from props
   useEffect(() => {
@@ -124,6 +134,7 @@ export function TaskManagementPanel({
 
       // Load tasks for the founder - BACKEND FIRST
       try {
+        setLoadError("");
         let tasks = [];
         if (user.role === "founder") {
           // Load founder's tasks from backend
@@ -134,7 +145,7 @@ export function TaskManagementPanel({
           const backendTasks = await taskApi.getTeamMemberTasks(user.id);
           tasks = backendTasks || [];
         }
-        setLocalTasks(tasks);
+        setLocalTasks((tasks || []).map(normalizeTask));
         console.log(`✅ [TaskPanel] Loaded ${tasks.length} tasks from backend`);
       } catch (error) {
         console.error(
@@ -149,7 +160,8 @@ export function TaskManagementPanel({
             (t) => t.assignedTo === user.id || t.assigneeId === user.id,
           );
         }
-        setLocalTasks(filteredTasks);
+        setLoadError("Could not sync tasks from server. Showing cached tasks.");
+        setLocalTasks(filteredTasks.map(normalizeTask));
       }
 
       // Load team members (for task assignment) - FROM BACKEND
@@ -213,6 +225,31 @@ export function TaskManagementPanel({
     // ✅ REALTIME: Removed task/team polling (was every 10s) - using real-time subscription
   }, [open, user.id, user.role, user.startupId, user.founderId]);
 
+  useEffect(() => {
+    if (!open || !founderId) return;
+    const startupId = founderId;
+    const unsubscribe = subscribeToTasks(
+      startupId,
+      (update) => {
+        const incoming = normalizeTask(update?.task || {});
+        if (!incoming.id) return;
+        setLocalTasks((prev) => {
+          const nextMap = new Map(prev.map((row) => [String(row.id), row]));
+          nextMap.set(incoming.id, { ...(nextMap.get(incoming.id) || {}), ...incoming });
+          return Array.from(nextMap.values()).sort(
+            (a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0),
+          );
+        });
+      },
+      {
+        role: user.role === "founder" ? "founder" : "team-member",
+        founderId,
+        userId: user.id,
+      },
+    );
+    return () => unsubscribe?.();
+  }, [open, founderId, user.id, user.role]);
+
   // Handle initialTaskId - scroll to and highlight the task
   useEffect(() => {
     if (initialTaskId && open && localTasks.length > 0) {
@@ -221,6 +258,7 @@ export function TaskManagementPanel({
       setTimeout(() => {
         const taskElement = document.getElementById(`task-${initialTaskId}`);
         if (taskElement) {
+          setTaskNotFound(false);
           taskElement.scrollIntoView({
             behavior: "smooth",
             block: "center",
@@ -234,6 +272,8 @@ export function TaskManagementPanel({
               "ring-offset-2",
             );
           }, 2000);
+        } else {
+          setTaskNotFound(true);
         }
       }, 300);
     }
@@ -340,6 +380,7 @@ export function TaskManagementPanel({
   };
   const handleStatusChange = (taskId, newStatus) => {
     if (!founderId) return;
+    const previousTasks = localTasks;
     const updatedTasks = localTasks.map((t) =>
       t.id === taskId
         ? {
@@ -350,13 +391,32 @@ export function TaskManagementPanel({
           }
         : t,
     );
-    setLocalTasks(updatedTasks);
-    saveTasks(founderId, updatedTasks);
+    const applySuccessState = (serverTask = null) => {
+      const nextTasks = serverTask?.id
+        ? updatedTasks.map((row) =>
+            row.id === serverTask.id ? normalizeTask(serverTask) : row,
+          )
+        : updatedTasks;
+      setLocalTasks(nextTasks);
+      saveTasks(founderId, nextTasks);
+      syncTasksToMilestones(founderId);
+      setLoadError("");
+      const statusLabel =
+        newStatus === "in-progress"
+          ? "In Progress"
+          : newStatus === "pending"
+            ? "To Do"
+            : "Completed";
+      toast.success(`Task moved to ${statusLabel}`);
+      onPlaySound?.();
+      if (newStatus === "completed") {
+        const task = nextTasks.find((t) => t.id === taskId);
+        if (task) {
+          createTaskCompletedNotification(task);
+        }
+      }
+    };
 
-    // 🚀 Sync tasks to milestones
-    syncTasksToMilestones(founderId);
-
-    // 🔔 Sync to backend to trigger notifications (team members only)
     if (user.role === "team-member" || user.role === "team") {
       console.log(
         `🔔 [TaskManagementPanel.handleStatusChange] Syncing task ${taskId} status change to backend...`,
@@ -374,29 +434,31 @@ export function TaskManagementPanel({
           completedByName: user.name,
         })
         .then(() =>
-          console.log(
-            `✅ Task status '${newStatus}' synced to backend - founder notified`,
-          ),
+          console.log(`✅ Task status '${newStatus}' synced to backend - founder notified`),
         )
-        .catch((error) => console.error("❌ Backend sync failed:", error));
-    }
-    const statusLabel =
-      newStatus === "in-progress"
-        ? "In Progress"
-        : newStatus === "pending"
-          ? "To Do"
-          : "Completed";
-    toast.success(`Task moved to ${statusLabel}`);
-    onPlaySound?.();
-    if (newStatus === "completed") {
-      const task = updatedTasks.find((t) => t.id === taskId);
-      if (task) {
-        createTaskCompletedNotification(task);
-      }
+        .then(() => applySuccessState())
+        .catch((error) => {
+          console.error("❌ Backend sync failed:", error);
+          setLocalTasks(previousTasks);
+          setLoadError(error?.message || "Task status update failed.");
+        });
+    } else {
+      taskApi
+        .updateTaskStatus(founderId, taskId, newStatus, {})
+        .then((serverTask) => applySuccessState(serverTask))
+        .catch((error) => {
+          setLocalTasks(previousTasks);
+          setLoadError(error?.message || "Task status update failed.");
+        });
     }
   };
   const handleBlockTask = (taskId, reason, note) => {
+    if (!reason?.trim() || !note?.trim()) {
+      toast.error("Blocker reason and note are required.");
+      return;
+    }
     if (!founderId) return;
+    const previousTasks = localTasks;
     const updatedTasks = localTasks.map((t) =>
       t.id === taskId
         ? {
@@ -407,19 +469,25 @@ export function TaskManagementPanel({
           }
         : t,
     );
-    setLocalTasks(updatedTasks);
-    saveTasks(founderId, updatedTasks);
+    const applyBlockedSuccess = () => {
+      setLocalTasks(updatedTasks);
+      saveTasks(founderId, updatedTasks);
+      syncTasksToMilestones(founderId);
+      setLoadError("");
+      toast.error("Task marked as blocked");
+      onPlaySound?.();
+      const task = updatedTasks.find((t) => t.id === taskId);
+      if (task) {
+        createTaskBlockedNotification(task);
+      }
+    };
 
-    // 🚀 Sync tasks to milestones
-    syncTasksToMilestones(founderId);
-
-    // 🔔 Sync to backend to trigger notifications (team members only)
-    if (user.role === "team-member") {
+    if (user.role === "team-member" || user.role === "team") {
       teamMemberApi
         .updateTaskStatus(user.id, taskId, {
           status: "blocked",
-          blockReason: reason,
-          blockNote: note,
+          blockerReason: reason,
+          blockerNote: note,
           founderId: founderId,
           completedBy: user.id,
           completedByName: user.name,
@@ -427,13 +495,23 @@ export function TaskManagementPanel({
         .then(() =>
           console.log(`✅ Task blocked synced to backend - founder notified`),
         )
-        .catch((error) => console.error("❌ Backend sync failed:", error));
-    }
-    toast.error("Task marked as blocked");
-    onPlaySound?.();
-    const task = updatedTasks.find((t) => t.id === taskId);
-    if (task) {
-      createTaskBlockedNotification(task);
+        .then(() => applyBlockedSuccess())
+        .catch((error) => {
+          console.error("❌ Backend sync failed:", error);
+          setLocalTasks(previousTasks);
+          setLoadError(error?.message || "Blocking task failed.");
+        });
+    } else {
+      taskApi
+        .updateTaskStatus(founderId, taskId, "blocked", {
+          blockerReason: reason,
+          blockerNote: note,
+        })
+        .then(() => applyBlockedSuccess())
+        .catch((error) => {
+          setLocalTasks(previousTasks);
+          setLoadError(error?.message || "Blocking task failed.");
+        });
     }
   };
   const handleDragStart = (task) => {
@@ -610,6 +688,16 @@ export function TaskManagementPanel({
                 </p>
               </div>
               <div className="p-4 border-b bg-slate-50 dark:bg-slate-900/50 space-y-3">
+                {loadError ? (
+                  <div className="text-xs text-red-600 bg-red-50 border border-red-200 rounded p-2">
+                    {loadError}
+                  </div>
+                ) : null}
+                {taskNotFound ? (
+                  <div className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded p-2">
+                    The linked task could not be found. It may have been deleted or moved.
+                  </div>
+                ) : null}
                 <div className="flex items-center gap-2">
                   <div className="relative flex-1">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
@@ -986,7 +1074,7 @@ function TaskCard({
     setShowAssignDialog(false);
   };
   const handleBlock = () => {
-    if (onBlock && blockReason) {
+    if (onBlock && blockReason && blockNote.trim()) {
       onBlock(task.id, blockReason, blockNote);
       setShowBlockDialog(false);
       setBlockReason("");
@@ -1298,6 +1386,7 @@ function TaskCard({
               </Button>
               <Button
                 onClick={handleBlock}
+                disabled={!blockReason || !blockNote.trim()}
                 className="flex-1 bg-red-600 hover:bg-red-700"
               >
                 Report Blocker

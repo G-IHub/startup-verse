@@ -1,4 +1,5 @@
 import { Router } from "express";
+import activityRouter from "./activity.routes.js";
 import agendaRouter from "./agenda.routes.js";
 import authRouter from "./auth.routes.js";
 import adminRouter from "./admin.routes.js";
@@ -26,6 +27,7 @@ import usersRouter from "./users.routes.js";
 const apiRouter = Router();
 
 apiRouter.use(healthRouter);
+apiRouter.use(activityRouter);
 apiRouter.use(authRouter);
 apiRouter.use(usersRouter);
 apiRouter.use(foundersRouter);

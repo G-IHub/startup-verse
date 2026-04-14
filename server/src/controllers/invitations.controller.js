@@ -10,6 +10,10 @@ import Presence from "../models/Presence.js";
 import Activity from "../models/Activity.js";
 import { error as apiError, success as apiSuccess } from "../utils/apiResponse.js";
 import { sendTokenResponse } from "../utils/sendToken.js";
+import { emitRealtime } from "../services/realtime.service.js";
+import { SOCKET_EVENTS } from "../realtime/events.js";
+import { startupRoom } from "../realtime/rooms.js";
+import { mapActivityToDto } from "../utils/activityDto.js";
 
 const isAdmin = (req) => req.user?.isAdmin === true;
 const isSelfOrAdmin = (req, userId) => isAdmin(req) || req.user?.id === String(userId);
@@ -284,6 +288,7 @@ export const onboardInterest = async (req, res) => {
   const session = await mongoose.startSession();
   try {
     let responsePayload = null;
+    let activityEvent = null;
     await session.withTransaction(async () => {
       const interest = await Interest.findById(req.params.interestId).session(session);
       if (!interest) {
@@ -345,19 +350,28 @@ export const onboardInterest = async (req, res) => {
         { upsert: true, new: true, runValidators: true, session },
       );
 
-      await Activity.create(
+      const createdActivity = await Activity.create(
         [{
           startupId,
           userId: talent._id,
           type: "join",
           text: "Team member onboarded from accepted interest.",
-          metadata: { interestId: interest._id, founderId: interest.founderId },
+          metadata: {
+            interestId: interest._id,
+            founderId: interest.founderId,
+            userName: talent.name || "",
+            icon: "👋",
+          },
         }],
         { session },
       );
+      activityEvent = mapActivityToDto(createdActivity?.[0]);
 
       responsePayload = { onboarded: true, interest };
     });
+    if (activityEvent?.startupId) {
+      emitRealtime(SOCKET_EVENTS.ACTIVITY_CREATED, activityEvent, [startupRoom(activityEvent.startupId)]);
+    }
     return apiSuccess(res, responsePayload);
   } catch (error) {
     if (error.message === "Interest not found.") {

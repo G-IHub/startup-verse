@@ -175,7 +175,11 @@ export function LiveActivityFeed({ activities, showPopups = true }) {
   );
 }
 function getTimeAgo(timestamp) {
-  const seconds = Math.floor((Date.now() - timestamp.getTime()) / 1000);
+  const date = timestamp instanceof Date ? timestamp : new Date(timestamp || Date.now());
+  if (Number.isNaN(date.getTime())) {
+    return "Just now";
+  }
+  const seconds = Math.floor((Date.now() - date.getTime()) / 1000);
   if (seconds < 10) return "Just now";
   if (seconds < 60) return `${seconds}s ago`;
   const minutes = Math.floor(seconds / 60);

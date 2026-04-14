@@ -14,8 +14,10 @@ import TeamMemberProfile from "../models/TeamMemberProfile.js";
 import {
   computeMilestoneCounters,
   ensureOutcomeMutable,
+  validateTaskStatusTransition,
   validateBlockedTaskPayload,
 } from "../domain/weeklyLoopRules.js";
+import { mapActivityToDto } from "../utils/activityDto.js";
 import { error as apiError, success as apiSuccess } from "../utils/apiResponse.js";
 import { emitRealtime } from "../services/realtime.service.js";
 import { SOCKET_EVENTS } from "../realtime/events.js";
@@ -52,21 +54,12 @@ async function appendLoopActivity({ founderId, startupId, type, text, metadata =
     userId: founderId,
     type,
     text,
-    metadata,
+    metadata: { ...metadata, userName: metadata?.userName || "" },
   });
   const sid = String(startupId);
   emitRealtime(
     SOCKET_EVENTS.ACTIVITY_CREATED,
-    {
-      id: String(doc._id),
-      userId: String(founderId),
-      userName: "",
-      type: String(type || "update"),
-      message: String(text || ""),
-      icon: "📋",
-      timestamp: (doc.createdAt || new Date()).toISOString(),
-      startupId: sid,
-    },
+    mapActivityToDto(doc),
     [startupRoom(sid)],
   );
 }
@@ -283,6 +276,12 @@ export const updateTask = async (req, res) => {
   if (!existingTask) {
     return apiError(res, "Task not found.", 404);
   }
+  if (payload?.status) {
+    const transition = validateTaskStatusTransition(existingTask.status, payload.status);
+    if (!transition.ok) {
+      return apiError(res, transition.message, transition.code);
+    }
+  }
 
   const updatedTask = await Task.findOneAndUpdate(
     { _id: req.params.taskId, founderId },
@@ -342,6 +341,10 @@ export const updateTaskStatus = async (req, res) => {
   const existingTask = await Task.findOne({ _id: req.params.taskId, founderId });
   if (!existingTask) {
     return apiError(res, "Task not found.", 404);
+  }
+  const transition = validateTaskStatusTransition(existingTask.status, status);
+  if (!transition.ok) {
+    return apiError(res, transition.message, transition.code);
   }
 
   const updatedTask = await Task.findOneAndUpdate(

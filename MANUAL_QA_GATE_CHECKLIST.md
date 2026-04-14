@@ -70,6 +70,9 @@ cd server && node scripts/phase3-weekly-loop-smoke.mjs
 - [ ] Open Virtual Startup Office with a founder who has `startupId`; confirm presence list, activity feed, tasks panel, and agenda/calendar widgets load without console errors.
 - [ ] Navigate away and back without losing startup context (`startupId` / room join).
 - [ ] Trigger or simulate a notification with `actionUrl` and confirm navigation lands in the expected office tab or route.
+- [ ] Task panel lifecycle guardrails: invalid transitions (for example `completed -> pending`) are rejected with a visible validation error.
+- [ ] Blocking a task requires both blocker reason and blocker note in UI and API payloads.
+- [ ] Task panel remains fresh during temporary socket disconnect (bounded polling fallback) and stops polling after reconnect.
 
 ---
 
