@@ -16,28 +16,52 @@ const isSelfOrAdmin = (req, userId) =>
   req.user?.isAdmin === true || req.user?.id === String(userId);
 
 async function canAccessStartup(req, startupId) {
-  if (req.user?.isAdmin) return true;
-  const normalizedStartupId = String(startupId || "");
-  if (normalizedStartupId === String(req.user.id)) return true;
+  const normalize = (value) => String(value || "").trim();
+  const resolveCanonicalStartupId = async (rawValue) => {
+    const value = normalize(rawValue);
+    if (!value) return null;
+    const byId = await Startup.findById(value, { _id: 1 });
+    if (byId?._id) return String(byId._id);
+    const byFounder = await Startup.findOne({ founderId: value }, { _id: 1 });
+    return byFounder?._id ? String(byFounder._id) : null;
+  };
+
+  const requestedCanonicalId = await resolveCanonicalStartupId(startupId);
+  if (!requestedCanonicalId) return null;
+  if (req.user?.isAdmin) return requestedCanonicalId;
+
   const me = await User.findById(req.user.id, { startupId: 1, founderId: 1 });
-  if (!me) return false;
-  if (String(me.founderId || "") === normalizedStartupId) return true;
-  if (String(me.startupId || "") === normalizedStartupId) return true;
-  const founded = await Startup.findOne({ founderId: req.user.id }, { _id: 1 });
-  return String(founded?._id || "") === normalizedStartupId;
+  if (!me) return null;
+
+  const candidateIds = [
+    req.user.id,
+    me.startupId,
+    me.founderId,
+  ];
+  for (const candidateId of candidateIds) {
+    const canonicalCandidate = await resolveCanonicalStartupId(candidateId);
+    if (canonicalCandidate && canonicalCandidate === requestedCanonicalId) {
+      return requestedCanonicalId;
+    }
+  }
+  return null;
 }
 
 activityRouter.get(
   "/startups/:startupId/activities",
   requireAuth,
   asyncHandler(async (req, res) => {
-    const startupId = String(req.params.startupId || "");
-    if (!(await canAccessStartup(req, startupId))) {
+    const canonicalStartupId = await canAccessStartup(req, req.params.startupId);
+    if (!canonicalStartupId) {
       return apiError(res, "Forbidden.", 403);
     }
 
-    const limit = Math.min(200, Math.max(1, Number(req.query?.limit || 50)));
-    const rows = await Activity.find({ startupId }).sort({ createdAt: -1, _id: -1 }).limit(limit);
+    const parsedLimit = Number.parseInt(String(req.query?.limit || "50"), 10);
+    const safeLimit = Number.isFinite(parsedLimit) ? parsedLimit : 50;
+    const limit = Math.max(1, Math.min(200, safeLimit));
+    const rows = await Activity.find({ startupId: canonicalStartupId })
+      .sort({ createdAt: -1, _id: -1 })
+      .limit(limit);
     return apiSuccess(res, rows.map((row) => mapActivityToDto(row)));
   }),
 );
@@ -46,8 +70,8 @@ activityRouter.post(
   "/startups/:startupId/activities",
   requireAuth,
   asyncHandler(async (req, res) => {
-    const startupId = String(req.params.startupId || "");
-    if (!(await canAccessStartup(req, startupId))) {
+    const canonicalStartupId = await canAccessStartup(req, req.params.startupId);
+    if (!canonicalStartupId) {
       return apiError(res, "Forbidden.", 403);
     }
 
@@ -62,23 +86,28 @@ activityRouter.post(
     }
 
     const type = String(req.body?.type || "update");
+    const actor = await User.findById(req.user.id, { name: 1, displayName: 1 });
     const metadata =
       req.body?.metadata && typeof req.body.metadata === "object"
         ? req.body.metadata
         : {};
+    const trustedUserName = String(
+      actor?.displayName || actor?.name || req.user?.name || req.user?.email || "",
+    );
+    const trustedIcon = "📋";
     const doc = await Activity.create({
-      startupId,
+      startupId: canonicalStartupId,
       userId: String(userId),
       type,
       text: message,
       metadata: {
         ...metadata,
-        userName: String(req.body?.userName || metadata.userName || ""),
-        icon: String(req.body?.icon || metadata.icon || "📋"),
+        userName: trustedUserName,
+        icon: trustedIcon,
       },
     });
     const activity = mapActivityToDto(doc);
-    emitRealtime(SOCKET_EVENTS.ACTIVITY_CREATED, activity, [startupRoom(startupId)]);
+    emitRealtime(SOCKET_EVENTS.ACTIVITY_CREATED, activity, [startupRoom(canonicalStartupId)]);
     return apiSuccess(res, activity, 201);
   }),
 );

@@ -1421,9 +1421,14 @@ export default function VirtualStartupOffice({
           return mergeActivityFeed(withoutOptimistic, [result.activity]);
         });
         setActivityError("");
+      } else {
+        setActivityFeed((prev) => prev.filter((event) => event.id !== newEvent.id));
+        console.error("Failed to post activity to backend:", result.error);
+        setActivityError(result.error || "Unable to post activity update.");
       }
     } catch (error) {
       console.error("Failed to post activity to backend:", error);
+      setActivityFeed((prev) => prev.filter((event) => event.id !== newEvent.id));
       setActivityError("Unable to post activity update.");
     }
   };

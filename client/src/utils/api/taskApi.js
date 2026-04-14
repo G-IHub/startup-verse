@@ -89,74 +89,38 @@ export async function assignTask(founderId, taskId, assigneeId, assigneeName) {
  * Get tasks with pagination support
  */
 export async function getTasks(founderId, params) {
-  try {
-    const queryParams = new URLSearchParams();
-    if (params?.page) queryParams.set("page", params.page.toString());
-    if (params?.pageSize)
-      queryParams.set("pageSize", params.pageSize.toString());
-    if (params?.status) queryParams.set("status", params.status);
-    if (params?.search) queryParams.set("search", params.search);
-
-    const queryString = queryParams.toString();
-    const url = `${API_BASE}/founders/${founderId}/tasks${queryString ? `?${queryString}` : ""}`;
-
-    const response = await fetch(url, {
-      method: "GET",
-      headers: {
-        Authorization: `Bearer ${getAccessToken()}`,
-        "Content-Type": "application/json",
-      },
-    });
-
-    if (!response.ok) {
-      throw new Error(`Failed to fetch tasks: ${response.statusText}`);
-    }
-
-    const data = await response.json();
-    return {
-      tasks: data.tasks || [],
-      pagination: data.pagination,
-    };
-  } catch (error) {
-    console.error("Error fetching tasks:", error);
-    throw error;
-  }
+  const queryParams = new URLSearchParams();
+  if (params?.page) queryParams.set("page", params.page.toString());
+  if (params?.pageSize) queryParams.set("pageSize", params.pageSize.toString());
+  if (params?.status) queryParams.set("status", params.status);
+  if (params?.search) queryParams.set("search", params.search);
+  const query = queryParams.toString();
+  const payload = await request(
+    `/founders/${founderId}/tasks${query ? `?${query}` : ""}`,
+    { method: "GET" },
+  );
+  const data = payload?.data || payload || {};
+  return {
+    tasks: (data.tasks || []).map(normalizeTask).filter(Boolean),
+    pagination: data.pagination,
+  };
 }
 
 /**
  * Get tasks by assignee with pagination support
  */
 export async function getTasksByAssignee(assigneeId, params) {
-  try {
-    const queryParams = new URLSearchParams();
-    if (params?.page) queryParams.set("page", params.page.toString());
-    if (params?.pageSize)
-      queryParams.set("pageSize", params.pageSize.toString());
-
-    const queryString = queryParams.toString();
-    const url = `${API_BASE}/team-members/${assigneeId}/tasks${queryString ? `?${queryString}` : ""}`;
-
-    const response = await fetch(url, {
-      method: "GET",
-      headers: {
-        Authorization: `Bearer ${getAccessToken()}`,
-        "Content-Type": "application/json",
-      },
-    });
-
-    if (!response.ok) {
-      throw new Error(
-        `Failed to fetch tasks by assignee: ${response.statusText}`,
-      );
-    }
-
-    const data = await response.json();
-    return {
-      tasks: data.tasks || [],
-      pagination: data.pagination,
-    };
-  } catch (error) {
-    console.error("Error fetching tasks by assignee:", error);
-    throw error;
-  }
+  const queryParams = new URLSearchParams();
+  if (params?.page) queryParams.set("page", params.page.toString());
+  if (params?.pageSize) queryParams.set("pageSize", params.pageSize.toString());
+  const query = queryParams.toString();
+  const payload = await request(
+    `/team-members/${assigneeId}/tasks${query ? `?${query}` : ""}`,
+    { method: "GET" },
+  );
+  const data = payload?.data || payload || {};
+  return {
+    tasks: (data.tasks || []).map(normalizeTask).filter(Boolean),
+    pagination: data.pagination,
+  };
 }

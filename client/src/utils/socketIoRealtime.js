@@ -119,7 +119,6 @@ export function subscribeToTasks(startupId, onUpdate, pollContext = null) {
   let pollTimer = null;
   let graceTimer = null;
   let stopped = false;
-  const seenIds = new Set();
 
   const clearTimers = () => {
     if (pollTimer != null) {
@@ -133,6 +132,7 @@ export function subscribeToTasks(startupId, onUpdate, pollContext = null) {
   };
 
   const emitRows = (rows = []) => {
+    const seenIds = new Set();
     rows.forEach((row) => {
       const mapped = mapTaskDoc(row);
       const id = String(mapped.id || mapped._id || "");
@@ -147,9 +147,17 @@ export function subscribeToTasks(startupId, onUpdate, pollContext = null) {
       clearTimers();
       return;
     }
+    const isFounder = pollContext?.role === "founder";
+    const canPoll =
+      Boolean(pollContext) &&
+      (isFounder ? Boolean(pollContext?.founderId) : Boolean(pollContext?.userId));
+    if (!canPoll) {
+      clearTimers();
+      return;
+    }
     try {
       const rows =
-        pollContext?.role === "founder"
+        isFounder
           ? await getFounderTasks(pollContext.founderId)
           : await getTeamMemberTasks(pollContext.userId);
       emitRows(rows || []);
@@ -174,23 +182,23 @@ export function subscribeToTasks(startupId, onUpdate, pollContext = null) {
     "task:updated",
     (task) => {
       const mapped = mapTaskDoc(task);
-      seenIds.add(String(mapped.id || mapped._id || ""));
       onUpdate({ action: "updated", task: mapped });
     },
   );
 
   const socket = SocketEngine.getSocket();
+  const manager = socket.io;
   const onDisconnect = () => armPollingIfNeeded();
   const onReconnect = () => clearTimers();
   socket.on("disconnect", onDisconnect);
-  socket.on("reconnect", onReconnect);
+  manager.on("reconnect", onReconnect);
   armPollingIfNeeded();
 
   return () => {
     stopped = true;
     clearTimers();
     socket.off("disconnect", onDisconnect);
-    socket.off("reconnect", onReconnect);
+    manager.off("reconnect", onReconnect);
     offTask?.();
   };
 }

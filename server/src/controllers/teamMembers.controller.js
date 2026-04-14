@@ -78,6 +78,9 @@ export const updateTask = async (req, res) => {
   if (Object.prototype.hasOwnProperty.call(req.body || {}, "description")) {
     updates.description = req.body.description || "";
   }
+  if (Object.keys(updates).length === 0) {
+    return apiError(res, "No updates provided.", 400);
+  }
 
   const task = await Task.findOneAndUpdate(
     { _id: req.params.taskId, assignedTo: req.params.teamMemberId },

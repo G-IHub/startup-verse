@@ -101,13 +101,15 @@ presenceRouter.post(
     emitRealtime(SOCKET_EVENTS.PRESENCE_UPDATED, normalizedPresence, [startupRoom(startupId)]);
 
     if (activity && typeof activity === "object" && startupId) {
+      const { lastFeedActivity: _ignoredActivity, ...activityMetadata } =
+        mergedMetadata && typeof mergedMetadata === "object" ? mergedMetadata : {};
       const activityDoc = await Activity.create({
         startupId: String(startupId),
         userId: String(userId),
         type: String(activity.type || "update"),
         text: String(activity.message || ""),
         metadata: {
-          ...mergedMetadata,
+          ...activityMetadata,
           userName: String(activity.userName || userName || ""),
           icon: String(activity.icon || "📋"),
         },
