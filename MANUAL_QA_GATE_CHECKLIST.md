@@ -73,6 +73,9 @@ cd server && node scripts/phase3-weekly-loop-smoke.mjs
 - [ ] Task panel lifecycle guardrails: invalid transitions (for example `completed -> pending`) are rejected with a visible validation error.
 - [ ] Blocking a task requires both blocker reason and blocker note in UI and API payloads.
 - [ ] Task panel remains fresh during temporary socket disconnect (bounded polling fallback) and stops polling after reconnect.
+- [ ] Team Hub messaging: send/receive between two users updates unread/read state correctly after refresh.
+- [ ] Team Hub announcements: create announcement appears for both users and realtime fallback works if socket disconnects.
+- [ ] Notification deep-links into Team Hub open the expected context (announcement or message thread).
 
 ---
 

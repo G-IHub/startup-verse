@@ -31,6 +31,13 @@ async function main() {
   assertContains(socketServer, '"room:join"', "server room:join handler", failures);
   assertContains(socketIo, "task:updated", "task realtime event name", failures);
   assertContains(socketIo, "TASK_POLL_MS", "task polling fallback interval", failures);
+  assertContains(socketIo, "announcement:created", "announcement realtime event name", failures);
+  assertContains(
+    socketIo,
+    "ANNOUNCEMENT_POLL_MS",
+    "announcement polling fallback interval",
+    failures,
+  );
   assertContains(socketIo, "message:created", "message realtime event name", failures);
   assertContains(socketIo, "activity:created", "activity realtime event name", failures);
   assertContains(socketIo, "presence:updated", "presence realtime event name", failures);

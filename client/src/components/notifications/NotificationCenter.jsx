@@ -189,8 +189,12 @@ export default function NotificationCenter({ onNavigate }) {
         onNavigate("startup-office");
       } else if (url.includes("/team")) {
         console.log("🔔 Notification clicked - navigating to team");
-        // For team member joined notifications - navigate to team page/hub
-        onNavigate("startup-office"); // Team Hub is in Virtual Office
+        const match = url.match(/\/team\/messages\/([^/?#]+)/);
+        const messageUserId = match ? decodeURIComponent(match[1]) : "";
+        onNavigate("startup-office", {
+          openTeamHub: true,
+          messageUserId,
+        });
       } else if (url.includes("/announcements")) {
         // Extract announcement ID and navigate to startup office
         const announcementId = url.split("/").pop();
@@ -201,6 +205,7 @@ export default function NotificationCenter({ onNavigate }) {
         // TODO: Pass announcementId to scroll to specific announcement
         onNavigate("startup-office", {
           announcementId,
+          openTeamHub: true,
         }); // Announcements are in Team Hub
       } else if (url.includes("/dashboard")) {
         console.log("🔔 Notification clicked - navigating to dashboard");

@@ -2,8 +2,30 @@
 
 import { getAccessToken } from "../app/session";
 import { API_BASE_URL } from "../config/apiBase.js";
+import { request } from "./backendClient";
 
 const API_BASE = API_BASE_URL;
+
+function mapMessageDto(row) {
+  if (!row) return null;
+  return {
+    id: String(row.id || row._id || ""),
+    senderId: String(row.senderId || row.fromUserId || ""),
+    senderName: String(row.senderName || ""),
+    senderRole: String(row.senderRole || ""),
+    recipientId: String(row.recipientId || row.toUserId || ""),
+    recipientName: String(row.recipientName || ""),
+    content: String(row.content || row.body || ""),
+    timestamp: row.timestamp ? Number(row.timestamp) : new Date(row.createdAt || Date.now()).getTime(),
+    startupId: String(row.startupId || ""),
+    read: Boolean(row.read || row.readAt),
+    fileUrl: row.fileUrl || "",
+    fileName: row.fileName || "",
+    fileSize: row.fileSize || 0,
+    fileType: row.fileType || "",
+    createdAt: row.createdAt || null,
+  };
+}
 
 // Send a new message
 export async function sendMessage(
@@ -62,54 +84,23 @@ export async function sendMessage(
 
   // Then send to backend
   try {
-    // Add timeout to prevent hanging requests
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 second timeout
-
-    const response = await fetch(`${API_BASE}/messages/send`, {
+    const payload = await request("/messages/send", {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${getAccessToken()}`,
-      },
       body: JSON.stringify({
-        senderId,
-        senderName,
-        senderRole,
-        recipientId,
-        recipientName,
-        content,
         startupId,
-        isTeamMessage,
-        fileUrl,
-        fileName,
-        fileSize,
-        fileType,
+        toUserId: recipientId,
+        body: content,
+        attachments: fileUrl
+          ? [{ url: fileUrl, fileName, fileSize, fileType }]
+          : [],
       }),
-      signal: controller.signal,
     });
-
-    clearTimeout(timeoutId);
-
-    if (!response.ok) {
-      const error = await response.json();
-      console.error("Error sending message to backend:", error);
-      // Still return the local message since it's saved to localStorage
-      return message;
-    }
-
-    const data = await response.json();
-    console.log("✅ Message sent successfully to backend");
-    return data.message;
+    const serverMessage = mapMessageDto(payload?.data || payload?.message);
+    return serverMessage || message;
   } catch (error) {
-    if (error instanceof Error && error.name === "AbortError") {
-      console.warn(
-        "⚠️ Message send timed out after 15 seconds, using localStorage",
-      );
-    } else {
-      console.error("Error sending message to backend:", error);
+    if (process.env.NODE_ENV === "development") {
+      console.debug("Message send fallback to localStorage:", error?.message);
     }
-    // Still return the local message since it's saved to localStorage
     return message;
   }
 }
@@ -117,37 +108,13 @@ export async function sendMessage(
 // Get conversation between two users or team chat
 export async function getConversation(userId, otherUserId, startupId) {
   try {
-    const response = await fetch(
-      `${API_BASE}/messages/conversation/${startupId}/${userId}/${otherUserId}`,
-      {
-        headers: {
-          Authorization: `Bearer ${getAccessToken()}`,
-        },
-      },
+    const payload = await request(
+      `/messages/conversation/${startupId}/${userId}/${otherUserId}`,
+      { method: "GET" },
     );
-
-    if (!response.ok) {
-      // 🔧 FIX: Use debug log instead of warn - fallback is working fine
-      if (process.env.NODE_ENV === "development") {
-        console.debug("⚠️ Server unavailable, using localStorage fallback");
-      }
-      return getMessagesFromLocalStorage(userId, otherUserId, startupId);
-    }
-
-    // Check if response is JSON (not HTML error page)
-    const contentType = response.headers.get("content-type");
-    if (!contentType || !contentType.includes("application/json")) {
-      if (process.env.NODE_ENV === "development") {
-        console.debug("⚠️ Server returned HTML, using localStorage fallback");
-      }
-      return getMessagesFromLocalStorage(userId, otherUserId, startupId);
-    }
-
-    const data = await response.json();
-    if (Array.isArray(data.data)) return data.data;
-    return data.messages || [];
+    const rows = payload?.data || payload?.messages || [];
+    return rows.map(mapMessageDto).filter(Boolean);
   } catch (error) {
-    // 🔧 FIX: Silent fallback - no need to spam console
     if (process.env.NODE_ENV === "development") {
       console.debug("⚠️ Conversation fetch failed, using localStorage");
     }
@@ -158,35 +125,24 @@ export async function getConversation(userId, otherUserId, startupId) {
 // Get all conversations for a user
 export async function getUserConversations(userId, startupId, teamMembers) {
   try {
-    const response = await fetch(
-      `${API_BASE}/messages/conversations/${startupId}/${userId}`,
-      {
-        headers: {
-          Authorization: `Bearer ${getAccessToken()}`,
-        },
-      },
-    );
-
-    if (!response.ok) {
-      // 🔧 FIX: Silent fallback - server is optional
-      if (process.env.NODE_ENV === "development") {
-        console.debug("⚠️ Server unavailable, using localStorage");
-      }
-      return getConversationsFromLocalStorage(userId, startupId, teamMembers);
-    }
-
-    // Check if response is JSON (not HTML error page)
-    const contentType = response.headers.get("content-type");
-    if (!contentType || !contentType.includes("application/json")) {
-      if (process.env.NODE_ENV === "development") {
-        console.debug("⚠️ Server returned HTML, using localStorage");
-      }
-      return getConversationsFromLocalStorage(userId, startupId, teamMembers);
-    }
-
-    const data = await response.json();
-    if (Array.isArray(data.data)) return data.data;
-    return data.conversations || [];
+    const payload = await request(`/messages/conversations/${startupId}/${userId}`, {
+      method: "GET",
+    });
+    const rows = payload?.data || payload?.conversations || [];
+    return rows.map(mapMessageDto).filter(Boolean).map((row) => {
+      const teammate =
+        teamMembers.find((m) => String(m.id) === String(row.fromUserId)) ||
+        teamMembers.find((m) => String(m.id) === String(row.toUserId));
+      const otherId = String(row.fromUserId) === String(userId) ? row.toUserId : row.fromUserId;
+      return {
+        userId: String(otherId),
+        userName: teammate?.name || "Team Member",
+        userRole: teammate?.role || "team-member",
+        lastMessage: row.content || "",
+        lastMessageTime: row.timestamp || Date.now(),
+        unreadCount: 0,
+      };
+    });
   } catch (error) {
     // 🔧 FIX: Silent fallback - no console spam
     if (process.env.NODE_ENV === "development") {
@@ -199,27 +155,15 @@ export async function getUserConversations(userId, startupId, teamMembers) {
 // Mark messages as read
 export async function markMessagesAsRead(userId, otherUserId, startupId) {
   try {
-    const response = await fetch(`${API_BASE}/messages/mark-read`, {
+    await request("/messages/mark-read", {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${getAccessToken()}`,
-      },
       body: JSON.stringify({
         userId,
         otherUserId,
         startupId,
       }),
     });
-
-    if (!response.ok) {
-      // 🔧 FIX: Silent failure - marking as read is non-critical
-      return;
-    }
-
-    console.log("✅ Messages marked as read");
   } catch (error) {
-    // 🔧 FIX: Silent failure - non-critical operation
     return;
   }
 }
@@ -227,26 +171,11 @@ export async function markMessagesAsRead(userId, otherUserId, startupId) {
 // Get unread message count for a user
 export async function getUnreadCount(userId, startupId) {
   try {
-    const response = await fetch(
-      `${API_BASE}/messages/unread-count/${startupId}/${userId}`,
-      {
-        headers: {
-          Authorization: `Bearer ${getAccessToken()}`,
-        },
-      },
-    );
-
-    if (!response.ok) {
-      const error = await response.json();
-      // Debug log only - backend is optional in demo mode
-      if (process.env.NODE_ENV === "development") {
-        console.debug("Backend unread count fetch failed:", error);
-      }
-      return 0;
-    }
-
-    const data = await response.json();
-    return data.count || 0;
+    const payload = await request(`/messages/unread-count/${startupId}/${userId}`, {
+      method: "GET",
+    });
+    const data = payload?.data || payload || {};
+    return Number(data.unreadCount ?? data.count ?? 0);
   } catch (error) {
     // Debug log only - backend is optional in demo mode
     if (process.env.NODE_ENV === "development") {

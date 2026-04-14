@@ -25,6 +25,11 @@ import {
 } from "../ui/select";
 import { toast } from "sonner";
 import {
+  getStartupAnnouncements,
+  postStartupAnnouncement,
+} from "../../utils/announcementApi";
+import { subscribeToAnnouncements } from "../../utils/realtimeSubscriptions";
+import {
   X,
   Plus,
   Megaphone,
@@ -40,6 +45,7 @@ export function TeamHubPanel({
   onClose,
   currentUserId,
   currentUserName,
+  startupId,
   onActivity,
   organizationAnnouncements = [],
 }) {
@@ -83,6 +89,8 @@ export function TeamHubPanel({
     }
     return [];
   });
+  const [announcementsLoading, setAnnouncementsLoading] = useState(false);
+  const [announcementsError, setAnnouncementsError] = useState("");
 
   // Persist to localStorage
   useEffect(() => {
@@ -94,6 +102,43 @@ export function TeamHubPanel({
       JSON.stringify(announcements),
     );
   }, [announcements]);
+
+  useEffect(() => {
+    if (!startupId) return;
+    let stopped = false;
+    setAnnouncementsLoading(true);
+    setAnnouncementsError("");
+    getStartupAnnouncements(startupId)
+      .then((result) => {
+        if (stopped) return;
+        if (result?.success) {
+          setAnnouncements(result.announcements || []);
+        } else {
+          setAnnouncementsError("Could not load announcements.");
+        }
+      })
+      .catch(() => {
+        if (!stopped) setAnnouncementsError("Could not load announcements.");
+      })
+      .finally(() => {
+        if (!stopped) setAnnouncementsLoading(false);
+      });
+    const unsub = subscribeToAnnouncements(startupId, (update) => {
+      const incoming = update?.announcement;
+      if (!incoming?.id) return;
+      setAnnouncements((prev) => {
+        const byId = new Map(prev.map((row) => [String(row.id), row]));
+        byId.set(String(incoming.id), incoming);
+        return Array.from(byId.values()).sort(
+          (a, b) => new Date(b.createdAt || b.timestamp || 0) - new Date(a.createdAt || a.timestamp || 0),
+        );
+      });
+    });
+    return () => {
+      stopped = true;
+      unsub?.();
+    };
+  }, [startupId]);
 
   // Poll creation state
   const [newPoll, setNewPoll] = useState({
@@ -160,31 +205,41 @@ export function TeamHubPanel({
       toast.error("Please enter an announcement message");
       return;
     }
-    const announcement = {
-      id: Date.now().toString(),
+    if (!startupId) {
+      toast.error("Startup context missing.");
+      return;
+    }
+    postStartupAnnouncement(startupId, {
+      title: "Announcement",
       message: newAnnouncement.message,
-      sender: currentUserName,
-      timestamp: new Date(),
-      emoji: newAnnouncement.emoji,
       priority: newAnnouncement.priority,
       category: newAnnouncement.category,
-      reactions: [],
-      comments: [],
-    };
-    setAnnouncements([announcement, ...announcements]);
-    setShowCreateAnnouncement(false);
-    setNewAnnouncement({
-      message: "",
-      emoji: "📢",
-      priority: "normal",
-      category: "general",
-    });
-    onActivity?.(
-      "announcement-create",
-      `created an announcement`,
-      newAnnouncement.emoji,
-    );
-    toast.success("📢 Announcement sent!");
+      userId: currentUserId,
+    })
+      .then((result) => {
+        if (!result?.success || !result?.announcement) {
+          throw new Error("Announcement publish failed.");
+        }
+        setAnnouncements((prev) => [result.announcement, ...prev]);
+        setAnnouncementsError("");
+        setShowCreateAnnouncement(false);
+        setNewAnnouncement({
+          message: "",
+          emoji: "📢",
+          priority: "normal",
+          category: "general",
+        });
+        onActivity?.(
+          "announcement-create",
+          "created an announcement",
+          newAnnouncement.emoji,
+        );
+        toast.success("📢 Announcement sent!");
+      })
+      .catch((error) => {
+        setAnnouncementsError(error?.message || "Unable to publish announcement.");
+        toast.error("Unable to publish announcement.");
+      });
   };
   const votePoll = (pollId, optionId) => {
     let pollQuestion = "";
@@ -290,8 +345,17 @@ export function TeamHubPanel({
     comments: [],
   }));
 
+  const localAnnouncements = announcements.map((ann) => ({
+    ...ann,
+    sender: ann.sender || ann.createdByName || currentUserName,
+    timestamp: ann.timestamp || ann.createdAt || new Date(),
+    emoji:
+      ann.emoji ||
+      (ann.priority === "urgent" ? "🚨" : ann.priority === "high" ? "⚠️" : "📢"),
+  }));
+
   // Merge local and organization announcements
-  const allAnnouncements = [...announcements, ...convertedOrgAnnouncements];
+  const allAnnouncements = [...localAnnouncements, ...convertedOrgAnnouncements];
   const filteredItems = () => {
     if (filter === "polls") return polls;
     if (filter === "announcements") return allAnnouncements;
@@ -431,7 +495,14 @@ export function TeamHubPanel({
                 </p>
               </div>
             ) : (
-              filteredItems().map((item) => {
+              <>
+                {announcementsLoading ? (
+                  <div className="text-xs text-muted-foreground">Loading announcements...</div>
+                ) : null}
+                {announcementsError ? (
+                  <div className="text-xs text-red-600">{announcementsError}</div>
+                ) : null}
+                {filteredItems().map((item) => {
                 const isPoll = "question" in item;
                 if (isPoll) {
                   const poll = item;
@@ -669,7 +740,8 @@ export function TeamHubPanel({
                     </motion.div>
                   );
                 }
-              })
+                })}
+              </>
             )}
           </div>
         </ScrollArea>

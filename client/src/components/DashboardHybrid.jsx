@@ -69,6 +69,7 @@ export default function DashboardHybrid({ user, onLogout, onUpdateUser }) {
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [taskToOpen, setTaskToOpen] = useState(null);
   const [announcementToOpen, setAnnouncementToOpen] = useState(null);
+  const [messageUserToOpen, setMessageUserToOpen] = useState(null);
 
   // Wrapper for setCurrentPage with logging
   const handleNavigate = (page, options) => {
@@ -95,6 +96,12 @@ export default function DashboardHybrid({ user, onLogout, onUpdateUser }) {
       );
       setAnnouncementToOpen(options.announcementId);
       // Navigate to startup-office (virtual office) with workspace view
+      setCurrentPage("startup-office");
+      setVirtualOfficeView("workspace");
+    } else if (options?.openTeamHub || options?.messageUserId) {
+      if (options?.messageUserId) {
+        setMessageUserToOpen(options.messageUserId);
+      }
       setCurrentPage("startup-office");
       setVirtualOfficeView("workspace");
     } else {
@@ -348,6 +355,8 @@ export default function DashboardHybrid({ user, onLogout, onUpdateUser }) {
             onTaskOpened={() => setTaskToOpen(null)}
             announcementToOpen={announcementToOpen}
             onAnnouncementOpened={() => setAnnouncementToOpen(null)}
+            messageUserToOpen={messageUserToOpen}
+            onMessageUserOpened={() => setMessageUserToOpen(null)}
           />
         );
     }
