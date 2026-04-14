@@ -79,6 +79,8 @@ Build in **thin vertical slices** so each slice is usable without waiting for th
 | 2.7 | **Check-ins** | Short daily check-in → Activity | Minimal POST + list UI. |
 | 2.8 | **Interactive tour** | Joyride, first-run not fully ignorable | Blueprint §8; wire to “first visit” flag on user/profile. |
 
+**Phase 2.6 (calendar/agenda) — implemented:** The canonical read is `GET /api/v1/calendar/:userId` (authenticated; self or admin only). Cohort scope is derived from `CohortMembership` for founders (`founderId`) and for team members via canonical `Startup` resolution from the user’s `startupId` / `founderId`. Optional `start` and `end` (ISO) bound the aggregation (default forward window ~90 days; maximum span 366 days). Responses include raw collections plus sorted `timeline` / `agenda` rows (`kind`, `agendaType`, `at`, `isOverdue`, etc.). The Virtual Office and `AgendaPanel` use the shared client path on **`user.id`** (not founder id passed as startup). Startup-scoped `GET /agenda/:startupId` and `GET /agenda/:startupId/upcoming` accept a canonical startup id, honor date/`days` filters, and return the same normalized agenda shape for compatibility.
+
 **Exit criteria:** With two users on a startup, task changes and presence show up in-office without refresh; a notification deep-link opens the right context; office still usable with sockets disabled (degraded polling).
 
 ---

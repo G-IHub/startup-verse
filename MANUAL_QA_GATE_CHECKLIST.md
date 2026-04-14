@@ -68,6 +68,9 @@ cd server && node scripts/phase3-weekly-loop-smoke.mjs
 ## Virtual Office cohesion (Phase 7.3)
 
 - [ ] Open Virtual Startup Office with a founder who has `startupId`; confirm presence list, activity feed, tasks panel, and agenda/calendar widgets load without console errors.
+- [ ] **Calendar/agenda:** As a **founder**, open `AgendaPanel` / office calendar; confirm items load via `GET /calendar/:userId` (same user id) and filters (upcoming / today / week / overdue) behave sensibly.
+- [ ] **Calendar/agenda:** As a **team member** linked to a startup with cohort membership, confirm the same calendar load shows cohort events/deliverables/milestones (not only founder-only membership rows).
+- [ ] **Calendar/agenda:** Optional — call `GET /calendar/:userId?start=…&end=…` with a narrow window and confirm results stay within the range.
 - [ ] Navigate away and back without losing startup context (`startupId` / room join).
 - [ ] Trigger or simulate a notification with `actionUrl` and confirm navigation lands in the expected office tab or route.
 - [ ] Task panel lifecycle guardrails: invalid transitions (for example `completed -> pending`) are rejected with a visible validation error.

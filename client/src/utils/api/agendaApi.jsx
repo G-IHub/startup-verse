@@ -1,37 +1,69 @@
 /**
- * Agenda API - Frontend client for unified calendar/agenda system
+ * Agenda / calendar API — canonical reads use GET /calendar/:userId (envelope).
  */
-import { getAccessToken } from "../../app/session";
-import { API_BASE_URL } from "../../config/apiBase.js";
+import { get } from "../backendClient.js";
+import {
+  normalizeCalendarResponse,
+  timelineToAgendaItems,
+} from "./calendarMappers.js";
 
-const API_URL = API_BASE_URL;
+function toIsoParam(d) {
+  if (d == null) return null;
+  if (typeof d === "string") return d;
+  if (d instanceof Date) return d.toISOString();
+  return String(d);
+}
 
 /**
- * Get all agenda items for a startup
+ * Primary read: unified calendar for the authenticated user (must match :userId or admin).
+ * @param {string} userId
+ * @param {{ start?: Date|string, end?: Date|string }} [options]
+ */
+export async function getUnifiedCalendar(userId, options = {}) {
+  try {
+    const params = new URLSearchParams();
+    const start = toIsoParam(options.start);
+    const end = toIsoParam(options.end);
+    if (start) params.set("start", start);
+    if (end) params.set("end", end);
+    const q = params.toString();
+    const path = `/calendar/${encodeURIComponent(userId)}${q ? `?${q}` : ""}`;
+    const payload = await get(path);
+    const normalized = normalizeCalendarResponse(payload.data);
+    return { success: true, ...normalized };
+  } catch (error) {
+    console.error("Error fetching unified calendar:", error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Failed to fetch calendar",
+    };
+  }
+}
+
+/**
+ * Startup-scoped agenda (cohort events, deliverables, milestones). Envelope + normalized agenda.
  */
 export async function getStartupAgenda(startupId, options) {
   try {
     const params = new URLSearchParams();
     if (options?.startDate) params.append("startDate", options.startDate);
     if (options?.endDate) params.append("endDate", options.endDate);
+    if (options?.start) params.append("start", toIsoParam(options.start));
+    if (options?.end) params.append("end", toIsoParam(options.end));
     if (options?.types) params.append("types", options.types.join(","));
     if (options?.includeCompleted) params.append("includeCompleted", "true");
 
-    const url = `${API_URL}/agenda/${startupId}?${params.toString()}`;
-
-    const response = await fetch(url, {
-      headers: {
-        Authorization: `Bearer ${getAccessToken()}`,
-        "Content-Type": "application/json",
-      },
-    });
-
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
-
-    const data = await response.json();
-    return data;
+    const q = params.toString();
+    const path = `/agenda/${encodeURIComponent(startupId)}${q ? `?${q}` : ""}`;
+    const payload = await get(path);
+    const data = payload.data || {};
+    const rawAgenda = Array.isArray(data.agenda)
+      ? data.agenda
+      : Array.isArray(data.timeline)
+        ? data.timeline
+        : [];
+    const agenda = timelineToAgendaItems(rawAgenda);
+    return { success: true, ...data, agenda };
   } catch (error) {
     console.error("Error fetching startup agenda:", error);
     return {
@@ -41,9 +73,6 @@ export async function getStartupAgenda(startupId, options) {
   }
 }
 
-/**
- * Get agenda items for a specific user
- */
 export async function getUserAgenda(userId, options) {
   try {
     const params = new URLSearchParams();
@@ -52,21 +81,10 @@ export async function getUserAgenda(userId, options) {
     if (options?.types) params.append("types", options.types.join(","));
     if (options?.includeCompleted) params.append("includeCompleted", "true");
 
-    const url = `${API_URL}/agenda/user/${userId}?${params.toString()}`;
-
-    const response = await fetch(url, {
-      headers: {
-        Authorization: `Bearer ${getAccessToken()}`,
-        "Content-Type": "application/json",
-      },
-    });
-
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
-
-    const data = await response.json();
-    return data;
+    const q = params.toString();
+    const path = `/agenda/user/${encodeURIComponent(userId)}${q ? `?${q}` : ""}`;
+    const payload = await get(path);
+    return { success: true, ...(payload.data || {}) };
   } catch (error) {
     console.error("Error fetching user agenda:", error);
     return {
@@ -78,25 +96,13 @@ export async function getUserAgenda(userId, options) {
 }
 
 /**
- * Get upcoming agenda items (next N days)
+ * @param {string} userId - authenticated user id (GET /calendar/:userId)
  */
-export async function getUpcomingAgenda(startupId, days = 7) {
+export async function getUpcomingAgenda(userId, days = 7) {
   try {
-    const url = `${API_URL}/agenda/${startupId}/upcoming?days=${days}`;
-
-    const response = await fetch(url, {
-      headers: {
-        Authorization: `Bearer ${getAccessToken()}`,
-        "Content-Type": "application/json",
-      },
-    });
-
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
-
-    const data = await response.json();
-    return data;
+    const start = new Date();
+    const end = new Date(start.getTime() + days * 86400000);
+    return await getUnifiedCalendar(userId, { start, end });
   } catch (error) {
     console.error("Error fetching upcoming agenda:", error);
     return {
@@ -109,9 +115,6 @@ export async function getUpcomingAgenda(startupId, days = 7) {
   }
 }
 
-/**
- * Get agenda items for a specific date range
- */
 export async function getAgendaByDateRange(
   startupId,
   startDate,
@@ -129,46 +132,45 @@ export async function getAgendaByDateRange(
 }
 
 /**
- * Get today's agenda items
+ * @param {string} userId
  */
-export async function getTodayAgenda(startupId) {
-  const today = new Date();
-  const todayStr = today.toISOString().split("T")[0];
-
-  return getStartupAgenda(startupId, {
-    startDate: todayStr,
-    endDate: todayStr,
-  });
+export async function getTodayAgenda(userId) {
+  const start = new Date();
+  start.setHours(0, 0, 0, 0);
+  const end = new Date(start);
+  end.setHours(23, 59, 59, 999);
+  return getUnifiedCalendar(userId, { start, end });
 }
 
 /**
- * Get this week's agenda items
+ * @param {string} userId
  */
-export async function getWeekAgenda(startupId) {
+export async function getWeekAgenda(userId) {
   const today = new Date();
+  today.setHours(0, 0, 0, 0);
   const endOfWeek = new Date(today);
   endOfWeek.setDate(today.getDate() + (6 - today.getDay()));
-
-  return getAgendaByDateRange(startupId, today, endOfWeek);
+  endOfWeek.setHours(23, 59, 59, 999);
+  return getUnifiedCalendar(userId, { start: today, end: endOfWeek });
 }
 
 /**
- * Get overdue items
+ * @param {string} userId
  */
-export async function getOverdueAgenda(startupId) {
+export async function getOverdueAgenda(userId) {
   try {
-    const result = await getStartupAgenda(startupId, {
-      includeCompleted: false,
-    });
-
-    if (result.success && result.agenda) {
-      const overdueItems = result.agenda.filter((item) => item.isOverdue);
+    const end = new Date();
+    end.setHours(23, 59, 59, 999);
+    const start = new Date();
+    start.setFullYear(start.getFullYear() - 2);
+    start.setHours(0, 0, 0, 0);
+    const result = await getUnifiedCalendar(userId, { start, end });
+    if (result.success && Array.isArray(result.agenda)) {
       return {
         success: true,
-        agenda: overdueItems,
+        agenda: result.agenda.filter((item) => item.isOverdue),
       };
     }
-
     return result;
   } catch (error) {
     console.error("Error fetching overdue agenda:", error);

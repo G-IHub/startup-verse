@@ -557,21 +557,25 @@ export default function VirtualStartupOffice({
     }
   };
 
-  // Load agenda items on mount
+  // Load agenda items (canonical user calendar — founders and team members)
   useEffect(() => {
-    if (founderId) {
+    if (user?.id) {
       loadAgendaItems();
     }
-  }, [founderId]);
+  }, [user?.id]);
   const loadAgendaItems = async () => {
+    if (!user?.id) return;
     setAgendaLoading(true);
     try {
-      const result = await agendaApi.getUpcomingAgenda(founderId, 30); // Next 30 days
-      if (result.success && result.agenda) {
+      const result = await agendaApi.getUpcomingAgenda(user.id, 30);
+      if (result.success && Array.isArray(result.agenda)) {
         setAgendaItems(result.agenda);
+      } else {
+        setAgendaItems([]);
       }
     } catch (error) {
       console.error("Error loading agenda items:", error);
+      setAgendaItems([]);
     } finally {
       setAgendaLoading(false);
     }

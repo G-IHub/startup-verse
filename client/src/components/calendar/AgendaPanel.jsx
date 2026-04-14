@@ -49,9 +49,21 @@ import { format, isToday, isTomorrow, isThisWeek, parseISO } from "date-fns";
  * - Color-coded items by type and status
  * - Grouped by date with smart labels
  */
+function itemMatchesSelectedTypes(item, selectedTypes) {
+  if (selectedTypes.includes(item.type)) return true;
+  if (
+    item.type === "company-event" &&
+    selectedTypes.includes("meeting")
+  ) {
+    return true;
+  }
+  return false;
+}
+
 export default function AgendaPanel({ user, onItemClick, compact = false }) {
   const [agendaItems, setAgendaItems] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [selectedTypes, setSelectedTypes] = useState([
     "meeting",
     "task",
@@ -66,40 +78,49 @@ export default function AgendaPanel({ user, onItemClick, compact = false }) {
   ]);
   const [showFilters, setShowFilters] = useState(false);
   const [view, setView] = useState("upcoming");
-  const startupId = user.role === "founder" ? user.id : user.startupId;
+  const calendarUserId = user?.id;
+
   useEffect(() => {
-    if (startupId) {
+    if (calendarUserId) {
       loadAgenda();
     }
-  }, [startupId, selectedTypes, view]);
+  }, [calendarUserId, selectedTypes, view]);
+
   const loadAgenda = async () => {
+    if (!calendarUserId) return;
     setLoading(true);
+    setError(null);
     try {
       let result;
       switch (view) {
         case "today":
-          result = await agendaApi.getTodayAgenda(startupId);
+          result = await agendaApi.getTodayAgenda(calendarUserId);
           break;
         case "week":
-          result = await agendaApi.getWeekAgenda(startupId);
+          result = await agendaApi.getWeekAgenda(calendarUserId);
           break;
         case "overdue":
-          result = await agendaApi.getOverdueAgenda(startupId);
+          result = await agendaApi.getOverdueAgenda(calendarUserId);
           break;
         case "upcoming":
         default:
-          result = await agendaApi.getUpcomingAgenda(startupId, 14); // Next 14 days
+          result = await agendaApi.getUpcomingAgenda(calendarUserId, 14);
           break;
       }
-      if (result.success && result.agenda) {
-        // Filter by selected types
-        const filtered = result.agenda.filter((item) =>
-          selectedTypes.includes(item.type),
+      if (result.success) {
+        const list = Array.isArray(result.agenda) ? result.agenda : [];
+        const filtered = list.filter((item) =>
+          itemMatchesSelectedTypes(item, selectedTypes),
         );
         setAgendaItems(filtered);
+      } else {
+        setError(result.error || "Could not load agenda");
+        setAgendaItems([]);
       }
-    } catch (error) {
-      console.error("Error loading agenda:", error);
+    } catch (err) {
+      console.error("Error loading agenda:", err);
+      setError(err instanceof Error ? err.message : "Could not load agenda");
+      setAgendaItems([]);
     } finally {
       setLoading(false);
     }
@@ -115,6 +136,10 @@ export default function AgendaPanel({ user, onItemClick, compact = false }) {
     switch (item.type) {
       case "meeting":
         return item.metadata?.type === "video-call" ? Video : Users;
+      case "company-event":
+        return Calendar;
+      case "organization-deadline":
+        return AlertCircle;
       case "task":
         return item.status === "completed" ? CheckCircle2 : CheckSquare;
       case "milestone":
@@ -298,6 +323,20 @@ export default function AgendaPanel({ user, onItemClick, compact = false }) {
             <div className="flex items-center justify-center py-8">
               <div className="w-6 h-6 border-2 border-[#3A5AFE] border-t-transparent rounded-full animate-spin" />
             </div>
+          ) : error ? (
+            <div className="text-center py-8 px-2 text-muted-foreground space-y-2">
+              <AlertCircle className="w-8 h-8 mx-auto text-destructive opacity-80" />
+              <p className="text-[11px] text-destructive">{error}</p>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-7 text-[10px]"
+                onClick={() => loadAgenda()}
+              >
+                Retry
+              </Button>
+            </div>
           ) : agendaItems.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">
               <Calendar className="w-8 h-8 mx-auto mb-2 opacity-50" />
@@ -323,7 +362,7 @@ export default function AgendaPanel({ user, onItemClick, compact = false }) {
                       const Icon = getItemIcon(item);
                       return (
                         <button
-                          key={item.id}
+                          key={`${item.kind || "item"}-${item.id}`}
                           onClick={() => onItemClick?.(item)}
                           className="w-full text-left p-2.5 rounded-lg border bg-card hover:bg-muted/50 transition-colors group"
                         >

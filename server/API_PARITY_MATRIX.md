@@ -1,6 +1,6 @@
 # API Parity Matrix (Client Runtime -> Express API)
 
-Last updated: 2026-04-13
+Last updated: 2026-04-14
 
 Envelope standard:
 - Success: `{ "success": true, "data": ... }`
@@ -45,7 +45,7 @@ Envelope standard:
 | `/deliverables/*` | Canonical | Yes | deliverable/submission payloads | deliverable/submission records | Implemented |
 | `/messages/*` | Canonical | Yes | message payloads | message records/unread stats | Implemented |
 | `/notifications/*` | Canonical | Yes | notification payloads | notification records | Implemented |
-| `/agenda/*` + `/calendar/:userId` | Canonical | Yes | startup/user context | `calendar`: events + deliverables + `programMilestones` + sorted `timeline` (`meetings: []` until modeled) | Implemented |
+| `/agenda/*` + `/calendar/:userId` | Canonical | Yes | **`GET /calendar/:userId`:** optional `start`/`end` (ISO) window; **403** unless self or admin. **`GET /agenda/:startupId`:** optional `startDate`/`endDate` or `start`/`end`; path param resolved to canonical `Startup` id; **403** if caller cannot access that startup. **`GET /agenda/:startupId/upcoming`:** `days` (1–90) filters cohort `Event.startsAt`. | Envelope `data`: raw `events` / `deliverables` / `programMilestones` (calendar) or `milestones` (agenda route), plus sorted **`timeline`** and **`agenda`** (normalized items: `kind`, `agendaType`, `at`, `isOverdue`, …); `meetings: []` on calendar until persisted meetings are modeled; `window: { start, end }` on calendar | Implemented |
 | `/execution-score/:userId` | Canonical | Yes | none | derived execution score | Implemented |
 | `/presence/*` | Canonical | Yes | presence update payload | short-lived presence records (TTL-evicted) | Implemented |
 | `/startups/:startupId/activities` | Canonical | Yes | startup-scoped activity create/list (`message`, `type`, optional metadata) | canonical activity DTO (`id`,`startupId`,`userId`,`userName`,`type`,`message`,`icon`,`timestamp`,`metadata`) | Implemented |

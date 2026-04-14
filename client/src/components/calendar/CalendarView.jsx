@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { cn } from "../ui/utils";
 import * as agendaApi from "../../utils/api/agendaApi";
+import { mergeCalendarAgendaIntoEvents } from "../../utils/api/calendarMappers";
 import AgendaPanel from "./AgendaPanel";
 export default function CalendarView({
   user,
@@ -27,33 +28,13 @@ export default function CalendarView({
   const [events, setEvents] = useState([]);
   const [agendaItems, setAgendaItems] = useState([]);
   const [agendaLoading, setAgendaLoading] = useState(false);
-  const startupId = user.role === "founder" ? user.id : user.startupId;
 
-  // Load agenda items
+  // Tasks, meetings, and server calendar rows for the visible month
   useEffect(() => {
-    if (startupId) {
-      loadAgendaItems();
-    }
-  }, [startupId]);
-  const loadAgendaItems = async () => {
-    setAgendaLoading(true);
-    try {
-      const result = await agendaApi.getUpcomingAgenda(startupId, 30); // Next 30 days
-      if (result.success && result.agenda) {
-        setAgendaItems(result.agenda);
-      }
-    } catch (error) {
-      console.error("Error loading agenda items:", error);
-    } finally {
-      setAgendaLoading(false);
-    }
-  };
+    let cancelled = false;
 
-  // Convert tasks and meetings to calendar events
-  useEffect(() => {
     const calendarEvents = [];
 
-    // Add tasks with due dates
     tasks.forEach((task) => {
       if (task.dueDate) {
         calendarEvents.push({
@@ -73,7 +54,6 @@ export default function CalendarView({
       }
     });
 
-    // Add meetings
     meetings.forEach((meeting) => {
       calendarEvents.push({
         id: `meeting-${meeting.id}`,
@@ -88,8 +68,63 @@ export default function CalendarView({
         color: "bg-purple-500",
       });
     });
-    setEvents(calendarEvents);
-  }, [tasks, meetings]);
+
+    if (!user?.id) {
+      setEvents(calendarEvents);
+      setAgendaItems([]);
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    setAgendaLoading(true);
+    const monthStart = new Date(
+      currentDate.getFullYear(),
+      currentDate.getMonth(),
+      1,
+    );
+    const monthEnd = new Date(
+      currentDate.getFullYear(),
+      currentDate.getMonth() + 1,
+      0,
+      23,
+      59,
+      59,
+      999,
+    );
+
+    (async () => {
+      try {
+        const result = await agendaApi.getUnifiedCalendar(user.id, {
+          start: monthStart,
+          end: monthEnd,
+        });
+        const agenda =
+          result.success && Array.isArray(result.agenda) ? result.agenda : [];
+        if (cancelled) return;
+        setAgendaItems(agenda);
+        setEvents(mergeCalendarAgendaIntoEvents(calendarEvents, agenda));
+      } catch (error) {
+        console.error("Error loading agenda items:", error);
+        if (!cancelled) {
+          setAgendaItems([]);
+          setEvents(calendarEvents);
+        }
+      } finally {
+        if (!cancelled) setAgendaLoading(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    user?.id,
+    currentDate.getMonth(),
+    currentDate.getFullYear(),
+    tasks,
+    meetings,
+  ]);
 
   // Calendar helpers
   const getDaysInMonth = (date) => {
@@ -165,6 +200,9 @@ export default function CalendarView({
         return Video;
       case "meeting":
         return Users;
+      case "calendar-event":
+      case "company-event":
+        return CalendarIcon;
       default:
         return CalendarIcon;
     }
