@@ -99,3 +99,60 @@ export async function getStartupActivities(startupId, options) {
     return { success: false, error: error.message || "Network error" };
   }
 }
+
+export async function getStartupWins(startupId, options) {
+  try {
+    const limit = Number(options?.pageSize || options?.limit || 50);
+    const url = `${BASE_URL}/startups/${startupId}/wins?limit=${encodeURIComponent(limit)}`;
+    const response = await fetch(url, {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${getAccessToken()}`,
+      },
+    });
+    if (!response.ok) {
+      const errorText = await response.text();
+      return { success: false, error: `HTTP ${response.status}: ${errorText}` };
+    }
+    const payload = await response.json();
+    const wins = (Array.isArray(payload?.data) ? payload.data : [])
+      .map((row) => toActivity(row))
+      .filter(Boolean);
+    return { success: true, wins };
+  } catch (error) {
+    return { success: false, error: error.message || "Network error" };
+  }
+}
+
+export async function postWin(params) {
+  try {
+    const url = `${BASE_URL}/startups/${params.startupId}/wins`;
+    const response = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${getAccessToken()}`,
+      },
+      body: JSON.stringify({
+        userId: params.userId,
+        message: params.message,
+      }),
+    });
+    if (!response.ok) {
+      const statusText = response.statusText || "Server error";
+      const errorText = await response.text();
+      return {
+        success: false,
+        error: `HTTP ${response.status}: ${statusText || errorText}`,
+      };
+    }
+    const payload = await response.json();
+    const win = toActivity(payload?.data);
+    if (!win) {
+      return { success: false, error: "Invalid win response" };
+    }
+    return { success: true, win };
+  } catch (error) {
+    return { success: false, error: error.message || "Network error" };
+  }
+}

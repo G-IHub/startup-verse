@@ -5,7 +5,7 @@
 import { io } from "socket.io-client";
 import { getSocketBaseUrl } from "./socketBaseUrl.js";
 import { getConversation } from "./messaging.js";
-import { getStartupActivities } from "./activityApi.js";
+import { getStartupActivities, getStartupWins } from "./activityApi.js";
 import { getFounderTasks, getTeamMemberTasks } from "./api/taskApi.js";
 import { getStartupAnnouncements } from "./announcementApi.js";
 
@@ -502,11 +502,88 @@ export function subscribeToStartupAnnouncements(startupId, onUpdate) {
 }
 
 export function subscribeToWins() {
-  return () => {};
+  return subscribeToStartupWins(...arguments);
 }
 
 export async function broadcastWinUpdate() {
   return false;
+}
+
+const WIN_POLL_MS = 30_000;
+const WIN_POLL_GRACE_MS = 3_000;
+
+export function subscribeToStartupWins(startupId, onUpdate) {
+  let pollTimer = null;
+  let graceTimer = null;
+  let stopped = false;
+  const seenIds = new Set();
+  const socket = SocketEngine.getSocket();
+
+  const clearTimers = () => {
+    if (pollTimer != null) {
+      clearInterval(pollTimer);
+      pollTimer = null;
+    }
+    if (graceTimer != null) {
+      clearTimeout(graceTimer);
+      graceTimer = null;
+    }
+  };
+
+  const emitRows = (rows = []) => {
+    for (const row of rows) {
+      if (!row?.id || seenIds.has(row.id)) continue;
+      seenIds.add(row.id);
+      onUpdate({ action: "created", win: row });
+    }
+  };
+
+  const armPollingIfNeeded = () => {
+    if (stopped || isRealtimeConnected()) return;
+    if (pollTimer != null || graceTimer != null) return;
+    graceTimer = setTimeout(() => {
+      graceTimer = null;
+      if (stopped || isRealtimeConnected()) return;
+      const tick = async () => {
+        if (stopped || isRealtimeConnected()) {
+          clearTimers();
+          return;
+        }
+        try {
+          const result = await getStartupWins(startupId, { limit: 50 });
+          if (!result?.success || !Array.isArray(result.wins)) return;
+          emitRows(result.wins);
+        } catch {
+          /* fallback best effort */
+        }
+      };
+      void tick();
+      pollTimer = setInterval(() => void tick(), WIN_POLL_MS);
+    }, WIN_POLL_GRACE_MS);
+  };
+
+  const onConnect = () => clearTimers();
+  const onDisconnect = () => armPollingIfNeeded();
+  socket.on("connect", onConnect);
+  socket.on("disconnect", onDisconnect);
+
+  const coreUnsub = createSubscription(
+    startupSocketRoom(startupId),
+    "win:created",
+    (win) => {
+      if (win?.id) seenIds.add(win.id);
+      onUpdate({ action: "created", win });
+    },
+  );
+
+  armPollingIfNeeded();
+  return () => {
+    stopped = true;
+    socket.off("connect", onConnect);
+    socket.off("disconnect", onDisconnect);
+    clearTimers();
+    coreUnsub();
+  };
 }
 
 // ========================================

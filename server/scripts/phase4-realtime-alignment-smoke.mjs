@@ -32,6 +32,7 @@ async function main() {
   assertContains(socketIo, "task:updated", "task realtime event name", failures);
   assertContains(socketIo, "TASK_POLL_MS", "task polling fallback interval", failures);
   assertContains(socketIo, "announcement:created", "announcement realtime event name", failures);
+  assertContains(socketIo, "win:created", "win realtime event name", failures);
   assertContains(
     socketIo,
     "ANNOUNCEMENT_POLL_MS",
@@ -42,6 +43,7 @@ async function main() {
   assertContains(socketIo, "activity:created", "activity realtime event name", failures);
   assertContains(socketIo, "presence:updated", "presence realtime event name", failures);
   assertContains(socketIo, "MESSAGE_POLL_MS", "messages REST polling fallback", failures);
+  assertContains(socketIo, "WIN_POLL_MS", "wins REST polling fallback", failures);
   assertContains(socketIo, "getConversation", "messages fallback uses REST conversation", failures);
   assertContains(realtimeService, "emitRealtime", "realtime service exposes emit helper", failures);
   assertContains(

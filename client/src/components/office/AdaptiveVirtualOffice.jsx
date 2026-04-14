@@ -13,6 +13,8 @@ export default function AdaptiveVirtualOffice({
   onAnnouncementOpened,
   messageUserToOpen,
   onMessageUserOpened,
+  winToOpen,
+  onWinOpened,
 }) {
   return (
     <div className="h-full flex flex-col bg-background">
@@ -27,6 +29,8 @@ export default function AdaptiveVirtualOffice({
             onAnnouncementOpened={onAnnouncementOpened}
             messageUserToOpen={messageUserToOpen}
             onMessageUserOpened={onMessageUserOpened}
+            winToOpen={winToOpen}
+            onWinOpened={onWinOpened}
           />
         )}
         {view === "journey" && (

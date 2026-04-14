@@ -128,6 +128,8 @@ export default function VirtualStartupOffice({
   onAnnouncementOpened,
   messageUserToOpen,
   onMessageUserOpened,
+  winToOpen,
+  onWinOpened,
 }) {
   // Presence features - Real backend data
   const [onlineUsers, setOnlineUsers] = useState([]);
@@ -452,6 +454,15 @@ export default function VirtualStartupOffice({
       onMessageUserOpened();
     }
   }, [messageUserToOpen, onMessageUserOpened]);
+
+  useEffect(() => {
+    if (!winToOpen) return;
+    setIsTeamHubOpen(true);
+    toast("Opening Wall of Wins", { icon: "🏆" });
+    if (onWinOpened) {
+      onWinOpened();
+    }
+  }, [winToOpen, onWinOpened]);
 
   // 🔥 CRITICAL: Listen for task-related notifications and refresh tasks
   useEffect(() => {

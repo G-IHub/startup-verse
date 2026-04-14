@@ -6,4 +6,5 @@ export const SOCKET_EVENTS = Object.freeze({
   NOTIFICATION_CREATED: "notification:created",
   TASK_UPDATED: "task:updated",
   ACTIVITY_CREATED: "activity:created",
+  WIN_CREATED: "win:created",
 });

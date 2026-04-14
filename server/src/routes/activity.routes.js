@@ -66,6 +66,24 @@ activityRouter.get(
   }),
 );
 
+activityRouter.get(
+  "/startups/:startupId/wins",
+  requireAuth,
+  asyncHandler(async (req, res) => {
+    const canonicalStartupId = await canAccessStartup(req, req.params.startupId);
+    if (!canonicalStartupId) {
+      return apiError(res, "Forbidden.", 403);
+    }
+    const parsedLimit = Number.parseInt(String(req.query?.limit || "50"), 10);
+    const safeLimit = Number.isFinite(parsedLimit) ? parsedLimit : 50;
+    const limit = Math.max(1, Math.min(200, safeLimit));
+    const rows = await Activity.find({ startupId: canonicalStartupId, type: "win" })
+      .sort({ createdAt: -1, _id: -1 })
+      .limit(limit);
+    return apiSuccess(res, rows.map((row) => mapActivityToDto(row)));
+  }),
+);
+
 activityRouter.post(
   "/startups/:startupId/activities",
   requireAuth,
@@ -108,6 +126,43 @@ activityRouter.post(
     });
     const activity = mapActivityToDto(doc);
     emitRealtime(SOCKET_EVENTS.ACTIVITY_CREATED, activity, [startupRoom(canonicalStartupId)]);
+    return apiSuccess(res, activity, 201);
+  }),
+);
+
+activityRouter.post(
+  "/startups/:startupId/wins",
+  requireAuth,
+  asyncHandler(async (req, res) => {
+    const canonicalStartupId = await canAccessStartup(req, req.params.startupId);
+    if (!canonicalStartupId) {
+      return apiError(res, "Forbidden.", 403);
+    }
+    const userId = req.body?.userId || req.user.id;
+    if (!isSelfOrAdmin(req, userId)) {
+      return apiError(res, "Forbidden.", 403);
+    }
+    const message = String(req.body?.message || "").trim();
+    if (!message) {
+      return apiError(res, "message is required.", 400);
+    }
+    const actor = await User.findById(req.user.id, { name: 1, displayName: 1 });
+    const doc = await Activity.create({
+      startupId: canonicalStartupId,
+      userId: String(userId),
+      type: "win",
+      text: message,
+      metadata: {
+        userName: String(
+          actor?.displayName || actor?.name || req.user?.name || req.user?.email || "",
+        ),
+        icon: "🏆",
+        category: "wall-of-wins",
+      },
+    });
+    const activity = mapActivityToDto(doc);
+    emitRealtime(SOCKET_EVENTS.ACTIVITY_CREATED, activity, [startupRoom(canonicalStartupId)]);
+    emitRealtime(SOCKET_EVENTS.WIN_CREATED, activity, [startupRoom(canonicalStartupId)]);
     return apiSuccess(res, activity, 201);
   }),
 );
