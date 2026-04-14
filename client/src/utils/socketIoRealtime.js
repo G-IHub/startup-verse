@@ -6,6 +6,7 @@ import { io } from "socket.io-client";
 import { getSocketBaseUrl } from "./socketBaseUrl.js";
 import { getConversation } from "./messaging.js";
 import { getStartupActivities } from "./activityApi.js";
+import { getFounderTasks, getTeamMemberTasks } from "./api/taskApi.js";
 
 /** Mirrors server/src/realtime/rooms.js */
 export function startupSocketRoom(startupId) {
@@ -111,17 +112,87 @@ export async function broadcastTeamMemberUpdate() {
 // TASKS — server emits task:updated
 // ========================================
 
-export function subscribeToTasks(startupId, onUpdate) {
-  return createSubscription(
+const TASK_POLL_MS = 20_000;
+const TASK_POLL_GRACE_MS = 4_000;
+
+export function subscribeToTasks(startupId, onUpdate, pollContext = null) {
+  let pollTimer = null;
+  let graceTimer = null;
+  let stopped = false;
+  const seenIds = new Set();
+
+  const clearTimers = () => {
+    if (pollTimer != null) {
+      clearInterval(pollTimer);
+      pollTimer = null;
+    }
+    if (graceTimer != null) {
+      clearTimeout(graceTimer);
+      graceTimer = null;
+    }
+  };
+
+  const emitRows = (rows = []) => {
+    rows.forEach((row) => {
+      const mapped = mapTaskDoc(row);
+      const id = String(mapped.id || mapped._id || "");
+      if (!id || seenIds.has(id)) return;
+      seenIds.add(id);
+      onUpdate({ action: "updated", task: mapped });
+    });
+  };
+
+  const pollTasks = async () => {
+    if (stopped || isRealtimeConnected()) {
+      clearTimers();
+      return;
+    }
+    try {
+      const rows =
+        pollContext?.role === "founder"
+          ? await getFounderTasks(pollContext.founderId)
+          : await getTeamMemberTasks(pollContext.userId);
+      emitRows(rows || []);
+    } catch {
+      // Keep silent; realtime path remains primary.
+    }
+  };
+
+  const armPollingIfNeeded = () => {
+    if (stopped || isRealtimeConnected()) return;
+    if (pollTimer != null || graceTimer != null) return;
+    graceTimer = setTimeout(() => {
+      graceTimer = null;
+      if (stopped || isRealtimeConnected()) return;
+      pollTasks();
+      pollTimer = setInterval(pollTasks, TASK_POLL_MS);
+    }, TASK_POLL_GRACE_MS);
+  };
+
+  const offTask = createSubscription(
     startupSocketRoom(startupId),
     "task:updated",
     (task) => {
-      onUpdate({
-        action: "updated",
-        task: mapTaskDoc(task),
-      });
+      const mapped = mapTaskDoc(task);
+      seenIds.add(String(mapped.id || mapped._id || ""));
+      onUpdate({ action: "updated", task: mapped });
     },
   );
+
+  const socket = SocketEngine.getSocket();
+  const onDisconnect = () => armPollingIfNeeded();
+  const onReconnect = () => clearTimers();
+  socket.on("disconnect", onDisconnect);
+  socket.on("reconnect", onReconnect);
+  armPollingIfNeeded();
+
+  return () => {
+    stopped = true;
+    clearTimers();
+    socket.off("disconnect", onDisconnect);
+    socket.off("reconnect", onReconnect);
+    offTask?.();
+  };
 }
 
 export async function broadcastTaskUpdate() {

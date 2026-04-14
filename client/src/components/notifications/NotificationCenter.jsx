@@ -154,7 +154,13 @@ export default function NotificationCenter({ onNavigate }) {
       // Map URLs to page names and extract relevant IDs
       if (url.includes("/tasks")) {
         // Extract task ID from URL (e.g., /tasks/task-123 -> task-123)
-        const taskId = url.split("/").pop();
+        const match = url.match(/\/tasks\/([^/?#]+)/);
+        const taskId = match ? decodeURIComponent(match[1]) : "";
+        if (!taskId) {
+          onNavigate("startup-office");
+          setOpen(false);
+          return;
+        }
         console.log("🔔 Notification clicked - navigating to task:", taskId);
         onNavigate("startup-office", {
           taskId,

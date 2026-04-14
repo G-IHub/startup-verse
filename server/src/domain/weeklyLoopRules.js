@@ -36,6 +36,28 @@ export function validateBlockedTaskPayload(payload = {}) {
   return { ok: true, blockerReason, blockerNote };
 }
 
+const ALLOWED_TASK_TRANSITIONS = Object.freeze({
+  pending: new Set(["pending", "in-progress", "blocked"]),
+  "in-progress": new Set(["in-progress", "pending", "blocked", "completed"]),
+  blocked: new Set(["blocked", "pending", "in-progress"]),
+  completed: new Set(["completed"]),
+});
+
+export function validateTaskStatusTransition(fromStatus, toStatus) {
+  const from = String(fromStatus || "pending").toLowerCase();
+  const to = String(toStatus || "").toLowerCase();
+  if (!to) return { ok: false, code: 422, message: "status is required." };
+  const allowedTargets = ALLOWED_TASK_TRANSITIONS[from] || new Set();
+  if (!allowedTargets.has(to)) {
+    return {
+      ok: false,
+      code: 422,
+      message: `Invalid task status transition: ${from} -> ${to}.`,
+    };
+  }
+  return { ok: true };
+}
+
 export function computeMilestoneCounters(tasks = []) {
   const totalTasks = tasks.length;
   const tasksCompleted = tasks.filter((task) => task.status === "completed").length;

@@ -14,6 +14,7 @@ import TeamMemberProfile from "../models/TeamMemberProfile.js";
 import {
   computeMilestoneCounters,
   ensureOutcomeMutable,
+  validateTaskStatusTransition,
   validateBlockedTaskPayload,
 } from "../domain/weeklyLoopRules.js";
 import { mapActivityToDto } from "../utils/activityDto.js";
@@ -275,6 +276,12 @@ export const updateTask = async (req, res) => {
   if (!existingTask) {
     return apiError(res, "Task not found.", 404);
   }
+  if (payload?.status) {
+    const transition = validateTaskStatusTransition(existingTask.status, payload.status);
+    if (!transition.ok) {
+      return apiError(res, transition.message, transition.code);
+    }
+  }
 
   const updatedTask = await Task.findOneAndUpdate(
     { _id: req.params.taskId, founderId },
@@ -334,6 +341,10 @@ export const updateTaskStatus = async (req, res) => {
   const existingTask = await Task.findOne({ _id: req.params.taskId, founderId });
   if (!existingTask) {
     return apiError(res, "Task not found.", 404);
+  }
+  const transition = validateTaskStatusTransition(existingTask.status, status);
+  if (!transition.ok) {
+    return apiError(res, transition.message, transition.code);
   }
 
   const updatedTask = await Task.findOneAndUpdate(

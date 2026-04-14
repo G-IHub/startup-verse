@@ -2,6 +2,13 @@ import TeamMemberProfile from "../models/TeamMemberProfile.js";
 import TeamMemberStatus from "../models/TeamMemberStatus.js";
 import Task from "../models/Task.js";
 import Activity from "../models/Activity.js";
+import { emitRealtime } from "../services/realtime.service.js";
+import { SOCKET_EVENTS } from "../realtime/events.js";
+import { startupRoom } from "../realtime/rooms.js";
+import {
+  validateBlockedTaskPayload,
+  validateTaskStatusTransition,
+} from "../domain/weeklyLoopRules.js";
 import { error as apiError, success as apiSuccess } from "../utils/apiResponse.js";
 
 export const createOrUpdateProfile = async (req, res) => {
@@ -40,14 +47,51 @@ export const getTasks = async (req, res) => {
 };
 
 export const updateTask = async (req, res) => {
+  const existingTask = await Task.findOne({
+    _id: req.params.taskId,
+    assignedTo: req.params.teamMemberId,
+  });
+  if (!existingTask) {
+    return apiError(res, "Task not found.", 404);
+  }
+
+  const updates = {};
+  if (req.body?.status) {
+    const transition = validateTaskStatusTransition(existingTask.status, req.body.status);
+    if (!transition.ok) {
+      return apiError(res, transition.message, transition.code);
+    }
+    const blockedValidation = validateBlockedTaskPayload(req.body);
+    if (!blockedValidation.ok) {
+      return apiError(res, blockedValidation.message, blockedValidation.code);
+    }
+    updates.status = req.body.status;
+    if (req.body.status === "blocked") {
+      updates.blockerReason = blockedValidation.blockerReason;
+      updates.blockerNote = blockedValidation.blockerNote;
+    } else {
+      updates.blockerReason = "";
+      updates.blockerNote = "";
+    }
+  }
+
+  if (Object.prototype.hasOwnProperty.call(req.body || {}, "description")) {
+    updates.description = req.body.description || "";
+  }
+
   const task = await Task.findOneAndUpdate(
     { _id: req.params.taskId, assignedTo: req.params.teamMemberId },
-    req.body || {},
+    updates,
     { new: true, runValidators: true },
   );
   if (!task) {
     return apiError(res, "Task not found.", 404);
   }
+
+  if (task.startupId) {
+    emitRealtime(SOCKET_EVENTS.TASK_UPDATED, task, [startupRoom(task.startupId)]);
+  }
+
   return apiSuccess(res, task);
 };
 

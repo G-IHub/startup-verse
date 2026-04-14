@@ -4,6 +4,7 @@ import {
   computeMilestoneCounters,
   ensureOutcomeMutable,
   validateBlockedTaskPayload,
+  validateTaskStatusTransition,
 } from "../src/domain/weeklyLoopRules.js";
 
 function testWeeklyOutcomeMutability() {
@@ -61,11 +62,20 @@ function testExecutionScoreDerivation() {
   assert.equal(typeof metrics.executionScore, "number");
 }
 
+function testTaskLifecycleTransitions() {
+  assert.equal(validateTaskStatusTransition("pending", "in-progress").ok, true);
+  assert.equal(validateTaskStatusTransition("in-progress", "completed").ok, true);
+  const invalid = validateTaskStatusTransition("completed", "pending");
+  assert.equal(invalid.ok, false);
+  assert.equal(invalid.code, 422);
+}
+
 function main() {
   testWeeklyOutcomeMutability();
   testBlockedTaskValidation();
   testMilestoneCounters();
   testExecutionScoreDerivation();
+  testTaskLifecycleTransitions();
   console.log("Phase 3.1 behavior smoke PASSED");
 }
 

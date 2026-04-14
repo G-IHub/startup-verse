@@ -139,13 +139,16 @@ export async function updateTaskStatus(teamMemberId, taskId, updates) {
     `📦 [NOTIFICATION SYSTEM] Status: ${updates.status}, Founder: ${updates.founderId}`,
   );
 
-  // ALWAYS use team-member endpoint - it triggers notifications properly
   try {
-    const endpoint = `/team-members/${teamMemberId}/tasks/${taskId}`;
-    console.log(`🌐 [NOTIFICATION SYSTEM] POST ${endpoint}`);
+    const hasFounder = Boolean(updates?.founderId);
+    const endpoint = hasFounder
+      ? `/founders/${updates.founderId}/tasks/${taskId}/status`
+      : `/team-members/${teamMemberId}/tasks/${taskId}`;
+    const method = hasFounder ? "PATCH" : "PUT";
+    console.log(`🌐 [NOTIFICATION SYSTEM] ${method} ${endpoint}`);
 
     const result = await apiRequest(endpoint, {
-      method: "PUT",
+      method,
       body: JSON.stringify(updates),
     });
 

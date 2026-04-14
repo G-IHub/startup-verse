@@ -1,99 +1,43 @@
 // Task API wrapper for backend-first task management
-import { getAccessToken } from "../../app/session";
-import { API_BASE_URL } from "../../config/apiBase.js";
+import { request } from "../backendClient";
 
-const API_BASE = API_BASE_URL;
+function normalizeTask(task) {
+  if (!task) return null;
+  return {
+    ...task,
+    id: String(task.id || task._id || ""),
+    blockerReason: task.blockerReason || task.blockedReason || "",
+    blockerNote: task.blockerNote || task.blockedNote || "",
+  };
+}
 
 /**
  * Get all tasks for a founder
  */
 export async function getFounderTasks(founderId) {
-  try {
-    console.log(`📥 Fetching tasks for founder: ${founderId}`);
-
-    const response = await fetch(`${API_BASE}/founders/${founderId}/tasks`, {
-      method: "GET",
-      headers: {
-        Authorization: `Bearer ${getAccessToken()}`,
-        "Content-Type": "application/json",
-      },
-    });
-
-    if (!response.ok) {
-      throw new Error(`Failed to fetch founder tasks: ${response.statusText}`);
-    }
-
-    const data = await response.json();
-    console.log(`✅ Loaded ${data.tasks?.length || 0} tasks from backend`);
-
-    return data.tasks || [];
-  } catch (error) {
-    console.error("❌ Error fetching founder tasks:", error);
-    throw error;
-  }
+  const payload = await request(`/founders/${founderId}/tasks`, { method: "GET" });
+  const tasks = payload?.data?.tasks || payload?.tasks || [];
+  return tasks.map(normalizeTask).filter(Boolean);
 }
 
 /**
  * Get tasks assigned to a team member
  */
 export async function getTeamMemberTasks(teamMemberId) {
-  try {
-    console.log(`📥 Fetching tasks for team member: ${teamMemberId}`);
-
-    const response = await fetch(
-      `${API_BASE}/team-members/${teamMemberId}/tasks`,
-      {
-        method: "GET",
-        headers: {
-          Authorization: `Bearer ${getAccessToken()}`,
-          "Content-Type": "application/json",
-        },
-      },
-    );
-
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      console.error("❌ Failed to fetch team member tasks:", errorData);
-      throw new Error(
-        `Failed to fetch team member tasks: ${response.statusText}`,
-      );
-    }
-
-    const data = await response.json();
-    console.log(
-      `✅ Loaded ${data.tasks?.length || 0} tasks assigned to team member`,
-    );
-
-    return data.tasks || [];
-  } catch (error) {
-    console.error("❌ Error fetching team member tasks:", error);
-    throw error;
-  }
+  const payload = await request(`/team-members/${teamMemberId}/tasks`, { method: "GET" });
+  const tasks = payload?.data?.tasks || payload?.tasks || [];
+  return tasks.map(normalizeTask).filter(Boolean);
 }
 
 /**
  * Save a task
  */
 export async function saveTask(founderId, task) {
-  try {
-    const response = await fetch(`${API_BASE}/founders/${founderId}/tasks`, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${getAccessToken()}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ task }),
-    });
-
-    if (!response.ok) {
-      throw new Error(`Failed to save task: ${response.statusText}`);
-    }
-
-    console.log(`✅ Task ${task.id} saved to backend`);
-  } catch (error) {
-    console.error("❌ Error saving task:", error);
-    throw error;
-  }
+  const payload = await request(`/founders/${founderId}/tasks`, {
+    method: "POST",
+    body: JSON.stringify({ task }),
+  });
+  return normalizeTask(payload?.data || payload?.task || task);
 }
 
 /**
@@ -105,93 +49,40 @@ export async function updateTaskStatus(
   status,
   additionalData,
 ) {
-  try {
-    const response = await fetch(
-      `${API_BASE}/founders/${founderId}/tasks/${taskId}/status`,
-      {
-        method: "PATCH",
-        headers: {
-          Authorization: `Bearer ${getAccessToken()}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          status,
-          ...additionalData,
-          updatedAt: new Date().toISOString(),
-        }),
-      },
-    );
-
-    if (!response.ok) {
-      throw new Error(`Failed to update task status: ${response.statusText}`);
-    }
-
-    console.log(`✅ Task ${taskId} status updated to ${status}`);
-  } catch (error) {
-    console.error("Error updating task status:", error);
-    throw error;
-  }
+  const payload = await request(`/founders/${founderId}/tasks/${taskId}/status`, {
+    method: "PATCH",
+    body: JSON.stringify({
+      status,
+      ...additionalData,
+      updatedAt: new Date().toISOString(),
+    }),
+  });
+  return normalizeTask(payload?.data || payload?.task || null);
 }
 
 /**
  * Delete a task
  */
 export async function deleteTask(founderId, taskId) {
-  try {
-    const response = await fetch(
-      `${API_BASE}/founders/${founderId}/tasks/${taskId}`,
-      {
-        method: "DELETE",
-        headers: {
-          Authorization: `Bearer ${getAccessToken()}`,
-          "Content-Type": "application/json",
-        },
-      },
-    );
-
-    if (!response.ok) {
-      throw new Error(`Failed to delete task: ${response.statusText}`);
-    }
-
-    console.log(`✅ Task ${taskId} deleted from backend`);
-  } catch (error) {
-    console.error("Error deleting task:", error);
-    throw error;
-  }
+  await request(`/founders/${founderId}/tasks/${taskId}`, { method: "DELETE" });
+  return true;
 }
 
 /**
  * Assign task to a team member
  */
 export async function assignTask(founderId, taskId, assigneeId, assigneeName) {
-  try {
-    const response = await fetch(
-      `${API_BASE}/founders/${founderId}/tasks/${taskId}/assign`,
-      {
-        method: "PATCH",
-        headers: {
-          Authorization: `Bearer ${getAccessToken()}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          assigneeId,
-          assigneeName,
-          assignedTo: assigneeId, // Also set assignedTo for compatibility
-          assignedToName: assigneeName, // Also set assignedToName for compatibility
-          assignedAt: new Date().toISOString(),
-        }),
-      },
-    );
-
-    if (!response.ok) {
-      throw new Error(`Failed to assign task: ${response.statusText}`);
-    }
-
-    console.log(`✅ Task ${taskId} assigned to ${assigneeName}`);
-  } catch (error) {
-    console.error("Error assigning task:", error);
-    throw error;
-  }
+  const payload = await request(`/founders/${founderId}/tasks/${taskId}/assign`, {
+    method: "PATCH",
+    body: JSON.stringify({
+      assigneeId,
+      assigneeName,
+      assignedTo: assigneeId,
+      assignedToName: assigneeName,
+      assignedAt: new Date().toISOString(),
+    }),
+  });
+  return normalizeTask(payload?.data || payload?.task || null);
 }
 
 /**
