@@ -448,8 +448,10 @@ export default function VirtualStartupOffice({
 
   useEffect(() => {
     if (!messageUserToOpen) return;
-    setSelectedMessageUserId(String(messageUserToOpen));
+    setIsTaskPanelOpen(false);
+    setIsTeamHubOpen(false);
     setIsMessagePanelOpen(true);
+    setSelectedMessageUserId(String(messageUserToOpen));
     if (onMessageUserOpened) {
       onMessageUserOpened();
     }

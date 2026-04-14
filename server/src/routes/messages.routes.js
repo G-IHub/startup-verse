@@ -48,15 +48,21 @@ async function createMessage(payload) {
   const message = await Message.create(payload);
 
   const rooms = [];
-  if (message.startupId) {
-    rooms.push(startupRoom(message.startupId));
-  }
+  const isDirectPeer =
+    Boolean(message.toUserId) &&
+    Boolean(message.fromUserId) &&
+    String(message.toUserId) !== String(message.fromUserId);
   if (message.organizationId) {
     rooms.push(organizationRoom(message.organizationId));
   }
+  if (message.startupId && !isDirectPeer) {
+    rooms.push(startupRoom(message.startupId));
+  }
+  rooms.push(userRoom(message.fromUserId));
   rooms.push(userRoom(message.toUserId));
 
-  emitRealtime(SOCKET_EVENTS.MESSAGE_CREATED, mapMessageDto(message), rooms);
+  const uniqueRooms = [...new Set(rooms.filter(Boolean))];
+  emitRealtime(SOCKET_EVENTS.MESSAGE_CREATED, mapMessageDto(message), uniqueRooms);
 
   return message;
 }
@@ -103,6 +109,15 @@ messagesRouter.post(
   "/messages/send-from-founder",
   requireAuth,
   asyncHandler(async (req, res) => {
+    if (!req.body?.toUserId) {
+      return apiError(res, "Missing toUserId", 400);
+    }
+    const rawBody =
+      req.body?.body ?? req.body?.content ?? req.body?.message ?? "";
+    const bodyText = String(rawBody || "").trim();
+    if (!bodyText && !(Array.isArray(req.body?.attachments) && req.body.attachments.length > 0)) {
+      return apiError(res, "Message body required", 400);
+    }
     if (req.body?.startupId && !(await canAccessStartupMessages(req, req.body.startupId))) {
       return apiError(res, "Forbidden.", 403);
     }
@@ -111,7 +126,7 @@ messagesRouter.post(
       organizationId: req.body?.organizationId || null,
       fromUserId: req.user.id,
       toUserId: req.body?.toUserId,
-      body: req.body?.body || req.body?.content || req.body?.message || "",
+      body: bodyText,
       attachments: req.body?.attachments || [],
     });
 

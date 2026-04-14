@@ -122,7 +122,13 @@ export function SimpleTeamMessaging({
           byId.set(String(m.id), m);
           return Array.from(byId.values()).sort((a, b) => a.timestamp - b.timestamp);
         });
-        void loadConversations();
+        if (startupId && selectedConversation) {
+          void markMessagesAsRead(currentUserId, selectedConversation, startupId).then(
+            () => loadConversations(),
+          );
+        } else {
+          void loadConversations();
+        }
       },
       {
         userId: currentUserId,

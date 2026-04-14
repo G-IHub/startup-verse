@@ -18,6 +18,11 @@ export function userSocketRoom(userId) {
   return `user:${String(userId)}`;
 }
 
+/** Matches server/src/realtime/rooms.js announcementRoom */
+export function announcementSocketRoom(startupId) {
+  return `announcements:${String(startupId)}`;
+}
+
 class SocketEngine {
   static instance = null;
 
@@ -86,14 +91,20 @@ function mapTaskDoc(task) {
 function mapServerMessageToClient(m) {
   if (!m || typeof m !== "object") return m;
   const id = m._id != null ? String(m._id) : m.id;
+  const attachments = Array.isArray(m.attachments) ? m.attachments : [];
+  const firstAtt = attachments[0] && typeof attachments[0] === "object" ? attachments[0] : null;
   return {
     id,
-    senderId: String(m.fromUserId),
-    recipientId: String(m.toUserId),
-    content: m.body || "",
+    senderId: String(m.senderId || m.fromUserId || ""),
+    recipientId: String(m.recipientId || m.toUserId || ""),
+    content: m.body || m.content || "",
     timestamp: m.createdAt ? new Date(m.createdAt).getTime() : Date.now(),
     startupId: m.startupId != null ? String(m.startupId) : m.startupId,
     read: Boolean(m.readAt),
+    fileUrl: m.fileUrl || firstAtt?.url || "",
+    fileName: m.fileName || firstAtt?.fileName || "",
+    fileSize: m.fileSize ?? firstAtt?.fileSize ?? 0,
+    fileType: m.fileType || firstAtt?.fileType || "",
   };
 }
 
@@ -295,8 +306,11 @@ export function subscribeToMessages(startupId, onUpdate, pollContext = null) {
   socket.on("connect", onConnect);
   socket.on("disconnect", onDisconnect);
 
+  const messageRoomId = pollContext?.userId
+    ? userSocketRoom(pollContext.userId)
+    : startupSocketRoom(startupId);
   const coreUnsub = createSubscription(
-    startupSocketRoom(startupId),
+    messageRoomId,
     "message:created",
     (message) => {
       const mapped = mapServerMessageToClient(message);
@@ -483,7 +497,7 @@ export function subscribeToStartupAnnouncements(startupId, onUpdate) {
   socket.on("disconnect", onDisconnect);
 
   const coreUnsub = createSubscription(
-    startupSocketRoom(startupId),
+    announcementSocketRoom(startupId),
     "announcement:created",
     (announcement) => {
       if (announcement?.id) seenIds.add(String(announcement.id));
