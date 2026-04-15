@@ -2,12 +2,14 @@
  * DashboardHybrid - Main dashboard router component
  * Handles routing between different views based on user role
  */
-import React, { useState, useEffect, lazy, Suspense } from "react";
+import React, { useState, useEffect, lazy, Suspense, useCallback } from "react";
 import AppLayoutHybrid from "./layout/AppLayoutHybrid";
 import AdaptiveVirtualOffice from "./office/AdaptiveVirtualOffice";
 import InteractiveTour from "./tours/InteractiveTour";
 import { homepageTourSteps } from "./tours/tourSteps";
 import { toast } from "sonner";
+import { getTalentProfileCompletionPercent } from "../utils/talentProfileCompletion";
+import { TALENT_ACTIONS_MIN_COMPLETION } from "../constants/talentProfile.js";
 
 // ⚡ LAZY LOAD HEAVY COMPONENTS - Only load when navigating to them
 const FounderDashboard = lazy(() => import("./dashboards/FounderDashboard"));
@@ -72,6 +74,29 @@ export default function DashboardHybrid({ user, onLogout, onUpdateUser }) {
   const [messageUserToOpen, setMessageUserToOpen] = useState(null);
   const [winToOpen, setWinToOpen] = useState(null);
 
+  const isTalentBrowseBlocked = useCallback(() => {
+    if (user.role !== "talent") return false;
+    const pct = getTalentProfileCompletionPercent(user);
+    return pct < TALENT_ACTIONS_MIN_COMPLETION;
+  }, [user]);
+
+  const notifyTalentBrowseBlocked = useCallback(() => {
+    toast.info("Complete your profile first", {
+      description: `Reach at least ${TALENT_ACTIONS_MIN_COMPLETION}% profile depth to browse startups. Use "Continue profile" on your home dashboard.`,
+    });
+  }, []);
+
+  const handleVirtualOfficeViewChange = useCallback(
+    (view) => {
+      if (view === "matching" && isTalentBrowseBlocked()) {
+        notifyTalentBrowseBlocked();
+        return;
+      }
+      setVirtualOfficeView(view);
+    },
+    [isTalentBrowseBlocked, notifyTalentBrowseBlocked],
+  );
+
   // Wrapper for setCurrentPage with logging
   const handleNavigate = (page, options) => {
     console.log(
@@ -109,6 +134,10 @@ export default function DashboardHybrid({ user, onLogout, onUpdateUser }) {
       setCurrentPage("startup-office");
       setVirtualOfficeView("workspace");
     } else {
+      if (page === "team-matching" && isTalentBrowseBlocked()) {
+        notifyTalentBrowseBlocked();
+        return;
+      }
       setCurrentPage(page);
     }
     console.log("✅ [DashboardHybrid] Page navigation triggered to:", page);
@@ -355,7 +384,7 @@ export default function DashboardHybrid({ user, onLogout, onUpdateUser }) {
             onNavigate={handleNavigate}
             onUpdateUser={onUpdateUser}
             view={virtualOfficeView}
-            onViewChange={setVirtualOfficeView}
+            onViewChange={handleVirtualOfficeViewChange}
             taskToOpen={taskToOpen}
             onTaskOpened={() => setTaskToOpen(null)}
             announcementToOpen={announcementToOpen}
@@ -385,7 +414,7 @@ export default function DashboardHybrid({ user, onLogout, onUpdateUser }) {
             currentPage={currentPage}
             onPageChange={handleNavigate}
             virtualOfficeView={virtualOfficeView}
-            onVirtualOfficeViewChange={setVirtualOfficeView}
+            onVirtualOfficeViewChange={handleVirtualOfficeViewChange}
           >
             {renderPageContent()}
           </AppLayoutHybrid>

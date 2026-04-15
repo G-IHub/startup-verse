@@ -718,7 +718,7 @@ export default function ProfileCompletionModal({
           <div className="p-6 space-y-6">
             <TalentProfileForm
               loading={loading}
-              formRef={talentFormRef}
+              ref={talentFormRef}
               initialData={{
                 name: user?.name,
                 email: user?.email,

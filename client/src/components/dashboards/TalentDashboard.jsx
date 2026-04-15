@@ -1,37 +1,29 @@
-import React, { useState, useEffect } from "react";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "../ui/card";
+import React, { useEffect, useMemo, useState } from "react";
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
 import { Avatar, AvatarFallback } from "../ui/avatar";
 import { Textarea } from "../ui/textarea";
+import { Progress } from "../ui/progress";
 import ProfileCompletionModal from "../ProfileCompletionModal";
-import ProfileCompletionReminder from "../ProfileCompletionReminder";
 import OfferDisplay from "../OfferDisplay";
 import { toast } from "sonner";
+import { getTalentProfileCompletionPercent } from "../../utils/talentProfileCompletion";
+import { TALENT_ACTIONS_MIN_COMPLETION } from "../../constants/talentProfile.js";
 import * as talentApi from "../../utils/api/talentApi";
 import * as founderApi from "../../utils/api/founderApi";
 import {
-  Search,
   Star,
   Heart,
-  Briefcase,
   MapPin,
   Users,
-  ArrowRight,
   AlertCircle,
-  Calendar,
-  Sparkles,
-  DollarSign,
   Clock,
   TrendingUp,
   Target,
   Send,
+  LayoutGrid,
+  List,
+  X,
 } from "lucide-react";
 import {
   Dialog,
@@ -40,21 +32,126 @@ import {
   DialogHeader,
   DialogTitle,
 } from "../ui/dialog";
+
+const FILTER_GROUPS = [
+  { key: "stage", label: "Stage" },
+  { key: "funding", label: "Funding" },
+  { key: "commitment", label: "Commitment Type" },
+  { key: "equity", label: "Equity Range" },
+  { key: "location", label: "Location" },
+  { key: "teamSize", label: "Team Size" },
+];
+
+const FILTER_DEFAULTS = {
+  stage: [],
+  funding: [],
+  commitment: [],
+  equity: [],
+  location: [],
+  teamSize: [],
+};
+
+function toNumber(value) {
+  const numeric = Number.parseFloat(value);
+  return Number.isFinite(numeric) ? numeric : null;
+}
+
+function toRelativePosted(postedDate, fallbackPosted) {
+  if (fallbackPosted) return fallbackPosted;
+  if (!postedDate) return "Just now";
+  const ageInDays = Math.floor(
+    (Date.now() - new Date(postedDate).getTime()) / (1000 * 60 * 60 * 24),
+  );
+  if (ageInDays <= 0) return "Today";
+  if (ageInDays === 1) return "1 day ago";
+  return `${ageInDays} days ago`;
+}
+
+function getAvatarTone(companyName) {
+  const toneClasses = [
+    "bg-slate-100 text-slate-700",
+    "bg-indigo-100 text-indigo-700",
+    "bg-emerald-100 text-emerald-700",
+    "bg-amber-100 text-amber-700",
+    "bg-rose-100 text-rose-700",
+    "bg-cyan-100 text-cyan-700",
+  ];
+  const hash = companyName
+    .split("")
+    .reduce((sum, char) => sum + char.charCodeAt(0), 0);
+  return toneClasses[Math.abs(hash) % toneClasses.length];
+}
+
+function getInitials(name) {
+  return (name || "")
+    .split(" ")
+    .filter(Boolean)
+    .map((part) => part[0])
+    .join("")
+    .slice(0, 2)
+    .toUpperCase();
+}
+
+function truncateDescription(text) {
+  if (!text) return "";
+  return text.length > 60 ? `${text.slice(0, 57)}...` : text;
+}
+
+function getEquityRange(startup) {
+  const equityMin = toNumber(startup?.offer?.equityMin);
+  const equityMax = toNumber(startup?.offer?.equityMax);
+  if (equityMin == null || equityMax == null) return null;
+  return {
+    min: equityMin,
+    max: equityMax,
+    label: `${equityMin}-${equityMax}%`,
+    midpoint: (equityMin + equityMax) / 2,
+  };
+}
+
+function getEquityBucket(equityRange) {
+  if (!equityRange) return "Not specified";
+  if (equityRange.max <= 2) return "0-2%";
+  if (equityRange.max <= 5) return "2-5%";
+  if (equityRange.max <= 10) return "5-10%";
+  return "10%+";
+}
+
+function getTeamSizeBucket(teamSize) {
+  if (!teamSize) return "Unknown";
+  if (teamSize <= 5) return "1-5";
+  if (teamSize <= 10) return "6-10";
+  if (teamSize <= 20) return "11-20";
+  return "21+";
+}
+
+function getMatchStyle(score) {
+  if (score >= 80) {
+    return "bg-green-100 text-green-700 border border-green-200";
+  }
+  if (score >= 60) {
+    return "bg-amber-100 text-amber-700 border border-amber-200";
+  }
+  return "bg-red-100 text-red-700 border border-red-200";
+}
+
 export default function TalentDashboard({
   user,
-  onLogout,
   onUpdateUser,
-  onNavigate,
 }) {
-  const [showProfileModal, setShowProfileModal] = useState(
-    !user.onboardingComplete,
-  );
+  const [showProfileModal, setShowProfileModal] = useState(false);
+  const talentCompletion = getTalentProfileCompletionPercent(user);
+  const canUsePrimaryTalentActions =
+    talentCompletion >= TALENT_ACTIONS_MIN_COMPLETION;
   const [selectedStartup, setSelectedStartup] = useState(null);
   const [expressedInterest, setExpressedInterest] = useState([]);
   const [interestMessage, setInterestMessage] = useState("");
+  const [profileBannerDismissed, setProfileBannerDismissed] = useState(false);
+  const [sortBy, setSortBy] = useState("bestMatch");
+  const [layoutMode, setLayoutMode] = useState("list");
+  const [filters, setFilters] = useState(FILTER_DEFAULTS);
 
   // Backend data state
-  const [opportunities, setOpportunities] = useState([]);
   const [matchedOpportunities, setMatchedOpportunities] = useState([]);
   const [savedItems, setSavedItems] = useState([]);
   const [applications, setApplications] = useState([]);
@@ -234,20 +331,20 @@ export default function TalentDashboard({
     // Ensure score is between 0 and maxScore
     return Math.min(maxScore, Math.max(0, Math.round(score)));
   };
-  const handleProfileComplete = (profileData) => {
-    onUpdateUser({
-      ...user,
-      profile: {
-        ...user.profile,
-        ...profileData,
-      },
-      onboardingComplete: true,
-    });
-    // Reload dashboard data with updated profile
+  const handleProfileComplete = () => {
+    // Modal already calls onUpdateUser with flattened talent fields
     loadDashboardData();
+    setShowProfileModal(false);
   };
   const handleExpressInterest = async () => {
     if (!selectedStartup) return;
+    if (!canUsePrimaryTalentActions) {
+      toast.info("Complete your profile first", {
+        description: `Reach at least ${TALENT_ACTIONS_MIN_COMPLETION}% profile depth to send interest.`,
+      });
+      setShowProfileModal(true);
+      return;
+    }
     if (!interestMessage.trim()) {
       toast.error("Please write a message to express your interest");
       return;
@@ -392,18 +489,6 @@ export default function TalentDashboard({
       });
     }
   };
-
-  // Get today's date
-  const today = new Date();
-  const todayFormatted = today.toLocaleDateString("en-US", {
-    weekday: "long",
-    month: "long",
-    day: "numeric",
-  });
-
-  // Calculate metrics from backend data
-  const newMatches = matchedOpportunities.length;
-  const savedOpportunities = savedItems.length;
 
   // Mock data for fallback when no backend data
   const topMatches = [
@@ -559,324 +644,482 @@ export default function TalentDashboard({
 
   // Use matched opportunities from backend, or fall back to mock data if empty
   const displayedMatches =
-    matchedOpportunities.length > 0
-      ? matchedOpportunities.slice(0, 3)
-      : topMatches;
-  const metrics = [
-    {
-      label: "New Matches",
-      value: newMatches,
-      icon: Star,
-      sublabel: "Startups for you",
-      color: "primary",
-    },
-    {
-      label: "Saved",
-      value: savedOpportunities,
-      icon: Heart,
-      sublabel: "Opportunities",
-      color: "primary",
-    },
-  ];
+    matchedOpportunities.length > 0 ? matchedOpportunities : topMatches;
+  const startupRows = useMemo(
+    () =>
+      displayedMatches.map((startup, index) => {
+        const equityRange = getEquityRange(startup);
+        const matchScore = Number(startup.match ?? startup.matchScore ?? 0);
+        const teamSize = Number(startup.teamSize || 0);
+        const normalizedTags = Array.isArray(startup.tags) ? startup.tags : [];
+        const normalizedLookingFor = Array.isArray(startup.lookingFor)
+          ? startup.lookingFor
+          : [];
+        const normalizedStartup = {
+          ...startup,
+          tags: normalizedTags,
+          lookingFor: normalizedLookingFor,
+          posted: toRelativePosted(startup.postedDate, startup.posted),
+        };
+        return {
+          id: startup.id?.toString() || `${startup.title || "startup"}-${index}`,
+          startup: normalizedStartup,
+          title: startup.title || "Untitled startup",
+          founder: startup.founder || "Founder",
+          shortDescription: truncateDescription(startup.description || ""),
+          stage: startup.stage || "Unknown stage",
+          funding: startup.funding || "Not disclosed",
+          commitment: startup.commitment || "Flexible",
+          location: startup.location || "Remote",
+          teamSize,
+          teamSizeBucket: getTeamSizeBucket(teamSize),
+          equityRange,
+          equityBucket: getEquityBucket(equityRange),
+          matchScore: Number.isFinite(matchScore) ? matchScore : 0,
+          avatarTone: getAvatarTone(startup.title || "Startup"),
+          postedDateValue: startup.postedDate
+            ? new Date(startup.postedDate).getTime()
+            : 0,
+        };
+      }),
+    [displayedMatches],
+  );
+  const filterOptions = useMemo(() => {
+    const unique = (values) =>
+      [...new Set(values.filter(Boolean))].sort((a, b) =>
+        String(a).localeCompare(String(b)),
+      );
+    return {
+      stage: unique(startupRows.map((row) => row.stage)),
+      funding: unique(startupRows.map((row) => row.funding)),
+      commitment: unique(startupRows.map((row) => row.commitment)),
+      equity: unique(startupRows.map((row) => row.equityBucket)),
+      location: unique(startupRows.map((row) => row.location)),
+      teamSize: unique(startupRows.map((row) => row.teamSizeBucket)),
+    };
+  }, [startupRows]);
+  const toggleFilter = (groupKey, optionValue) => {
+    setFilters((prev) => {
+      const existing = prev[groupKey] || [];
+      const nextValues = existing.includes(optionValue)
+        ? existing.filter((value) => value !== optionValue)
+        : [...existing, optionValue];
+      return { ...prev, [groupKey]: nextValues };
+    });
+  };
+  const clearFilters = () => setFilters(FILTER_DEFAULTS);
+  const activeFilterCount = Object.values(filters).reduce(
+    (total, group) => total + group.length,
+    0,
+  );
+  const filteredRows = useMemo(
+    () =>
+      startupRows.filter((row) => {
+        if (filters.stage.length > 0 && !filters.stage.includes(row.stage)) {
+          return false;
+        }
+        if (
+          filters.funding.length > 0 &&
+          !filters.funding.includes(row.funding)
+        ) {
+          return false;
+        }
+        if (
+          filters.commitment.length > 0 &&
+          !filters.commitment.includes(row.commitment)
+        ) {
+          return false;
+        }
+        if (filters.equity.length > 0 && !filters.equity.includes(row.equityBucket)) {
+          return false;
+        }
+        if (filters.location.length > 0 && !filters.location.includes(row.location)) {
+          return false;
+        }
+        if (
+          filters.teamSize.length > 0 &&
+          !filters.teamSize.includes(row.teamSizeBucket)
+        ) {
+          return false;
+        }
+        return true;
+      }),
+    [startupRows, filters],
+  );
+  const sortedRows = useMemo(() => {
+    const rows = [...filteredRows];
+    rows.sort((left, right) => {
+      if (sortBy === "newest") return right.postedDateValue - left.postedDateValue;
+      if (sortBy === "equity") {
+        return (
+          (right.equityRange?.midpoint || -1) - (left.equityRange?.midpoint || -1)
+        );
+      }
+      if (sortBy === "teamSize") return right.teamSize - left.teamSize;
+      return right.matchScore - left.matchScore;
+    });
+    return rows;
+  }, [filteredRows, sortBy]);
+  const showProfileBanner =
+    !profileBannerDismissed && talentCompletion < TALENT_ACTIONS_MIN_COMPLETION;
+  const hasRows = sortedRows.length > 0;
   return (
-    <div className="p-2 md:p-3 space-y-2 md:space-y-2.5">
-      {showProfileModal && !user.onboardingComplete && (
+    <div className="space-y-3 p-3">
+      {showProfileModal && (
         <ProfileCompletionModal
           role={user.role}
+          user={user}
+          onUpdateUser={onUpdateUser}
           onComplete={handleProfileComplete}
           onClose={() => setShowProfileModal(false)}
         />
       )}
-      <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-1.5">
-        <div className="flex-shrink-0">
-          <h1 className="mb-0 text-sm md:text-base">
-            {"Welcome back, "}
-            {user.name}
-          </h1>
-          <p className="text-muted-foreground text-[9px]">{todayFormatted}</p>
-        </div>
-        <div className="flex gap-1 lg:ml-auto">
-          {metrics.map((metric, index) => {
-            const IconComponent = metric.icon;
-            return (
-              <div
-                key={index}
-                className="bg-card border border-border rounded-lg hover:shadow-md transition-all cursor-pointer"
-              >
-                <div className="p-1 flex items-center gap-1">
-                  <div className="w-4 h-4 bg-primary/10 dark:bg-primary/20 rounded flex items-center justify-center flex-shrink-0">
-                    <IconComponent className="w-2.5 h-2.5 text-primary" />
-                  </div>
-                  <div>
-                    <p className="text-sm font-semibold text-foreground leading-none">
-                      {metric.value}
-                    </p>
-                    <p className="text-[8px] text-muted-foreground leading-tight mt-0.5">
-                      {metric.label}
-                    </p>
-                  </div>
+      {showProfileBanner && (
+        <div className="rounded-md border border-blue-200 bg-blue-50 px-4 py-3">
+          <div className="flex items-start gap-3">
+            <AlertCircle className="mt-0.5 h-4 w-4 flex-shrink-0 text-blue-700" />
+            <div className="flex-1">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-[13px] font-medium uppercase tracking-[0.04em] text-blue-900">
+                    Complete your profile
+                  </p>
+                  <p className="text-[12px] text-blue-800">
+                    Reach {TALENT_ACTIONS_MIN_COMPLETION}% profile strength to
+                    unlock browsing and applications.
+                  </p>
                 </div>
+                <button
+                  type="button"
+                  onClick={() => setProfileBannerDismissed(true)}
+                  className="rounded p-1 text-blue-700 hover:bg-blue-100"
+                  aria-label="Dismiss profile completion banner"
+                >
+                  <X className="h-4 w-4" />
+                </button>
               </div>
-            );
-          })}
-        </div>
-      </div>
-      {user.onboardingComplete && (
-        <ProfileCompletionReminder
-          user={user}
-          onNavigateToProfile={() => onNavigate?.("settings")}
-        />
-      )}
-      {!user.onboardingComplete && (
-        <Card className="border-2 border-orange-200 bg-orange-50/50 dark:bg-orange-950/20">
-          <CardContent className="p-1.5">
-            <div className="flex items-start gap-1.5">
-              <AlertCircle className="w-3.5 h-3.5 text-orange-600 flex-shrink-0 mt-0.5" />
-              <div className="flex-1">
-                <p className="font-medium text-orange-900 dark:text-orange-100 text-[10px]">
-                  Complete your profile to find opportunities
-                </p>
-                <p className="text-[9px] text-orange-700 dark:text-orange-300 mt-0.5">
-                  Add your skills and experience to get matched with the best
-                  startups.
-                </p>
+              <div className="mt-3 flex flex-wrap items-center gap-3">
+                <div className="min-w-[160px] flex-1">
+                  <Progress value={talentCompletion} className="h-1.5" />
+                </div>
+                <span className="text-[12px] font-semibold text-blue-900">
+                  {talentCompletion}%
+                </span>
                 <Button
+                  type="button"
                   size="sm"
-                  className="mt-1 h-5 text-[9px] px-2"
+                  variant="outline"
+                  className="h-7 rounded-[4px] border-blue-300 px-3 text-[12px] hover:border-indigo-500"
                   onClick={() => setShowProfileModal(true)}
                 >
-                  Complete Profile
+                  Continue profile
                 </Button>
               </div>
             </div>
-          </CardContent>
-        </Card>
+          </div>
+        </div>
       )}
-      <Card className="bg-gradient-to-r from-[#3A5AFE] to-[#304FFE] border-none text-white overflow-hidden relative shadow-lg">
-        <div className="absolute inset-0 bg-grid-white/[0.05] bg-[length:20px_20px]" />
-        <CardContent className="p-3 md:p-4 relative">
-          <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-2">
-            <div className="flex-1 space-y-1">
-              <div>
-                <h2 className="text-white mb-0.5 text-sm">
-                  Find Your Perfect Startup
-                </h2>
-                <p className="text-white/90 max-w-xl text-[10px]">
-                  Discover startups that match your skills, interests, and
-                  career goals. Connect with founders and join exciting teams.
-                </p>
+      <div className="grid grid-cols-1 gap-3 lg:grid-cols-[280px_minmax(0,1fr)]">
+        <aside className="h-fit rounded-md border border-border bg-background p-4">
+          <div className="mb-5 flex items-center justify-between">
+            <h2 className="text-[13px] font-medium uppercase tracking-[0.05em] text-muted-foreground">
+              Filters
+            </h2>
+            {activeFilterCount > 0 && (
+              <button
+                type="button"
+                onClick={clearFilters}
+                className="text-[12px] text-muted-foreground underline-offset-2 hover:underline"
+              >
+                Clear all
+              </button>
+            )}
+          </div>
+          <div className="space-y-5">
+            {FILTER_GROUPS.map((group) => {
+              const groupOptions = filterOptions[group.key] || [];
+              return (
+                <details key={group.key} open>
+                  <summary className="cursor-pointer list-none text-[13px] font-medium uppercase tracking-[0.04em] text-foreground">
+                    {group.label}
+                  </summary>
+                  <div className="mt-3 space-y-2">
+                    {groupOptions.length === 0 && (
+                      <p className="text-[12px] text-muted-foreground">
+                        No options
+                      </p>
+                    )}
+                    {groupOptions.map((option) => {
+                      const optionId = `${group.key}-${String(option)
+                        .replace(/\s+/g, "-")
+                        .toLowerCase()}`;
+                      const isChecked = filters[group.key]?.includes(option);
+                      return (
+                        <div key={optionId} className="flex items-center gap-2">
+                          <input
+                            id={optionId}
+                            type="checkbox"
+                            checked={isChecked}
+                            onChange={() => toggleFilter(group.key, option)}
+                            className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                          />
+                          <label
+                            htmlFor={optionId}
+                            className="cursor-pointer text-[12px] text-muted-foreground"
+                          >
+                            {option}
+                          </label>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </details>
+              );
+            })}
+          </div>
+        </aside>
+        <section className="rounded-md border border-border bg-background">
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-4 py-3">
+            <p className="text-[13px] font-medium uppercase tracking-[0.05em] text-muted-foreground">
+              {sortedRows.length} results
+            </p>
+            <div className="flex items-center gap-2">
+              {isLoading && (
+                <span className="text-[11px] uppercase tracking-[0.04em] text-muted-foreground">
+                  Refreshing...
+                </span>
+              )}
+              <label
+                htmlFor="match-sort"
+                className="text-[12px] text-muted-foreground"
+              >
+                Sort
+              </label>
+              <select
+                id="match-sort"
+                value={sortBy}
+                onChange={(event) => setSortBy(event.target.value)}
+                className="h-8 rounded-[4px] border border-input bg-background px-2 text-[12px]"
+              >
+                <option value="bestMatch">Best Match</option>
+                <option value="newest">Newest</option>
+                <option value="equity">Equity %</option>
+                <option value="teamSize">Team Size</option>
+              </select>
+              <div
+                role="group"
+                aria-label="Layout toggle"
+                className="ml-1 flex items-center gap-1 rounded-[4px] border border-border p-1"
+              >
+                <button
+                  type="button"
+                  onClick={() => setLayoutMode("list")}
+                  className={`rounded p-1 ${layoutMode === "list" ? "bg-muted text-foreground" : "text-muted-foreground"}`}
+                  aria-label="Show list layout"
+                  aria-pressed={layoutMode === "list"}
+                >
+                  <List className="h-4 w-4" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setLayoutMode("grid")}
+                  className={`rounded p-1 ${layoutMode === "grid" ? "bg-muted text-foreground" : "text-muted-foreground"}`}
+                  aria-label="Show grid layout"
+                  aria-pressed={layoutMode === "grid"}
+                >
+                  <LayoutGrid className="h-4 w-4" />
+                </button>
               </div>
             </div>
-            <Button
-              size="sm"
-              className="bg-white !text-black hover:bg-white/90 shadow-lg hover:shadow-xl transition-all text-[10px] px-3 py-1.5 h-auto font-semibold"
-              onClick={() => onNavigate?.("team-matching")}
-            >
-              <Search className="w-3 h-3 mr-1 text-black" />
-              Browse Startups
-              <ArrowRight className="w-3 h-3 ml-1 text-black" />
-            </Button>
           </div>
-        </CardContent>
-      </Card>
-      {user.onboardingComplete && (
-        <Card className="shadow-sm">
-          <CardHeader className="pb-4">
-            <CardTitle className="flex items-center gap-2">
-              <Star className="w-5 h-5 text-primary" />
-              Top Matches for You
-            </CardTitle>
-            <CardDescription>Startups looking for your skills</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              {displayedMatches.map((startup) => (
-                <div
-                  key={startup.id}
-                  className="p-6 border rounded-xl hover:shadow-lg transition-all hover:border-primary/50 bg-card flex flex-col gap-4"
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="flex items-start gap-3 flex-1">
-                      <Avatar className="w-12 h-12 flex-shrink-0">
-                        <AvatarFallback className="bg-primary/10 text-primary">
-                          {startup.title
-                            .split(" ")
-                            .map((w) => w[0])
-                            .join("")
-                            .slice(0, 2)}
-                        </AvatarFallback>
-                      </Avatar>
-                      <div className="flex-1 min-w-0">
-                        <h3 className="font-semibold mb-1 line-clamp-2">
-                          {startup.title}
-                        </h3>
-                        <p className="text-sm text-muted-foreground">
-                          {"by "}
-                          {startup.founder}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="flex-shrink-0">
-                      <div className="bg-primary/10 dark:bg-primary/20 border border-primary/30 rounded-lg px-3 py-2 text-center">
-                        <span className="text-xl font-semibold text-primary">
-                          {startup.match}%
+          {isLoading && !hasRows && (
+            <div className="px-4 py-8 text-[13px] text-muted-foreground">
+              Loading startup matches...
+            </div>
+          )}
+          {!!error && !hasRows && (
+            <div className="px-4 py-8 text-[13px] text-red-600">{error}</div>
+          )}
+          {!isLoading && !error && !hasRows && (
+            <div className="space-y-3 px-4 py-8">
+              <p className="text-[13px] text-muted-foreground">
+                No startups match your selected filters.
+              </p>
+              <Button
+                type="button"
+                variant="outline"
+                className="h-7 rounded-[4px] border-[#D1D5DB] px-3 text-[12px] hover:border-indigo-500"
+                onClick={clearFilters}
+              >
+                Reset filters
+              </Button>
+            </div>
+          )}
+          {hasRows && layoutMode === "list" && (
+            <ul className="divide-y divide-border">
+              {sortedRows.map((row) => (
+                <li key={row.id} className="px-4 py-3">
+                  <div className="flex items-start gap-3 lg:items-center">
+                    <Avatar className="h-8 w-8 rounded-[6px]">
+                      <AvatarFallback
+                        className={`rounded-[6px] font-mono text-[12px] ${row.avatarTone}`}
+                      >
+                        {getInitials(row.title)}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2">
+                        <p className="truncate text-[14px] font-medium">{row.title}</p>
+                        <span
+                          aria-label={`${row.matchScore}% match score`}
+                          className={`inline-flex h-[22px] items-center rounded-[4px] px-2 text-[11px] font-semibold uppercase tracking-[0.03em] ${getMatchStyle(row.matchScore)}`}
+                        >
+                          {row.matchScore}%
                         </span>
-                        <p className="text-xs text-muted-foreground">Match</p>
                       </div>
+                      <p className="truncate text-[12px] text-muted-foreground">
+                        {row.founder}
+                      </p>
+                      <p className="truncate text-[12px] text-muted-foreground">
+                        {row.shortDescription}
+                      </p>
                     </div>
-                  </div>
-                  <p className="text-sm text-muted-foreground line-clamp-3 leading-relaxed">
-                    {startup.description}
-                  </p>
-                  <div className="flex flex-wrap gap-2">
-                    <Badge
-                      variant="secondary"
-                      className="bg-primary/10 text-primary border-primary/20"
-                    >
-                      <Briefcase className="w-3 h-3 mr-1" />
-                      {startup.lookingFor.join(", ")}
-                    </Badge>
-                    <Badge variant="outline">{startup.industry}</Badge>
-                  </div>
-                  <div className="border-t" />
-                  <div className="grid grid-cols-2 gap-3 text-sm">
-                    <div className="flex items-center gap-2">
-                      <TrendingUp className="w-4 h-4 text-muted-foreground flex-shrink-0" />
-                      <div className="min-w-0">
-                        <p className="text-xs text-muted-foreground">Stage</p>
-                        <p className="font-medium truncate">{startup.stage}</p>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <DollarSign className="w-4 h-4 text-muted-foreground flex-shrink-0" />
-                      <div className="min-w-0">
-                        <p className="text-xs text-muted-foreground">Funding</p>
-                        <p className="font-medium truncate">
-                          {startup.funding}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Users className="w-4 h-4 text-muted-foreground flex-shrink-0" />
-                      <div className="min-w-0">
-                        <p className="text-xs text-muted-foreground">
-                          Team Size
-                        </p>
-                        <p className="font-medium">
-                          {startup.teamSize}
-                          {" members"}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <MapPin className="w-4 h-4 text-muted-foreground flex-shrink-0" />
-                      <div className="min-w-0">
-                        <p className="text-xs text-muted-foreground">
-                          Location
-                        </p>
-                        <p className="font-medium truncate">
-                          {startup.location}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                  <div className="flex items-center justify-between gap-4 p-3 bg-muted/50 rounded-lg">
-                    <div className="flex items-center gap-2">
-                      <DollarSign className="w-4 h-4 text-green-600 dark:text-green-400" />
-                      <div>
-                        <p className="text-xs text-muted-foreground">
-                          Equity Offer
-                        </p>
-                        <p className="text-sm font-semibold text-green-600 dark:text-green-400">
-                          {startup.offer.equityMin}-{startup.offer.equityMax}%
-                        </p>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Clock className="w-4 h-4 text-blue-600 dark:text-blue-400" />
-                      <div>
-                        <p className="text-xs text-muted-foreground">
-                          Commitment
-                        </p>
-                        <p className="text-sm font-semibold">
-                          {startup.commitment}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                  <div className="border-t" />
-                  <div className="flex items-center justify-between gap-3">
-                    <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                      <Calendar className="w-3.5 h-3.5" />
-                      <span>
-                        {"Posted "}
-                        {startup.posted}
+                    <div className="hidden items-center gap-1.5 lg:flex">
+                      <span className="inline-flex h-5 items-center rounded-[3px] bg-[#F3F4F6] px-2 text-[11px] uppercase tracking-[0.05em] text-[#374151]">
+                        {row.stage}
+                      </span>
+                      <span className="inline-flex h-5 items-center rounded-[3px] bg-[#F3F4F6] px-2 text-[11px] uppercase tracking-[0.05em] text-[#374151]">
+                        {row.funding}
+                      </span>
+                      <span className="inline-flex h-5 items-center rounded-[3px] border border-border px-2 text-[11px] uppercase tracking-[0.05em] text-muted-foreground">
+                        EQ {row.equityRange?.label || "N/A"}
+                      </span>
+                      <span className="inline-flex h-5 items-center rounded-[3px] border border-border px-2 text-[11px] uppercase tracking-[0.05em] text-muted-foreground">
+                        {row.commitment}
                       </span>
                     </div>
+                    <div className="ml-auto flex items-center gap-1.5">
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7"
+                        onClick={(event) => handleToggleSave(row.startup, event)}
+                        disabled={savingItems.has(row.id)}
+                        aria-label={`Save ${row.title}`}
+                        aria-pressed={isSaved(row.id)}
+                      >
+                        <Heart
+                          className={`h-4 w-4 transition-colors ${
+                            isSaved(row.id)
+                              ? "fill-red-500 text-red-500"
+                              : "text-muted-foreground hover:fill-red-500 hover:text-red-500"
+                          }`}
+                        />
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="h-7 rounded-[4px] border-[#D1D5DB] px-3 text-[12px] hover:border-[#6366F1]"
+                        onClick={() => setSelectedStartup(row.startup)}
+                      >
+                        View Details
+                      </Button>
+                    </div>
+                  </div>
+                  <div className="mt-2 flex flex-wrap gap-1.5 lg:hidden">
+                    <span className="inline-flex h-5 items-center rounded-[3px] bg-[#F3F4F6] px-2 text-[11px] uppercase tracking-[0.05em] text-[#374151]">
+                      {row.stage}
+                    </span>
+                    <span className="inline-flex h-5 items-center rounded-[3px] bg-[#F3F4F6] px-2 text-[11px] uppercase tracking-[0.05em] text-[#374151]">
+                      {row.funding}
+                    </span>
+                    <span className="inline-flex h-5 items-center rounded-[3px] border border-border px-2 text-[11px] uppercase tracking-[0.05em] text-muted-foreground">
+                      EQ {row.equityRange?.label || "N/A"}
+                    </span>
+                    <span className="inline-flex h-5 items-center rounded-[3px] border border-border px-2 text-[11px] uppercase tracking-[0.05em] text-muted-foreground">
+                      {row.commitment}
+                    </span>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+          {hasRows && layoutMode === "grid" && (
+            <div className="grid grid-cols-1 gap-0 divide-y divide-border md:grid-cols-2 md:divide-x md:divide-y-0">
+              {sortedRows.map((row) => (
+                <div key={row.id} className="space-y-3 px-4 py-3">
+                  <div className="flex items-center gap-2">
+                    <Avatar className="h-8 w-8 rounded-[6px]">
+                      <AvatarFallback
+                        className={`rounded-[6px] font-mono text-[12px] ${row.avatarTone}`}
+                      >
+                        {getInitials(row.title)}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2">
+                        <p className="truncate text-[14px] font-medium">{row.title}</p>
+                        <span
+                          aria-label={`${row.matchScore}% match score`}
+                          className={`inline-flex h-[22px] items-center rounded-[4px] px-2 text-[11px] font-semibold uppercase tracking-[0.03em] ${getMatchStyle(row.matchScore)}`}
+                        >
+                          {row.matchScore}%
+                        </span>
+                      </div>
+                      <p className="truncate text-[12px] text-muted-foreground">
+                        {row.founder}
+                      </p>
+                    </div>
+                  </div>
+                  <p className="truncate text-[12px] text-muted-foreground">
+                    {row.shortDescription}
+                  </p>
+                  <div className="flex flex-wrap gap-1.5">
+                    <span className="inline-flex h-5 items-center rounded-[3px] bg-[#F3F4F6] px-2 text-[11px] uppercase tracking-[0.05em] text-[#374151]">
+                      {row.stage}
+                    </span>
+                    <span className="inline-flex h-5 items-center rounded-[3px] bg-[#F3F4F6] px-2 text-[11px] uppercase tracking-[0.05em] text-[#374151]">
+                      {row.funding}
+                    </span>
+                    <span className="inline-flex h-5 items-center rounded-[3px] border border-border px-2 text-[11px] uppercase tracking-[0.05em] text-muted-foreground">
+                      EQ {row.equityRange?.label || "N/A"}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-end gap-1.5">
                     <Button
-                      size="icon"
+                      type="button"
                       variant="ghost"
-                      className="h-8 w-8 flex-shrink-0"
-                      onClick={(e) => handleToggleSave(startup, e)}
-                      disabled={savingItems.has(startup.id.toString())}
+                      size="icon"
+                      className="h-7 w-7"
+                      onClick={(event) => handleToggleSave(row.startup, event)}
+                      disabled={savingItems.has(row.id)}
+                      aria-label={`Save ${row.title}`}
+                      aria-pressed={isSaved(row.id)}
                     >
                       <Heart
-                        className={`w-4 h-4 transition-colors ${isSaved(startup.id.toString()) ? "fill-red-500 text-red-500" : "text-muted-foreground hover:text-red-500"}`}
+                        className={`h-4 w-4 transition-colors ${
+                          isSaved(row.id)
+                            ? "fill-red-500 text-red-500"
+                            : "text-muted-foreground hover:fill-red-500 hover:text-red-500"
+                        }`}
                       />
                     </Button>
-                  </div>
-                  <div className="flex gap-2">
                     <Button
-                      className="flex-1"
-                      size="sm"
-                      onClick={() => setSelectedStartup(startup)}
+                      type="button"
+                      variant="outline"
+                      className="h-7 rounded-[4px] border-[#D1D5DB] px-3 text-[12px] hover:border-[#6366F1]"
+                      onClick={() => setSelectedStartup(row.startup)}
                     >
                       View Details
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="icon"
-                      className="h-9 w-9 flex-shrink-0"
-                      onClick={(e) => handleToggleSave(startup, e)}
-                      disabled={savingItems.has(startup.id.toString())}
-                    >
-                      <Heart
-                        className={`w-4 h-4 transition-colors ${isSaved(startup.id.toString()) ? "fill-red-500 text-red-500" : ""}`}
-                      />
                     </Button>
                   </div>
                 </div>
               ))}
             </div>
-            <Button
-              variant="outline"
-              className="w-full"
-              onClick={() => onNavigate?.("team-matching")}
-            >
-              View All Matches
-              <ArrowRight className="w-4 h-4 ml-2" />
-            </Button>
-          </CardContent>
-        </Card>
-      )}
-      {user.onboardingComplete && (
-        <Card className="bg-blue-50 dark:bg-blue-950/20 border-blue-200 dark:border-blue-800">
-          <CardContent className="p-4">
-            <div className="flex items-start gap-3">
-              <Sparkles className="w-5 h-5 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" />
-              <div>
-                <p className="text-sm font-medium text-blue-900 dark:text-blue-100 mb-1">
-                  Boost Your Profile
-                </p>
-                <p className="text-sm text-blue-700 dark:text-blue-300">
-                  Add a portfolio or project samples to stand out to founders.
-                  Profiles with work examples get 3x more messages!
-                </p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      )}
+          )}
+        </section>
+      </div>
       <Dialog
         open={selectedStartup !== null}
         onOpenChange={() => {
@@ -933,7 +1176,7 @@ export default function TalentDashboard({
                 </div>
                 <div>
                   <div className="flex flex-wrap gap-2">
-                    {selectedStartup.tags.map((tag, idx) => (
+                    {(selectedStartup.tags || []).map((tag, idx) => (
                       <Badge key={idx} variant="secondary" className="text-xs">
                         {tag}
                       </Badge>
@@ -988,7 +1231,7 @@ export default function TalentDashboard({
                     Looking for:
                   </p>
                   <div className="flex flex-wrap gap-2">
-                    {selectedStartup.lookingFor.map((role, idx) => (
+                    {(selectedStartup.lookingFor || []).map((role, idx) => (
                       <Badge key={idx} className="text-sm py-1.5 px-3">
                         {role}
                       </Badge>

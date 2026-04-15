@@ -1,4 +1,6 @@
 import React from "react";
+import { getTalentProfileCompletionPercent } from "../../utils/talentProfileCompletion";
+import { TALENT_ACTIONS_MIN_COMPLETION } from "../../constants/talentProfile.js";
 import { Badge } from "../ui/badge";
 import { Separator } from "../ui/separator";
 import {
@@ -22,29 +24,9 @@ export default function VerticalSidebar({
   isOpen = false,
   onClose,
 }) {
-  // Calculate profile completion for talent users
-  const calculateProfileCompletion = () => {
-    if (user.role !== "talent") return 100;
-    const requiredFields = [
-      user.name,
-      user.email,
-      user.professionalTitle,
-      user.location,
-      user.yearsOfExperience,
-      user.bio,
-      user.skills && user.skills.length > 0,
-      user.linkedin,
-      user.workExperience && user.workExperience.length > 0,
-      user.availabilityStatus,
-      user.preferredCommitment,
-    ];
-    const requiredCompleted = requiredFields.filter(
-      (field) => field && field !== "",
-    ).length;
-    return Math.round((requiredCompleted / requiredFields.length) * 100);
-  };
-  const profileCompletion = calculateProfileCompletion();
-  const showProfileBadge = user.role === "talent" && profileCompletion < 100;
+  const profileCompletion = getTalentProfileCompletionPercent(user);
+  const showProfileBadge =
+    user.role === "talent" && profileCompletion < TALENT_ACTIONS_MIN_COMPLETION;
 
   // Define all possible navigation items
   const allNavItems = [

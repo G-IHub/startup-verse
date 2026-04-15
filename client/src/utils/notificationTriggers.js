@@ -39,7 +39,7 @@ export async function notifyTeamMemberInvited(params) {
 export async function notifyTeamMemberJoined(params) {
   await createNotification({
     userId: params.founderId,
-    type: "team_member_joined",
+    type: "team-member-joined",
     title: "New Team Member Joined",
     message: `${params.teamMemberName} joined your team as ${params.role}`,
     actionUrl: "/team",
@@ -57,7 +57,7 @@ export async function notifyTeamMemberJoined(params) {
 export async function notifyCommentAdded(params) {
   await createNotification({
     userId: params.userId,
-    type: "comment_added",
+    type: "comment-added",
     title: `New Comment on ${params.entityType}`,
     message: `${params.commentedByName} commented: "${params.commentText.substring(0, 50)}${params.commentText.length > 50 ? "..." : ""}"`,
     actionUrl: `/${params.entityType}s/${params.entityId}`,
@@ -77,7 +77,7 @@ export async function notifyCommentAdded(params) {
 export async function notifyAnnouncementReaction(params) {
   await createNotification({
     userId: params.announcementAuthorId,
-    type: "announcement_reaction",
+    type: "announcement-reaction",
     title: "New Reaction",
     message: `${params.reactedByName} reacted ${params.reaction} to "${params.announcementTitle}"`,
     actionUrl: `/announcements/${params.announcementId}`,
@@ -97,7 +97,7 @@ export async function notifyAnnouncementReaction(params) {
 export async function notifyAnnouncementComment(params) {
   await createNotification({
     userId: params.announcementAuthorId,
-    type: "announcement_comment",
+    type: "announcement-comment",
     title: "New Comment on Announcement",
     message: `${params.commentedByName} commented on "${params.announcementTitle}"`,
     actionUrl: `/announcements/${params.announcementId}`,
@@ -118,7 +118,7 @@ export async function notifyMilestoneCompleted(params) {
   // Notify founder
   await createNotification({
     userId: params.founderId,
-    type: "milestone_completed",
+    type: "milestone-completed",
     title: "🎉 Milestone Completed!",
     message: `Your team completed "${params.milestoneTitle}"`,
     actionUrl: `/milestones/${params.milestoneId}`,
@@ -132,7 +132,7 @@ export async function notifyMilestoneCompleted(params) {
   for (const memberId of params.teamMemberIds) {
     await createNotification({
       userId: memberId,
-      type: "milestone_completed",
+      type: "milestone-completed",
       title: "🎉 Milestone Completed!",
       message: `The team completed "${params.milestoneTitle}"`,
       actionUrl: `/milestones/${params.milestoneId}`,
@@ -151,7 +151,7 @@ export async function notifyOutcomeAchieved(params) {
   // Notify founder
   await createNotification({
     userId: params.founderId,
-    type: "outcome_achieved",
+    type: "outcome-achieved",
     title: "✅ Weekly Outcome Achieved!",
     message: `"${params.outcomeTitle}" was achieved this week!`,
     actionUrl: `/outcomes/${params.weekId}`,
@@ -166,7 +166,7 @@ export async function notifyOutcomeAchieved(params) {
   for (const memberId of params.teamMemberIds) {
     await createNotification({
       userId: memberId,
-      type: "outcome_achieved",
+      type: "outcome-achieved",
       title: "✅ Weekly Outcome Achieved!",
       message: `The team achieved "${params.outcomeTitle}" this week!`,
       actionUrl: `/outcomes/${params.weekId}`,
@@ -193,7 +193,7 @@ export async function notifyStreakMilestone(params) {
 
   await createNotification({
     userId: params.founderId,
-    type: "streak_milestone",
+    type: "streak-milestone",
     title: "Streak Milestone Achieved! 🎉",
     message:
       messages[params.streak] || `Amazing! ${params.streak}-week streak!`,
@@ -210,7 +210,7 @@ export async function notifyStreakMilestone(params) {
 export async function notifyWeeklyReviewReminder(params) {
   await createNotification({
     userId: params.founderId,
-    type: "weekly_review_reminder",
+    type: "weekly-review-reminder",
     title: "📋 Weekly Review Time",
     message: "Time to review this week's progress and set next week's outcome",
     actionUrl: "/weekly-review",
@@ -219,3 +219,4 @@ export async function notifyWeeklyReviewReminder(params) {
     },
   });
 }
+

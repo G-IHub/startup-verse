@@ -223,26 +223,18 @@ notificationsRouter.post(
   "/notifications/streak-at-risk",
   requireAuth,
   asyncHandler(async (req, res) => {
+    const targetUserId = req.body?.userId || req.user.id;
+    if (!isSelfOrAdmin(req, targetUserId)) {
+      return apiError(res, "Forbidden.", 403);
+    }
     const notification = await createAndEmitNotification({
-      userId: req.body?.userId,
+      userId: targetUserId,
       title: "Streak At Risk",
       message: req.body?.message || "Your execution streak is at risk.",
       type: "streak-at-risk",
       metadata: req.body?.metadata || {},
     });
     return apiSuccess(res, notification, 201);
-  }),
-);
-
-notificationsRouter.post(
-  "/users/:userId/notifications/mark-all-read",
-  requireAuth,
-  asyncHandler(async (req, res) => {
-    if (!isSelfOrAdmin(req, req.params.userId)) {
-      return apiError(res, "Forbidden.", 403);
-    }
-    await Notification.updateMany({ userId: req.params.userId, readAt: null }, { $set: { readAt: new Date() } });
-    return apiSuccess(res, { markedAllRead: true });
   }),
 );
 

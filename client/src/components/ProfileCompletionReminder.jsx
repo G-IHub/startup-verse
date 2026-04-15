@@ -14,6 +14,7 @@ import {
   Calendar,
   Link2,
   FolderKanban,
+  Target,
 } from "lucide-react";
 import {
   Dialog,
@@ -22,6 +23,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from "./ui/dialog";
+import { getTalentProfileCompletionPercent } from "../utils/talentProfileCompletion";
+
 const COMPLETION_THRESHOLD = 80; // Profile must be 80% complete to permanently dismiss
 
 export default function ProfileCompletionReminder({
@@ -31,62 +34,34 @@ export default function ProfileCompletionReminder({
   const [isMinimized, setIsMinimized] = useState(false);
   const [showPopup, setShowPopup] = useState(false);
 
-  // Calculate profile completion
   const calculateCompletion = () => {
-    const requiredFields = [
-      user.name,
-      user.email,
-      user.professionalTitle,
-      user.location,
-      user.yearsOfExperience,
-      user.bio,
-      user.skills && user.skills.length > 0,
-      user.linkedin,
-      user.workExperience && user.workExperience.length > 0,
-      user.availabilityStatus,
-      user.preferredCommitment,
-    ];
-    const optionalFields = [
-      user.github,
-      user.website,
-      user.education && user.education.length > 0,
-      user.certifications && user.certifications.length > 0,
-      user.portfolioItems && user.portfolioItems.length > 0,
-    ];
-    const requiredCompleted = requiredFields.filter(
-      (field) => field && field !== "",
-    ).length;
-    const optionalCompleted = optionalFields.filter(
-      (field) => field && field !== "",
-    ).length;
-    const requiredScore = (requiredCompleted / requiredFields.length) * 70;
-    const optionalScore = (optionalCompleted / optionalFields.length) * 30;
+    const percentage = getTalentProfileCompletionPercent(user);
     return {
-      percentage: Math.round(requiredScore + optionalScore),
-      requiredCompleted,
-      requiredTotal: requiredFields.length,
-      optionalCompleted,
-      optionalTotal: optionalFields.length,
+      percentage,
+      requiredCompleted: 0,
+      requiredTotal: 0,
+      optionalCompleted: 0,
+      optionalTotal: 0,
     };
   };
   const getProfileSegments = () => {
-    // Define profile segments with their completion status
     const segments = [
       {
         id: "professional-profile",
         label: "Professional Profile",
         icon: UserCircle,
-        isComplete: !!(user.professionalTitle && user.bio && user.location),
+        isComplete: !!(
+          user.name &&
+          user.professionalTitle &&
+          user.yearsOfExperience &&
+          user.bio
+        ),
       },
       {
         id: "skills-expertise",
         label: "Skills & Expertise",
         icon: Code,
-        isComplete: !!(
-          user.skills &&
-          user.skills.length > 0 &&
-          user.yearsOfExperience
-        ),
+        isComplete: !!(user.skills && user.skills.length > 0),
       },
       {
         id: "professional-links",
@@ -122,7 +97,22 @@ export default function ProfileCompletionReminder({
         id: "availability",
         label: "Availability & Preferences",
         icon: Calendar,
-        isComplete: !!(user.availabilityStatus && user.preferredCommitment),
+        isComplete: !!(
+          user.availabilityStatus &&
+          user.preferredCommitment &&
+          user.experience &&
+          user.availability
+        ),
+      },
+      {
+        id: "career-goals",
+        label: "Career Goals & Industries",
+        icon: Target,
+        isComplete: !!(
+          (user.professionalGoals && String(user.professionalGoals).trim()) ||
+          (user.interests && user.interests.length > 0) ||
+          (user.industryPreferences && user.industryPreferences.length > 0)
+        ),
       },
     ];
     return segments;

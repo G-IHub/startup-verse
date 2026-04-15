@@ -17,14 +17,16 @@ async function main() {
 
   const { connectDatabase } = await import("../src/config/db.js");
   const { default: app } = await import("../src/app.js");
+  const User = (await import("../src/models/User.js")).default;
 
   await connectDatabase();
 
+  const password = "ContractPass123!";
   const email = `contract_${Date.now()}@example.com`;
   const signup = await request(app).post("/api/v1/auth/signup").send({
     name: "Contract User",
     email,
-    password: "ContractPass123!",
+    password,
     role: "talent",
   });
   assert.equal(signup.status, 201);
@@ -39,7 +41,7 @@ async function main() {
   const signupB = await request(app).post("/api/v1/auth/signup").send({
     name: "Contract User B",
     email: emailB,
-    password: "ContractPass123!",
+    password,
     role: "talent",
   });
   assert.equal(signupB.status, 201);
@@ -66,6 +68,74 @@ async function main() {
     .get(`/api/v1/users/${userBId}/notifications`)
     .set("Authorization", `Bearer ${token}`);
   assert.equal(peerNotif.status, 403);
+
+  const streakSelfDefault = await request(app)
+    .post("/api/v1/notifications/streak-at-risk")
+    .set("Authorization", `Bearer ${token}`)
+    .send({ message: "self default target" });
+  assert.equal(streakSelfDefault.status, 201);
+  const streakSelfUserId =
+    streakSelfDefault.body?.data?.userId ||
+    streakSelfDefault.body?.data?.user?._id ||
+    streakSelfDefault.body?.data?.user?.id;
+  assert.equal(String(streakSelfUserId), String(userAId));
+
+  const streakPeerDenied = await request(app)
+    .post("/api/v1/notifications/streak-at-risk")
+    .set("Authorization", `Bearer ${token}`)
+    .send({ userId: String(userBId), message: "cross-user should fail" });
+  assert.equal(streakPeerDenied.status, 403);
+
+  const createdNotif = await request(app)
+    .post("/api/v1/notifications")
+    .set("Authorization", `Bearer ${token}`)
+    .send({
+      userId: String(userAId),
+      title: "Contract Notification",
+      message: "mark read contract flow",
+      type: "task-blocked",
+    });
+  assert.equal(createdNotif.status, 201);
+  const notificationId =
+    createdNotif.body?.data?._id || createdNotif.body?.data?.id;
+  assert.ok(notificationId);
+
+  const markedRead = await request(app)
+    .put(`/api/v1/notifications/${notificationId}/read`)
+    .set("Authorization", `Bearer ${token}`)
+    .send({});
+  assert.equal(markedRead.status, 200);
+
+  const deletePeerDenied = await request(app)
+    .delete(`/api/v1/users/${userBId}/notifications`)
+    .set("Authorization", `Bearer ${token}`);
+  assert.equal(deletePeerDenied.status, 403);
+
+  const deleteOwn = await request(app)
+    .delete(`/api/v1/users/${userAId}/notifications`)
+    .set("Authorization", `Bearer ${token}`);
+  assert.equal(deleteOwn.status, 200);
+  assert.ok(Number(deleteOwn.body?.data?.deletedCount || 0) >= 1);
+
+  await User.findByIdAndUpdate(userAId, { $set: { isAdmin: true } });
+  const adminSignin = await request(app).post("/api/v1/auth/signin").send({
+    email,
+    password,
+  });
+  assert.equal(adminSignin.status, 200);
+  const adminToken = adminSignin.body?.data?.token;
+  assert.ok(typeof adminToken === "string" && adminToken.length > 10);
+
+  const adminCrossUserCreate = await request(app)
+    .post("/api/v1/notifications/streak-at-risk")
+    .set("Authorization", `Bearer ${adminToken}`)
+    .send({ userId: String(userBId), message: "admin cross-user" });
+  assert.equal(adminCrossUserCreate.status, 201);
+
+  const adminCrossUserDelete = await request(app)
+    .delete(`/api/v1/users/${userBId}/notifications`)
+    .set("Authorization", `Bearer ${adminToken}`);
+  assert.equal(adminCrossUserDelete.status, 200);
 
   const ReminderJob = (await import("../src/models/ReminderJob.js")).default;
   const { processReminderJobsOnce } = await import("../src/services/reminderDeliveryQueue.js");

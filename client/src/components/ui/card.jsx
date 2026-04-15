@@ -98,7 +98,7 @@ function CardContent({ className, ...props }) {
       {..._extends(
         {
           "data-slot": "card-content",
-          className: cn("px-4 [&:last-child]:pb-4", className),
+          className: cn("px-4 py-6 sm:px-6", className),
         },
         props,
       )}

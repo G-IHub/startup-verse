@@ -733,7 +733,7 @@ export default function ProfileCompletionForm({
           {role === "talent" ? (
             <TalentProfileForm
               loading={loading}
-              formRef={talentFormRef}
+              ref={talentFormRef}
               initialData={{
                 name: user?.name,
                 email: user?.email,

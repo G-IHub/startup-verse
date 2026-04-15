@@ -1348,19 +1348,22 @@ export default function FounderDashboard({
         description: "Your team will be notified",
       });
 
-      // Send email notification to founder (MVP Gap 3)
+      // Send notification to founder (MVP Gap 3 compatibility path)
       const updatedTasks = await coreEngineApi.getTasks(user.id);
       const task = updatedTasks.find((t) => t.id === taskId);
-      if (task && task.assignedToName && user.email) {
+      if (task) {
         const { sendTaskBlockedNotification } =
           await import("../../utils/emailNotifications");
         sendTaskBlockedNotification(
-          user.email,
-          user.name,
-          task.title,
-          reason,
-          note,
-          task.assignedToName,
+          {
+            userId: user.id,
+            founderEmail: user.email || "",
+            founderName: user.name,
+            taskTitle: task.title,
+            blockerReason: reason,
+            blockerNote: note,
+            teamMemberName: task.assignedToName || "",
+          },
         ).catch((err) => console.warn("Email notification failed:", err));
       }
     } catch (error) {
@@ -1399,20 +1402,23 @@ export default function FounderDashboard({
       if (assignedToName) {
         toast.success(`Task assigned to ${assignedToName}! 👤`);
 
-        // Send email notification (MVP Gap 3)
+        // Send notification (MVP Gap 3 compatibility path)
         const updatedTasks = await coreEngineApi.getTasks(user.id);
         const task = updatedTasks.find((t) => t.id === taskId);
         const teamMember = teamMembers.find((m) => m.id === assignedTo);
-        if (task && teamMember?.email) {
+        if (task && assignedTo) {
           const { sendTaskAssignedNotification } =
             await import("../../utils/emailNotifications");
           sendTaskAssignedNotification(
-            teamMember.email,
-            assignedToName,
-            task.title,
-            task.description || "",
-            user.name,
-            task.milestoneName || "General Tasks",
+            {
+              userId: assignedTo,
+              teamMemberEmail: teamMember?.email || "",
+              teamMemberName: assignedToName,
+              taskTitle: task.title,
+              taskDescription: task.description || "",
+              founderName: user.name,
+              milestoneName: task.milestoneName || "General Tasks",
+            },
           ).catch((err) => console.warn("Email notification failed:", err));
         }
       } else {

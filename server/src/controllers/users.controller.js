@@ -47,6 +47,12 @@ export const markAllNotificationsRead = async (req, res) => {
   return apiSuccess(res, { markedAllRead: true });
 };
 
+// - Delete all user's notifications
+export const clearNotifications = async (req, res) => {
+  const result = await Notification.deleteMany({ userId: req.params.userId });
+  return apiSuccess(res, { deletedCount: Number(result.deletedCount || 0) });
+};
+
 // - Get notification preferences
 export const getNotificationPreferences = async (req, res) => {
   const user = await User.findById(req.params.userId);
