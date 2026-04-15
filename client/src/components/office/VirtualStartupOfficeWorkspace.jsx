@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo } from "react";
+﻿import React, { useState, useEffect, useRef, useMemo } from "react";
 import { API_BASE_URL } from "../../config/apiBase.js";
 import { Button } from "../ui/button";
 import { toast } from "sonner";
@@ -27,7 +27,7 @@ import { Switch } from "../ui/switch";
 import { Tooltip, TooltipContent, TooltipTrigger } from "../ui/tooltip";
 import { cn } from "../ui/utils";
 import { motion, AnimatePresence } from "motion/react";
-import { APP_URL } from "../../config"; // ✅ Simple config import
+import { APP_URL } from "../../config"; // âœ… Simple config import
 import { GoogleMeetCall } from "./GoogleMeetCall";
 import { SimpleTeamMessaging } from "./SimpleTeamMessaging";
 import GoogleAccountConnect from "../shared/GoogleAccountConnect";
@@ -47,9 +47,6 @@ import { getUnreadCount } from "../../utils/messaging";
 import { TaskManagementPanel } from "./TaskManagementPanel";
 import { TeamHubPanel } from "./TeamHubPanel";
 import MeetingScheduler from "../calendar/MeetingScheduler";
-import InteractiveTour from "../tours/InteractiveTour";
-import { virtualOfficeTourSteps } from "../tours/tourSteps";
-import { authApi } from "../../api/authApi.jsx";
 import { useAudioManager } from "../../hooks/useAudioManager";
 import { useOfficeSettings } from "../../hooks/useOfficeSettings";
 import { LiveActivityFeed } from "../presence/LiveActivityFeed";
@@ -65,7 +62,7 @@ import {
   isRealtimeConnected,
 } from "../../utils/realtimeSubscriptions";
 import { PresenceBar } from "../presence/PresenceBar";
-// 🔥 NEW: Real-time hooks for seamless updates without polling
+// ðŸ”¥ NEW: Real-time hooks for seamless updates without polling
 
 import {
   Users,
@@ -107,7 +104,7 @@ function mergeActivityFeed(prev, incoming) {
         row.timestamp instanceof Date
           ? row.timestamp
           : new Date(row.timestamp || Date.now()),
-      icon: typeof row.icon === "string" ? row.icon : "📋",
+      icon: typeof row.icon === "string" ? row.icon : "ðŸ“‹",
     }));
   const deduped = Array.from(new Map(normalized.map((row) => [String(row.id), row])).values());
   deduped.sort((a, b) => {
@@ -129,7 +126,7 @@ function isSameLocalCalendarDay(d1, d2) {
   );
 }
 
-/** Strip the synthetic "checked in: \"…\"" wrapper for list display. */
+/** Strip the synthetic "checked in: \"â€¦\"" wrapper for list display. */
 function formatCheckInBody(text) {
   const s = String(text || "");
   const m = s.match(/^checked in:\s*"([\s\S]*)"\s*$/i);
@@ -311,7 +308,7 @@ export default function VirtualStartupOffice({
   const [announcementText, setAnnouncementText] = useState("");
   const [latestAnnouncement, setLatestAnnouncement] = useState(null);
 
-  // 🔥 NEW: Organization announcements from backend
+  // ðŸ”¥ NEW: Organization announcements from backend
   const [orgAnnouncements, setOrgAnnouncements] = useState([]);
 
   // Load announcements from localStorage with auto-refresh
@@ -358,29 +355,6 @@ export default function VirtualStartupOffice({
   const [activeCallRoomName, setActiveCallRoomName] = useState();
   const [googleMeetLink, setGoogleMeetLink] = useState("");
   const [showGoogleConnectDialog, setShowGoogleConnectDialog] = useState(false);
-  const [showOfficeTour, setShowOfficeTour] = useState(true);
-  const [officeTourReplay, setOfficeTourReplay] = useState(false);
-  const virtualOfficeTourLsKey = "tour_completed_virtual-office-tour";
-  const tourMigrationAttemptedRef = useRef(false);
-
-  // Sync legacy localStorage completion to server once (cross-device / fresh DB)
-  useEffect(() => {
-    if (!user?.id || user.virtualOfficeTourCompleted) return;
-    if (localStorage.getItem(virtualOfficeTourLsKey) !== "true") return;
-    if (tourMigrationAttemptedRef.current) return;
-    tourMigrationAttemptedRef.current = true;
-    void (async () => {
-      try {
-        await authApi.updateProfile(user.id, {
-          virtualOfficeTourCompleted: true,
-        });
-        onUpdateUser?.({ ...user, virtualOfficeTourCompleted: true });
-      } catch (err) {
-        console.error("[Virtual Office] Tour migration failed:", err);
-        tourMigrationAttemptedRef.current = false;
-      }
-    })();
-  }, [user, onUpdateUser]);
 
   // Announcement detail modal
   const [selectedAnnouncement, setSelectedAnnouncement] = useState(null);
@@ -399,7 +373,7 @@ export default function VirtualStartupOffice({
   const [founderId, setFounderId] = useState("");
   const [unreadMessagesCount, setUnreadMessagesCount] = useState(0); // Will be loaded from backend
 
-  // 🔥 REALTIME: Get startup ID for subscriptions
+  // ðŸ”¥ REALTIME: Get startup ID for subscriptions
   const currentStartupId =
     user.role === "founder" ? user.id : user.startupId || user.founderId || "";
 
@@ -450,7 +424,7 @@ export default function VirtualStartupOffice({
     }
   };
 
-  // ✅ REALTIME: Announcements - removed polling, now uses real-time subscription below
+  // âœ… REALTIME: Announcements - removed polling, now uses real-time subscription below
 
   // Save announcements to localStorage when they change
   useEffect(() => {
@@ -462,7 +436,7 @@ export default function VirtualStartupOffice({
     }
   }, [announcements]);
 
-  // ✅ REALTIME: Wall of Wins - removed polling, now uses real-time subscription below
+  // âœ… REALTIME: Wall of Wins - removed polling, now uses real-time subscription below
 
   // Load meetings from backend
   const loadMeetings = async () => {
@@ -483,7 +457,7 @@ export default function VirtualStartupOffice({
     loadTasks();
     loadMeetings();
 
-    // ✅ REALTIME: Removed task polling (was every 2s) - now using real-time subscription below
+    // âœ… REALTIME: Removed task polling (was every 2s) - now using real-time subscription below
 
     // Listen for localStorage changes (when TaskManagementPanel updates tasks)
     const handleStorageChange = (e) => {
@@ -500,15 +474,15 @@ export default function VirtualStartupOffice({
   // Handle opening specific task from notification
   useEffect(() => {
     if (taskToOpen) {
-      console.log("📋 Opening task from notification:", taskToOpen);
+      console.log("ðŸ“‹ Opening task from notification:", taskToOpen);
       setIsTaskPanelOpen(true);
 
-      // 🔥 CRITICAL: Force refresh tasks from backend when notification opens a task
+      // ðŸ”¥ CRITICAL: Force refresh tasks from backend when notification opens a task
       if (founderId) {
-        console.log("🔄 [TASK SYNC] Refreshing tasks due to notification...");
+        console.log("ðŸ”„ [TASK SYNC] Refreshing tasks due to notification...");
         refreshTasksFromBackend(founderId).then((freshTasks) => {
           console.log(
-            `✅ [TASK SYNC] Refreshed ${freshTasks.length} tasks from backend`,
+            `âœ… [TASK SYNC] Refreshed ${freshTasks.length} tasks from backend`,
           );
           // Reload tasks after refresh
           loadTasks();
@@ -526,7 +500,7 @@ export default function VirtualStartupOffice({
   useEffect(() => {
     if (announcementToOpen) {
       console.log(
-        "📢 Opening announcement from notification:",
+        "ðŸ“¢ Opening announcement from notification:",
         announcementToOpen,
       );
       setIsTeamHubOpen(true);
@@ -551,13 +525,13 @@ export default function VirtualStartupOffice({
   useEffect(() => {
     if (!winToOpen) return;
     setIsTeamHubOpen(true);
-    toast("Opening Wall of Wins", { icon: "🏆" });
+    toast("Opening Wall of Wins", { icon: "ðŸ†" });
     if (onWinOpened) {
       onWinOpened();
     }
   }, [winToOpen, onWinOpened]);
 
-  // 🔥 CRITICAL: Listen for task-related notifications and refresh tasks
+  // ðŸ”¥ CRITICAL: Listen for task-related notifications and refresh tasks
   useEffect(() => {
     if (!founderId || !notifications || notifications.length === 0) return;
 
@@ -578,12 +552,12 @@ export default function VirtualStartupOffice({
       // Only refresh if this notification is newer than last check
       if (!lastCheckedTime || notifTime > parseInt(lastCheckedTime)) {
         console.log(
-          "🔔 [TASK SYNC] New task notification detected, refreshing tasks...",
+          "ðŸ”” [TASK SYNC] New task notification detected, refreshing tasks...",
           latestTaskNotif,
         );
         refreshTasksFromBackend(founderId).then((freshTasks) => {
           console.log(
-            `✅ [TASK SYNC] Tasks refreshed due to notification - ${freshTasks.length} tasks`,
+            `âœ… [TASK SYNC] Tasks refreshed due to notification - ${freshTasks.length} tasks`,
           );
           loadTasks();
           localStorage.setItem(
@@ -616,7 +590,7 @@ export default function VirtualStartupOffice({
           : "unassigned",
     }));
 
-  // 🔥 NEW: Load organization announcements on mount
+  // ðŸ”¥ NEW: Load organization announcements on mount
   useEffect(() => {
     if (user?.id && user?.role === "founder") {
       loadOrganizationAnnouncements();
@@ -637,18 +611,18 @@ export default function VirtualStartupOffice({
         const raw = unwrapData(await response.json());
         const list = Array.isArray(raw) ? raw : raw.announcements || [];
         console.log(
-          "✅ [Virtual Office] Loaded organization announcements:",
+          "âœ… [Virtual Office] Loaded organization announcements:",
           list.length,
         );
         setOrgAnnouncements(list);
       }
     } catch (error) {
-      console.error("❌ Error loading organization announcements:", error);
+      console.error("âŒ Error loading organization announcements:", error);
       setOrgAnnouncements([]);
     }
   };
 
-  // Load agenda items (canonical user calendar — founders and team members)
+  // Load agenda items (canonical user calendar â€” founders and team members)
   useEffect(() => {
     if (user?.id) {
       loadAgendaItems();
@@ -722,7 +696,7 @@ export default function VirtualStartupOffice({
       .sort((a, b) => a.date.getTime() - b.date.getTime());
   };
 
-  // ✅ REALTIME: Unread messages count - removed polling, using real-time hook below
+  // âœ… REALTIME: Unread messages count - removed polling, using real-time hook below
   // Initial load only
   useEffect(() => {
     const loadUnreadCount = async () => {
@@ -737,7 +711,7 @@ export default function VirtualStartupOffice({
       }
     };
     loadUnreadCount();
-    // ✅ REALTIME: Removed polling (was every 3s) - real-time updates via subscription
+    // âœ… REALTIME: Removed polling (was every 3s) - real-time updates via subscription
   }, [user.id, user.role, user.startupId, user.founderId]);
 
   // Team data - loaded from real data sources
@@ -751,8 +725,8 @@ export default function VirtualStartupOffice({
         const allUsers = JSON.parse(
           localStorage.getItem(STORAGE_KEYS.teamMembers) || "[]",
         );
-        console.log("🔍 [VirtualOffice] Loading team members...");
-        console.log("🔍 [VirtualOffice] Current user:", {
+        console.log("ðŸ” [VirtualOffice] Loading team members...");
+        console.log("ðŸ” [VirtualOffice] Current user:", {
           id: user.id,
           name: user.name,
           role: user.role,
@@ -760,11 +734,11 @@ export default function VirtualStartupOffice({
           startupId: user.startupId,
         });
         console.log(
-          "🔍 [VirtualOffice] All users in localStorage:",
+          "ðŸ” [VirtualOffice] All users in localStorage:",
           allUsers.length,
         );
         console.log(
-          "🔍 [VirtualOffice] All users:",
+          "ðŸ” [VirtualOffice] All users:",
           allUsers.map((u) => ({
             id: u.id,
             name: u.name,
@@ -782,17 +756,17 @@ export default function VirtualStartupOffice({
         // Filter team members:
         // - If user is founder: find all team members where startupId === founder.id OR founderId === founder.id
         // - If user is team member: find founder and other team members in same startup
-        // 🔒 SECURITY FIX: Removed companyId matching to prevent cross-startup data leaks
+        // ðŸ”’ SECURITY FIX: Removed companyId matching to prevent cross-startup data leaks
         const localTeamMembers = allUsers.filter((u) => {
           if (u.id === user.id) return false; // Exclude current user
 
           if (user.role === "founder") {
             // Founder sees: team members with matching startupId OR founderId ONLY
-            // 🔒 SECURITY: Removed companyId matching - it's not unique per startup
+            // ðŸ”’ SECURITY: Removed companyId matching - it's not unique per startup
             const matchByStartupId = u.startupId === user.id;
             const matchByFounderId = u.founderId === user.id;
             const shouldInclude = matchByStartupId || matchByFounderId;
-            console.log(`🔍 [VirtualOffice] Checking user ${u.name}:`, {
+            console.log(`ðŸ” [VirtualOffice] Checking user ${u.name}:`, {
               matchByStartupId,
               matchByFounderId,
               shouldInclude,
@@ -803,7 +777,7 @@ export default function VirtualStartupOffice({
             return shouldInclude;
           } else {
             // Team member sees: founder + other team members in same startup ONLY
-            // 🔒 SECURITY: Removed companyId matching - it's not unique per startup
+            // ðŸ”’ SECURITY: Removed companyId matching - it's not unique per startup
             const founderIdToMatch = user.startupId || user.founderId;
             return (
               u.id === founderIdToMatch ||
@@ -815,7 +789,7 @@ export default function VirtualStartupOffice({
           }
         });
         console.log(
-          "✅ [VirtualOffice] Filtered team members:",
+          "âœ… [VirtualOffice] Filtered team members:",
           localTeamMembers.length,
           localTeamMembers.map((m) => ({
             id: m.id,
@@ -886,7 +860,7 @@ export default function VirtualStartupOffice({
           deskItems: deskItemsOptions[index % deskItemsOptions.length],
         }));
 
-        // 🔧 FIX: Only include current user in team grid if they're a founder
+        // ðŸ”§ FIX: Only include current user in team grid if they're a founder
         // Team members should see their founder + other team members, not themselves
         let allMembers;
         if (user.role === "founder") {
@@ -915,7 +889,7 @@ export default function VirtualStartupOffice({
         }
         setTeamMembers(allMembers);
         console.log(
-          "✅ Team members loaded from localStorage:",
+          "âœ… Team members loaded from localStorage:",
           allMembers.length,
         );
 
@@ -923,7 +897,7 @@ export default function VirtualStartupOffice({
         const startupIdForBackend =
           user.role === "founder" ? user.id : user.startupId || user.companyId;
         console.log(
-          "🔍 [VirtualOffice] Fetching from backend with startupId:",
+          "ðŸ” [VirtualOffice] Fetching from backend with startupId:",
           startupIdForBackend,
         );
         if (startupIdForBackend) {
@@ -931,11 +905,11 @@ export default function VirtualStartupOffice({
             const backendTeamMembers =
               await teamMemberApi.getStartupTeamMembers(startupIdForBackend);
             console.log(
-              "🔍 [VirtualOffice] Backend returned team members:",
+              "ðŸ” [VirtualOffice] Backend returned team members:",
               backendTeamMembers,
             );
             console.log(
-              "🔍 [VirtualOffice] Backend team members details:",
+              "ðŸ” [VirtualOffice] Backend team members details:",
               backendTeamMembers?.map((m) => ({
                 id: m.id,
                 name: m.name || m.talentName,
@@ -965,7 +939,7 @@ export default function VirtualStartupOffice({
                   deskItems: deskItemsOptions[index % deskItemsOptions.length],
                 }));
 
-              // 🔧 FIX: Only include current user if they're a founder
+              // ðŸ”§ FIX: Only include current user if they're a founder
               let allMembersWithBackend;
               if (user.role === "founder") {
                 // Founders see themselves + their team
@@ -993,11 +967,11 @@ export default function VirtualStartupOffice({
               }
               setTeamMembers(allMembersWithBackend);
               console.log(
-                "✅ Team members updated from backend:",
+                "âœ… Team members updated from backend:",
                 allMembersWithBackend.length,
               );
 
-              // 🔥 CRITICAL FIX: Update localStorage with fresh backend data
+              // ðŸ”¥ CRITICAL FIX: Update localStorage with fresh backend data
               // This ensures deleted users are removed from localStorage
               const existingUsers = JSON.parse(
                 localStorage.getItem(STORAGE_KEYS.teamMembers) || "[]",
@@ -1026,7 +1000,7 @@ export default function VirtualStartupOffice({
                 JSON.stringify(updatedUsers),
               );
               console.log(
-                "🧹 localStorage cleaned: removed deleted team members",
+                "ðŸ§¹ localStorage cleaned: removed deleted team members",
               );
             }
           } catch (error) {
@@ -1040,7 +1014,7 @@ export default function VirtualStartupOffice({
           }
         }
       } catch (error) {
-        console.error("❌ Error loading team members:", error);
+        console.error("âŒ Error loading team members:", error);
         // Show at least the current user if everything fails
         setTeamMembers([
           {
@@ -1064,7 +1038,7 @@ export default function VirtualStartupOffice({
     // Auto-debug on load
     debugStartupData();
 
-    // ✅ REALTIME: Removed team member polling (was every 10s) - using real-time subscription below
+    // âœ… REALTIME: Removed team member polling (was every 10s) - using real-time subscription below
 
     return () => {
       // Cleanup handled by real-time subscription
@@ -1086,7 +1060,7 @@ export default function VirtualStartupOffice({
       const startupIdForDebug =
         user.role === "founder" ? user.id : user.startupId || user.companyId;
       console.log(
-        "🐛 [DEBUG] Checking database for startup:",
+        "ðŸ› [DEBUG] Checking database for startup:",
         startupIdForDebug,
       );
       const token = getAccessToken();
@@ -1101,10 +1075,10 @@ export default function VirtualStartupOffice({
         },
       );
       const data = await response.json();
-      console.log("🐛 [DEBUG] Database state:", unwrapData(data));
+      console.log("ðŸ› [DEBUG] Database state:", unwrapData(data));
       // Removed debug toast notification for production
     } catch (error) {
-      console.error("❌ [DEBUG] Error:", error);
+      console.error("âŒ [DEBUG] Error:", error);
       toast.error("Debug failed - check console");
     }
   };
@@ -1289,7 +1263,7 @@ export default function VirtualStartupOffice({
     {
       id: "war-room",
       name: "War Room",
-      icon: "🎯",
+      icon: "ðŸŽ¯",
       type: "meeting",
       capacity: 10,
       occupants: ["1"],
@@ -1305,7 +1279,7 @@ export default function VirtualStartupOffice({
     {
       id: "focus-room",
       name: "Focus Room",
-      icon: "🎧",
+      icon: "ðŸŽ§",
       type: "focus",
       capacity: 4,
       occupants: ["6"],
@@ -1321,7 +1295,7 @@ export default function VirtualStartupOffice({
     {
       id: "water-cooler",
       name: "Water Cooler",
-      icon: "☕",
+      icon: "â˜•",
       type: "social",
       capacity: 8,
       occupants: ["5"],
@@ -1337,7 +1311,7 @@ export default function VirtualStartupOffice({
     {
       id: "break-room",
       name: "Break Room",
-      icon: "🎮",
+      icon: "ðŸŽ®",
       type: "social",
       capacity: 10,
       occupants: [],
@@ -1354,37 +1328,37 @@ export default function VirtualStartupOffice({
   const quickReactions = [
     {
       id: "1",
-      emoji: "👋",
+      emoji: "ðŸ‘‹",
       label: "Wave",
       action: "wave",
     },
     {
       id: "2",
-      emoji: "☕",
+      emoji: "â˜•",
       label: "Coffee?",
       action: "coffee-invite",
     },
     {
       id: "3",
-      emoji: "🙌",
+      emoji: "ðŸ™Œ",
       label: "High Five",
       action: "high-five",
     },
     {
       id: "4",
-      emoji: "💡",
+      emoji: "ðŸ’¡",
       label: "Idea!",
       action: "share-idea",
     },
     {
       id: "5",
-      emoji: "🎉",
+      emoji: "ðŸŽ‰",
       label: "Celebrate",
       action: "celebrate",
     },
     {
       id: "6",
-      emoji: "🤔",
+      emoji: "ðŸ¤”",
       label: "Question",
       action: "question",
     },
@@ -1413,14 +1387,14 @@ export default function VirtualStartupOffice({
     }
   }, [activityFeed, user.id, user.role, user.startupId, user.founderId]);
 
-  // 🔄 FETCH ACTIVITIES FROM BACKEND - Sync all team activities
+  // ðŸ”„ FETCH ACTIVITIES FROM BACKEND - Sync all team activities
   useEffect(() => {
     const currentStartupId =
       user.role === "founder"
         ? user.id
         : user.startupId || user.founderId || "";
     if (!currentStartupId) {
-      console.warn("⚠️ No startupId found, skipping activity sync");
+      console.warn("âš ï¸ No startupId found, skipping activity sync");
       setActivityLoading(false);
       return;
     }
@@ -1446,7 +1420,7 @@ export default function VirtualStartupOffice({
     // Initial fetch (delayed to let UI load first)
     const initialTimeout = setTimeout(fetchActivities, 2000);
 
-    // ✅ REALTIME: Removed activity polling (was every 60s) - using real-time subscription below
+    // âœ… REALTIME: Removed activity polling (was every 60s) - using real-time subscription below
 
     return () => {
       isActive = false;
@@ -1455,17 +1429,17 @@ export default function VirtualStartupOffice({
     };
   }, [user.id, user.role, user.startupId, user.founderId]);
 
-  // 📡 SUBSCRIBE TO REALTIME ACTIVITY UPDATES
+  // ðŸ“¡ SUBSCRIBE TO REALTIME ACTIVITY UPDATES
   useEffect(() => {
     const currentStartupId =
       user.role === "founder"
         ? user.id
         : user.startupId || user.founderId || "";
     if (!currentStartupId) {
-      console.warn("⚠️ No startupId found, skipping realtime subscription");
+      console.warn("âš ï¸ No startupId found, skipping realtime subscription");
       return;
     }
-    console.log("📡 Setting up realtime activity subscription...");
+    console.log("ðŸ“¡ Setting up realtime activity subscription...");
 
     // Subscribe to realtime activities
     const unsubscribe = subscribeToActivities(currentStartupId, (activity) => {
@@ -1473,7 +1447,7 @@ export default function VirtualStartupOffice({
         const incoming = {
           ...activity,
           timestamp: new Date(activity.timestamp || Date.now()),
-          icon: typeof activity.icon === "string" ? activity.icon : "📋",
+          icon: typeof activity.icon === "string" ? activity.icon : "ðŸ“‹",
         };
         const pruned = prev.filter((event) => {
           if (!String(event.id || "").startsWith("optimistic-")) return true;
@@ -1496,7 +1470,7 @@ export default function VirtualStartupOffice({
 
     // Cleanup on unmount
     return () => {
-      console.log("🔌 Cleaning up realtime subscription");
+      console.log("ðŸ”Œ Cleaning up realtime subscription");
       unsubscribe();
     };
   }, [user.id, user.role, user.startupId, user.founderId, audio]);
@@ -1507,7 +1481,7 @@ export default function VirtualStartupOffice({
         ? user.id
         : user.startupId || user.founderId || "";
     if (!currentStartupId) {
-      console.warn("⚠️ No startupId found, skipping activity");
+      console.warn("âš ï¸ No startupId found, skipping activity");
       return { success: false, error: "No startup context" };
     }
     const newEvent = {
@@ -1573,13 +1547,13 @@ export default function VirtualStartupOffice({
   const getMoodEmoji = (mood) => {
     switch (mood) {
       case "happy":
-        return "😊";
+        return "ðŸ˜Š";
       case "focused":
-        return "🎯";
+        return "ðŸŽ¯";
       case "tired":
-        return "😴";
+        return "ðŸ˜´";
       default:
-        return "😐";
+        return "ðŸ˜";
     }
   };
   const formatTimeAgo = (timestamp) => {
@@ -1607,7 +1581,7 @@ export default function VirtualStartupOffice({
     addActivity(
       "status-change",
       `switched to ${newStatus.replace("-", " ")}`,
-      "🔄",
+      "ðŸ”„",
     );
     toast.success(`Status updated to: ${newStatus.replace("-", " ")}`);
   };
@@ -1626,7 +1600,7 @@ export default function VirtualStartupOffice({
     if (!currentRoom) return;
     const room = meetingRooms.find((r) => r.id === currentRoom);
     setCurrentRoom(null);
-    addActivity("departure", `left ${room?.name}`, "👋");
+    addActivity("departure", `left ${room?.name}`, "ðŸ‘‹");
     toast(`Left ${room?.name}`);
     audio.playDoorSound("close");
   };
@@ -1656,7 +1630,7 @@ export default function VirtualStartupOffice({
     if (hour < 12)
       return {
         greeting: "Good morning",
-        icon: "🌅",
+        icon: "ðŸŒ…",
         message: "Ready to tackle the day?",
       };
     if (hour < 17)
@@ -1668,12 +1642,12 @@ export default function VirtualStartupOffice({
     if (hour < 22)
       return {
         greeting: "Good evening",
-        icon: "🌙",
+        icon: "ðŸŒ™",
         message: "Winding down for the day?",
       };
     return {
       greeting: "Late night",
-      icon: "🌙",
+      icon: "ðŸŒ™",
       message: "Burning the midnight oil?",
     };
   };
@@ -1682,11 +1656,11 @@ export default function VirtualStartupOffice({
   // Handle sending invitation
   const handleSendInvitation = async () => {
     console.log(
-      "🔍 [VirtualOffice] handleSendInvitation called with form:",
+      "ðŸ” [VirtualOffice] handleSendInvitation called with form:",
       inviteForm,
     );
     if (!inviteForm.email || !inviteForm.role) {
-      console.error("❌ [VirtualOffice] Missing email or role:", {
+      console.error("âŒ [VirtualOffice] Missing email or role:", {
         email: inviteForm.email,
         role: inviteForm.role,
       });
@@ -1715,23 +1689,23 @@ export default function VirtualStartupOffice({
         expiresAt: new Date(
           Date.now() + 14 * 24 * 60 * 60 * 1000,
         ).toISOString(),
-        appUrl: APP_URL, // ✅ Use custom domain
+        appUrl: APP_URL, // âœ… Use custom domain
       };
       const expectedInvitationLink = `${APP_URL}?invitation=${token}`;
-      console.log("📧 [VirtualOffice] Sending invitation:", invitationData);
-      console.log("🔗 [VirtualOffice] App URL for email link:", APP_URL);
+      console.log("ðŸ“§ [VirtualOffice] Sending invitation:", invitationData);
+      console.log("ðŸ”— [VirtualOffice] App URL for email link:", APP_URL);
       console.log(
-        "🔗 [VirtualOffice] Expected invitation link:",
+        "ðŸ”— [VirtualOffice] Expected invitation link:",
         expectedInvitationLink,
       );
       console.log(
-        "✅ [VirtualOffice] EMAIL WILL CONTAIN THIS LINK:",
+        "âœ… [VirtualOffice] EMAIL WILL CONTAIN THIS LINK:",
         expectedInvitationLink,
       );
 
       const data = await sendInvitation(invitationData);
-      console.log("✅ [VirtualOffice] Invitation sent successfully:", data);
-      toast.success(`📧 Invitation sent to ${inviteForm.email}!`);
+      console.log("âœ… [VirtualOffice] Invitation sent successfully:", data);
+      toast.success(`ðŸ“§ Invitation sent to ${inviteForm.email}!`);
       audio.playClickSound();
 
       // Reset form
@@ -1744,7 +1718,7 @@ export default function VirtualStartupOffice({
       });
       setShowInviteDialog(false);
     } catch (error) {
-      console.error("❌ [VirtualOffice] Error sending invitation:", error);
+      console.error("âŒ [VirtualOffice] Error sending invitation:", error);
       toast.error(
         error instanceof Error ? error.message : "Failed to send invitation",
       );
@@ -1879,7 +1853,7 @@ export default function VirtualStartupOffice({
     );
 
     // Add to live activity feed
-    addActivity("announcement-comment", "commented on an announcement", "💬");
+    addActivity("announcement-comment", "commented on an announcement", "ðŸ’¬");
 
     // Send notification to announcement author
     if (announcementAuthorId && announcementAuthorId !== user.id) {
@@ -2020,7 +1994,7 @@ export default function VirtualStartupOffice({
       sender: user.name,
       authorId: user.id,
       timestamp: new Date(),
-      emoji: "📢",
+      emoji: "ðŸ“¢",
       priority: "normal",
       category: "general",
       reactions: [],
@@ -2028,8 +2002,8 @@ export default function VirtualStartupOffice({
     };
     setAnnouncements((prev) => [newAnnouncement, ...prev]);
     setLatestAnnouncement(announcement);
-    addActivity("announcement", announcementText, "📢");
-    toast.success("📢 Announcement sent to everyone!");
+    addActivity("announcement", announcementText, "ðŸ“¢");
+    toast.success("ðŸ“¢ Announcement sent to everyone!");
     setAnnouncementText("");
     setShowAnnouncementDialog(false);
     audio.playNotificationSound("info");
@@ -2162,15 +2136,15 @@ export default function VirtualStartupOffice({
       setIsVideoCallActive(true);
       // Video call starts minimized by default (don't change isVideoMinimized state)
 
-      console.log("📹 Video call started:", {
+      console.log("ðŸ“¹ Video call started:", {
         participantCount: participants.length,
         callType,
         roomName,
         meetLink: meetingResult.meetLink,
         isVideoCallActive: true,
       });
-      addActivity("chat", `started video call with ${targetName}`, "📹");
-      toast.success(`📹 Meeting created! Click to join ${targetName}`, {
+      addActivity("chat", `started video call with ${targetName}`, "ðŸ“¹");
+      toast.success(`ðŸ“¹ Meeting created! Click to join ${targetName}`, {
         duration: 3000,
       });
       audio.playNotificationSound("info");
@@ -2190,7 +2164,7 @@ export default function VirtualStartupOffice({
       setIsVideoMinimized(false);
       setActiveCallParticipants([]);
       setGoogleMeetLink("");
-      addActivity("chat", "ended video call", "📴");
+      addActivity("chat", "ended video call", "ðŸ“´");
       toast("Call ended");
       audio.playNotificationSound("info");
     } catch (error) {
@@ -2210,7 +2184,7 @@ export default function VirtualStartupOffice({
     if (willOpen) {
       setIsTaskPanelOpen(false);
       setIsTeamHubOpen(false);
-      addActivity("panel-open", "opened team chat", "💬");
+      addActivity("panel-open", "opened team chat", "ðŸ’¬");
     } else {
       // When closing, refresh unread count
       try {
@@ -2234,7 +2208,7 @@ export default function VirtualStartupOffice({
     if (willOpen) {
       setIsMessagePanelOpen(false);
       setIsTeamHubOpen(false);
-      addActivity("panel-open", "opened task panel", "🎯");
+      addActivity("panel-open", "opened task panel", "ðŸŽ¯");
       audio.playClickSound();
     }
   };
@@ -2246,7 +2220,7 @@ export default function VirtualStartupOffice({
     if (willOpen) {
       setIsMessagePanelOpen(false);
       setIsTaskPanelOpen(false);
-      addActivity("panel-open", "opened updates", "✨");
+      addActivity("panel-open", "opened updates", "âœ¨");
       audio.playClickSound();
     }
   };
@@ -2277,9 +2251,9 @@ export default function VirtualStartupOffice({
             addActivity(
               "task-complete",
               `completed task: "${task.title}"`,
-              "✅",
+              "âœ…",
             );
-            toast.success(`✅ Task completed: ${task.title}`);
+            toast.success(`âœ… Task completed: ${task.title}`);
             audio.playClickSound();
           }
           return {
@@ -2302,7 +2276,7 @@ export default function VirtualStartupOffice({
   // GAMIFICATION FUNCTIONS
 
   // Check-in Prompt Effect - REMOVED (replaced with interactive tour)
-  // Users can still check in manually via ⌘⇧C keyboard shortcut
+  // Users can still check in manually via âŒ˜â‡§C keyboard shortcut
   // The check-in dialog won't auto-popup anymore to keep the workspace clean
   // useEffect(() => {
   //   const hasCheckedInLocalStorage = localStorage.getItem(`office_checkin_${new Date().toDateString()}`);
@@ -2385,7 +2359,7 @@ export default function VirtualStartupOffice({
         e.preventDefault();
         setShowStatusDialog(true);
         toast("Opening status dialog", {
-          icon: "⚡",
+          icon: "âš¡",
         });
       }
 
@@ -2400,7 +2374,7 @@ export default function VirtualStartupOffice({
         e.preventDefault();
         setShowKeyboardShortcuts(true);
         toast("Keyboard shortcuts reference", {
-          icon: "⌨��",
+          icon: "âŒ¨ï¿½ï¿½",
         });
       }
 
@@ -2410,11 +2384,11 @@ export default function VirtualStartupOffice({
         if (!hasCheckedInToday) {
           setShowCheckInDialog(true);
           toast("Opening daily check-in", {
-            icon: "✅",
+            icon: "âœ…",
           });
         } else {
-          toast("You've already checked in today! 🎉", {
-            icon: "✨",
+          toast("You've already checked in today! ðŸŽ‰", {
+            icon: "âœ¨",
           });
         }
       }
@@ -2425,7 +2399,7 @@ export default function VirtualStartupOffice({
         audio.updateSettings({
           isMuted: !audio.settings.isMuted,
         });
-        toast(audio.settings.isMuted ? "🔊 Audio unmuted" : "🔇 Audio muted");
+        toast(audio.settings.isMuted ? "ðŸ”Š Audio unmuted" : "ðŸ”‡ Audio muted");
         audio.playClickSound();
       }
 
@@ -2530,16 +2504,16 @@ export default function VirtualStartupOffice({
                           variant="secondary"
                           className={`text-[10px] h-5 w-full justify-center ${member.status === "available" ? "bg-green-100 dark:bg-green-950 text-green-700 dark:text-green-300" : member.status === "in-meeting" ? "bg-red-100 dark:bg-red-950 text-red-700 dark:text-red-300" : member.status === "focus-mode" ? "bg-purple-100 dark:bg-purple-950 text-purple-700 dark:text-purple-300" : member.status === "on-break" ? "bg-orange-100 dark:bg-orange-950 text-orange-700 dark:text-orange-300" : "bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400"}`}
                         >
-                          {member.status === "available" && "✓ Available"}
-                          {member.status === "in-meeting" && "📞 In Meeting"}
-                          {member.status === "focus-mode" && "🎯 Focusing"}
-                          {member.status === "on-break" && "☕ On Break"}
+                          {member.status === "available" && "âœ“ Available"}
+                          {member.status === "in-meeting" && "ðŸ“ž In Meeting"}
+                          {member.status === "focus-mode" && "ðŸŽ¯ Focusing"}
+                          {member.status === "on-break" && "â˜• On Break"}
                           {member.status === "away" && "Away"}
                         </Badge>
                         {member.currentTask && (
                           <div className="w-full bg-blue-50 dark:bg-blue-950/20 rounded px-2 py-1">
                             <p className="text-[9px] text-blue-700 dark:text-blue-300 font-medium truncate">
-                              {"🎯 "}
+                              {"ðŸŽ¯ "}
                               {member.currentTask}
                             </p>
                           </div>
@@ -2683,7 +2657,7 @@ export default function VirtualStartupOffice({
                       >
                         <div className="flex items-start gap-2">
                           <div className="text-gray-500 flex-shrink-0 mt-0.5">
-                            {typeof event.icon === "string" ? event.icon : "📋"}
+                            {typeof event.icon === "string" ? event.icon : "ðŸ“‹"}
                           </div>
                           <div className="flex-1 min-w-0">
                             <p className="text-xs">
@@ -2751,7 +2725,7 @@ export default function VirtualStartupOffice({
                           setIsTeamHubOpen(true);
                           setSelectedTeamHubTab("wall-of-wins");
                           toast("Opening Wall of Wins", {
-                            icon: "🏆",
+                            icon: "ðŸ†",
                           });
                         }}
                         className="relative p-1.5 rounded-lg hover:bg-white/50 dark:hover:bg-black/20 transition-colors group"
@@ -2771,7 +2745,7 @@ export default function VirtualStartupOffice({
                           setIsTeamHubOpen(true);
                           setSelectedTeamHubTab("announcements");
                           toast("Opening Announcements", {
-                            icon: "📢",
+                            icon: "ðŸ“¢",
                           });
                         }}
                         className="relative p-1.5 rounded-lg hover:bg-white/50 dark:hover:bg-black/20 transition-colors group"
@@ -2855,7 +2829,7 @@ export default function VirtualStartupOffice({
                                     toast(
                                       `${itemsText} scheduled on this day`,
                                       {
-                                        icon: "📅",
+                                        icon: "ðŸ“…",
                                       },
                                     );
                                   }
@@ -2904,7 +2878,7 @@ export default function VirtualStartupOffice({
                                 setActivePanel("tasks");
                               } else if (item.type === "meeting") {
                                 toast(`Meeting: ${item.title}`, {
-                                  icon: "📹",
+                                  icon: "ðŸ“¹",
                                 });
                               }
                             }}
@@ -3028,11 +3002,11 @@ export default function VirtualStartupOffice({
                       Current:
                     </span>
                     <Badge variant="secondary" className="text-xs">
-                      {myStatus === "available" && "🟢 Available"}
-                      {myStatus === "in-meeting" && "🔴 In Meeting"}
-                      {myStatus === "focus-mode" && "🟡 Focus Mode"}
-                      {myStatus === "on-break" && "☕ On Break"}
-                      {myStatus === "away" && "⚫ Away"}
+                      {myStatus === "available" && "ðŸŸ¢ Available"}
+                      {myStatus === "in-meeting" && "ðŸ”´ In Meeting"}
+                      {myStatus === "focus-mode" && "ðŸŸ¡ Focus Mode"}
+                      {myStatus === "on-break" && "â˜• On Break"}
+                      {myStatus === "away" && "âš« Away"}
                     </Badge>
                   </div>
                   {myStatusMessage && (
@@ -3128,7 +3102,7 @@ export default function VirtualStartupOffice({
                     e.preventDefault();
                     e.stopPropagation();
                     console.log("Team Call button clicked!");
-                    toast.success("📹 Starting team call...");
+                    toast.success("ðŸ“¹ Starting team call...");
                     startVideoCall();
                   }}
                   className="h-7 text-[10px] px-1 cursor-pointer touch-manipulation active:scale-95"
@@ -3336,11 +3310,11 @@ export default function VirtualStartupOffice({
                           <p className="text-[9px] text-muted-foreground">
                             {meetingRooms.find((r) => r.id === currentRoom)
                               ?.type === "social"
-                              ? "💬 Perfect for casual conversations"
+                              ? "ðŸ’¬ Perfect for casual conversations"
                               : meetingRooms.find((r) => r.id === currentRoom)
                                     ?.type === "focus"
-                                ? "🎧 Quiet space for deep work"
-                                : "🎯 Great for team meetings"}
+                                ? "ðŸŽ§ Quiet space for deep work"
+                                : "ðŸŽ¯ Great for team meetings"}
                           </p>
                         </div>
                       </div>
@@ -3401,14 +3375,14 @@ export default function VirtualStartupOffice({
                           }}
                           className="text-sm"
                         >
-                          📢
+                          ðŸ“¢
                         </motion.div>
                         <div className="flex-1">
                           <p className="text-[10px] font-medium text-orange-900 dark:text-orange-100">
                             {latestAnnouncement.message}
                           </p>
                           <p className="text-[9px] text-orange-700 dark:text-orange-300">
-                            Team Announcement • Just now
+                            Team Announcement â€¢ Just now
                           </p>
                         </div>
                       </div>
@@ -3453,8 +3427,8 @@ export default function VirtualStartupOffice({
                     </Button>
                   </TooltipTrigger>
                   <TooltipContent side="bottom" className="text-xs">
-                    {"Start a team video call �� "}
-                    <kbd className="px-1 py-0.5 bg-black/20 rounded">⌘K</kbd>
+                    {"Start a team video call ï¿½ï¿½ "}
+                    <kbd className="px-1 py-0.5 bg-black/20 rounded">âŒ˜K</kbd>
                   </TooltipContent>
                 </Tooltip>
                 <Tooltip>
@@ -3476,8 +3450,8 @@ export default function VirtualStartupOffice({
                     </Button>
                   </TooltipTrigger>
                   <TooltipContent side="bottom" className="text-xs">
-                    {"Open messages panel • "}
-                    <kbd className="px-1 py-0.5 bg-black/20 rounded">⌘M</kbd>
+                    {"Open messages panel â€¢ "}
+                    <kbd className="px-1 py-0.5 bg-black/20 rounded">âŒ˜M</kbd>
                   </TooltipContent>
                 </Tooltip>
                 <Tooltip>
@@ -3499,8 +3473,8 @@ export default function VirtualStartupOffice({
                     </Button>
                   </TooltipTrigger>
                   <TooltipContent side="bottom" className="text-xs">
-                    {"Manage tasks & projects • "}
-                    <kbd className="px-1 py-0.5 bg-black/20 rounded">⌘T</kbd>
+                    {"Manage tasks & projects â€¢ "}
+                    <kbd className="px-1 py-0.5 bg-black/20 rounded">âŒ˜T</kbd>
                   </TooltipContent>
                 </Tooltip>
                 <Tooltip>
@@ -3516,8 +3490,8 @@ export default function VirtualStartupOffice({
                     </Button>
                   </TooltipTrigger>
                   <TooltipContent side="bottom" className="text-xs">
-                    {"Schedule & Meetings • "}
-                    <kbd className="px-1 py-0.5 bg-black/20 rounded">⌘C</kbd>
+                    {"Schedule & Meetings â€¢ "}
+                    <kbd className="px-1 py-0.5 bg-black/20 rounded">âŒ˜C</kbd>
                   </TooltipContent>
                 </Tooltip>
                 <Tooltip>
@@ -3534,8 +3508,8 @@ export default function VirtualStartupOffice({
                     </Button>
                   </TooltipTrigger>
                   <TooltipContent side="bottom" className="text-xs">
-                    {"Polls & Announcements • "}
-                    <kbd className="px-1 py-0.5 bg-black/20 rounded">⌘H</kbd>
+                    {"Polls & Announcements â€¢ "}
+                    <kbd className="px-1 py-0.5 bg-black/20 rounded">âŒ˜H</kbd>
                   </TooltipContent>
                 </Tooltip>
               </div>
@@ -3556,7 +3530,7 @@ export default function VirtualStartupOffice({
                   Shortcuts
                 </span>
                 <kbd className="ml-0.5 px-1 py-0.5 bg-white dark:bg-gray-800 border border-indigo-200 dark:border-indigo-700 rounded text-[9px] font-mono text-indigo-600 dark:text-indigo-400">
-                  ⌘?
+                  âŒ˜?
                 </kbd>
                 {showHelpTooltip && (
                   <span className="absolute -top-0.5 -right-0.5 flex h-2 w-2">
@@ -3633,7 +3607,7 @@ export default function VirtualStartupOffice({
                               <div className="text-gray-500 flex-shrink-0 mt-0.5 text-xs">
                                 {typeof event.icon === "string"
                                   ? event.icon
-                                  : "📋"}
+                                  : "ðŸ“‹"}
                               </div>
                               <div className="flex-1 min-w-0">
                                 <p className="text-[9px]">
@@ -3737,7 +3711,7 @@ export default function VirtualStartupOffice({
                                   className="flex-1 h-5 text-[9px] px-1"
                                   onClick={() => {
                                     toast.success(
-                                      `👋 Waved at ${member.name}!`,
+                                      `ðŸ‘‹ Waved at ${member.name}!`,
                                     );
                                   }}
                                 >
@@ -3844,7 +3818,7 @@ export default function VirtualStartupOffice({
                             setIsTeamHubOpen(true);
                             setSelectedTeamHubTab("wall-of-wins");
                             toast("Opening Wall of Wins", {
-                              icon: "🏆",
+                              icon: "ðŸ†",
                             });
                           }}
                           className="relative p-0.5 rounded hover:bg-white/50 dark:hover:bg-black/20 transition-colors group"
@@ -3867,7 +3841,7 @@ export default function VirtualStartupOffice({
                             setIsTeamHubOpen(true);
                             setSelectedTeamHubTab("announcements");
                             toast("Opening Announcements", {
-                              icon: "📢",
+                              icon: "ðŸ“¢",
                             });
                           }}
                           className="relative p-0.5 rounded hover:bg-white/50 dark:hover:bg-black/20 transition-colors group"
@@ -3949,7 +3923,7 @@ export default function VirtualStartupOffice({
                                     toast(
                                       `${itemsText} scheduled on this day`,
                                       {
-                                        icon: "📅",
+                                        icon: "ðŸ“…",
                                       },
                                     );
                                   }
@@ -4000,7 +3974,7 @@ export default function VirtualStartupOffice({
                                   setActivePanel("tasks");
                                 } else if (item.type === "meeting") {
                                   toast(`Meeting: ${item.title}`, {
-                                    icon: "📹",
+                                    icon: "ðŸ“¹",
                                   });
                                 }
                               }}
@@ -4194,7 +4168,7 @@ export default function VirtualStartupOffice({
                 </div>
                 <div className="p-3 bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg">
                   <p className="text-xs text-blue-900 dark:text-blue-100">
-                    <strong>💡 Tip:</strong>
+                    <strong>ðŸ’¡ Tip:</strong>
                     {
                       " Your status appears in the Team Grid and helps teammates know if you're available!"
                     }
@@ -4359,7 +4333,7 @@ export default function VirtualStartupOffice({
                 )}
                 <div className="p-3 bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg">
                   <p className="text-xs text-blue-900 dark:text-blue-100">
-                    <strong>💡 Tip:</strong>
+                    <strong>ðŸ’¡ Tip:</strong>
                     {
                       " Daily check-ins help the team stay aligned and spot where help is needed!"
                     }
@@ -4410,7 +4384,7 @@ export default function VirtualStartupOffice({
                         <span className="text-sm">Toggle Messages</span>
                         <div className="flex items-center gap-1">
                           <kbd className="px-2 py-1 bg-white dark:bg-gray-800 border border-slate-300 dark:border-slate-700 rounded text-xs font-mono">
-                            ⌘
+                            âŒ˜
                           </kbd>
                           <span className="text-xs">+</span>
                           <kbd className="px-2 py-1 bg-white dark:bg-gray-800 border border-slate-300 dark:border-slate-700 rounded text-xs font-mono">
@@ -4422,7 +4396,7 @@ export default function VirtualStartupOffice({
                         <span className="text-sm">Toggle Tasks</span>
                         <div className="flex items-center gap-1">
                           <kbd className="px-2 py-1 bg-white dark:bg-gray-800 border border-slate-300 dark:border-slate-700 rounded text-xs font-mono">
-                            ⌘
+                            âŒ˜
                           </kbd>
                           <span className="text-xs">+</span>
                           <kbd className="px-2 py-1 bg-white dark:bg-gray-800 border border-slate-300 dark:border-slate-700 rounded text-xs font-mono">
@@ -4434,7 +4408,7 @@ export default function VirtualStartupOffice({
                         <span className="text-sm">Toggle Updates</span>
                         <div className="flex items-center gap-1">
                           <kbd className="px-2 py-1 bg-white dark:bg-gray-800 border border-slate-300 dark:border-slate-700 rounded text-xs font-mono">
-                            ⌘
+                            âŒ˜
                           </kbd>
                           <span className="text-xs">+</span>
                           <kbd className="px-2 py-1 bg-white dark:bg-gray-800 border border-slate-300 dark:border-slate-700 rounded text-xs font-mono">
@@ -4446,7 +4420,7 @@ export default function VirtualStartupOffice({
                         <span className="text-sm">Toggle Calendar</span>
                         <div className="flex items-center gap-1">
                           <kbd className="px-2 py-1 bg-white dark:bg-gray-800 border border-slate-300 dark:border-slate-700 rounded text-xs font-mono">
-                            ⌘
+                            âŒ˜
                           </kbd>
                           <span className="text-xs">+</span>
                           <kbd className="px-2 py-1 bg-white dark:bg-gray-800 border border-slate-300 dark:border-slate-700 rounded text-xs font-mono">
@@ -4458,7 +4432,7 @@ export default function VirtualStartupOffice({
                         <span className="text-sm">Toggle Team</span>
                         <div className="flex items-center gap-1">
                           <kbd className="px-2 py-1 bg-white dark:bg-gray-800 border border-slate-300 dark:border-slate-700 rounded text-xs font-mono">
-                            ⌘
+                            âŒ˜
                           </kbd>
                           <span className="text-xs">+</span>
                           <kbd className="px-2 py-1 bg-white dark:bg-gray-800 border border-slate-300 dark:border-slate-700 rounded text-xs font-mono">
@@ -4470,7 +4444,7 @@ export default function VirtualStartupOffice({
                         <span className="text-sm">Start Video Call</span>
                         <div className="flex items-center gap-1">
                           <kbd className="px-2 py-1 bg-white dark:bg-gray-800 border border-slate-300 dark:border-slate-700 rounded text-xs font-mono">
-                            ⌘
+                            âŒ˜
                           </kbd>
                           <span className="text-xs">+</span>
                           <kbd className="px-2 py-1 bg-white dark:bg-gray-800 border border-slate-300 dark:border-slate-700 rounded text-xs font-mono">
@@ -4482,7 +4456,7 @@ export default function VirtualStartupOffice({
                         <span className="text-sm">Update Status</span>
                         <div className="flex items-center gap-1">
                           <kbd className="px-2 py-1 bg-white dark:bg-gray-800 border border-slate-300 dark:border-slate-700 rounded text-xs font-mono">
-                            ��
+                            ï¿½ï¿½
                           </kbd>
                           <span className="text-xs">+</span>
                           <kbd className="px-2 py-1 bg-white dark:bg-gray-800 border border-slate-300 dark:border-slate-700 rounded text-xs font-mono">
@@ -4494,11 +4468,11 @@ export default function VirtualStartupOffice({
                         <span className="text-sm">Announce to Team</span>
                         <div className="flex items-center gap-1">
                           <kbd className="px-2 py-1 bg-white dark:bg-gray-800 border border-slate-300 dark:border-slate-700 rounded text-xs font-mono">
-                            ⌘
+                            âŒ˜
                           </kbd>
                           <span className="text-xs">+</span>
                           <kbd className="px-2 py-1 bg-white dark:bg-gray-800 border border-slate-300 dark:border-slate-700 rounded text-xs font-mono">
-                            ⇧
+                            â‡§
                           </kbd>
                           <span className="text-xs">+</span>
                           <kbd className="px-2 py-1 bg-white dark:bg-gray-800 border border-slate-300 dark:border-slate-700 rounded text-xs font-mono">
@@ -4517,11 +4491,11 @@ export default function VirtualStartupOffice({
                         <span className="text-sm">Check In</span>
                         <div className="flex items-center gap-1">
                           <kbd className="px-2 py-1 bg-white dark:bg-gray-800 border border-slate-300 dark:border-slate-700 rounded text-xs font-mono">
-                            ⌘
+                            âŒ˜
                           </kbd>
                           <span className="text-xs">+</span>
                           <kbd className="px-2 py-1 bg-white dark:bg-gray-800 border border-slate-300 dark:border-slate-700 rounded text-xs font-mono">
-                            ⇧
+                            â‡§
                           </kbd>
                           <span className="text-xs">+</span>
                           <kbd className="px-2 py-1 bg-white dark:bg-gray-800 border border-slate-300 dark:border-slate-700 rounded text-xs font-mono">
@@ -4541,7 +4515,7 @@ export default function VirtualStartupOffice({
                         <span className="text-sm">Show Shortcuts</span>
                         <div className="flex items-center gap-1">
                           <kbd className="px-2 py-1 bg-white dark:bg-gray-800 border border-slate-300 dark:border-slate-700 rounded text-xs font-mono">
-                            ⌘
+                            âŒ˜
                           </kbd>
                           <span className="text-xs">+</span>
                           <kbd className="px-2 py-1 bg-white dark:bg-gray-800 border border-slate-300 dark:border-slate-700 rounded text-xs font-mono">
@@ -4562,10 +4536,10 @@ export default function VirtualStartupOffice({
                 </div>
                 <div className="mt-6 p-3 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg">
                   <p className="text-xs text-blue-900">
-                    <strong>💡 Pro tip:</strong>
+                    <strong>ðŸ’¡ Pro tip:</strong>
                     {" Use "}
                     <kbd className="px-1 py-0.5 bg-white border border-blue-300 rounded text-[10px] font-mono">
-                      ⌘
+                      âŒ˜
                     </kbd>
                     {" on Mac or"}
                     <kbd className="px-1 py-0.5 bg-white border border-blue-300 rounded text-[10px] font-mono ml-1">
@@ -4584,20 +4558,7 @@ export default function VirtualStartupOffice({
                       Esc
                     </kbd>
                     {" to close dialogs"}
-                  </p>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      localStorage.removeItem(virtualOfficeTourLsKey);
-                      setShowKeyboardShortcuts(false);
-                      setOfficeTourReplay(true);
-                      setShowOfficeTour(true);
-                    }}
-                  >
-                    🎯 Replay Tour
-                  </Button>
-                </div>
+                  </p></div>
                 <Button onClick={() => setShowKeyboardShortcuts(false)}>
                   Got it!
                 </Button>
@@ -4610,31 +4571,7 @@ export default function VirtualStartupOffice({
             user={user}
             teamMembers={teamMembers}
           />
-          <InteractiveTour
-            steps={virtualOfficeTourSteps}
-            tourKey="virtual-office-tour"
-            run={showOfficeTour}
-            serverCompleted={Boolean(user?.virtualOfficeTourCompleted)}
-            bypassPersistedGate={officeTourReplay}
-            allowSkip={
-              Boolean(user?.virtualOfficeTourCompleted) || officeTourReplay
-            }
-            onPersistComplete={async () => {
-              const next = { ...user, virtualOfficeTourCompleted: true };
-              if (onUpdateUser) {
-                onUpdateUser(next);
-                return;
-              }
-              await authApi.updateProfile(user.id, {
-                virtualOfficeTourCompleted: true,
-              });
-            }}
-            onComplete={() => {
-              setShowOfficeTour(false);
-              setOfficeTourReplay(false);
-            }}
-          />
-          <div className="hidden lg:block fixed bottom-6 right-6 z-40">
+<div className="hidden lg:block fixed bottom-6 right-6 z-40">
             <motion.button
               initial={{
                 scale: 0,
@@ -4664,7 +4601,7 @@ export default function VirtualStartupOffice({
               <span className="absolute bottom-full right-0 mb-2 px-3 py-1.5 bg-slate-900 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none">
                 Keyboard Shortcuts
                 <kbd className="ml-2 px-1.5 py-0.5 bg-slate-700 rounded text-[10px] font-mono">
-                  ⌘?
+                  âŒ˜?
                 </kbd>
               </span>
             </motion.button>
@@ -4695,12 +4632,12 @@ export default function VirtualStartupOffice({
                         <Sparkles className="w-5 h-5 mt-0.5 flex-shrink-0" />
                         <div>
                           <p className="font-semibold text-sm mb-1">
-                            ⚡ Power User Tip!
+                            âš¡ Power User Tip!
                           </p>
                           <p className="text-xs text-white/90">
                             {"Press "}
                             <kbd className="px-1.5 py-0.5 bg-white/20 rounded text-xs font-mono mx-0.5">
-                              ⌘?
+                              âŒ˜?
                             </kbd>
                             {" anytime to see all keyboard shortcuts"}
                           </p>
@@ -4709,7 +4646,7 @@ export default function VirtualStartupOffice({
                       <div className="mt-3 pt-3 border-t border-white/20">
                         <p className="text-[10px] text-white/70 flex items-center gap-1">
                           <Zap className="w-3 h-3" />
-                          Navigate faster • Work smarter
+                          Navigate faster â€¢ Work smarter
                         </p>
                       </div>
                     </div>
@@ -4995,7 +4932,7 @@ export default function VirtualStartupOffice({
                   Quick Reactions
                 </Label>
                 <div className="flex flex-wrap gap-2">
-                  {["👍", "❤️", "🎉", "🔥", "✨", "👏"].map((emoji) => {
+                  {["ðŸ‘", "â¤ï¸", "ðŸŽ‰", "ðŸ”¥", "âœ¨", "ðŸ‘"].map((emoji) => {
                     const reaction = selectedAnnouncement?.reactions?.find(
                       (r) => r.emoji === emoji,
                     );
@@ -5142,3 +5079,4 @@ export default function VirtualStartupOffice({
     </>
   );
 }
+

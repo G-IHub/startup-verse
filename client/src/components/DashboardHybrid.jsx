@@ -5,14 +5,14 @@
 import React, { useState, useEffect, lazy, Suspense, useCallback } from "react";
 import AppLayoutHybrid from "./layout/AppLayoutHybrid";
 import AdaptiveVirtualOffice from "./office/AdaptiveVirtualOffice";
-import InteractiveTour from "./tours/InteractiveTour";
-import { homepageTourSteps } from "./tours/tourSteps";
 import { toast } from "sonner";
 import { getTalentProfileCompletionPercent } from "../utils/talentProfileCompletion";
 import { TALENT_ACTIONS_MIN_COMPLETION } from "../constants/talentProfile.js";
+import { featureFlags } from "../config/featureFlags";
 
 // ⚡ LAZY LOAD HEAVY COMPONENTS - Only load when navigating to them
 const FounderDashboard = lazy(() => import("./dashboards/FounderDashboard"));
+const FounderHomeV2 = lazy(() => import("./founder/FounderHomeV2"));
 const TeamMemberDashboard = lazy(
   () => import("./dashboards/TeamMemberDashboard"),
 );
@@ -68,7 +68,6 @@ export default function DashboardHybrid({ user, onLogout, onUpdateUser }) {
   };
   const [currentPage, setCurrentPage] = useState(getDefaultPage());
   const [virtualOfficeView, setVirtualOfficeView] = useState("workspace");
-  const [showOnboarding, setShowOnboarding] = useState(false);
   const [taskToOpen, setTaskToOpen] = useState(null);
   const [announcementToOpen, setAnnouncementToOpen] = useState(null);
   const [messageUserToOpen, setMessageUserToOpen] = useState(null);
@@ -143,17 +142,6 @@ export default function DashboardHybrid({ user, onLogout, onUpdateUser }) {
     console.log("✅ [DashboardHybrid] Page navigation triggered to:", page);
   };
 
-  // Check if user has seen onboarding (only for founders with completed profiles)
-  useEffect(() => {
-    const hasSeenOnboarding = localStorage.getItem("has_seen_onboarding");
-    if (
-      !hasSeenOnboarding &&
-      user.role === "founder" &&
-      user.onboardingComplete
-    ) {
-      setShowOnboarding(true);
-    }
-  }, [user.role, user.onboardingComplete]);
   const handleProfileComplete = (profileData) => {
     const updatedUser = {
       ...user,
@@ -164,12 +152,7 @@ export default function DashboardHybrid({ user, onLogout, onUpdateUser }) {
       onboardingComplete: true,
     };
     onUpdateUser(updatedUser);
-    setShowOnboarding(false);
     toast.success("Profile completed successfully!");
-  };
-  const handleCloseOnboarding = () => {
-    localStorage.setItem("has_seen_onboarding", "true");
-    setShowOnboarding(false);
   };
   const renderPageContent = () => {
     // Only render pages outside Virtual Office when explicitly navigated to
@@ -180,13 +163,21 @@ export default function DashboardHybrid({ user, onLogout, onUpdateUser }) {
           case "founder":
             return (
               <Suspense fallback={<PageLoadingFallback />}>
-                <FounderDashboard
-                  user={user}
-                  onLogout={onLogout}
-                  onUpdateUser={onUpdateUser}
-                  onNavigate={handleNavigate}
-                  onVirtualOfficeViewChange={setVirtualOfficeView}
-                />
+                {featureFlags.redesignedFounderHome ? (
+                  <FounderHomeV2
+                    user={user}
+                    onNavigate={handleNavigate}
+                    onVirtualOfficeViewChange={setVirtualOfficeView}
+                  />
+                ) : (
+                  <FounderDashboard
+                    user={user}
+                    onLogout={onLogout}
+                    onUpdateUser={onUpdateUser}
+                    onNavigate={handleNavigate}
+                    onVirtualOfficeViewChange={setVirtualOfficeView}
+                  />
+                )}
               </Suspense>
             );
           case "team-member":
@@ -421,14 +412,6 @@ export default function DashboardHybrid({ user, onLogout, onUpdateUser }) {
           <Suspense fallback={<PageLoadingFallback />}>
             <AdminDebugIndicator />
           </Suspense>
-          {showOnboarding && (
-            <InteractiveTour
-              steps={homepageTourSteps}
-              tourKey="homepage-welcome"
-              run={showOnboarding}
-              onComplete={handleCloseOnboarding}
-            />
-          )}
         </>
       )}
     </>
