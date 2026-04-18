@@ -3,7 +3,7 @@
  * Handles all backend API calls for Founder users
  */
 
-import { request } from "../backendClient";
+import { request, tryRequest } from "../backendClient";
 
 // Pagination types
 
@@ -42,10 +42,25 @@ function buildQueryString(params) {
 // User & Profile Management
 // ==========================================
 
-export async function saveFounderProfile(userId, profileData) {
+/**
+ * POST /founders/profile — body must match server `createOrUpdateProfile`.
+ */
+export async function saveFounderProfile({
+  userId,
+  startupId,
+  bio = "",
+  background = "",
+  links = {},
+}) {
   return apiCall("/founders/profile", {
     method: "POST",
-    body: JSON.stringify({ userId, profileData }),
+    body: JSON.stringify({
+      userId,
+      startupId,
+      bio,
+      background,
+      links,
+    }),
   });
 }
 
@@ -62,10 +77,45 @@ export async function getAllFounders(params = {}) {
 // Startup/Company Data
 // ==========================================
 
-export async function saveStartupData(startupId, founderId, startupData) {
+/**
+ * POST /founders/startup — upsert by founderId (matches `createOrUpdateStartup`).
+ */
+export async function upsertFounderStartup({
+  founderId,
+  name,
+  description = "",
+  industry = "",
+  stage = "",
+  website = "",
+  logo = "",
+  data,
+}) {
   return apiCall("/founders/startup", {
     method: "POST",
-    body: JSON.stringify({ startupId, founderId, startupData }),
+    body: JSON.stringify({
+      founderId,
+      name,
+      description,
+      industry,
+      stage,
+      website,
+      logo,
+      ...(data !== undefined ? { data } : {}),
+    }),
+  });
+}
+
+/** @deprecated Use `upsertFounderStartup` */
+export async function saveStartupData(startupId, founderId, startupData) {
+  return upsertFounderStartup({
+    founderId,
+    name: startupData?.name || "",
+    description: startupData?.description,
+    industry: startupData?.industry,
+    stage: startupData?.stage,
+    website: startupData?.website,
+    logo: startupData?.logo,
+    data: startupData?.data,
   });
 }
 
@@ -75,6 +125,12 @@ export async function getStartupData(startupId) {
 
 export async function getFounderStartup(founderId) {
   return apiCall(`/founders/${founderId}/startup`);
+}
+
+/** Returns startup doc or null if missing / error (no throw). */
+export async function getFounderStartupSafe(founderId) {
+  const payload = await tryRequest(`/founders/${founderId}/startup`);
+  return payload?.data ?? null;
 }
 
 // ==========================================
