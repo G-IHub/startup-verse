@@ -2,12 +2,9 @@
  * DashboardHybrid - Main dashboard router component
  * Handles routing between different views based on user role
  */
-import React, { useState, useEffect, lazy, Suspense, useCallback } from "react";
+import React, { useState, lazy, Suspense, useCallback } from "react";
 import AppLayoutHybrid from "./layout/AppLayoutHybrid";
 import AdaptiveVirtualOffice from "./office/AdaptiveVirtualOffice";
-import { toast } from "sonner";
-import { getTalentProfileCompletionPercent } from "../utils/talentProfileCompletion";
-import { TALENT_ACTIONS_MIN_COMPLETION } from "../constants/talentProfile.js";
 import { featureFlags } from "../config/featureFlags";
 
 // ⚡ LAZY LOAD HEAVY COMPONENTS - Only load when navigating to them
@@ -72,28 +69,13 @@ export default function DashboardHybrid({ user, onLogout, onUpdateUser }) {
   const [announcementToOpen, setAnnouncementToOpen] = useState(null);
   const [messageUserToOpen, setMessageUserToOpen] = useState(null);
   const [winToOpen, setWinToOpen] = useState(null);
-
-  const isTalentBrowseBlocked = useCallback(() => {
-    if (user.role !== "talent") return false;
-    const pct = getTalentProfileCompletionPercent(user);
-    return pct < TALENT_ACTIONS_MIN_COMPLETION;
-  }, [user]);
-
-  const notifyTalentBrowseBlocked = useCallback(() => {
-    toast.info("Complete your profile first", {
-      description: `Reach at least ${TALENT_ACTIONS_MIN_COMPLETION}% profile depth to browse startups. Use "Continue profile" on your home dashboard.`,
-    });
-  }, []);
+  const [talentDashboardMode, setTalentDashboardMode] = useState("overview");
 
   const handleVirtualOfficeViewChange = useCallback(
     (view) => {
-      if (view === "matching" && isTalentBrowseBlocked()) {
-        notifyTalentBrowseBlocked();
-        return;
-      }
       setVirtualOfficeView(view);
     },
-    [isTalentBrowseBlocked, notifyTalentBrowseBlocked],
+    [],
   );
 
   // Wrapper for setCurrentPage with logging
@@ -133,27 +115,14 @@ export default function DashboardHybrid({ user, onLogout, onUpdateUser }) {
       setCurrentPage("startup-office");
       setVirtualOfficeView("workspace");
     } else {
-      if (page === "team-matching" && isTalentBrowseBlocked()) {
-        notifyTalentBrowseBlocked();
-        return;
+      if (page === "dashboard" && user.role === "talent") {
+        setTalentDashboardMode(options?.mode || "overview");
       }
       setCurrentPage(page);
     }
     console.log("✅ [DashboardHybrid] Page navigation triggered to:", page);
   };
 
-  const handleProfileComplete = (profileData) => {
-    const updatedUser = {
-      ...user,
-      profile: {
-        ...user.profile,
-        ...profileData,
-      },
-      onboardingComplete: true,
-    };
-    onUpdateUser(updatedUser);
-    toast.success("Profile completed successfully!");
-  };
   const renderPageContent = () => {
     // Only render pages outside Virtual Office when explicitly navigated to
     switch (currentPage) {
@@ -191,14 +160,15 @@ export default function DashboardHybrid({ user, onLogout, onUpdateUser }) {
           case "talent":
             return (
               <Suspense fallback={<PageLoadingFallback />}>
-                <TalentDashboard
-                  user={user}
-                  onLogout={onLogout}
-                  onUpdateUser={onUpdateUser}
-                  onNavigate={handleNavigate}
-                />
-              </Suspense>
-            );
+              <TalentDashboard
+                user={user}
+                onLogout={onLogout}
+                onUpdateUser={onUpdateUser}
+                onNavigate={handleNavigate}
+                entryMode={talentDashboardMode}
+              />
+            </Suspense>
+          );
           case "organization-admin":
             return (
               <Suspense fallback={<PageLoadingFallback />}>
@@ -319,6 +289,19 @@ export default function DashboardHybrid({ user, onLogout, onUpdateUser }) {
 
       // Team Matching
       case "team-matching":
+        if (user.role === "talent") {
+          return (
+            <Suspense fallback={<PageLoadingFallback />}>
+              <TalentDashboard
+                user={user}
+                onLogout={onLogout}
+                onUpdateUser={onUpdateUser}
+                onNavigate={handleNavigate}
+                entryMode="opportunities"
+              />
+            </Suspense>
+          );
+        }
         return (
           <Suspense fallback={<PageLoadingFallback />}>
             <TeamMatching user={user} onNavigate={handleNavigate} />
@@ -406,6 +389,7 @@ export default function DashboardHybrid({ user, onLogout, onUpdateUser }) {
             onPageChange={handleNavigate}
             virtualOfficeView={virtualOfficeView}
             onVirtualOfficeViewChange={handleVirtualOfficeViewChange}
+            talentDashboardMode={talentDashboardMode}
           >
             {renderPageContent()}
           </AppLayoutHybrid>

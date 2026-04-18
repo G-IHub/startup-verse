@@ -20,6 +20,7 @@ export default function ChooseYourPathPage({ onBack, onComplete }) {
   const [selectedRole, setSelectedRole] = useState(null);
   const [showProfileSetup, setShowProfileSetup] = useState(false);
   const [newUser, setNewUser] = useState(null);
+  const [pendingAccessToken, setPendingAccessToken] = useState("");
   const [currentSlide, setCurrentSlide] = useState(0);
   const [isExiting, setIsExiting] = useState(false);
   const isMountedRef = useRef(true);
@@ -106,6 +107,7 @@ export default function ChooseYourPathPage({ onBack, onComplete }) {
 
     // Close signup modal and show profile setup
     setShowSignupModal(false);
+    setPendingAccessToken(data.backendToken || "");
 
     // Extract user from signup data
     let user;
@@ -141,7 +143,7 @@ export default function ChooseYourPathPage({ onBack, onComplete }) {
         ...newUser,
         onboardingComplete: true,
       };
-      onComplete(selectedRole, completedUser);
+      onComplete(selectedRole, completedUser, pendingAccessToken);
     }
   };
   const handleProfileUpdateUser = (updatedUser) => {
@@ -152,6 +154,7 @@ export default function ChooseYourPathPage({ onBack, onComplete }) {
   const handleSignupModalClose = () => {
     if (!isMountedRef.current) return;
     setShowSignupModal(false);
+    setPendingAccessToken("");
     setSelectedRole(null);
     setView("choose-path");
   };
@@ -159,6 +162,7 @@ export default function ChooseYourPathPage({ onBack, onComplete }) {
     if (!isMountedRef.current) return;
     setShowProfileSetup(false);
     setNewUser(null);
+    setPendingAccessToken("");
     setSelectedRole(null);
     setView("choose-path");
   };

@@ -50,6 +50,12 @@ export function TeamHubPanel({
   startupId,
   onActivity,
   organizationAnnouncements = [],
+  embedded = false,
+  strictMode = false,
+  announcementsData,
+  winsData,
+  onCreateAnnouncement,
+  onCreateWin,
 }) {
   const [filter, setFilter] = useState("all");
   const [showCreatePoll, setShowCreatePoll] = useState(false);
@@ -57,6 +63,7 @@ export function TeamHubPanel({
 
   // Clear old mock data (one-time cleanup)
   useEffect(() => {
+    if (strictMode) return;
     const mockDataCleared = localStorage.getItem(
       "startupverse_mock_data_cleared",
     );
@@ -69,6 +76,7 @@ export function TeamHubPanel({
 
   // Load from localStorage
   const [polls, setPolls] = useState(() => {
+    if (strictMode) return [];
     const saved = localStorage.getItem("startupverse_polls");
     if (saved) {
       const parsed = JSON.parse(saved);
@@ -81,6 +89,7 @@ export function TeamHubPanel({
     return [];
   });
   const [announcements, setAnnouncements] = useState(() => {
+    if (strictMode) return [];
     const saved = localStorage.getItem("startupverse_announcements");
     if (saved) {
       const parsed = JSON.parse(saved);
@@ -99,14 +108,16 @@ export function TeamHubPanel({
 
   // Persist to localStorage
   useEffect(() => {
+    if (strictMode) return;
     localStorage.setItem("startupverse_polls", JSON.stringify(polls));
-  }, [polls]);
+  }, [polls, strictMode]);
   useEffect(() => {
+    if (strictMode) return;
     localStorage.setItem(
       "startupverse_announcements",
       JSON.stringify(announcements),
     );
-  }, [announcements]);
+  }, [announcements, strictMode]);
 
   useEffect(() => {
     if (!startupId) {
@@ -118,6 +129,11 @@ export function TeamHubPanel({
     let stopped = false;
     setAnnouncementsLoading(true);
     setAnnouncementsError("");
+    if (announcementsData) {
+      setAnnouncements(announcementsData);
+      setAnnouncementsLoading(false);
+      return () => {};
+    }
     getStartupAnnouncements(startupId)
       .then((result) => {
         if (stopped) return;
@@ -152,7 +168,7 @@ export function TeamHubPanel({
       stopped = true;
       unsub?.();
     };
-  }, [startupId]);
+  }, [startupId, announcementsData]);
 
   useEffect(() => {
     if (!startupId) {
@@ -164,6 +180,11 @@ export function TeamHubPanel({
     let stopped = false;
     setWinsLoading(true);
     setWinsError("");
+    if (winsData) {
+      setWins(winsData);
+      setWinsLoading(false);
+      return () => {};
+    }
     getStartupWins(startupId, { limit: 100 })
       .then((result) => {
         if (stopped) return;
@@ -194,7 +215,7 @@ export function TeamHubPanel({
       stopped = true;
       unsub?.();
     };
-  }, [startupId]);
+  }, [startupId, winsData]);
 
   // Poll creation state
   const [newPoll, setNewPoll] = useState({
@@ -267,7 +288,12 @@ export function TeamHubPanel({
     }
     const submitPromise =
       newAnnouncement.category === "wall-of-wins"
-        ? postWin(startupId ? { startupId, userId: currentUserId, message: newAnnouncement.message } : {})
+        ? onCreateWin
+          ? onCreateWin({ message: newAnnouncement.message }).then((win) => ({
+              success: true,
+              win,
+            }))
+          : postWin(startupId ? { startupId, userId: currentUserId, message: newAnnouncement.message } : {})
         : postStartupAnnouncement(startupId, {
             title: "Announcement",
             message: newAnnouncement.message,
@@ -276,7 +302,18 @@ export function TeamHubPanel({
             emoji: newAnnouncement.emoji,
             userId: currentUserId,
           });
-    submitPromise
+    const effectivePromise =
+      newAnnouncement.category !== "wall-of-wins" && onCreateAnnouncement
+        ? onCreateAnnouncement({
+            title: "Announcement",
+            message: newAnnouncement.message,
+            priority: newAnnouncement.priority,
+            category: newAnnouncement.category,
+            emoji: newAnnouncement.emoji,
+            userId: currentUserId,
+          }).then((announcement) => ({ success: true, announcement }))
+        : submitPromise;
+    effectivePromise
       .then((result) => {
         if (newAnnouncement.category === "wall-of-wins") {
           if (!result?.success || !result?.win) {
@@ -484,25 +521,27 @@ export function TeamHubPanel({
     "🔥",
     "✨",
   ];
+  const createDialogClassName = embedded
+    ? "max-w-sm z-[80] office-dialog-panel"
+    : "max-w-sm z-[80] fixed right-[500px] top-1/2 -translate-y-1/2 office-dialog-panel";
+
   return (
     <motion.div
-      initial={{
-        x: "100%",
-      }}
-      animate={{
-        x: 0,
-      }}
-      exit={{
-        x: "100%",
-      }}
+      initial={embedded ? { opacity: 0, y: 16 } : { x: "100%" }}
+      animate={embedded ? { opacity: 1, y: 0 } : { x: 0 }}
+      exit={embedded ? { opacity: 0, y: 16 } : { x: "100%" }}
       transition={{
         type: "spring",
-        damping: 25,
-        stiffness: 200,
+        damping: 28,
+        stiffness: 260,
       }}
-      className="fixed top-0 right-0 h-screen w-full md:w-[480px] bg-white dark:bg-slate-900 border-l-2 border-slate-200 dark:border-slate-700 shadow-2xl z-[70] flex flex-col"
+      className={
+        embedded
+          ? "h-[72vh] w-full office-panel office-panel-shell office-motion-soft flex flex-col"
+          : "fixed top-0 right-0 h-screen w-full md:w-[480px] office-panel office-panel-shell office-motion-soft z-[70] flex flex-col rounded-none md:rounded-l-xl"
+      }
     >
-      <div className="flex-shrink-0 bg-gradient-to-r from-blue-50 to-purple-50 dark:from-slate-800 dark:to-slate-700 p-3 border-b-2 border-slate-200 dark:border-slate-700">
+      <div className="office-panel-header flex-shrink-0 p-3">
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2">
             <Sparkles className="w-4 h-4 text-slate-700 dark:text-slate-300" />
@@ -536,7 +575,7 @@ export function TeamHubPanel({
           )}
         </div>
       </div>
-      <div className="flex-shrink-0 p-4 border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800">
+      <div className="flex-shrink-0 p-4 border-b border-border bg-surface-container-low">
         <div className="flex items-center justify-between gap-2">
           <div className="flex gap-1">
             <Button
@@ -587,7 +626,7 @@ export function TeamHubPanel({
           </div>
         </div>
       </div>
-      <div className="flex-1 overflow-hidden">
+      <div className="flex-1 overflow-hidden office-panel-body">
         <ScrollArea className="h-full">
           <div className="p-4 space-y-3">
             {announcementsLoading ? (
@@ -858,7 +897,7 @@ export function TeamHubPanel({
         </ScrollArea>
       </div>
       <Dialog open={showCreatePoll} onOpenChange={setShowCreatePoll}>
-        <DialogContent className="max-w-sm z-[80] fixed right-[500px] top-1/2 -translate-y-1/2">
+        <DialogContent className={createDialogClassName}>
           <DialogHeader>
             <DialogTitle className="text-sm">Create New Poll</DialogTitle>
             <DialogDescription className="text-xs">
@@ -1022,7 +1061,7 @@ export function TeamHubPanel({
         open={showCreateAnnouncement}
         onOpenChange={setShowCreateAnnouncement}
       >
-        <DialogContent className="max-w-sm z-[80] fixed right-[500px] top-1/2 -translate-y-1/2">
+        <DialogContent className={createDialogClassName}>
           <DialogHeader>
             <DialogTitle className="text-sm">Create Announcement</DialogTitle>
             <DialogDescription className="text-xs">

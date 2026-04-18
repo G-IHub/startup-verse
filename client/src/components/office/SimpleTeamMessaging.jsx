@@ -41,6 +41,8 @@ export function SimpleTeamMessaging({
   teamMembers = [],
   onActivity,
   initialSelectedUserId = null,
+  embedded = false,
+  strictMode = false,
 }) {
   const [conversations, setConversations] = useState([]);
   const [selectedConversation, setSelectedConversation] = useState(null);
@@ -150,6 +152,7 @@ export function SimpleTeamMessaging({
       currentUserId,
       startupId,
       teamMembers,
+      { strict: strictMode },
     );
     console.log("📋 Loaded conversations:", convs);
     setConversations(convs);
@@ -160,7 +163,9 @@ export function SimpleTeamMessaging({
       otherUserId,
       startupId,
     });
-    const msgs = await getConversation(currentUserId, otherUserId, startupId);
+    const msgs = await getConversation(currentUserId, otherUserId, startupId, {
+      strict: strictMode,
+    });
     console.log("📥 Loaded messages:", msgs.length, msgs);
     setMessages(msgs);
   };
@@ -186,6 +191,11 @@ export function SimpleTeamMessaging({
       inputValue,
       startupId,
       false,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      { strict: strictMode },
     );
     console.log("📤 Message send result:", result);
     onActivity?.(
@@ -231,7 +241,7 @@ export function SimpleTeamMessaging({
     });
   const getOnlineStatus = (userId) => {
     const member = teamMembers.find((m) => m.id === userId);
-    return member?.online ?? false;
+    return Boolean(member?.isOnline || member?.online || member?.status === "online");
   };
   const handleFileSelect = async (e) => {
     const file = e.target.files?.[0];
@@ -244,6 +254,7 @@ export function SimpleTeamMessaging({
         file,
         startupId,
         currentUserId,
+        { strict: strictMode },
       );
       if (!uploadResult) {
         console.error("Failed to upload file");
@@ -268,6 +279,7 @@ export function SimpleTeamMessaging({
         uploadResult.fileName,
         uploadResult.fileSize,
         uploadResult.fileType,
+        { strict: strictMode },
       );
       onActivity?.(
         "file-share",
@@ -289,23 +301,22 @@ export function SimpleTeamMessaging({
     setMessageInput((prev) => prev + emoji);
     setShowEmojiPicker(false);
   };
+  const panelMotion = {
+    type: "spring",
+    damping: 28,
+    stiffness: 260,
+  };
   return (
     <motion.div
-      initial={{
-        x: "100%",
-      }}
-      animate={{
-        x: 0,
-      }}
-      exit={{
-        x: "100%",
-      }}
-      transition={{
-        type: "spring",
-        damping: 25,
-        stiffness: 200,
-      }}
-      className="fixed top-0 right-0 h-full z-[70] w-full md:w-96 bg-white dark:bg-gray-900 border-l border-gray-200 dark:border-gray-700 shadow-lg flex flex-col"
+      initial={embedded ? { opacity: 0, y: 16 } : { x: "100%" }}
+      animate={embedded ? { opacity: 1, y: 0 } : { x: 0 }}
+      exit={embedded ? { opacity: 0, y: 16 } : { x: "100%" }}
+      transition={panelMotion}
+      className={
+        embedded
+          ? "h-[72vh] w-full office-panel office-panel-shell office-motion-soft flex flex-col"
+          : "fixed top-0 right-0 h-full z-[70] w-full md:w-[420px] office-panel office-panel-shell office-motion-soft flex flex-col rounded-none md:rounded-l-xl"
+      }
     >
       <AnimatePresence mode="wait">
         {!selectedConversation ? (
@@ -322,7 +333,7 @@ export function SimpleTeamMessaging({
             }}
             className="flex flex-col h-full"
           >
-            <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 dark:border-gray-700">
+            <div className="office-panel-header flex items-center justify-between px-4 py-3">
               <h3 className="text-sm font-semibold text-gray-900 dark:text-white">
                 Team Messages
               </h3>
@@ -335,7 +346,7 @@ export function SimpleTeamMessaging({
                 <X className="w-4 h-4" />
               </Button>
             </div>
-            <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-700">
+            <div className="px-4 py-3 border-b border-border bg-surface-container-low">
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
                 <Input
@@ -346,7 +357,7 @@ export function SimpleTeamMessaging({
                 />
               </div>
             </div>
-            <ScrollArea className="flex-1">
+            <ScrollArea className="flex-1 office-panel-body">
               {filteredConversations.length === 0 ? (
                 <div className="p-8 text-center">
                   <MessageSquare className="w-12 h-12 text-gray-300 dark:text-gray-600 mx-auto mb-3" />
@@ -365,7 +376,7 @@ export function SimpleTeamMessaging({
                   >
                     <div className="relative flex-shrink-0">
                       <Avatar className="w-10 h-10">
-                        <AvatarFallback className="text-xs font-medium bg-blue-600 text-black">
+                        <AvatarFallback className="text-xs font-medium bg-blue-600 text-white">
                           {member.name
                             .split(" ")
                             .map((n) => n[0])
@@ -431,7 +442,7 @@ export function SimpleTeamMessaging({
             }}
             className="flex flex-col h-full"
           >
-            <div className="flex items-center justify-between px-3 py-3 border-b border-gray-200 dark:border-gray-700">
+            <div className="office-panel-header flex items-center justify-between px-3 py-3">
               <div className="flex items-center gap-2 flex-1 min-w-0">
                 <Button
                   size="sm"
@@ -443,7 +454,7 @@ export function SimpleTeamMessaging({
                 </Button>
                 <div className="relative flex-shrink-0">
                   <Avatar className="w-8 h-8">
-                    <AvatarFallback className="text-[10px] font-medium bg-blue-600 text-black">
+                    <AvatarFallback className="text-[10px] font-medium bg-blue-600 text-white">
                       {selectedConv?.userName
                         .split(" ")
                         .map((n) => n[0])
@@ -480,7 +491,7 @@ export function SimpleTeamMessaging({
               </Button>
             </div>
             <div className="flex-1 overflow-hidden">
-              <ScrollArea className="h-full p-4 bg-gray-50 dark:bg-gray-950">
+              <ScrollArea className="h-full p-4 bg-surface-container-low dark:bg-slate-950/40">
                 {messages.length === 0 ? (
                   <div className="flex flex-col items-center justify-center h-full text-center py-12">
                     <MessageSquare className="w-16 h-16 text-gray-300 dark:text-gray-600 mb-4" />
@@ -606,7 +617,7 @@ export function SimpleTeamMessaging({
                 )}
               </ScrollArea>
             </div>
-            <div className="flex-shrink-0 p-3 border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900">
+            <div className="flex-shrink-0 p-3 border-t border-border bg-surface-container-low">
               <AnimatePresence>
                 {showEmojiPicker && (
                   <motion.div
@@ -622,7 +633,7 @@ export function SimpleTeamMessaging({
                       opacity: 0,
                       y: 10,
                     }}
-                    className="mb-2 p-2 bg-gray-50 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700"
+                    className="mb-2 p-2 bg-card rounded-lg border border-border"
                   >
                     <div className="grid grid-cols-8 gap-1">
                       {commonEmojis.map((emoji) => (

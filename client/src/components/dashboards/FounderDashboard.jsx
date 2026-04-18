@@ -1,8 +1,7 @@
 /**
  * StartupVerse Founder Dashboard
  */
-import React, { useState, useEffect } from "react";
-import { API_BASE_URL } from "../../config/apiBase.js";
+import React, { useState, useEffect, useMemo } from "react";
 import { Button } from "../ui/button";
 import {
   Card,
@@ -34,7 +33,17 @@ import Phase3Welcome from "../execution-engine/Phase3Welcome";
 import StageLearningModal from "../learning/StageLearningModal";
 import StageRoadmapModal from "../roadmap/StageRoadmapModal";
 import CohortMembershipBadge from "../organizations/CohortMembershipBadge";
-import { getAccessToken, STORAGE_KEYS } from "../../app/session";
+
+import { useHomeStore } from "../../state/useHomeStore";
+import { useWeeklyLoopStore } from "../../state/useWeeklyLoopStore";
+import { useExecutionScoreStore } from "../../state/useExecutionScoreStore";
+import { useTeamStore } from "../../state/useTeamStore";
+import { useDeliverablesStore } from "../../state/useDeliverablesStore";
+import { useJourneyStore } from "../../state/useJourneyStore";
+import {
+  useNotificationsStore,
+  selectUnreadCount,
+} from "../../state/useNotificationsStore";
 
 // 🔥 REMOVED: OrganizationEventsWidget and OrganizationAnnouncementsWidget
 // Events appear in Virtual Office updates/calendar, announcements in inbox
@@ -68,26 +77,17 @@ import {
 } from "../../utils/smartTeamMatching";
 import { getUnreadCount } from "../../utils/messaging";
 import {
-  getJourneyProgress,
   completeCurrentStage,
   updateStageProgress,
-  autoDetectStageProgression,
   getOverallProgress,
   getTimeInCurrentStage,
   JOURNEY_STAGES,
 } from "../../utils/journeyProgress";
 import {
-  createOutcomeFromTemplate,
-  generateTasksFromOutcome,
-  getActionButtonForTask,
-} from "../../utils/executionEngine";
-import * as coreEngineApi from "../../utils/api/coreEngineApi";
-import * as teamMemberApi from "../../utils/api/teamMemberApi";
+  buildWeeklyPlanFromIntent,
+  buildWeeklyPlanFromTemplate,
+} from "../../domains/founder/mappers/weeklyPlanPayload.js";
 import { migrateTasksToBackend } from "../../utils/taskMigration";
-import {
-  createOutcomeFromIntent,
-  generateTasksFromIntent,
-} from "../../utils/intentParser";
 import PendingCompensationCard from "../compensation/PendingCompensationCard";
 
 // Stage-specific task definitions
@@ -294,34 +294,19 @@ const STAGE_TASKS = {
 
 // Inline Execution Score Card for 3-card layout
 function ExecutionScoreInlineCard({ userId }) {
-  const [scoreData, setScoreData] = React.useState(null);
-  const [loading, setLoading] = React.useState(true);
+  const scoreData = useExecutionScoreStore((state) => state.score);
+  const storeLoading = useExecutionScoreStore((state) => state.loading);
+  const storeUserId = useExecutionScoreStore((state) => state.userId);
+  const loadScore = useExecutionScoreStore((state) => state.load);
+  const loading = storeLoading && !scoreData;
   const [showBreakdown, setShowBreakdown] = React.useState(false);
   const [showShareOptions, setShowShareOptions] = React.useState(false);
   const [copySuccess, setCopySuccess] = React.useState(false);
   React.useEffect(() => {
-    const loadScore = async () => {
-      try {
-        const response = await fetch(
-          `${API_BASE_URL}/execution-score/${userId}`,
-          {
-            headers: {
-              Authorization: `Bearer ${getAccessToken()}`,
-            },
-          },
-        );
-        if (response.ok) {
-          const data = await response.json();
-          setScoreData(data);
-        }
-      } catch (err) {
-        console.error("Error loading execution score:", err);
-      } finally {
-        setLoading(false);
-      }
-    };
-    loadScore();
-  }, [userId]);
+    if (userId && String(storeUserId) !== String(userId)) {
+      loadScore(userId).catch(() => {});
+    }
+  }, [userId, storeUserId, loadScore]);
   const getScoreColor = (score) => {
     if (score >= 80) return "text-green-600";
     if (score >= 60) return "text-primary";
@@ -619,7 +604,6 @@ export default function FounderDashboard({
   const [showProfileModal, setShowProfileModal] = useState(
     !user.onboardingComplete,
   );
-  const [journeyProgress, setJourneyProgress] = useState(null);
   const [completedTasks, setCompletedTasks] = useState(new Set());
   const [activeTaskId, setActiveTaskId] = useState(null);
   const [taskFormData, setTaskFormData] = useState({});
@@ -629,27 +613,147 @@ export default function FounderDashboard({
   const [selectedTalent, setSelectedTalent] = useState(null);
   const [isTalentModalOpen, setIsTalentModalOpen] = useState(false);
 
-  // Execution Engine State
-  const [executionData, setExecutionData] = useState(null);
+  // Modal state
   const [showOutcomeModal, setShowOutcomeModal] = useState(false);
   const [showIntentCaptureModal, setShowIntentCaptureModal] = useState(false);
   const [showMilestoneDetailView, setShowMilestoneDetailView] = useState(false);
   const [showWeeklyReviewModal, setShowWeeklyReviewModal] = useState(false);
-  const [tasks, setTasks] = useState([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [isRefreshing, setIsRefreshing] = useState(false);
-  const [isLoadingExecutionData, setIsLoadingExecutionData] = useState(true); // ⚡ Specific loading state for This Week's Focus
 
-  // Deliverables State - From Organization Cohorts
-  const [deliverables, setDeliverables] = useState([]);
+  // Deliverable submission form state (UI only; data comes from store)
   const [submittingDeliverable, setSubmittingDeliverable] = useState(null);
   const [deliverableSubmissionData, setDeliverableSubmissionData] = useState({
     submissionUrl: "",
     notes: "",
   });
 
-  // Team Members State - Load from backend
-  const [teamMembers, setTeamMembers] = useState([]);
+  // Zustand store subscriptions (primary data layer)
+  const homeLoading = useHomeStore((s) => s.loading);
+  const homeRefreshing = useHomeStore((s) => s.refreshing);
+  const homeBootstrapped = useHomeStore((s) => s.bootstrapped);
+  const loadHome = useHomeStore((s) => s.loadAll);
+  const refreshHome = useHomeStore((s) => s.refresh);
+
+  const outcomesRaw = useWeeklyLoopStore((s) => s.outcomes);
+  const milestonesRaw = useWeeklyLoopStore((s) => s.milestones);
+  const weeklyTasksRaw = useWeeklyLoopStore((s) => s.tasks);
+  const executionScore = useWeeklyLoopStore((s) => s.executionScore);
+  const weeklyLoopLoading = useWeeklyLoopStore((s) => s.loading);
+  const weeklyLoop = useWeeklyLoopStore();
+
+  const teamMembers = useTeamStore((s) => s.members);
+
+  const deliverables = useDeliverablesStore((s) => s.deliverables);
+  const submitDeliverableAction = useDeliverablesStore((s) => s.submit);
+
+  const journeyProgress = useJourneyStore((s) => s.progress);
+  const setJourneyProgress = (progress) => {
+    if (!progress) return;
+    useJourneyStore.setState({ progress });
+  };
+
+  const unreadNotificationsCount = useNotificationsStore(selectUnreadCount);
+
+  const isLoading = homeLoading && !homeBootstrapped;
+  const isRefreshing = homeRefreshing;
+  const isLoadingExecutionData = weeklyLoopLoading && !executionScore && outcomesRaw.length === 0;
+
+  // Derive the legacy `executionData` shape from store state for minimal UI churn.
+  const executionData = useMemo(() => {
+    if (!user?.id) return null;
+    const outcomes = Array.isArray(outcomesRaw) ? outcomesRaw : [];
+    const milestones = Array.isArray(milestonesRaw) ? milestonesRaw : [];
+    const isStatus = (row, target) =>
+      String(row?.status || "").toLowerCase() === target;
+    const activeRaw = outcomes.find((o) => isStatus(o, "active")) || null;
+    const completedOutcomes = outcomes.filter(
+      (o) =>
+        isStatus(o, "completed") ||
+        isStatus(o, "partial") ||
+        isStatus(o, "missed"),
+    );
+    const hasPartialWeeks = outcomes.some((o) => isStatus(o, "partial"));
+    const streak = Number(
+      executionScore?.currentStreak ||
+        executionScore?.streak ||
+        executionScore?.streakCount ||
+        0,
+    );
+
+    let currentOutcome = activeRaw;
+    if (activeRaw) {
+      const oid = String(activeRaw._id || activeRaw.id || "");
+      const linked = milestones.filter(
+        (m) => String(m.weeklyOutcomeId || "") === oid,
+      );
+      const title = activeRaw.goal || activeRaw.title || "This week";
+      const weekNumber = completedOutcomes.length + 1;
+
+      if (linked.length > 0) {
+        currentOutcome = {
+          ...activeRaw,
+          id: activeRaw._id || activeRaw.id,
+          title,
+          weekNumber,
+          milestones: linked.map((m) => {
+            const total = Number(m.totalTasks ?? 0);
+            const done = Number(m.tasksCompleted ?? 0);
+            let status = String(m.status || "pending").toLowerCase();
+            if (total > 0 && done >= total) status = "completed";
+            else if (done > 0) status = "in-progress";
+            return {
+              id: String(m._id || m.id),
+              title: m.title,
+              description: m.description || "",
+              status,
+              tasksCompleted: done,
+              totalTasks: total,
+            };
+          }),
+        };
+      } else {
+        currentOutcome = {
+          ...activeRaw,
+          id: activeRaw._id || activeRaw.id,
+          title,
+          weekNumber,
+          milestones: Array.isArray(activeRaw.milestones)
+            ? activeRaw.milestones
+            : [],
+        };
+      }
+    }
+
+    return {
+      userId: user.id,
+      currentOutcome,
+      streak,
+      hasPartialWeeks,
+      weekHistory: completedOutcomes.map((o) => ({
+        outcomeId: o.id || o._id,
+        title: o.goal || o.title,
+        weekNumber: o.weekNumber,
+        status: o.status,
+        completedDate: o.completedAt || "",
+        progressPercentage: o.completionPercentage || 0,
+        completionData: o.completionData,
+        achievement: o.completionData?.achievement || o.status,
+      })),
+      lastUpdated: useWeeklyLoopStore.getState().lastLoadedAt,
+    };
+  }, [outcomesRaw, milestonesRaw, executionScore, user?.id]);
+
+  // Tasks filtered to the current outcome (same rule as legacy).
+  const tasks = useMemo(() => {
+    const all = Array.isArray(weeklyTasksRaw) ? weeklyTasksRaw : [];
+    const current = executionData?.currentOutcome;
+    if (!current) return [];
+    return all.filter(
+      (t) =>
+        t.weekId === current.weekId ||
+        t.outcomeId === (current.id || current._id) ||
+        current.milestones?.some((m) => m.id === t.milestoneId),
+    );
+  }, [weeklyTasksRaw, executionData]);
 
   // Phase 3 Welcome - Show once per user
   const [showPhase3Welcome, setShowPhase3Welcome] = useState(() => {
@@ -668,255 +772,50 @@ export default function FounderDashboard({
   const rightCardRef = React.useRef(null);
   const teamSize = teamMembers.length + 1;
 
-  // Initialize execution engine data - ASYNC BACKEND LOADING
+  // Orchestrate Home hydration through the Zustand stores.
+  // Guarded by user.id so we never fire `/founders/undefined/...` requests.
   useEffect(() => {
-    let mounted = true;
+    if (!user?.id) return undefined;
 
-    // 🎯 Initialize automatic stage progression system
     initializeStageProgressionCheck();
 
-    // 🔔 Check for upcoming event reminders (async, non-blocking)
     checkAndSendEventReminders(user.id).catch((err) => {
       console.warn("Event reminder check failed:", err);
     });
-    const loadData = async () => {
-      try {
-        // ⚡ PERFORMANCE: Show UI immediately, load data in background
-        setIsLoading(false);
-        setIsLoadingExecutionData(true); // ⚡ Start loading execution data
 
-        // ⚡ Migrate tasks in background (non-blocking)
-        migrateTasksToBackend(user.id)
-          .then((migrationResult) => {
-            if (migrationResult.migrated > 0) {
-              console.log(
-                `🔄 Migrated ${migrationResult.migrated} tasks from localStorage to backend`,
-              );
-            }
-          })
-          .catch(() => {});
-
-        // Load from backend (async)
-        const [data, existingTasks] = await Promise.all([
-          coreEngineApi.getExecutionData(user.id),
-          coreEngineApi.getTasks(user.id),
-        ]);
-        if (!mounted) return;
-        console.log("✅ Loaded execution data from backend:", data);
-        console.log("✅ Loaded tasks from backend:", existingTasks);
-        setExecutionData(data);
-        setIsLoadingExecutionData(false); // ⚡ Done loading execution data
-
-        // Load deliverables from organizations (non-blocking)
-        loadDeliverables();
-
-        // ✅ FILTER: Only show tasks for current outcome
-        const currentOutcomeTasks = data.currentOutcome
-          ? existingTasks.filter(
-              (t) =>
-                t.weekId === data.currentOutcome.weekId ||
-                t.outcomeId === data.currentOutcome.id ||
-                // Fallback: if task has no weekId/outcomeId, check if milestone exists in current outcome
-                data.currentOutcome.milestones?.some(
-                  (m) => m.id === t.milestoneId,
-                ),
-            )
-          : [];
-        console.log(
-          `📊 Filtered tasks for current outcome: ${existingTasks.length} total → ${currentOutcomeTasks.length} for current`,
-        );
-
-        // Add action buttons to existing tasks that don't have them
-        const tasksWithButtons = currentOutcomeTasks.map((task) => {
-          if (!task.actionButton) {
-            const actionButton = getActionButtonForTask(task.title);
-            if (actionButton) {
-              console.log(
-                "Adding action button to task:",
-                task.title,
-                actionButton,
-              );
-            }
-            return actionButton
-              ? {
-                  ...task,
-                  actionButton,
-                }
-              : task;
-          }
-          return task;
-        });
-
-        // Save updated tasks in background (non-blocking)
-        if (
-          JSON.stringify(tasksWithButtons) !==
-          JSON.stringify(currentOutcomeTasks)
-        ) {
-          console.log("Saving migrated tasks with action buttons");
-          coreEngineApi.saveTasks(user.id, tasksWithButtons).catch(() => {});
-        }
-        setTasks(tasksWithButtons);
-      } catch (error) {
-        // Debug log only - backend is optional in demo mode
-        if (process.env.NODE_ENV === "development") {
-          console.debug(
-            "Backend execution data fetch failed (using localStorage):",
-            error.message,
-          );
-        }
-
-        // Don't show error toast - silently fallback to localStorage
-        console.log("Using cached execution data due to backend error");
-        setIsLoadingExecutionData(false); // ⚡ Stop loading even on error
-      }
-    };
-    loadData();
-    return () => {
-      mounted = false;
-    };
-  }, [user.id]);
-
-  // Load team members from backend
-  useEffect(() => {
-    let mounted = true;
-    const loadTeamMembers = async () => {
-      try {
-        // 1. Load from localStorage first (fast initial render)
-        const allUsersFromMultipleSources = [
-          ...JSON.parse(localStorage.getItem(STORAGE_KEYS.teamMembers) || "[]"),
-          ...JSON.parse(
-            localStorage.getItem("startupverse_registered_users") || "[]",
-          ),
-        ];
-        const userMap = {};
-        allUsersFromMultipleSources.forEach((u) => {
-          if (u && u.id) {
-            userMap[u.id] = u;
-          }
-        });
-        const uniqueUsers = Object.values(userMap);
-
-        // 🔒 SECURITY FIX: Use startupId/founderId ONLY, removed companyId matching
-        const filtered = uniqueUsers.filter(
-          (u) =>
-            u.id !== user.id &&
-            (u.role === "team-member" || u.role === "team") &&
-            (u.startupId === user.id || u.founderId === user.id),
-        );
-        setTeamMembers(filtered);
-        console.log(
-          "📊 [FounderDashboard] Team members loaded from localStorage:",
-          filtered.length,
-        );
-
-        // 2. Fetch from backend in BACKGROUND to get fresh data
-        const backendTeamMembers = await teamMemberApi.getStartupTeamMembers(
-          user.id,
-        );
-        if (!mounted) return;
-        if (backendTeamMembers && backendTeamMembers.length > 0) {
-          // Map backend data to consistent format
-          const mappedMembers = backendTeamMembers
-            .filter((m) => m.id !== user.id) // Exclude founder
-            .map((member) => ({
-              id: member.id,
-              name: member.name || member.talentName || "Unknown User",
-              role: member.role || member.talentArea || "Team Member",
-              email: member.email,
-              avatar: member.avatar,
-              title:
-                member.title || member.talentArea || member.professionalTitle,
-              skills: member.skills || member.talentSkills || [],
-              startupId: member.startupId || user.id,
-              founderId: member.founderId || user.id,
-            }));
-          setTeamMembers(mappedMembers);
+    // Background, non-blocking legacy task migration.
+    migrateTasksToBackend(user.id)
+      .then((migrationResult) => {
+        if (migrationResult?.migrated > 0) {
           console.log(
-            "✅ [FounderDashboard] Team members updated from backend:",
-            mappedMembers.length,
+            `🔄 Migrated ${migrationResult.migrated} tasks from localStorage to backend`,
           );
         }
-      } catch (error) {
-        // Silently fail - localStorage data is already displayed
-        if (process.env.NODE_ENV === "development") {
-          console.debug(
-            "Failed to load team members from backend (expected in demo mode):",
-            error.message,
-          );
-        }
-      }
-    };
-    loadTeamMembers();
+      })
+      .catch(() => {});
 
-    // ✅ REALTIME: Removed team member polling (was every 10s) - using real-time subscription
+    loadHome({ userId: user.id, startupId: user.startupId || user.id }).catch(
+      (error) => {
+        console.warn("Home data load failed:", error);
+      },
+    );
 
-    return () => {
-      mounted = false;
-      // Real-time subscription cleanup handled separately
-    };
-  }, [user.id, user.companyId]);
+    return undefined;
+  }, [user?.id, user?.startupId, loadHome]);
 
-  // Load deliverables from organizations
-  const loadDeliverables = async () => {
-    try {
-      const response = await fetch(
-        `${API_BASE_URL}/deliverables/founder/${user.id}`,
-        {
-          headers: {
-            Authorization: `Bearer ${getAccessToken()}`,
-          },
-        },
-      );
-      if (!response.ok) {
-        console.warn("Failed to fetch deliverables:", response.status);
-        return;
-      }
-      const data = await response.json();
-      setDeliverables(data.deliverables || []);
-      console.log("✅ Loaded deliverables:", data.deliverables?.length || 0);
-    } catch (error) {
-      console.error("Error loading deliverables:", error);
-    }
-  };
-
-  // Initialize journey progress
+  // Load completed-task ids the user has manually checked from the stage
+  // learning checklist. Still kept on localStorage since it's purely local UX.
   useEffect(() => {
-    // Load or initialize journey progress
-    let progress = getJourneyProgress();
-
-    // Only initialize if no progress exists at all
-    if (!progress || !progress.currentStage) {
-      const initialProgress = {
-        currentStage: 1,
-        // Default to Stage 1 for truly new users
-        completedStages: [],
-        stageData: {
-          1: {
-            startedAt: new Date().toISOString(),
-            completionPercentage: 0,
-            milestonesCompleted: [],
-          },
-        },
-      };
-      localStorage.setItem("journey_progress", JSON.stringify(initialProgress));
-      progress = initialProgress;
-      console.log(
-        "📊 [FounderDashboard] Initialized new journey progress for first-time user",
-      );
-    } else {
-      console.log(
-        `📊 [FounderDashboard] Loaded existing journey progress - Stage ${progress.currentStage}`,
-      );
-    }
-    setJourneyProgress(progress);
-    autoDetectStageProgression(user.id);
-
-    // Load completed tasks from localStorage
+    if (!user?.id) return;
     const saved = localStorage.getItem(`completed_tasks_${user.id}`);
     if (saved) {
-      setCompletedTasks(new Set(JSON.parse(saved)));
+      try {
+        setCompletedTasks(new Set(JSON.parse(saved)));
+      } catch {
+        // ignore corrupted payloads
+      }
     }
-  }, [user.id]);
+  }, [user?.id]);
 
   // Generate team recommendations for Stage 3
   useEffect(() => {
@@ -1012,14 +911,10 @@ export default function FounderDashboard({
   };
   const outcomeProgress = getCurrentOutcomeProgress();
 
-  // Quick access metrics
   const unreadMessages = getUnreadCount();
-  const notifications = JSON.parse(
-    localStorage.getItem("founder_notifications") || "[]",
-  );
-  const unreadNotifications = notifications.filter((n) => !n.read).length;
+  const unreadNotifications = unreadNotificationsCount;
   const onlineMembers =
-    teamMembers.filter((m) => m.status === "online").length + 1;
+    teamMembers.filter((m) => m.status === "online" || m.isOnline).length + 1;
 
   // 🎯 Generate Inspirational Startup Insight - Company stories + motivational coaching
   const getSmartInsight = () => {
@@ -1229,36 +1124,10 @@ export default function FounderDashboard({
 
   const refreshExecutionData = async () => {
     try {
-      setIsRefreshing(true);
-      const [data, latestTasks] = await Promise.all([
-        coreEngineApi.getExecutionData(user.id),
-        coreEngineApi.getTasks(user.id),
-      ]);
-      console.log("✅ Data refreshed from backend");
-      setExecutionData(data);
-
-      // ✅ FILTER: Only show tasks for current outcome
-      // This prevents old tasks from previous outcomes from appearing
-      const currentOutcomeTasks = data.currentOutcome
-        ? latestTasks.filter(
-            (t) =>
-              t.weekId === data.currentOutcome.weekId ||
-              t.outcomeId === data.currentOutcome.id ||
-              // Fallback: if task has no weekId/outcomeId, check if milestone exists in current outcome
-              data.currentOutcome.milestones?.some(
-                (m) => m.id === t.milestoneId,
-              ),
-          )
-        : [];
-      console.log(
-        `📊 Filtered tasks: ${latestTasks.length} total → ${currentOutcomeTasks.length} for current outcome`,
-      );
-      setTasks(currentOutcomeTasks);
+      await refreshHome();
     } catch (error) {
       console.error("Error refreshing data:", error);
       toast.error("Failed to refresh data");
-    } finally {
-      setIsRefreshing(false);
     }
   };
 
@@ -1271,42 +1140,24 @@ export default function FounderDashboard({
   ) => {
     if (!executionData) return;
     try {
-      setIsRefreshing(true);
-
-      // Calculate current week number
       const weekNumber = (executionData.weekHistory.length || 0) + 1;
 
-      // Create outcome from template
-      const outcome = createOutcomeFromTemplate(
+      const plan = buildWeeklyPlanFromTemplate(
         templateId,
         currentStageId,
         weekNumber,
+        { customTitle, customDescription },
       );
-      if (!outcome) {
+      if (!plan?.goal) {
         toast.error("Failed to create outcome");
         return;
       }
 
-      // Apply custom title/description if provided
-      if (customTitle) outcome.title = customTitle;
-      if (customDescription) outcome.description = customDescription;
+      await weeklyLoop.saveWeeklyPlan(plan);
+      await refreshHome();
 
-      // Generate tasks from outcome
-      const newTasks = generateTasksFromOutcome(
-        outcome,
-        user.id,
-        currentStageId,
-        templateId,
-      );
-
-      // Save to backend (async)
-      await coreEngineApi.saveTasks(user.id, newTasks);
-      await coreEngineApi.saveWeeklyOutcome(user.id, outcome);
-
-      // Refresh data from backend
-      await refreshExecutionData();
       toast.success("🎯 Weekly outcome set!", {
-        description: `${outcome.title} - Let's make it happen this week!`,
+        description: `${plan.goal} - Let's make it happen this week!`,
       });
       setShowOutcomeModal(false);
     } catch (error) {
@@ -1314,20 +1165,11 @@ export default function FounderDashboard({
       toast.error("Failed to set outcome", {
         description: "Please try again",
       });
-    } finally {
-      setIsRefreshing(false);
     }
   };
   const handleToggleTask = async (taskId) => {
     try {
-      // Toggle task in backend (async)
-      await coreEngineApi.toggleTask(user.id, taskId);
-
-      // Sync milestones and outcome progress
-      await coreEngineApi.syncTasksToMilestones(user.id);
-
-      // Refresh data from backend
-      await refreshExecutionData();
+      await weeklyLoop.toggleTask(taskId);
       toast.success("Task updated! ✓");
     } catch (error) {
       console.error("Error toggling task:", error);
@@ -1336,35 +1178,27 @@ export default function FounderDashboard({
   };
   const handleBlockTask = async (taskId, reason, note) => {
     try {
-      // Block task in backend (async)
-      await coreEngineApi.blockTask(user.id, taskId, reason, note);
-
-      // Sync milestones
-      await coreEngineApi.syncTasksToMilestones(user.id);
-
-      // Refresh data
-      await refreshExecutionData();
+      await weeklyLoop.blockTask(taskId, reason, note);
       toast.info("Task marked as blocked", {
         description: "Your team will be notified",
       });
 
-      // Send notification to founder (MVP Gap 3 compatibility path)
-      const updatedTasks = await coreEngineApi.getTasks(user.id);
-      const task = updatedTasks.find((t) => t.id === taskId);
+      const task = useWeeklyLoopStore
+        .getState()
+        .tasks.find((t) => String(t.id || t._id) === String(taskId));
       if (task) {
-        const { sendTaskBlockedNotification } =
-          await import("../../utils/emailNotifications");
-        sendTaskBlockedNotification(
-          {
-            userId: user.id,
-            founderEmail: user.email || "",
-            founderName: user.name,
-            taskTitle: task.title,
-            blockerReason: reason,
-            blockerNote: note,
-            teamMemberName: task.assignedToName || "",
-          },
-        ).catch((err) => console.warn("Email notification failed:", err));
+        const { sendTaskBlockedNotification } = await import(
+          "../../utils/emailNotifications"
+        );
+        sendTaskBlockedNotification({
+          userId: user.id,
+          founderEmail: user.email || "",
+          founderName: user.name,
+          taskTitle: task.title,
+          blockerReason: reason,
+          blockerNote: note,
+          teamMemberName: task.assignedToName || "",
+        }).catch((err) => console.warn("Email notification failed:", err));
       }
     } catch (error) {
       console.error("Error blocking task:", error);
@@ -1373,14 +1207,7 @@ export default function FounderDashboard({
   };
   const handleUnblockTask = async (taskId) => {
     try {
-      // Unblock task in backend (async)
-      await coreEngineApi.unblockTask(user.id, taskId);
-
-      // Sync milestones
-      await coreEngineApi.syncTasksToMilestones(user.id);
-
-      // Refresh data
-      await refreshExecutionData();
+      await weeklyLoop.unblockTask(taskId);
       toast.success("Task unblocked!");
     } catch (error) {
       console.error("Error unblocking task:", error);
@@ -1389,37 +1216,28 @@ export default function FounderDashboard({
   };
   const handleAssignTask = async (taskId, assignedTo, assignedToName) => {
     try {
-      // Assign task in backend (async)
-      await coreEngineApi.assignTask(
-        user.id,
-        taskId,
-        assignedTo,
-        assignedToName,
-      );
+      await weeklyLoop.assignTask(taskId, assignedTo, assignedToName);
 
-      // Refresh data
-      await refreshExecutionData();
       if (assignedToName) {
         toast.success(`Task assigned to ${assignedToName}! 👤`);
 
-        // Send notification (MVP Gap 3 compatibility path)
-        const updatedTasks = await coreEngineApi.getTasks(user.id);
-        const task = updatedTasks.find((t) => t.id === taskId);
+        const task = useWeeklyLoopStore
+          .getState()
+          .tasks.find((t) => String(t.id || t._id) === String(taskId));
         const teamMember = teamMembers.find((m) => m.id === assignedTo);
         if (task && assignedTo) {
-          const { sendTaskAssignedNotification } =
-            await import("../../utils/emailNotifications");
-          sendTaskAssignedNotification(
-            {
-              userId: assignedTo,
-              teamMemberEmail: teamMember?.email || "",
-              teamMemberName: assignedToName,
-              taskTitle: task.title,
-              taskDescription: task.description || "",
-              founderName: user.name,
-              milestoneName: task.milestoneName || "General Tasks",
-            },
-          ).catch((err) => console.warn("Email notification failed:", err));
+          const { sendTaskAssignedNotification } = await import(
+            "../../utils/emailNotifications"
+          );
+          sendTaskAssignedNotification({
+            userId: assignedTo,
+            teamMemberEmail: teamMember?.email || "",
+            teamMemberName: assignedToName,
+            taskTitle: task.title,
+            taskDescription: task.description || "",
+            founderName: user.name,
+            milestoneName: task.milestoneName || "General Tasks",
+          }).catch((err) => console.warn("Email notification failed:", err));
         }
       } else {
         toast.success("Task unassigned");
@@ -1431,11 +1249,7 @@ export default function FounderDashboard({
   };
   const handleSetTaskIncentive = async (taskId, incentive) => {
     try {
-      // Set task incentive in backend (async)
-      await coreEngineApi.setTaskIncentive(user.id, taskId, incentive);
-
-      // Refresh data
-      await refreshExecutionData();
+      await weeklyLoop.setTaskIncentive(taskId, incentive);
       const incentiveLabel =
         incentive.type === "equity"
           ? `${incentive.equity} equity`
@@ -1457,36 +1271,27 @@ export default function FounderDashboard({
   ) => {
     if (!executionData) return;
     try {
-      setIsRefreshing(true);
-
-      // Calculate current week number
       const weekNumber = (executionData.weekHistory.length || 0) + 1;
 
-      // Create outcome from parsed intent
-      const outcome = createOutcomeFromIntent(parsedIntent, weekNumber);
+      const plan = buildWeeklyPlanFromIntent(parsedIntent, weekNumber, {
+        customTitle,
+        customDescription,
+      });
+      if (!plan?.goal) {
+        toast.error("Failed to set outcome");
+        return;
+      }
 
-      // Apply custom overrides if provided
-      if (customTitle) outcome.title = customTitle;
-      if (customDescription) outcome.description = customDescription;
+      await weeklyLoop.saveWeeklyPlan(plan);
+      await refreshHome();
 
-      // Generate tasks from intent
-      const newTasks = generateTasksFromIntent(parsedIntent, outcome, user.id);
-
-      // Save to backend (async)
-      await coreEngineApi.saveTasks(user.id, newTasks);
-      await coreEngineApi.saveWeeklyOutcome(user.id, outcome);
-
-      // Refresh data from backend
-      await refreshExecutionData();
       toast.success("🎯 Weekly outcome set!", {
-        description: `${outcome.title} - Powered by your vision!`,
+        description: `${plan.goal} - Powered by your vision!`,
       });
       setShowIntentCaptureModal(false);
     } catch (error) {
       console.error("Error confirming intent:", error);
       toast.error("Failed to set outcome");
-    } finally {
-      setIsRefreshing(false);
     }
   };
 
@@ -1494,25 +1299,21 @@ export default function FounderDashboard({
 
   const handleCompleteWeeklyReview = async (outcomeId, completionData) => {
     try {
-      setIsRefreshing(true);
+      await weeklyLoop.completeWeeklyReview(outcomeId, completionData);
+      await refreshHome();
 
-      // Complete weekly review in backend (async)
-      const updatedData = await coreEngineApi.completeWeeklyReview(
-        user.id,
-        outcomeId,
-        completionData,
+      const streak = Number(
+        useWeeklyLoopStore.getState().executionScore?.currentStreak ||
+          useWeeklyLoopStore.getState().executionScore?.streak ||
+          0,
       );
 
-      // Refresh data from backend
-      await refreshExecutionData();
-
-      // Show celebration toast
       if (completionData.achievement === "completed") {
         toast.success("🎉 Outstanding! Week completed!", {
-          description: `Streak: ${updatedData.streak} weeks! Keep the momentum going!`,
+          description: `Streak: ${streak} weeks! Keep the momentum going!`,
         });
       } else if (completionData.achievement === "partial") {
-        toast.success(`💪 Good progress! Streak: ${updatedData.streak}`, {
+        toast.success(`💪 Good progress! Streak: ${streak}`, {
           description: "Apply your learnings next week!",
         });
       } else {
@@ -1524,8 +1325,6 @@ export default function FounderDashboard({
     } catch (error) {
       console.error("Error completing weekly review:", error);
       toast.error("Failed to complete review");
-    } finally {
-      setIsRefreshing(false);
     }
   };
   const renderTaskForm = (task) => {
@@ -1671,7 +1470,7 @@ export default function FounderDashboard({
   // Show loading state while fetching data from backend
   if (isLoading) {
     return (
-      <div className="p-2 md:p-3 h-screen flex items-center justify-center">
+      <div className="h-screen flex items-center justify-center">
         <div className="text-center">
           <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mb-4" />
           <p className="text-sm text-gray-600">
@@ -1682,7 +1481,7 @@ export default function FounderDashboard({
     );
   }
   return (
-    <div className="p-2 md:p-3 min-h-screen flex flex-col pt-2 pb-12 md:pb-16">
+    <div className="min-h-screen flex flex-col pt-2 pb-12 md:pb-16">
       {isRefreshing && (
         <div className="fixed top-16 right-4 z-50 bg-blue-600 text-white px-4 py-2 rounded-lg shadow-lg flex items-center gap-2">
           <div className="inline-block animate-spin rounded-full h-4 w-4 border-b-2 border-white" />
@@ -2275,35 +2074,26 @@ export default function FounderDashboard({
                                             size="sm"
                                             onClick={async () => {
                                               try {
-                                                const response = await fetch(
-                                                  `${API_BASE_URL}/deliverables/${deliverable.id}/submit`,
-                                                  {
-                                                    method: "POST",
-                                                    headers: {
-                                                      Authorization: `Bearer ${getAccessToken()}`,
-                                                      "Content-Type":
-                                                        "application/json",
-                                                    },
-                                                    body: JSON.stringify({
+                                                const result =
+                                                  await submitDeliverableAction(
+                                                    deliverable.id,
+                                                    {
                                                       founderId: user.id,
                                                       submissionUrl:
                                                         deliverableSubmissionData.submissionUrl,
                                                       notes:
                                                         deliverableSubmissionData.notes,
                                                       attachments: [],
-                                                    }),
-                                                  },
-                                                );
-                                                if (!response.ok)
-                                                  throw new Error(
-                                                    "Failed to submit",
+                                                    },
                                                   );
+                                                if (!result?.ok) {
+                                                  throw result?.error || new Error("Failed to submit");
+                                                }
                                                 setDeliverableSubmissionData({
                                                   submissionUrl: "",
                                                   notes: "",
                                                 });
                                                 setSubmittingDeliverable(null);
-                                                loadDeliverables();
                                                 toast.success(
                                                   "Deliverable submitted!",
                                                 );

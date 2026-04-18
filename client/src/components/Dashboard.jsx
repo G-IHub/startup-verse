@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import AppLayout from "./layout/AppLayout";
 import MessagingSystem from "./messaging/MessagingSystem";
 import VideoCallSystem from "./video/VideoCallSystem";
-import VirtualStartupOffice from "./office/VirtualStartupOfficeWorkspace";
+import AdaptiveVirtualOffice from "./office/AdaptiveVirtualOffice";
 import TeamManagement from "./team/TeamManagement";
 import TaskBoard from "./tasks/TaskBoard";
 import TeamMatching from "./TeamMatching";
@@ -182,10 +182,11 @@ export default function Dashboard({ user, onLogout, onUpdateUser }) {
         return <ProfileSetup />;
       case "startup-office":
         return (
-          <VirtualStartupOffice
+          <AdaptiveVirtualOffice
             user={user}
             onNavigate={setCurrentPage}
             onUpdateUser={onUpdateUser}
+            view="workspace"
           />
         );
       case "team-matching":

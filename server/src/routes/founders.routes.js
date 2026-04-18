@@ -27,6 +27,7 @@ foundersRouter.delete("/founders/:founderId/tasks/:taskId", requireAuth, asyncHa
 
 foundersRouter.get("/founders/:founderId/weekly-outcomes", requireAuth, asyncHandler(foundersController.getWeeklyOutcomes));
 foundersRouter.post("/founders/:founderId/weekly-outcomes", requireAuth, asyncHandler(foundersController.createWeeklyOutcome));
+foundersRouter.post("/founders/:founderId/weekly-plan", requireAuth, asyncHandler(foundersController.createWeeklyPlan));
 
 foundersRouter.get("/founders/:founderId/posts", requireAuth, asyncHandler(foundersController.getPosts));
 foundersRouter.post("/founders/:founderId/posts", requireAuth, asyncHandler(foundersController.createPost));

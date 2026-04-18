@@ -7,11 +7,7 @@ import { toast } from "sonner";
 import ThemeToggle from "../ThemeToggle";
 import VerticalSidebar from "./VerticalSidebar";
 import NotificationCenter from "../notifications/NotificationCenter";
-import {
-  MobileActionDock,
-  PageHeader,
-  PageViewport,
-} from "../shell/PageScaffold";
+import { MobileActionDock, PageViewport } from "../shell/PageScaffold";
 import {
   LogOut,
   ChevronDown,
@@ -106,6 +102,7 @@ export default function AppLayoutHybrid({
   onPageChange,
   virtualOfficeView,
   onVirtualOfficeViewChange,
+  talentDashboardMode = "overview",
   mobileActions = null,
 }) {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -269,6 +266,8 @@ export default function AppLayoutHybrid({
     setTimeout(() => window.location.reload(), 500);
   };
 
+  const showDevRoleSwitcher = Boolean(import.meta?.env?.DEV);
+
   const getRoleIcon = (role) => {
     const icons = {
       founder: Rocket,
@@ -295,14 +294,15 @@ export default function AppLayoutHybrid({
           onVirtualOfficeViewChange={onVirtualOfficeViewChange}
           unreadCount={unreadMessagesCount}
           notificationCount={notificationCount}
+          talentDashboardMode={talentDashboardMode}
           isOpen={isMobileMenuOpen}
           onClose={() => setIsMobileMenuOpen(false)}
         />
       )}
       <div className="flex flex-1 flex-col overflow-hidden">
-        <header className="z-50 border-b border-border/70 bg-background/95 backdrop-blur-sm">
+        <header className="z-50 border-b border-border bg-background shadow-sm">
           <PageViewport>
-            <div className="flex items-center gap-3 py-2 sm:py-3">
+            <div className="flex items-center gap-3 py-2">
               {user.role === "organization-admin" ? (
                 <h1 className="text-headline-small text-primary">StartupVerse</h1>
               ) : (
@@ -315,13 +315,23 @@ export default function AppLayoutHybrid({
                   <Menu className="h-5 w-5" />
                 </Button>
               )}
+              {user.role !== "organization-admin" ? (
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-semibold text-foreground">
+                    {pageMeta.title}
+                  </p>
+                  <p className="truncate text-xs text-muted-foreground">
+                    {pageMeta.description}
+                  </p>
+                </div>
+              ) : null}
               <div className="flex-1" />
               <div className="flex items-center gap-2">
                 <div data-tour="theme-toggle">
                   <ThemeToggle
                     variant="ghost"
                     size="sm"
-                    className="bg-muted/80 transition-colors hover:bg-accent/20"
+                    className="bg-muted/80 transition-colors hover:bg-muted"
                   />
                 </div>
                 <NotificationCenter onNavigate={onPageChange} />
@@ -329,7 +339,11 @@ export default function AppLayoutHybrid({
                   <div data-tour="profile-menu">
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild={true}>
-                        <Button variant="ghost" size="sm" className="h-9 gap-2 px-2">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-9 gap-2 rounded-full bg-muted/80 px-2 transition-colors hover:bg-muted"
+                        >
                           <Avatar className="h-7 w-7">
                             <AvatarImage src={user.profile?.avatar} />
                             <AvatarFallback className="text-xs">
@@ -368,40 +382,44 @@ export default function AppLayoutHybrid({
                         >
                           Settings
                         </DropdownMenuItem>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuLabel className="text-xs text-muted-foreground">
-                          <span className="inline-flex items-center gap-2">
-                            <RoleIcon className="h-3.5 w-3.5" />
-                            Dev Tools - Switch Role
-                          </span>
-                        </DropdownMenuLabel>
-                        <DropdownMenuItem
-                          onClick={() => switchRole("founder")}
-                          className="text-xs"
-                          disabled={user.role === "founder"}
-                        >
-                          <Rocket className="mr-2 h-3 w-3" />
-                          {"Founder "}
-                          {user.role === "founder" && "OK"}
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          onClick={() => switchRole("talent")}
-                          className="text-xs"
-                          disabled={user.role === "talent"}
-                        >
-                          <Users className="mr-2 h-3 w-3" />
-                          {"Talent "}
-                          {user.role === "talent" && "OK"}
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          onClick={() => switchRole("team-member")}
-                          className="text-xs"
-                          disabled={user.role === "team-member"}
-                        >
-                          <UserCheck className="mr-2 h-3 w-3" />
-                          {"Team Member "}
-                          {user.role === "team-member" && "OK"}
-                        </DropdownMenuItem>
+                        {showDevRoleSwitcher ? (
+                          <>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuLabel className="text-xs text-muted-foreground">
+                              <span className="inline-flex items-center gap-2">
+                                <RoleIcon className="h-3.5 w-3.5" />
+                                Dev Tools - Switch Role
+                              </span>
+                            </DropdownMenuLabel>
+                            <DropdownMenuItem
+                              onClick={() => switchRole("founder")}
+                              className="text-xs"
+                              disabled={user.role === "founder"}
+                            >
+                              <Rocket className="mr-2 h-3 w-3" />
+                              {"Founder "}
+                              {user.role === "founder" && "OK"}
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={() => switchRole("talent")}
+                              className="text-xs"
+                              disabled={user.role === "talent"}
+                            >
+                              <Users className="mr-2 h-3 w-3" />
+                              {"Talent "}
+                              {user.role === "talent" && "OK"}
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={() => switchRole("team-member")}
+                              className="text-xs"
+                              disabled={user.role === "team-member"}
+                            >
+                              <UserCheck className="mr-2 h-3 w-3" />
+                              {"Team Member "}
+                              {user.role === "team-member" && "OK"}
+                            </DropdownMenuItem>
+                          </>
+                        ) : null}
                         <DropdownMenuSeparator />
                         <DropdownMenuItem
                           onClick={onLogout}
@@ -416,9 +434,6 @@ export default function AppLayoutHybrid({
                 )}
               </div>
             </div>
-            {user.role !== "organization-admin" && (
-              <PageHeader title={pageMeta.title} description={pageMeta.description} />
-            )}
           </PageViewport>
         </header>
         <main className="flex-1 overflow-auto">

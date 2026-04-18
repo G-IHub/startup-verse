@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useMemo, useState } from "react";
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
 import { Avatar, AvatarFallback } from "../ui/avatar";
@@ -9,8 +9,7 @@ import OfferDisplay from "../OfferDisplay";
 import { toast } from "sonner";
 import { getTalentProfileCompletionPercent } from "../../utils/talentProfileCompletion";
 import { TALENT_ACTIONS_MIN_COMPLETION } from "../../constants/talentProfile.js";
-import * as talentApi from "../../utils/api/talentApi";
-import * as founderApi from "../../utils/api/founderApi";
+import { useTalentHomeData } from "../../domains/talent/hooks/useTalentHomeData";
 import {
   Star,
   Heart,
@@ -144,198 +143,35 @@ export default function TalentDashboard({
   const canUsePrimaryTalentActions =
     talentCompletion >= TALENT_ACTIONS_MIN_COMPLETION;
   const [selectedStartup, setSelectedStartup] = useState(null);
-  const [expressedInterest, setExpressedInterest] = useState([]);
   const [interestMessage, setInterestMessage] = useState("");
   const [profileBannerDismissed, setProfileBannerDismissed] = useState(false);
   const [sortBy, setSortBy] = useState("bestMatch");
   const [layoutMode, setLayoutMode] = useState("list");
   const [filters, setFilters] = useState(FILTER_DEFAULTS);
 
-  // Backend data state
-  const [matchedOpportunities, setMatchedOpportunities] = useState([]);
-  const [savedItems, setSavedItems] = useState([]);
-  const [applications, setApplications] = useState([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [isSubmittingApplication, setIsSubmittingApplication] = useState(false);
-  const [savingItems, setSavingItems] = useState(new Set());
+  const {
+    loading: isLoading,
+    error,
+    savingIds: savingItems,
+    submittingInterest: isSubmittingApplication,
+    viewModel,
+    toggleSaved,
+    sendInterest,
+    refresh,
+  } = useTalentHomeData({ user });
+  const matchedOpportunities = viewModel.opportunities || [];
 
-  // Load data from backend on mount
-  useEffect(() => {
-    loadDashboardData();
-  }, [user.id]);
-  const loadDashboardData = async () => {
-    if (!user.id) return;
-    setIsLoading(true);
-    setError(null);
-    try {
-      console.log("🔄 [TalentDashboard] Loading dashboard data...");
 
-      // Load all data in parallel
-      const [postsRes, savedRes, applicationsRes] = await Promise.all([
-        // Load startup posts (same as Browse Startups page)
-        founderApi.getAllPosts(),
-        talentApi.getSavedItems(user.id),
-        talentApi.getTalentApplications(user.id),
-      ]);
-
-      // Process startup posts and calculate match scores
-      let startupPosts = postsRes.posts || [];
-      if (startupPosts.length > 0 && user.role === "talent" && user.profile) {
-        // Calculate match scores for each startup
-        const scoredPosts = startupPosts.map((post) => {
-          const matchScore = calculateStartupMatchScore(post, user.profile);
-          return {
-            ...post,
-            matchScore,
-            match: matchScore,
-            // For consistency with display
-            postedDate: new Date(post.postedDate || Date.now()),
-          };
-        });
-
-        // Sort by match score
-        scoredPosts.sort((a, b) => b.matchScore - a.matchScore);
-        startupPosts = scoredPosts;
-        console.log(
-          "✅ [TalentDashboard] Calculated match scores for",
-          startupPosts.length,
-          "startups",
-        );
-      }
-      setMatchedOpportunities(startupPosts);
-      setSavedItems(savedRes.savedItems || []);
-      setApplications(applicationsRes.applications || []);
-      console.log("✅ Talent dashboard data loaded:", {
-        startups: startupPosts.length,
-        topMatch: startupPosts[0]?.matchScore || 0,
-        saved: savedRes.savedItems?.length || 0,
-        applications: applicationsRes.applications?.length || 0,
-      });
-    } catch (err) {
-      console.error("Failed to load dashboard data:", err);
-      setError("Failed to load dashboard data. Please refresh the page.");
-    } finally {
-      setIsLoading(false);
-    }
+  const hasExpressedInterest = (startup) => {
+    const startupId = String(startup?.startupId || startup?.id || "");
+    return viewModel.sentInterestStartupIds.includes(startupId);
   };
 
-  // Calculate how well a startup matches talent's profile
-  const calculateStartupMatchScore = (startup, talentProfile) => {
-    let score = 0;
-    const maxScore = 100;
-
-    // Skills match (40 points max)
-    const talentSkills = Array.isArray(talentProfile.skills)
-      ? talentProfile.skills
-      : [];
-    const lookingFor = Array.isArray(startup.lookingFor)
-      ? startup.lookingFor
-      : [];
-    const tags = Array.isArray(startup.tags) ? startup.tags : [];
-    if (talentSkills.length > 0 && (lookingFor.length > 0 || tags.length > 0)) {
-      const allStartupKeywords = [...lookingFor, ...tags].map((k) =>
-        k.toLowerCase(),
-      );
-      const matchingSkills = talentSkills.filter((skill) =>
-        allStartupKeywords.some(
-          (keyword) =>
-            keyword.includes(skill.toLowerCase()) ||
-            skill.toLowerCase().includes(keyword),
-        ),
-      );
-      score += Math.min(40, (matchingSkills.length / talentSkills.length) * 40);
-    }
-
-    // Industry match (20 points max)
-    const talentInterests = Array.isArray(talentProfile.interests)
-      ? talentProfile.interests
-      : [];
-    const industryPrefs = Array.isArray(talentProfile.industryPreferences)
-      ? talentProfile.industryPreferences
-      : [];
-    const allTalentIndustries = [...talentInterests, ...industryPrefs].map(
-      (i) => i.toLowerCase(),
-    );
-    if (startup.industry && allTalentIndustries.length > 0) {
-      const startupIndustry = startup.industry.toLowerCase();
-      if (
-        allTalentIndustries.some(
-          (ind) =>
-            startupIndustry.includes(ind) || ind.includes(startupIndustry),
-        )
-      ) {
-        score += 20;
-      }
-    }
-
-    // Location match (10 points max)
-    if (talentProfile.location && startup.location) {
-      const talentLoc = talentProfile.location.toLowerCase();
-      const startupLoc = startup.location.toLowerCase();
-      if (
-        talentLoc === startupLoc ||
-        talentLoc.includes(startupLoc) ||
-        startupLoc.includes(talentLoc)
-      ) {
-        score += 10;
-      } else if (
-        startupLoc.includes("remote") ||
-        talentLoc.includes("remote")
-      ) {
-        score += 5;
-      }
-    }
-
-    // Commitment match (10 points max)
-    if (talentProfile.preferredCommitment && startup.commitment) {
-      const talentCommitment = talentProfile.preferredCommitment.toLowerCase();
-      const startupCommitment = startup.commitment.toLowerCase();
-      if (
-        talentCommitment === startupCommitment ||
-        startupCommitment.includes(talentCommitment) ||
-        talentCommitment.includes("flexible") ||
-        startupCommitment.includes("flexible")
-      ) {
-        score += 10;
-      }
-    }
-
-    // Stage preference (10 points max) - favor early stage for growth opportunities
-    if (startup.stage) {
-      const stage = startup.stage.toLowerCase();
-      if (stage.includes("idea") || stage.includes("mvp")) {
-        score += 10; // High potential for impact
-      } else if (stage.includes("traction") || stage.includes("seed")) {
-        score += 8;
-      } else {
-        score += 5;
-      }
-    }
-
-    // Recency bonus (10 points max) - favor newly posted opportunities
-    if (startup.postedDate) {
-      const daysAgo = Math.floor(
-        (Date.now() - new Date(startup.postedDate).getTime()) /
-          (1000 * 60 * 60 * 24),
-      );
-      if (daysAgo <= 3) {
-        score += 10;
-      } else if (daysAgo <= 7) {
-        score += 7;
-      } else if (daysAgo <= 14) {
-        score += 4;
-      }
-    }
-
-    // Ensure score is between 0 and maxScore
-    return Math.min(maxScore, Math.max(0, Math.round(score)));
-  };
-  const handleProfileComplete = () => {
-    // Modal already calls onUpdateUser with flattened talent fields
-    loadDashboardData();
+  const handleProfileComplete = async () => {
+    await refresh();
     setShowProfileModal(false);
   };
+
   const handleExpressInterest = async () => {
     if (!selectedStartup) return;
     if (!canUsePrimaryTalentActions) {
@@ -349,302 +185,44 @@ export default function TalentDashboard({
       toast.error("Please write a message to express your interest");
       return;
     }
-    if (expressedInterest.includes(selectedStartup.id)) {
+    if (hasExpressedInterest(selectedStartup)) {
       toast.info("You have already expressed interest in this startup");
       return;
     }
-    setIsSubmittingApplication(true);
-    try {
-      // Submit application to backend
-      const applicationData = {
-        startupId: selectedStartup.id.toString(),
-        opportunityId: selectedStartup.id.toString(),
-        coverLetter: interestMessage,
-        portfolio: [], // Could add portfolio items in the future
-      };
-      const result = await talentApi.submitApplication(
-        user.id,
-        applicationData,
-      );
-      console.log("✅ Application submitted to backend:", result);
 
-      // Update local state
-      setExpressedInterest([...expressedInterest, selectedStartup.id]);
+    const result = await sendInterest({
+      opportunity: selectedStartup,
+      message: interestMessage,
+    });
 
-      // Add to applications list
-      const newApplication = {
-        id: result.applicationId || Date.now().toString(),
-        startupId: selectedStartup.id,
-        startupTitle: selectedStartup.title,
-        founderName: selectedStartup.founder,
-        message: interestMessage,
-        coverLetter: interestMessage,
-        status: "pending",
-        submittedAt: new Date().toISOString(),
-        ...selectedStartup,
-      };
-      setApplications([newApplication, ...applications]);
-
-      // Also save to localStorage for backwards compatibility
-      const interests = JSON.parse(
-        localStorage.getItem("startupverse_sent_interests") || "[]",
-      );
-      interests.push({
-        id: result.applicationId || Date.now().toString(),
-        startupId: selectedStartup.id,
-        startupTitle: selectedStartup.title,
-        founderName: selectedStartup.founder,
-        message: interestMessage,
-        sentBy: user.name,
-        sentById: user.id,
-        sentAt: new Date().toISOString(),
-        status: "pending",
-      });
-      localStorage.setItem(
-        "startupverse_sent_interests",
-        JSON.stringify(interests),
-      );
-      toast.success(
-        `✉️ Your application has been sent to ${selectedStartup.founder}! They'll be able to view your profile and message.`,
-      );
-      setInterestMessage("");
-      setSelectedStartup(null);
-    } catch (error) {
-      console.error("❌ Failed to submit application:", error);
-      toast.error("Failed to submit application. Please try again.");
-    } finally {
-      setIsSubmittingApplication(false);
+    if (!result.success) {
+      toast.error(result.error || "Failed to send interest. Please try again.");
+      return;
     }
+
+    toast.success("Interest sent. Continue in Inbox > Sent.");
+    setInterestMessage("");
+    setSelectedStartup(null);
   };
 
-  // Check if an item is saved
-  const isSaved = (itemId) => {
-    return savedItems.some(
-      (item) =>
-        item.itemId === itemId.toString() ||
-        item.startupId === itemId.toString() ||
-        item.id === itemId.toString(),
-    );
+  const isSaved = (itemId, startupId) => {
+    const id = String(itemId || "");
+    const startup = String(startupId || "");
+    return viewModel.savedIdSet.has(id) || viewModel.savedIdSet.has(startup);
   };
 
-  // Save/unsave handler
   const handleToggleSave = async (startup, e) => {
-    e?.stopPropagation(); // Prevent triggering parent click events
-
-    const itemId = startup.id.toString();
-    const isCurrentlySaved = isSaved(itemId);
-
-    // Prevent multiple simultaneous saves
-    if (savingItems.has(itemId)) return;
-
-    // Add to saving set
-    setSavingItems((prev) => new Set(prev).add(itemId));
-    try {
-      if (isCurrentlySaved) {
-        // Unsave
-        await talentApi.removeSavedItem(user.id, "startup", itemId);
-
-        // Remove from savedItems
-        setSavedItems((prev) =>
-          prev.filter(
-            (item) =>
-              item.itemId !== itemId &&
-              item.startupId !== itemId &&
-              item.id !== itemId,
-          ),
-        );
-        console.log("✅ Item unsaved from backend:", itemId);
-        toast.success("Removed from saved");
-      } else {
-        // Save
-        const itemData = {
-          itemType: "startup",
-          itemId: itemId,
-          itemData: startup,
-        };
-        const result = await talentApi.saveItem(user.id, itemData);
-
-        // Add to savedItems
-        const newSavedItem = {
-          id: result.savedItemId || Date.now().toString(),
-          itemId: itemId,
-          startupId: itemId,
-          itemType: "startup",
-          itemData: startup,
-          savedAt: new Date().toISOString(),
-        };
-        setSavedItems((prev) => [newSavedItem, ...prev]);
-        console.log("✅ Item saved to backend:", result);
-        toast.success("Saved for later!");
-      }
-    } catch (error) {
-      console.error("❌ Failed to toggle save:", error);
-      toast.error("Failed to update. Please try again.");
-    } finally {
-      // Remove from saving set
-      setSavingItems((prev) => {
-        const newSet = new Set(prev);
-        newSet.delete(itemId);
-        return newSet;
-      });
+    e?.stopPropagation();
+    const result = await toggleSaved(startup);
+    if (!result.success) {
+      toast.error(result.error || "Failed to update. Please try again.");
+      return;
     }
+    toast.success(result.saved ? "Saved for later!" : "Removed from saved");
   };
 
-  // Mock data for fallback when no backend data
-  const topMatches = [
-    {
-      id: 1,
-      title: "AI-Powered Healthcare Diagnostics",
-      description:
-        "Building an AI platform that helps doctors diagnose diseases faster and more accurately using machine learning and medical imaging.",
-      founder: "Dr. Sarah Johnson",
-      industry: "HealthTech",
-      stage: "Idea Stage",
-      lookingFor: ["Full-Stack Developer", "ML Engineer", "UX Designer"],
-      location: "San Francisco, CA",
-      match: 92,
-      teamSize: 8,
-      funding: "Seed Funded",
-      commitment: "Full-time",
-      tags: ["AI", "Healthcare", "B2B", "SaaS"],
-      posted: "2 days ago",
-      postedDate: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000),
-      interested: 12,
-      offer: {
-        compensationPhilosophy: "equity-focused",
-        equityMin: "2",
-        equityMax: "8",
-        salaryApproach: "deferred",
-        benefits: [
-          "remote-first",
-          "flexible-hours",
-          "learning-budget",
-          "latest-tech",
-        ],
-        whyJoinUs: [
-          "Impact millions of patients worldwide with better diagnostics",
-          "Work with cutting-edge AI/ML technology in healthcare",
-          "Join a mission-driven team with deep medical expertise",
-        ],
-      },
-    },
-    {
-      id: 2,
-      title: "Next-Gen AI Assistant Platform",
-      description:
-        "Building enterprise AI assistants that integrate seamlessly with existing workflows. Using advanced LLMs and proprietary training methods to deliver personalized automation at scale.",
-      founder: "Michael Zhang",
-      industry: "AI Tech",
-      stage: "MVP Building",
-      lookingFor: ["AI/ML Engineer", "Backend Developer", "DevOps Engineer"],
-      location: "Austin, TX",
-      match: 88,
-      teamSize: 6,
-      funding: "Seed Funded",
-      commitment: "Full-time",
-      tags: ["AI", "Enterprise", "SaaS", "Automation"],
-      posted: "3 days ago",
-      postedDate: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000),
-      interested: 16,
-      offer: {
-        compensationPhilosophy: "balanced",
-        equityMin: "1.5",
-        equityMax: "6",
-        salaryApproach: "competitive",
-        salaryMin: "100000",
-        salaryMax: "150000",
-        benefits: [
-          "remote-first",
-          "flexible-hours",
-          "health-insurance",
-          "learning-budget",
-          "latest-tech",
-        ],
-        whyJoinUs: [
-          "Work on cutting-edge AI technology used by Fortune 500 companies",
-          "Backed by top-tier VCs with strong AI/ML portfolio",
-          "Competitive compensation package with significant equity upside",
-        ],
-      },
-    },
-    {
-      id: 3,
-      title: "Sustainable Fashion Marketplace",
-      description:
-        "Creating a marketplace that connects eco-conscious consumers with sustainable fashion brands. Focus on transparency and carbon footprint tracking.",
-      founder: "Maya Patel",
-      industry: "E-commerce",
-      stage: "MVP Building",
-      lookingFor: ["Backend Developer", "Marketing Lead", "Operations Manager"],
-      location: "New York, NY",
-      match: 85,
-      teamSize: 5,
-      funding: "Pre-Seed",
-      commitment: "Part-time to Full-time",
-      tags: ["Sustainability", "Fashion", "E-commerce", "B2C"],
-      posted: "5 days ago",
-      postedDate: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000),
-      interested: 8,
-      offer: {
-        compensationPhilosophy: "balanced",
-        equityMin: "1",
-        equityMax: "5",
-        salaryApproach: "startup-friendly",
-        salaryMin: "50000",
-        salaryMax: "80000",
-        benefits: ["remote-first", "flexible-hours", "work-from-home"],
-        whyJoinUs: [
-          "Help combat climate change through sustainable fashion",
-          "Growing market with $15B+ opportunity",
-          "Already have partnerships with 20+ eco-brands",
-        ],
-        customPerks: "4-day work week option after MVP launch",
-      },
-    },
-    {
-      id: 4,
-      title: "EdTech for Coding Education",
-      description:
-        "Interactive platform teaching kids age 8-16 how to code through game-based learning. Already have 500 beta users.",
-      founder: "Alex Chen",
-      industry: "EdTech",
-      stage: "Early Traction",
-      lookingFor: ["Frontend Developer", "Product Designer", "Growth Marketer"],
-      location: "Remote",
-      match: 78,
-      teamSize: 12,
-      funding: "Series A",
-      commitment: "Full-time",
-      tags: ["EdTech", "Kids", "Gaming", "SaaS"],
-      posted: "7 days ago",
-      postedDate: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000),
-      interested: 24,
-      offer: {
-        compensationPhilosophy: "balanced",
-        equityMin: "0.5",
-        equityMax: "4",
-        salaryApproach: "competitive",
-        salaryMin: "90000",
-        salaryMax: "140000",
-        benefits: [
-          "remote-first",
-          "flexible-hours",
-          "health-insurance",
-          "learning-budget",
-          "conference-budget",
-        ],
-        whyJoinUs: [
-          "500 active users growing 40% month-over-month",
-          "Recently accepted into Y Combinator",
-          "Shape the future of how millions of kids learn to code",
-        ],
-      },
-    },
-  ];
 
-  // Use matched opportunities from backend, or fall back to mock data if empty
-  const displayedMatches =
-    matchedOpportunities.length > 0 ? matchedOpportunities : topMatches;
+  const displayedMatches = matchedOpportunities;
   const startupRows = useMemo(
     () =>
       displayedMatches.map((startup, index) => {
@@ -663,6 +241,10 @@ export default function TalentDashboard({
         };
         return {
           id: startup.id?.toString() || `${startup.title || "startup"}-${index}`,
+          startupId:
+            startup.startupId?.toString() ||
+            startup.id?.toString() ||
+            `${startup.title || "startup"}-${index}`,
           startup: normalizedStartup,
           title: startup.title || "Untitled startup",
           founder: startup.founder || "Founder",
@@ -763,6 +345,32 @@ export default function TalentDashboard({
   const showProfileBanner =
     !profileBannerDismissed && talentCompletion < TALENT_ACTIONS_MIN_COMPLETION;
   const hasRows = sortedRows.length > 0;
+  const summaryCards = [
+    {
+      id: "opportunities",
+      label: "Opportunities",
+      value: viewModel.summary.opportunityCount,
+      hint: "Available now",
+    },
+    {
+      id: "saved",
+      label: "Saved",
+      value: viewModel.summary.savedCount,
+      hint: "Watchlist",
+    },
+    {
+      id: "interests",
+      label: "Sent interests",
+      value: viewModel.summary.sentInterestCount,
+      hint: `${viewModel.summary.pendingInterestCount} pending`,
+    },
+    {
+      id: "invitations",
+      label: "Inbox invites",
+      value: viewModel.summary.invitationCount,
+      hint: `${viewModel.summary.pendingInvitationCount} pending`,
+    },
+  ];
   return (
     <div className="space-y-3 p-3">
       {showProfileModal && (
@@ -817,6 +425,25 @@ export default function TalentDashboard({
               </div>
             </div>
           </div>
+        </div>
+      )}
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        {summaryCards.map((card) => (
+          <article
+            key={card.id}
+            className="rounded-md border border-border bg-background px-3 py-2"
+          >
+            <p className="text-[12px] uppercase tracking-[0.04em] text-muted-foreground">
+              {card.label}
+            </p>
+            <p className="text-[20px] font-semibold text-foreground">{card.value}</p>
+            <p className="text-[12px] text-muted-foreground">{card.hint}</p>
+          </article>
+        ))}
+      </div>
+      {viewModel.fallbackUsed && (
+        <div className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-[12px] text-amber-800">
+          Some sections are using cached fallback data while backend sync recovers.
         </div>
       )}
       <div className="grid grid-cols-1 gap-3 lg:grid-cols-[280px_minmax(0,1fr)]">
@@ -1005,13 +632,13 @@ export default function TalentDashboard({
                         size="icon"
                         className="h-7 w-7"
                         onClick={(event) => handleToggleSave(row.startup, event)}
-                        disabled={savingItems.has(row.id)}
+                        disabled={savingItems.has(String(row.id))}
                         aria-label={`Save ${row.title}`}
-                        aria-pressed={isSaved(row.id)}
+                        aria-pressed={isSaved(row.id, row.startupId)}
                       >
                         <Heart
                           className={`h-4 w-4 transition-colors ${
-                            isSaved(row.id)
+                            isSaved(row.id, row.startupId)
                               ? "fill-red-500 text-red-500"
                               : "text-muted-foreground hover:fill-red-500 hover:text-red-500"
                           }`}
@@ -1093,13 +720,13 @@ export default function TalentDashboard({
                       size="icon"
                       className="h-7 w-7"
                       onClick={(event) => handleToggleSave(row.startup, event)}
-                      disabled={savingItems.has(row.id)}
+                      disabled={savingItems.has(String(row.id))}
                       aria-label={`Save ${row.title}`}
-                      aria-pressed={isSaved(row.id)}
+                      aria-pressed={isSaved(row.id, row.startupId)}
                     >
                       <Heart
                         className={`h-4 w-4 transition-colors ${
-                          isSaved(row.id)
+                          isSaved(row.id, row.startupId)
                             ? "fill-red-500 text-red-500"
                             : "text-muted-foreground hover:fill-red-500 hover:text-red-500"
                         }`}
@@ -1243,7 +870,7 @@ export default function TalentDashboard({
                     <OfferDisplay offer={selectedStartup.offer} />
                   </div>
                 )}
-                {!expressedInterest.includes(selectedStartup.id) && (
+                {!hasExpressedInterest(selectedStartup) && (
                   <div className="pt-4 border-t space-y-3">
                     <div>
                       <p className="text-sm font-medium mb-2">
@@ -1270,7 +897,7 @@ export default function TalentDashboard({
                     </Button>
                   </div>
                 )}
-                {expressedInterest.includes(selectedStartup.id) && (
+                {hasExpressedInterest(selectedStartup) && (
                   <div className="pt-4 border-t">
                     <Button className="w-full" size="lg" disabled={true}>
                       <Target className="w-5 h-5 mr-2" />

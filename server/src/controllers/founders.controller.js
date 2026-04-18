@@ -105,6 +105,12 @@ export const createOrUpdateStartup = async (req, res) => {
     return apiError(res, "Forbidden.", 403);
   }
 
+  const existing = await Startup.findOne({ founderId: normalizedFounderId });
+  const mergedData =
+    data !== undefined && data !== null && typeof data === "object"
+      ? { ...((existing && existing.data) || {}), ...data }
+      : existing?.data;
+
   const startup = await Startup.findOneAndUpdate(
     { founderId: normalizedFounderId },
     {
@@ -115,7 +121,7 @@ export const createOrUpdateStartup = async (req, res) => {
       stage,
       website,
       logo,
-      data,
+      ...(mergedData !== undefined ? { data: mergedData } : {}),
     },
     { upsert: true, new: true, runValidators: true },
   );
@@ -146,7 +152,13 @@ export const getMilestones = async (req, res) => {
   if (!founderGuard(req, req.params.founderId)) {
     return apiError(res, "Forbidden.", 403);
   }
-  const milestones = await Milestone.find({ founderId: req.params.founderId }).sort({ sequence: 1 });
+  const founderId = req.params.founderId;
+  const weeklyOutcomeId = req.query?.weeklyOutcomeId;
+  const filter = { founderId };
+  if (weeklyOutcomeId) {
+    filter.weeklyOutcomeId = weeklyOutcomeId;
+  }
+  const milestones = await Milestone.find(filter).sort({ sequence: 1 });
   const milestoneIds = milestones.map((m) => String(m._id));
   const tasks = milestoneIds.length
     ? await Task.find({ milestoneId: { $in: milestoneIds } }, { milestoneId: 1, status: 1 })
@@ -190,6 +202,7 @@ export const createMilestone = async (req, res) => {
     title: payload?.title || "Milestone",
     description: payload?.description || "",
     dueDate: payload?.dueDate || null,
+    weeklyOutcomeId: payload?.weeklyOutcomeId || null,
     sequence,
     status: payload?.status || "pending",
   });
@@ -450,12 +463,21 @@ export const createWeeklyOutcome = async (req, res) => {
     return apiError(res, mutability.message, mutability.code, mutability.errors);
   }
 
+  const goalText = String(payload?.goal || payload?.title || "").trim();
+  if (!goalText) {
+    return apiError(res, "goal (or title) is required.", 400);
+  }
+
+  if (!startup?._id) {
+    return apiError(res, "Startup is required before saving weekly outcomes.", 400);
+  }
+
   const update = {
     founderId,
-    startupId: payload?.startupId || startup?._id,
+    startupId: payload?.startupId || startup._id,
     weekOf: weekStart,
-    goal: payload?.goal || "",
-    summary: payload?.summary || payload?.notes || "",
+    goal: goalText,
+    summary: String(payload?.summary || payload?.notes || payload?.description || "").trim(),
     status: requestedStatus,
     score: Number(payload?.score || 0),
   };
@@ -479,6 +501,121 @@ export const createWeeklyOutcome = async (req, res) => {
   });
 
   return apiSuccess(res, outcome, existing ? 200 : 201);
+};
+
+function serializeTaskActionButton(value) {
+  if (value === undefined || value === null || value === "") return "";
+  if (typeof value === "string") return String(value).slice(0, 1000);
+  try {
+    return JSON.stringify(value).slice(0, 1000);
+  } catch {
+    return "";
+  }
+}
+
+export const createWeeklyPlan = async (req, res) => {
+  const founderId = req.params.founderId;
+  if (!founderGuard(req, founderId)) {
+    return apiError(res, "Forbidden.", 403);
+  }
+
+  const plan = unwrapPayload(req, "plan") || req.body?.plan || req.body || {};
+  const goalText = String(plan.goal || plan.title || "").trim();
+  if (!goalText) {
+    return apiError(res, "goal is required.", 400);
+  }
+
+  const startup = await Startup.findOne({ founderId });
+  if (!startup?._id) {
+    return apiError(res, "Startup is required before setting a weekly plan.", 400);
+  }
+
+  const incomingWeek = plan.weekOf ? new Date(plan.weekOf) : new Date();
+  const weekStart = new Date(incomingWeek);
+  weekStart.setHours(0, 0, 0, 0);
+
+  const existing = await WeeklyOutcome.findOne({ founderId, weekOf: weekStart });
+  const mutability = ensureOutcomeMutable(existing);
+  if (!mutability.ok) {
+    return apiError(res, mutability.message, mutability.code, mutability.errors);
+  }
+
+  if (existing?._id) {
+    const oldMilestoneIds = await Milestone.find({ weeklyOutcomeId: existing._id }).distinct("_id");
+    if (oldMilestoneIds.length) {
+      await Task.deleteMany({ milestoneId: { $in: oldMilestoneIds } });
+      await Milestone.deleteMany({ _id: { $in: oldMilestoneIds } });
+    }
+  }
+
+  const update = {
+    founderId,
+    startupId: startup._id,
+    weekOf: weekStart,
+    goal: goalText,
+    summary: String(plan.summary || plan.description || "").trim(),
+    status: plan.status || "active",
+    score: Number(plan.score || 0),
+  };
+
+  const outcome = existing
+    ? await WeeklyOutcome.findByIdAndUpdate(existing._id, update, {
+        new: true,
+        runValidators: true,
+      })
+    : await WeeklyOutcome.create(update);
+
+  const milestonesInput = Array.isArray(plan.milestones) ? plan.milestones : [];
+  const createdMilestones = [];
+  let sequence = 1;
+
+  for (const m of milestonesInput) {
+    const milestone = await Milestone.create({
+      founderId,
+      startupId: startup._id,
+      weeklyOutcomeId: outcome._id,
+      title: String(m?.title || "Milestone").trim().slice(0, 200),
+      description: String(m?.description || "").slice(0, 5000),
+      dueDate: m?.dueDate ? new Date(m.dueDate) : null,
+      sequence: sequence++,
+      status: "pending",
+    });
+    createdMilestones.push(milestone);
+
+    const taskItems = Array.isArray(m?.tasks) ? m.tasks : [];
+    for (const t of taskItems) {
+      const title = typeof t === "string" ? t : t?.title;
+      if (!title || !String(title).trim()) continue;
+      const actionButton = typeof t === "object" && t !== null ? serializeTaskActionButton(t.actionButton) : "";
+      await Task.create({
+        founderId,
+        startupId: startup._id,
+        title: String(title).trim().slice(0, 200),
+        description: typeof t === "object" && t?.description ? String(t.description).slice(0, 5000) : "",
+        status: "pending",
+        milestoneId: milestone._id,
+        actionButton,
+      });
+    }
+    await syncMilestoneCounters(milestone._id);
+  }
+
+  await appendLoopActivity({
+    founderId,
+    startupId: outcome.startupId,
+    type: "status-change",
+    text: "Weekly goal set.",
+    metadata: { outcomeId: outcome._id, milestoneCount: createdMilestones.length },
+  });
+
+  return apiSuccess(
+    res,
+    {
+      outcome,
+      milestones: createdMilestones,
+    },
+    existing ? 200 : 201,
+  );
 };
 
 export const getPosts = async (req, res) => {

@@ -98,8 +98,7 @@ export function mapFounderWeeklyLoop({
   const normalizedTasks = normalizeTasks(tasks);
 
   const orderedOutcomes = sortByDateDesc(normalizedOutcomes, (row) => row.weekOf);
-  const activeOutcome =
-    orderedOutcomes.find((row) => row.status === "active") || orderedOutcomes[0] || null;
+  const activeOutcome = orderedOutcomes.find((row) => row.status === "active") || null;
 
   const taskMix = normalizedTasks.reduce(
     (accumulator, task) => {
@@ -138,6 +137,7 @@ export function mapFounderWeeklyLoop({
       streak:
         Number(executionScore?.currentStreak) ||
         Number(executionScore?.streak) ||
+        Number(executionScore?.streakCount) ||
         computeStreak(orderedOutcomes),
       executionScore: Number(executionScore?.score) || 0,
       executionPercentile: Number(executionScore?.percentile) || 0,

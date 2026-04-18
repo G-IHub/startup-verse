@@ -7,7 +7,6 @@ function isEnabled(value, defaultValue = true) {
 export const featureFlags = {
   redesignedFounderHome: isEnabled(
     import.meta.env.VITE_UI_REDESIGN_FOUNDER_HOME,
-    true,
+    false,
   ),
 };
-

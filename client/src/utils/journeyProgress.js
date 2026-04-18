@@ -183,9 +183,39 @@ export const JOURNEY_STAGES = [
   },
 ];
 
+let journeyUserId = null;
+
+export function configureJourneyUser(userId) {
+  journeyUserId = userId || null;
+}
+
+function journeyStorageKey() {
+  return journeyUserId ? `journey_progress_${journeyUserId}` : "journey_progress";
+}
+
+/**
+ * Overwrite local journey state from server (Startup.data.journey).
+ */
+export function applyServerJourneySnapshot(snapshot) {
+  if (!snapshot || typeof snapshot !== "object") return;
+  const stage = Number(snapshot.currentStage);
+  if (!Number.isFinite(stage) || stage < 1) return;
+  const key = journeyStorageKey();
+  localStorage.setItem(key, JSON.stringify(snapshot));
+}
+
 // Initialize journey progress for new users
 export function initializeJourneyProgress() {
-  const existingProgress = localStorage.getItem("journey_progress");
+  const key = journeyStorageKey();
+  let existingProgress = localStorage.getItem(key);
+
+  if (!existingProgress && journeyUserId) {
+    const legacy = localStorage.getItem("journey_progress");
+    if (legacy) {
+      existingProgress = legacy;
+      localStorage.setItem(key, legacy);
+    }
+  }
 
   if (existingProgress) {
     return JSON.parse(existingProgress);
@@ -203,7 +233,7 @@ export function initializeJourneyProgress() {
     },
   };
 
-  localStorage.setItem("journey_progress", JSON.stringify(initialProgress));
+  localStorage.setItem(key, JSON.stringify(initialProgress));
   return initialProgress;
 }
 
@@ -220,7 +250,7 @@ export function getCurrentStage() {
 
 // Update journey progress
 export function updateJourneyProgress(progress) {
-  localStorage.setItem("journey_progress", JSON.stringify(progress));
+  localStorage.setItem(journeyStorageKey(), JSON.stringify(progress));
 }
 
 // Mark current stage as complete and move to next
@@ -441,6 +471,6 @@ export function getTimeInCurrentStage() {
 
 // Reset journey progress (for testing or restart)
 export function resetJourneyProgress() {
-  localStorage.removeItem("journey_progress");
+  localStorage.removeItem(journeyStorageKey());
   initializeJourneyProgress();
 }

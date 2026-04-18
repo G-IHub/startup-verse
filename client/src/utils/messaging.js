@@ -47,6 +47,7 @@ export async function sendMessage(
   fileName,
   fileSize,
   fileType,
+  options = {},
 ) {
   // Create message object first
   const messageId = `msg-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
@@ -68,24 +69,24 @@ export async function sendMessage(
     ...(fileType && { fileType }),
   };
 
-  // 🔧 FIX: Save to localStorage FIRST for instant local updates
-  try {
-    const localStorageKey = `messages_${startupId}_${senderId}_${recipientId}`;
-    const existingMessages = JSON.parse(
-      localStorage.getItem(localStorageKey) || "[]",
-    );
-    existingMessages.push(message);
-    localStorage.setItem(localStorageKey, JSON.stringify(existingMessages));
+  if (!options?.strict) {
+    try {
+      const localStorageKey = `messages_${startupId}_${senderId}_${recipientId}`;
+      const existingMessages = JSON.parse(
+        localStorage.getItem(localStorageKey) || "[]",
+      );
+      existingMessages.push(message);
+      localStorage.setItem(localStorageKey, JSON.stringify(existingMessages));
 
-    // Also save to the reverse key for the recipient's view
-    const reverseKey = `messages_${startupId}_${recipientId}_${senderId}`;
-    const recipientMessages = JSON.parse(
-      localStorage.getItem(reverseKey) || "[]",
-    );
-    recipientMessages.push(message);
-    localStorage.setItem(reverseKey, JSON.stringify(recipientMessages));
-  } catch (e) {
-    console.warn("Failed to save message to localStorage:", e);
+      const reverseKey = `messages_${startupId}_${recipientId}_${senderId}`;
+      const recipientMessages = JSON.parse(
+        localStorage.getItem(reverseKey) || "[]",
+      );
+      recipientMessages.push(message);
+      localStorage.setItem(reverseKey, JSON.stringify(recipientMessages));
+    } catch (e) {
+      console.warn("Failed to save message to localStorage:", e);
+    }
   }
 
   // Then send to backend
@@ -104,6 +105,9 @@ export async function sendMessage(
     const serverMessage = mapMessageDto(payload?.data || payload?.message);
     return serverMessage || message;
   } catch (error) {
+    if (options?.strict) {
+      throw error;
+    }
     if (process.env.NODE_ENV === "development") {
       console.debug("Message send fallback to localStorage:", error?.message);
     }
@@ -112,7 +116,7 @@ export async function sendMessage(
 }
 
 // Get conversation between two users or team chat
-export async function getConversation(userId, otherUserId, startupId) {
+export async function getConversation(userId, otherUserId, startupId, options = {}) {
   try {
     const payload = await request(
       `/messages/conversation/${startupId}/${userId}/${otherUserId}`,
@@ -121,6 +125,7 @@ export async function getConversation(userId, otherUserId, startupId) {
     const rows = payload?.data || payload?.messages || [];
     return rows.map(mapMessageDto).filter(Boolean);
   } catch (error) {
+    if (options?.strict) throw error;
     if (process.env.NODE_ENV === "development") {
       console.debug("⚠️ Conversation fetch failed, using localStorage");
     }
@@ -129,7 +134,7 @@ export async function getConversation(userId, otherUserId, startupId) {
 }
 
 // Get all conversations for a user
-export async function getUserConversations(userId, startupId, teamMembers) {
+export async function getUserConversations(userId, startupId, teamMembers, options = {}) {
   try {
     const payload = await request(`/messages/conversations/${startupId}/${userId}`, {
       method: "GET",
@@ -151,7 +156,7 @@ export async function getUserConversations(userId, startupId, teamMembers) {
       };
     });
   } catch (error) {
-    // 🔧 FIX: Silent fallback - no console spam
+    if (options?.strict) throw error;
     if (process.env.NODE_ENV === "development") {
       console.debug("⚠️ Conversations fetch failed, using localStorage");
     }
@@ -231,7 +236,7 @@ export function formatMessageTimestamp(timestamp) {
 }
 
 // Upload file to the messaging API (multipart)
-export async function uploadMessageFile(file, startupId, senderId) {
+export async function uploadMessageFile(file, startupId, senderId, options = {}) {
   try {
     const formData = new FormData();
     formData.append("file", file);
@@ -254,12 +259,13 @@ export async function uploadMessageFile(file, startupId, senderId) {
 
     const data = await response.json();
     return {
-      url: data.url,
+      url: data?.data?.fileUrl || data?.fileUrl || data?.url,
       fileName: file.name,
       fileSize: file.size,
       fileType: file.type,
     };
   } catch (error) {
+    if (options?.strict) throw error;
     console.error("Error uploading file:", error);
     return null;
   }
