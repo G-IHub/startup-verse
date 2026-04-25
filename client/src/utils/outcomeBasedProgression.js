@@ -13,6 +13,8 @@ import {
   completeCurrentStage,
   JOURNEY_STAGES,
 } from "./journeyProgress";
+import { syncJourneyProgressToServer } from "./founderJourneyApi.js";
+import { useJourneyStore } from "../state/useJourneyStore.js";
 import { toast } from "sonner";
 
 /**
@@ -307,12 +309,13 @@ export function calculateProgressIncrement(
  * Process a completed weekly outcome and update stage progress
  * This is called after a founder completes their weekly review
  */
-export function processOutcomeForProgression(
+export async function processOutcomeForProgression(
   outcomeTitle,
   outcomeDescription,
   achievement,
   whatWorked = "",
   learnings = "",
+  userId,
 ) {
   const progress = getJourneyProgress();
   const currentStage = progress.currentStage;
@@ -393,6 +396,15 @@ export function processOutcomeForProgression(
       ) {
         autoCompleteStage(currentStage);
       }
+    }
+  }
+
+  if (userId) {
+    try {
+      await syncJourneyProgressToServer(userId);
+      useJourneyStore.getState().refresh();
+    } catch (e) {
+      console.warn("[OutcomeProgression] Journey sync failed:", e?.message || e);
     }
   }
 }
@@ -491,7 +503,7 @@ export function calculateCombinedProgress(stageId) {
 /**
  * Export hook for weekly review completion
  */
-export function onWeeklyReviewCompleted(
+export async function onWeeklyReviewCompleted(
   outcomeTitle,
   outcomeDescription,
   achievement,
@@ -499,17 +511,19 @@ export function onWeeklyReviewCompleted(
   whatDidnt,
   learnings,
   outcomeId,
+  userId,
 ) {
   console.log(
     "🎯 [OutcomeProgression] Weekly review completed, processing for progression...",
   );
 
-  processOutcomeForProgression(
+  await processOutcomeForProgression(
     outcomeTitle,
     outcomeDescription,
     achievement,
     whatWorked,
     learnings,
+    userId,
   );
 
   // Track this outcome's contribution

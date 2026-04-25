@@ -1,5 +1,4 @@
 import React, { useState, useRef, useEffect } from "react";
-import { API_BASE_URL } from "../config/apiBase.js";
 import { Button } from "./ui/button";
 import {
   Card,
@@ -11,15 +10,34 @@ import {
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
 import { Textarea } from "./ui/textarea";
-import { ArrowLeft, Upload, ChevronDown, ChevronUp, X } from "lucide-react";
+import { ArrowLeft, ChevronDown, ChevronUp } from "lucide-react";
 import TalentProfileForm from "./TalentProfileForm";
 import {
   determineInitialStage,
   getStageName,
 } from "../utils/algorithmicStageDetection";
-import { setCurrentStage } from "../utils/journeyProgress";
+import {
+  applyServerJourneySnapshot,
+  configureJourneyUser,
+} from "../utils/journeyProgress";
+import { syncJourneyProgressToServer } from "../utils/founderJourneyApi.js";
 import { toast } from "sonner";
-import { getAccessToken } from "../app/session";
+import * as founderApi from "../utils/api/founderApi";
+import {
+  FOUNDER_INDUSTRY_OPTIONS,
+  FOUNDER_TARGET_AUDIENCE_OPTIONS,
+  FOUNDER_ROLES_NEEDED_OPTIONS,
+  FOUNDER_TEAM_SIZE_OPTIONS,
+  ORG_ADMIN_PROGRAM_STAGE_OPTIONS,
+  resolveIndustryForPersistence,
+  validateFounderStartupFields,
+} from "../domains/founder/founderProfileConfig";
+
+const industryOptions = FOUNDER_INDUSTRY_OPTIONS;
+const audienceOptions = FOUNDER_TARGET_AUDIENCE_OPTIONS;
+const rolesOptions = FOUNDER_ROLES_NEEDED_OPTIONS;
+const teamSizeOptions = FOUNDER_TEAM_SIZE_OPTIONS;
+const startupStagesOptions = ORG_ADMIN_PROGRAM_STAGE_OPTIONS;
 
 // Single-select dropdown component with scroll indicators
 function SingleSelectDropdown({
@@ -284,12 +302,6 @@ export default function ProfileCompletionForm({
   const talentFormRef = useRef(null);
   const isMountedRef = useRef(true);
 
-  // Avatar upload state
-  const [avatarFile, setAvatarFile] = useState(null);
-  const [avatarPreview, setAvatarPreview] = useState("");
-  const [uploadingAvatar, setUploadingAvatar] = useState(false);
-  const fileInputRef = useRef(null);
-
   // Founder form fields
   const [startupName, setStartupName] = useState("");
   const [startupDescription, setStartupDescription] = useState("");
@@ -314,100 +326,6 @@ export default function ProfileCompletionForm({
   const [programDuration, setProgramDuration] = useState("");
   const [supportedStages, setSupportedStages] = useState([]);
   const [supportedIndustries, setSupportedIndustries] = useState([]);
-
-  // Industry options
-  const industryOptions = [
-    "FinTech",
-    "HealthTech",
-    "EdTech",
-    "E-commerce",
-    "SaaS",
-    "AI/Machine Learning",
-    "Blockchain/Web3",
-    "CleanTech",
-    "FoodTech",
-    "PropTech",
-    "AgriTech",
-    "BioTech",
-    "HRTech",
-    "MarTech",
-    "CyberSecurity",
-    "Gaming",
-    "Social Media",
-    "IoT",
-    "Logistics/Supply Chain",
-    "Travel/Hospitality",
-    "Entertainment/Media",
-    "Fashion/Beauty",
-    "Sports/Fitness",
-    "Others",
-  ];
-
-  // Target audience options
-  const audienceOptions = [
-    "B2C",
-    "B2B",
-    "Enterprise",
-    "Consumers",
-    "SMB",
-    "Students",
-    "Professionals",
-    "Developers",
-    "Creatives",
-    "Healthcare Providers",
-    "Educators",
-    "Others",
-  ];
-
-  // Roles needed options
-  const rolesOptions = [
-    "CTO",
-    "CMO",
-    "CPO",
-    "CFO",
-    "COO",
-    "Head of Sales",
-    "Head of Marketing",
-    "Head of Product",
-    "Head of Engineering",
-    "Head of Design",
-    "Full-stack Developer",
-    "Frontend Developer",
-    "Backend Developer",
-    "Mobile Developer",
-    "DevOps Engineer",
-    "Data Scientist",
-    "Data Engineer",
-    "ML Engineer",
-    "UI/UX Designer",
-    "Product Designer",
-    "Graphic Designer",
-    "Product Manager",
-    "Project Manager",
-    "Business Analyst",
-    "Sales Manager",
-    "Marketing Manager",
-    "Content Creator",
-    "Social Media Manager",
-    "Growth Hacker",
-    "Customer Success Manager",
-    "HR Manager",
-    "Legal Advisor",
-    "Financial Analyst",
-    "QA Engineer",
-    "Others",
-  ];
-
-  // Team size options
-  const teamSizeOptions = [
-    "Just me (Solo founder)",
-    "2-5 people",
-    "6-10 people",
-    "11-20 people",
-    "21-50 people",
-    "51-100 people",
-    "100+ people",
-  ];
 
   // Organization type options
   const organizationTypeOptions = [
@@ -451,16 +369,6 @@ export default function ProfileCompletionForm({
     "Ongoing/No fixed duration",
   ];
 
-  // Startup stages options
-  const startupStagesOptions = [
-    "Ideation",
-    "Validation",
-    "Building MVP",
-    "Market Testing",
-    "Growth",
-    "Scaling",
-    "All Stages",
-  ];
   const handleTargetAudienceChange = (audience) => {
     setTargetAudience((prev) =>
       prev.includes(audience)
@@ -493,49 +401,6 @@ export default function ProfileCompletionForm({
       isMountedRef.current = false;
     };
   }, []);
-  const handleAvatarChange = (e) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      setAvatarFile(file);
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setAvatarPreview(reader.result);
-      };
-      reader.readAsDataURL(file);
-    }
-  };
-  const uploadAvatar = async () => {
-    if (!avatarFile || !user) return null;
-    setUploadingAvatar(true);
-    try {
-      const formData = new FormData();
-      formData.append("file", avatarFile);
-      formData.append("userId", user.id);
-      const response = await fetch(
-        `${API_BASE_URL}/upload-avatar`,
-        {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${getAccessToken()}`,
-          },
-          body: formData,
-        },
-      );
-      const result = await response.json();
-      if (!response.ok || !result.success) {
-        throw new Error(result.error || "Failed to upload avatar");
-      }
-      console.log("✅ [Avatar] Upload successful:", result.avatarUrl);
-      toast.success("Profile picture uploaded successfully!");
-      return result.avatarUrl;
-    } catch (error) {
-      console.error("❌ [Avatar] Upload failed:", error);
-      toast.error("Failed to upload profile picture");
-      return null;
-    } finally {
-      setUploadingAvatar(false);
-    }
-  };
   const handleSubmit = async (e) => {
     if (e) {
       e.preventDefault();
@@ -552,22 +417,29 @@ export default function ProfileCompletionForm({
     if (!isMountedRef.current) return;
     setLoading(true);
     try {
-      // Upload avatar first if selected
-      let avatarUrl = null;
-      if (avatarFile) {
-        console.log("🖼️ [ProfileCompletion] Uploading avatar...");
-        avatarUrl = await uploadAvatar();
-        if (!avatarUrl) {
-          toast.error(
-            "Failed to upload avatar, but continuing with profile setup",
-          );
-        }
-      }
+      const avatarUrl = null;
 
-      // ALGORITHMIC STAGE DETERMINATION (Founders only)
-      let algorithmicStageId = 1; // Default to Stage 1
+      let algorithmicStageId = 1;
+      let startupIdForUser = user?.startupId;
+
       if (role === "founder") {
-        // Convert form answers to algorithm format
+        const validation = validateFounderStartupFields({
+          startupName,
+          startupDescription,
+          industryFocus,
+          otherIndustry,
+          teamSize,
+          targetAudience,
+          hasValidatedIdea,
+          hasMVP,
+          hasCustomers,
+        });
+        if (!validation.ok) {
+          toast.error(validation.errors[0]);
+          if (isMountedRef.current) setLoading(false);
+          return;
+        }
+
         const hasValidatedIdeaValue = hasValidatedIdea.includes("Yes")
           ? "yes"
           : "no";
@@ -582,7 +454,6 @@ export default function ProfileCompletionForm({
             ? "yes-users"
             : "no";
 
-        // Convert team size to algorithm format
         let currentTeamSizeValue = "1";
         if (teamSize.includes("2-5")) currentTeamSizeValue = "2-3";
         else if (teamSize.includes("6-10")) currentTeamSizeValue = "6-10";
@@ -590,13 +461,7 @@ export default function ProfileCompletionForm({
           currentTeamSizeValue = "10+";
         else if (teamSize.includes("51-100") || teamSize.includes("100+"))
           currentTeamSizeValue = "10+";
-        console.log("🎯 [Onboarding] Stage determination inputs:", {
-          hasValidatedIdea: hasValidatedIdeaValue,
-          hasMVP: hasMVPValue,
-          hasCustomers: hasCustomersValue,
-          currentTeamSize: currentTeamSizeValue,
-          monthlyRevenue: "none",
-        });
+
         algorithmicStageId = determineInitialStage({
           hasValidatedIdea: hasValidatedIdeaValue,
           hasMVP: hasMVPValue,
@@ -604,22 +469,69 @@ export default function ProfileCompletionForm({
           currentTeamSize: currentTeamSizeValue,
           monthlyRevenue: "none",
         });
-        console.log(
-          `🎯 [Onboarding] Determined initial stage: ${algorithmicStageId} - ${getStageName(algorithmicStageId)}`,
-        );
 
-        // Set the algorithmically-determined stage
-        setCurrentStage(algorithmicStageId);
+        const founderId = String(user._id ?? user.id);
+        const resolvedIndustry = resolveIndustryForPersistence(
+          industryFocus,
+          otherIndustry,
+        );
+        const stageLabel = getStageName(algorithmicStageId);
+
+        const startup = await founderApi.upsertFounderStartup({
+          founderId,
+          name: startupName.trim(),
+          description: startupDescription,
+          industry: resolvedIndustry,
+          stage: stageLabel,
+        });
+        startupIdForUser = String(startup._id || startup.id);
+
+        await founderApi.saveFounderProfile({
+          userId: String(user._id ?? user.id),
+          startupId: startupIdForUser,
+          bio: bio || "",
+          background: "",
+          links: {},
+        });
+
+        const journeyForServer = {
+          currentStage: algorithmicStageId,
+          completedStages: [],
+          stageData: {
+            [algorithmicStageId]: {
+              startedAt: new Date().toISOString(),
+              completionPercentage: 0,
+              milestonesCompleted: [],
+            },
+          },
+        };
+        configureJourneyUser(founderId);
+        applyServerJourneySnapshot(journeyForServer);
+        try {
+          await syncJourneyProgressToServer(founderId);
+        } catch (err) {
+          console.warn(
+            "[ProfileCompletionForm] Initial journey sync failed",
+            err,
+          );
+        }
       }
+
+      const resolvedFounderIndustry =
+        role === "founder"
+          ? resolveIndustryForPersistence(industryFocus, otherIndustry)
+          : "";
+
       const profileData = {
         role,
         ...(role === "founder"
           ? {
-              // Founder-specific fields
               startupName,
               startupDescription,
               industryFocus:
                 industryFocus === "Others" ? otherIndustry : industryFocus,
+              industry: resolvedFounderIndustry,
+              startupStage: getStageName(algorithmicStageId),
               targetAudience,
               rolesNeeded: rolesNeeded.includes("Others")
                 ? [...rolesNeeded.filter((r) => r !== "Others"), otherRole]
@@ -629,9 +541,11 @@ export default function ProfileCompletionForm({
               hasValidatedIdea,
               hasMVP,
               hasCustomers,
+              ...(industryFocus === "Others"
+                ? { otherIndustry: otherIndustry.trim() }
+                : {}),
             }
           : {
-              // Organization-admin fields
               organizationName: startupName,
               organizationDescription: startupDescription,
               organizationType:
@@ -646,61 +560,72 @@ export default function ProfileCompletionForm({
         avatarUrl,
         onboardingComplete: true,
       };
-      setTimeout(() => {
-        if (!isMountedRef.current) return;
-        if (user && onUpdateUser) {
-          const updatedUser = {
-            ...user,
-            avatarUrl: avatarUrl || user.avatarUrl,
-            profile: {
-              ...user.profile,
-              ...profileData,
-            },
-            onboardingComplete: true,
-          };
-          onUpdateUser(updatedUser);
-        }
-        if (role === "founder" && isMountedRef.current) {
-          toast.success("🎉 Profile setup complete! Welcome to StartupVerse!", {
-            description: `Based on your startup's current state, you're in: ${getStageName(algorithmicStageId)}`,
-          });
 
-          // Check if user is joining the 12-Week Challenge
-          const urlParams = new URLSearchParams(window.location.search);
-          const challengeCohort = urlParams.get("challenge");
-          if (challengeCohort === "cohort1" && user) {
-            console.log(
-              "🏆 [Challenge] Auto-joining user to 12-Week Challenge Cohort 1...",
-            );
-            // TODO: Auto-join user to challenge organization
-            // This would be an API call to add them to a special "Challenge Cohort 1" organization
-            // For now, we'll add this feature in a future iteration
-            toast.success(
-              "🏆 You're in! Welcome to the 12-Week Execution Challenge",
-              {
-                description:
-                  "Your execution journey starts now. Complete your first weekly outcome!",
-              },
-            );
-          }
-        } else if (role === "organization-admin" && isMountedRef.current) {
+      if (!isMountedRef.current) return;
+
+      if (user && onUpdateUser) {
+        const updatedUser = {
+          ...user,
+          ...(role === "founder"
+            ? {
+                startupName,
+                startupDescription,
+                industry: resolvedFounderIndustry,
+                startupStage: getStageName(algorithmicStageId),
+                teamSize,
+                bio,
+                targetAudience: profileData.targetAudience,
+                rolesNeeded: profileData.rolesNeeded,
+                hasValidatedIdea,
+                hasMVP,
+                hasCustomers,
+                startupId: startupIdForUser,
+              }
+            : {}),
+          profile: {
+            ...user.profile,
+            ...profileData,
+          },
+          onboardingComplete: true,
+        };
+        onUpdateUser(updatedUser);
+      }
+
+      if (role === "founder" && isMountedRef.current) {
+        toast.success("🎉 Profile setup complete! Welcome to StartupVerse!", {
+          description: `Based on your startup's current state, you're in: ${getStageName(algorithmicStageId)}`,
+        });
+        const urlParams = new URLSearchParams(window.location.search);
+        const challengeCohort = urlParams.get("challenge");
+        if (challengeCohort === "cohort1" && user) {
           toast.success(
-            "🎉 Organization setup complete! Welcome to StartupVerse!",
+            "🏆 You're in! Welcome to the 12-Week Execution Challenge",
             {
               description:
-                "You can now create cohorts and invite startups to your program",
+                "Your execution journey starts now. Complete your first weekly outcome!",
             },
           );
         }
-        if (isMountedRef.current) {
-          onComplete(profileData);
-          setLoading(false);
-        }
-      }, 1000);
+      } else if (role === "organization-admin" && isMountedRef.current) {
+        toast.success(
+          "🎉 Organization setup complete! Welcome to StartupVerse!",
+          {
+            description:
+              "You can now create cohorts and invite startups to your program",
+          },
+        );
+      }
+
+      if (isMountedRef.current) {
+        onComplete(profileData);
+        setLoading(false);
+      }
     } catch (error) {
       if (!isMountedRef.current) return;
       console.error("❌ [ProfileCompletion] Error submitting form:", error);
-      toast.error("Failed to complete profile setup");
+      toast.error(
+        error?.message || "Failed to complete profile setup",
+      );
       if (isMountedRef.current) {
         setLoading(false);
       }
@@ -847,7 +772,7 @@ export default function ProfileCompletionForm({
                       />
                     </div>
                     <SingleSelectDropdown
-                      label="Industry Focus"
+                      label="Startup type (industry)"
                       options={industryOptions}
                       value={industryFocus}
                       onChange={setIndustryFocus}
@@ -1055,78 +980,10 @@ export default function ProfileCompletionForm({
                     </div>
                   </div>
                 )}
-                <div>
-                  <h3 className="mb-4 text-sm font-semibold">Profile Photo</h3>
-                  <div className="border-2 border-dashed border-border/70 rounded-lg p-6 text-center">
-                    {avatarPreview ? (
-                      <div className="space-y-3">
-                        <div className="relative inline-block">
-                          <img
-                            src={avatarPreview}
-                            alt="Avatar preview"
-                            className="w-24 h-24 rounded-full object-cover mx-auto"
-                          />
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setAvatarFile(null);
-                              setAvatarPreview("");
-                            }}
-                            className="absolute top-0 right-0 bg-destructive text-destructive-foreground rounded-full p-1 hover:bg-destructive/90"
-                          >
-                            <X className="w-4 h-4" />
-                          </button>
-                        </div>
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          onClick={() => fileInputRef.current?.click()}
-                          disabled={loading}
-                        >
-                          Change Photo
-                        </Button>
-                      </div>
-                    ) : (
-                      <div className="space-y-3">
-                        <Upload className="w-12 h-12 mx-auto text-muted-foreground" />
-                        <div>
-                          <p className="text-sm text-muted-foreground mb-2">
-                            Upload a profile picture
-                          </p>
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            onClick={() => fileInputRef.current?.click()}
-                            disabled={loading}
-                          >
-                            Choose File
-                          </Button>
-                        </div>
-                      </div>
-                    )}
-                    <input
-                      ref={fileInputRef}
-                      type="file"
-                      accept="image/*"
-                      onChange={handleAvatarChange}
-                      className="hidden"
-                    />
-                  </div>
-                </div>
               </div>
               <div className="flex justify-end gap-3 pt-4 border-t border-border/70">
-                <Button
-                  type="submit"
-                  disabled={loading || uploadingAvatar}
-                  className="px-8"
-                >
-                  {uploadingAvatar
-                    ? "Uploading Photo..."
-                    : loading
-                      ? "Saving..."
-                      : "Complete Profile"}
+                <Button type="submit" disabled={loading} className="px-8">
+                  {loading ? "Saving..." : "Complete Profile"}
                 </Button>
               </div>
             </form>

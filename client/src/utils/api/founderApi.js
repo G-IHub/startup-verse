@@ -223,6 +223,13 @@ export async function getWeeklyOutcomes(founderId, params = {}) {
   return apiCall(`/founders/${founderId}/weekly-outcomes${queryString}`);
 }
 
+export async function parseFounderIntent(founderId, input) {
+  return apiCall(`/founders/${founderId}/intent-parse`, {
+    method: "POST",
+    body: JSON.stringify({ input }),
+  });
+}
+
 // ==========================================
 // Startup Posts (for Talent Matching)
 // ==========================================

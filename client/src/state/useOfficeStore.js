@@ -44,7 +44,7 @@ function mergeById(existing, incoming) {
 }
 
 function resolveFounderId(user = {}) {
-  if (user?.role === "founder") return String(user.id || "");
+  if (user?.role === "founder") return String(user._id ?? user.id ?? "");
   return String(user?.startupId || user?.founderId || "");
 }
 
@@ -52,9 +52,10 @@ export const useOfficeStore = create((set, get) => ({
   ...initialState(),
 
   async loadWorkspace(user, options = {}) {
-    const startupId = String(user?.startupId || user?.id || "");
+    const rawId = String(user?._id ?? user?.id ?? "");
+    const startupId = String(user?.startupId || rawId);
     const founderId = resolveFounderId(user);
-    const userId = String(user?.id || "");
+    const userId = rawId;
     const userRole = String(user?.role || "");
 
     if (!startupId || !founderId || !userId) {

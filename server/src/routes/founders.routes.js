@@ -14,6 +14,7 @@ foundersRouter.get("/founders/startup/:startupId", requireAuth, asyncHandler(fou
 
 foundersRouter.get("/founders/:founderId/milestones", requireAuth, asyncHandler(foundersController.getMilestones));
 foundersRouter.post("/founders/:founderId/milestones", requireAuth, asyncHandler(foundersController.createMilestone));
+foundersRouter.put("/founders/:founderId/milestones/:milestoneId", requireAuth, asyncHandler(foundersController.updateMilestone));
 foundersRouter.delete("/founders/:founderId/milestones/:milestoneId", requireAuth, asyncHandler(foundersController.deleteMilestone));
 
 foundersRouter.get("/founders/:founderId/tasks", requireAuth, asyncHandler(foundersController.getTasks));
@@ -28,6 +29,15 @@ foundersRouter.delete("/founders/:founderId/tasks/:taskId", requireAuth, asyncHa
 foundersRouter.get("/founders/:founderId/weekly-outcomes", requireAuth, asyncHandler(foundersController.getWeeklyOutcomes));
 foundersRouter.post("/founders/:founderId/weekly-outcomes", requireAuth, asyncHandler(foundersController.createWeeklyOutcome));
 foundersRouter.post("/founders/:founderId/weekly-plan", requireAuth, asyncHandler(foundersController.createWeeklyPlan));
+foundersRouter.post("/founders/:founderId/intent-parse", requireAuth, asyncHandler(foundersController.parseFounderIntent));
+
+foundersRouter.get("/founders/:founderId/journey", requireAuth, asyncHandler(foundersController.getFounderJourney));
+foundersRouter.put("/founders/:founderId/journey", requireAuth, asyncHandler(foundersController.putFounderJourney));
+foundersRouter.get(
+  "/founders/:founderId/execution-state",
+  requireAuth,
+  asyncHandler(foundersController.getFounderExecutionState),
+);
 
 foundersRouter.get("/founders/:founderId/posts", requireAuth, asyncHandler(foundersController.getPosts));
 foundersRouter.post("/founders/:founderId/posts", requireAuth, asyncHandler(foundersController.createPost));
@@ -41,5 +51,15 @@ foundersRouter.get("/founder/:founderId/announcements", requireAuth, asyncHandle
 
 foundersRouter.get("/founders/:founderId/resources", requireAuth, asyncHandler(foundersController.getFounderResources));
 foundersRouter.get("/founders/:founderId/analytics", requireAuth, asyncHandler(foundersController.getFounderAnalyticsDashboard));
+
+foundersRouter.get("/founders/:founderId/stage-tasks", requireAuth, asyncHandler(foundersController.getStageTaskResponses));
+foundersRouter.put("/founders/:founderId/stage-tasks", requireAuth, asyncHandler(foundersController.putStageTaskResponses));
+
+foundersRouter.get("/founders/:founderId/stage-completions", requireAuth, asyncHandler(foundersController.getStageCompletions));
+foundersRouter.post("/founders/:founderId/stage-completions", requireAuth, asyncHandler(foundersController.createStageCompletion));
+
+foundersRouter.get("/founders/:founderId/learning-resources", requireAuth, asyncHandler(foundersController.getLearningResources));
+foundersRouter.get("/founders/:founderId/learning-progress", requireAuth, asyncHandler(foundersController.getLearningProgress));
+foundersRouter.post("/founders/:founderId/learning-progress", requireAuth, asyncHandler(foundersController.trackLearningWatch));
 
 export default foundersRouter;

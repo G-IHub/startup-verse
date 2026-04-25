@@ -210,11 +210,17 @@ function AppContent() {
             .catch(() => {});
         }
 
-        setCurrentView(
-          savedUser.onboardingComplete
-            ? APP_VIEWS.dashboard
-            : APP_VIEWS.profileSetup,
-        );
+        let nextView = savedUser.onboardingComplete
+          ? APP_VIEWS.dashboard
+          : APP_VIEWS.profileSetup;
+        if (savedUser.role === "founder" && savedUser.onboardingComplete) {
+          const fid = String(savedUser._id ?? savedUser.id);
+          if (fid) {
+            const startup = await founderApi.getFounderStartupSafe(fid);
+            if (!startup) nextView = APP_VIEWS.profileSetup;
+          }
+        }
+        setCurrentView(nextView);
       }
 
       setIsLoading(false);
@@ -228,8 +234,18 @@ function AppContent() {
     if (!user) return;
     if (!user.onboardingComplete && currentView === APP_VIEWS.dashboard) {
       setCurrentView(APP_VIEWS.profileSetup);
+      return;
     }
     if (user.onboardingComplete && currentView === APP_VIEWS.profileSetup) {
+      if (user.role === "founder") {
+        const fid = String(user._id ?? user.id);
+        if (fid) {
+          founderApi.getFounderStartupSafe(fid).then((startup) => {
+            if (startup) setCurrentView(APP_VIEWS.dashboard);
+          });
+          return;
+        }
+      }
       setCurrentView(APP_VIEWS.dashboard);
     }
   }, [user, currentView]);
@@ -253,7 +269,19 @@ function AppContent() {
       });
       if (currentUser.onboardingComplete) {
         toast.success(`Welcome back, ${currentUser.name}!`);
-        setCurrentView(APP_VIEWS.dashboard);
+        if (
+          currentUser.role === "founder" &&
+          (currentUser._id || currentUser.id)
+        ) {
+          const fid = String(currentUser._id ?? currentUser.id);
+          founderApi.getFounderStartupSafe(fid).then((startup) => {
+            setCurrentView(
+              startup ? APP_VIEWS.dashboard : APP_VIEWS.profileSetup,
+            );
+          });
+        } else {
+          setCurrentView(APP_VIEWS.dashboard);
+        }
       } else {
         setCurrentView(APP_VIEWS.profileSetup);
       }
@@ -296,7 +324,9 @@ function AppContent() {
     setUser(updatedUser);
     upsertStoredRecord(STORAGE_KEYS.registeredUsers, updatedUser);
 
-    authApi.updateProfile(updatedUser.id, updatedUser).catch(() => {});
+    authApi
+      .updateProfile(String(updatedUser._id ?? updatedUser.id), updatedUser)
+      .catch(() => {});
 
     const { role } = updatedUser;
 
@@ -305,9 +335,17 @@ function AppContent() {
         STORAGE_KEYS.founderProfiles,
         buildFounderProfile(updatedUser),
       );
-      founderApi
-        .saveFounderProfile(updatedUser.id, updatedUser)
-        .catch(() => {});
+      if (updatedUser.startupId) {
+        founderApi
+          .saveFounderProfile({
+            userId: String(updatedUser._id ?? updatedUser.id),
+            startupId: updatedUser.startupId,
+            bio: updatedUser.bio || updatedUser.profile?.bio || "",
+            background: "",
+            links: {},
+          })
+          .catch(() => {});
+      }
     } else if (role === "team-member") {
       teamMemberApi
         .saveTeamMemberProfile(updatedUser.id, updatedUser)
@@ -369,12 +407,22 @@ function AppContent() {
       {currentView === APP_VIEWS.choosePath && (
         <ChooseYourPathPage
           onBack={() => setCurrentView(APP_VIEWS.landing)}
-          onComplete={(_role, completedUser, accessToken) => {
+          onComplete={async (_role, completedUser, accessToken) => {
             login({
               user: completedUser,
               accessToken: accessToken || getAccessToken(),
             });
-            setCurrentView(APP_VIEWS.dashboard);
+            let nextView = APP_VIEWS.dashboard;
+            if (!completedUser.onboardingComplete) {
+              nextView = APP_VIEWS.profileSetup;
+            } else if (completedUser.role === "founder") {
+              const fid = String(completedUser._id ?? completedUser.id);
+              if (fid) {
+                const startup = await founderApi.getFounderStartupSafe(fid);
+                if (!startup) nextView = APP_VIEWS.profileSetup;
+              }
+            }
+            setCurrentView(nextView);
           }}
         />
       )}
@@ -444,7 +492,21 @@ function AppContent() {
             user={user}
             onUpdateUser={handleUpdateUser}
             onComplete={() => setCurrentView(APP_VIEWS.dashboard)}
-            onClose={() => setCurrentView(APP_VIEWS.dashboard)}
+            onClose={async () => {
+              if (user?.role === "founder") {
+                const fid = String(user._id ?? user.id);
+                if (fid) {
+                  const startup = await founderApi.getFounderStartupSafe(fid);
+                  if (!startup) {
+                    toast.error(
+                      "Complete startup profile (including startup name and type) before continuing.",
+                    );
+                    return;
+                  }
+                }
+              }
+              setCurrentView(APP_VIEWS.dashboard);
+            }}
           />
         </Suspense>
       )}

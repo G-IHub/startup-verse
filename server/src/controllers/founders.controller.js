@@ -10,13 +10,18 @@ import Announcement from "../models/Announcement.js";
 import Event from "../models/Event.js";
 import Activity from "../models/Activity.js";
 import Resource from "../models/Resource.js";
+import StageCompletion from "../models/StageCompletion.js";
+import LearningProgress from "../models/LearningProgress.js";
 import TeamMemberProfile from "../models/TeamMemberProfile.js";
 import {
   computeMilestoneCounters,
   ensureOutcomeMutable,
   validateTaskStatusTransition,
   validateBlockedTaskPayload,
+  computeExecutionScoreMetrics,
 } from "../domain/weeklyLoopRules.js";
+import { normalizeJourney, validateJourneyPut } from "../domain/founderJourney.js";
+import { WEEKLY_OUTCOME_STATUSES, TASK_PRIORITIES } from "../utils/enums.js";
 import { mapActivityToDto } from "../utils/activityDto.js";
 import { error as apiError, success as apiSuccess } from "../utils/apiResponse.js";
 import { emitRealtime } from "../services/realtime.service.js";
@@ -45,6 +50,20 @@ async function syncMilestoneCounters(milestoneId) {
     counters,
     { new: false },
   );
+}
+
+const MAX_COMPLETION_JSON = 32000;
+
+function sanitizeCompletionData(data) {
+  if (data === undefined || data === null) return undefined;
+  if (typeof data !== "object" || Array.isArray(data)) return undefined;
+  try {
+    const s = JSON.stringify(data);
+    if (s.length > MAX_COMPLETION_JSON) return undefined;
+    return JSON.parse(s);
+  } catch {
+    return undefined;
+  }
 }
 
 async function appendLoopActivity({ founderId, startupId, type, text, metadata = {} }) {
@@ -193,6 +212,21 @@ export const createMilestone = async (req, res) => {
   }
 
   const payload = unwrapPayload(req, "milestone");
+  const weeklyOutcomeId = payload?.weeklyOutcomeId || null;
+  if (weeklyOutcomeId) {
+    const outcome = await WeeklyOutcome.findOne({
+      _id: weeklyOutcomeId,
+      founderId,
+    });
+    if (!outcome) {
+      return apiError(res, "Weekly outcome not found.", 404);
+    }
+    const mutability = ensureOutcomeMutable(outcome);
+    if (!mutability.ok) {
+      return apiError(res, mutability.message, mutability.code, mutability.errors);
+    }
+  }
+
   const startup = await Startup.findOne({ founderId });
   const sequence = Number(payload?.sequence || 1);
 
@@ -202,12 +236,75 @@ export const createMilestone = async (req, res) => {
     title: payload?.title || "Milestone",
     description: payload?.description || "",
     dueDate: payload?.dueDate || null,
-    weeklyOutcomeId: payload?.weeklyOutcomeId || null,
+    weeklyOutcomeId,
     sequence,
     status: payload?.status || "pending",
   });
 
   return apiSuccess(res, milestone, 201);
+};
+
+export const updateMilestone = async (req, res) => {
+  const founderId = req.params.founderId;
+  if (!founderGuard(req, founderId)) {
+    return apiError(res, "Forbidden.", 403);
+  }
+
+  const existing = await Milestone.findOne({
+    _id: req.params.milestoneId,
+    founderId,
+  });
+  if (!existing) {
+    return apiError(res, "Milestone not found.", 404);
+  }
+
+  if (existing.weeklyOutcomeId) {
+    const outcome = await WeeklyOutcome.findOne({
+      _id: existing.weeklyOutcomeId,
+      founderId,
+    });
+    if (outcome) {
+      const mutability = ensureOutcomeMutable(outcome);
+      if (!mutability.ok) {
+        return apiError(res, mutability.message, mutability.code, mutability.errors);
+      }
+    }
+  }
+
+  const payload = unwrapPayload(req, "milestone") || {};
+  const updates = {};
+
+  if (payload.title != null) {
+    const t = String(payload.title).trim();
+    if (t.length < 2) {
+      return apiError(res, "Milestone title must be at least 2 characters.", 400);
+    }
+    updates.title = t.slice(0, 200);
+  }
+  if (payload.description != null) {
+    updates.description = String(payload.description).trim().slice(0, 5000);
+  }
+  if (payload.sequence != null) {
+    const s = Number(payload.sequence);
+    if (Number.isFinite(s) && s >= 1) {
+      updates.sequence = Math.round(s);
+    }
+  }
+  if (payload.dueDate !== undefined) {
+    updates.dueDate = payload.dueDate ? new Date(payload.dueDate) : null;
+  }
+
+  if (!Object.keys(updates).length) {
+    return apiSuccess(res, existing);
+  }
+
+  const milestone = await Milestone.findOneAndUpdate(
+    { _id: existing._id, founderId },
+    updates,
+    { new: true, runValidators: true },
+  );
+
+  return apiSuccess(res, milestone);
 };
 
 export const deleteMilestone = async (req, res) => {
@@ -216,7 +313,29 @@ export const deleteMilestone = async (req, res) => {
     return apiError(res, "Forbidden.", 403);
   }
 
-  await Milestone.findOneAndDelete({ _id: req.params.milestoneId, founderId });
+  const existing = await Milestone.findOne({
+    _id: req.params.milestoneId,
+    founderId,
+  });
+  if (!existing) {
+    return apiError(res, "Milestone not found.", 404);
+  }
+
+  if (existing.weeklyOutcomeId) {
+    const outcome = await WeeklyOutcome.findOne({
+      _id: existing.weeklyOutcomeId,
+      founderId,
+    });
+    if (outcome) {
+      const mutability = ensureOutcomeMutable(outcome);
+      if (!mutability.ok) {
+        return apiError(res, mutability.message, mutability.code, mutability.errors);
+      }
+    }
+  }
+
+  await Task.deleteMany({ milestoneId: existing._id, founderId });
+  await Milestone.deleteOne({ _id: existing._id, founderId });
   return apiSuccess(res, { deleted: true });
 };
 
@@ -244,7 +363,12 @@ export const createTask = async (req, res) => {
     description: payload?.description || "",
     status: payload?.status || "pending",
     assignedTo: payload?.assignedTo || null,
+    assignedToName: String(payload?.assignedToName || "").trim().slice(0, 200),
+    assignedToAvatar: String(payload?.assignedToAvatar || "").trim().slice(0, 2000),
     milestoneId: payload?.milestoneId || null,
+    priority: TASK_PRIORITIES.includes(String(payload?.priority || "").toLowerCase())
+      ? String(payload.priority).toLowerCase()
+      : "medium",
     incentive: payload?.incentive || "",
     actionButton: payload?.actionButton || "",
     blockerReason: payload?.blockerReason || "",
@@ -392,10 +516,21 @@ export const assignTask = async (req, res) => {
     return apiError(res, "Forbidden.", 403);
   }
 
-  const { assignedTo, assigneeId } = req.body || {};
+  const body = req.body || {};
+  const { assignedTo, assigneeId, assigneeName, assignedToName, assignedToAvatar } = body;
+  const nextAssigned = assignedTo || assigneeId || null;
+  const name =
+    String(assigneeName || assignedToName || "").trim().slice(0, 200) || "";
+  const avatar =
+    String(assignedToAvatar || "").trim().slice(0, 2000) || "";
+  const assignUpdate = {
+    assignedTo: nextAssigned,
+    assignedToName: nextAssigned ? name : "",
+    assignedToAvatar: nextAssigned ? avatar : "",
+  };
   const task = await Task.findOneAndUpdate(
     { _id: req.params.taskId, founderId },
-    { assignedTo: assignedTo || assigneeId || null },
+    assignUpdate,
     { new: true, runValidators: true },
   );
   if (!task) {
@@ -457,7 +592,17 @@ export const createWeeklyOutcome = async (req, res) => {
   weekStart.setHours(0, 0, 0, 0);
   const existing = await WeeklyOutcome.findOne({ founderId, weekOf: weekStart });
 
-  const requestedStatus = payload?.status || "active";
+  const requestedLower = String(payload?.status || "active").toLowerCase();
+  const requestedStatus =
+    WEEKLY_OUTCOME_STATUSES.find((s) => String(s).toLowerCase() === requestedLower) || null;
+  if (!requestedStatus) {
+    return apiError(
+      res,
+      `Invalid status. Allowed: ${WEEKLY_OUTCOME_STATUSES.join(", ")}.`,
+      400,
+    );
+  }
+
   const mutability = ensureOutcomeMutable(existing);
   if (!mutability.ok) {
     return apiError(res, mutability.message, mutability.code, mutability.errors);
@@ -481,6 +626,29 @@ export const createWeeklyOutcome = async (req, res) => {
     status: requestedStatus,
     score: Number(payload?.score || 0),
   };
+
+  const completionData = sanitizeCompletionData(payload?.completionData);
+  if (completionData !== undefined) {
+    update.completionData = completionData;
+  }
+  if (payload?.completionPercentage != null) {
+    const p = Number(payload.completionPercentage);
+    if (Number.isFinite(p)) {
+      update.completionPercentage = Math.min(100, Math.max(0, p));
+    }
+  }
+  if (payload?.completedAt) {
+    const d = new Date(payload.completedAt);
+    if (!Number.isNaN(d.getTime())) {
+      update.completedAt = d;
+    }
+  }
+  if (payload?.weekNumber != null) {
+    const w = Number(payload.weekNumber);
+    if (Number.isFinite(w) && w >= 1) {
+      update.weekNumber = Math.round(w);
+    }
+  }
 
   const outcome = existing
     ? await WeeklyOutcome.findByIdAndUpdate(existing._id, update, {
@@ -513,6 +681,84 @@ function serializeTaskActionButton(value) {
   }
 }
 
+function parseIntentCategory(input) {
+  const text = String(input || "").toLowerCase();
+  const defs = [
+    {
+      category: "validation",
+      keywords: ["validate", "interview", "survey", "feedback", "assumption", "test"],
+      title: "Validate core assumptions with real users",
+      description: "Test and validate key assumptions with target users.",
+      milestones: [
+        { title: "Define validation criteria", tasks: ["List assumptions", "Define success metrics", "Create interview/survey guide"] },
+        { title: "Recruit participants", tasks: ["Define participant profile", "Reach out to candidates", "Schedule sessions"] },
+        { title: "Conduct validation", tasks: ["Run sessions", "Document findings", "Synthesize insights"] },
+      ],
+    },
+    {
+      category: "product-development",
+      keywords: ["build", "mvp", "feature", "prototype", "develop", "ship"],
+      title: "Build and ship core product scope",
+      description: "Deliver the highest-impact product work for this week.",
+      milestones: [
+        { title: "Finalize scope", tasks: ["Prioritize must-have items", "Define acceptance criteria", "Plan implementation"] },
+        { title: "Implement core work", tasks: ["Build features", "Test critical paths", "Fix blockers"] },
+        { title: "Ship and review", tasks: ["Deploy/update release", "Collect early feedback", "Capture learnings"] },
+      ],
+    },
+    {
+      category: "team-building",
+      keywords: ["team", "hire", "cofounder", "co-founder", "talent", "recruit"],
+      title: "Find and onboard the right team members",
+      description: "Identify, engage, and move forward with critical talent.",
+      milestones: [
+        { title: "Define roles", tasks: ["List required roles", "Clarify responsibilities", "Set selection criteria"] },
+        { title: "Source candidates", tasks: ["Shortlist candidates", "Reach out and screen", "Schedule conversations"] },
+        { title: "Close and onboard", tasks: ["Select top candidates", "Align on terms", "Start onboarding"] },
+      ],
+    },
+  ];
+
+  let best = null;
+  let score = 0;
+  const detectedKeywords = [];
+  for (const def of defs) {
+    let cur = 0;
+    for (const k of def.keywords) {
+      if (text.includes(k)) {
+        cur += 1;
+        detectedKeywords.push(k);
+      }
+    }
+    if (cur > score) {
+      score = cur;
+      best = def;
+    }
+  }
+  if (!best) {
+    return {
+      category: "general",
+      confidence: 0.5,
+      suggestedTitle: String(input || "").slice(0, 70) || "Set a focused weekly outcome",
+      suggestedDescription: "Define a concrete, measurable outcome for this week.",
+      detectedKeywords: [],
+      suggestedMilestones: [
+        { title: "Plan", tasks: ["Define success criteria", "Break work into tasks", "Assign ownership"] },
+        { title: "Execute", tasks: ["Complete core tasks", "Track progress daily", "Resolve blockers quickly"] },
+        { title: "Review", tasks: ["Measure results", "Document learnings", "Plan next steps"] },
+      ],
+    };
+  }
+  return {
+    category: best.category,
+    confidence: Math.min(0.95, 0.6 + score * 0.1),
+    suggestedTitle: best.title,
+    suggestedDescription: best.description,
+    detectedKeywords: [...new Set(detectedKeywords)],
+    suggestedMilestones: best.milestones,
+  };
+}
+
 export const createWeeklyPlan = async (req, res) => {
   const founderId = req.params.founderId;
   if (!founderGuard(req, founderId)) {
@@ -540,13 +786,12 @@ export const createWeeklyPlan = async (req, res) => {
     return apiError(res, mutability.message, mutability.code, mutability.errors);
   }
 
-  if (existing?._id) {
-    const oldMilestoneIds = await Milestone.find({ weeklyOutcomeId: existing._id }).distinct("_id");
-    if (oldMilestoneIds.length) {
-      await Task.deleteMany({ milestoneId: { $in: oldMilestoneIds } });
-      await Milestone.deleteMany({ _id: { $in: oldMilestoneIds } });
-    }
-  }
+  const milestonesInput = Array.isArray(plan.milestones) ? plan.milestones : [];
+  const createdMilestones = [];
+
+  const planStatusLower = String(plan.status || "active").toLowerCase();
+  const planStatusCanonical =
+    WEEKLY_OUTCOME_STATUSES.find((s) => String(s).toLowerCase() === planStatusLower) || "active";
 
   const update = {
     founderId,
@@ -554,50 +799,104 @@ export const createWeeklyPlan = async (req, res) => {
     weekOf: weekStart,
     goal: goalText,
     summary: String(plan.summary || plan.description || "").trim(),
-    status: plan.status || "active",
+    status: planStatusCanonical,
     score: Number(plan.score || 0),
   };
 
-  const outcome = existing
-    ? await WeeklyOutcome.findByIdAndUpdate(existing._id, update, {
+  const completionDataPlan = sanitizeCompletionData(plan?.completionData);
+  if (completionDataPlan !== undefined) {
+    update.completionData = completionDataPlan;
+  }
+  if (plan?.completionPercentage != null) {
+    const p = Number(plan.completionPercentage);
+    if (Number.isFinite(p)) {
+      update.completionPercentage = Math.min(100, Math.max(0, p));
+    }
+  }
+  if (plan?.completedAt) {
+    const d = new Date(plan.completedAt);
+    if (!Number.isNaN(d.getTime())) {
+      update.completedAt = d;
+    }
+  }
+  if (plan?.weekNumber != null) {
+    const w = Number(plan.weekNumber);
+    if (Number.isFinite(w) && w >= 1) {
+      update.weekNumber = Math.round(w);
+    }
+  }
+
+  let outcome;
+  const oldMilestoneIds = existing?._id
+    ? (
+        await Milestone.find(
+          { weeklyOutcomeId: existing._id },
+          { _id: 1 },
+        ).lean()
+      ).map((d) => d._id)
+    : [];
+
+  try {
+    if (existing) {
+      outcome = await WeeklyOutcome.findByIdAndUpdate(existing._id, update, {
         new: true,
         runValidators: true,
-      })
-    : await WeeklyOutcome.create(update);
+      });
+    } else {
+      outcome = await WeeklyOutcome.create(update);
+    }
 
-  const milestonesInput = Array.isArray(plan.milestones) ? plan.milestones : [];
-  const createdMilestones = [];
-  let sequence = 1;
-
-  for (const m of milestonesInput) {
-    const milestone = await Milestone.create({
-      founderId,
-      startupId: startup._id,
-      weeklyOutcomeId: outcome._id,
-      title: String(m?.title || "Milestone").trim().slice(0, 200),
-      description: String(m?.description || "").slice(0, 5000),
-      dueDate: m?.dueDate ? new Date(m.dueDate) : null,
-      sequence: sequence++,
-      status: "pending",
-    });
-    createdMilestones.push(milestone);
-
-    const taskItems = Array.isArray(m?.tasks) ? m.tasks : [];
-    for (const t of taskItems) {
-      const title = typeof t === "string" ? t : t?.title;
-      if (!title || !String(title).trim()) continue;
-      const actionButton = typeof t === "object" && t !== null ? serializeTaskActionButton(t.actionButton) : "";
-      await Task.create({
+    let sequence = 1;
+    for (const m of milestonesInput) {
+      const milestone = await Milestone.create({
         founderId,
         startupId: startup._id,
-        title: String(title).trim().slice(0, 200),
-        description: typeof t === "object" && t?.description ? String(t.description).slice(0, 5000) : "",
+        weeklyOutcomeId: outcome._id,
+        title: String(m?.title || "Milestone").trim().slice(0, 200),
+        description: String(m?.description || "").slice(0, 5000),
+        dueDate: m?.dueDate ? new Date(m.dueDate) : null,
+        sequence: sequence++,
         status: "pending",
-        milestoneId: milestone._id,
-        actionButton,
       });
+      createdMilestones.push(milestone);
+
+      const taskItems = Array.isArray(m?.tasks) ? m.tasks : [];
+      for (const t of taskItems) {
+        const title = typeof t === "string" ? t : t?.title;
+        if (!title || !String(title).trim()) continue;
+        const actionButton =
+          typeof t === "object" && t !== null ? serializeTaskActionButton(t.actionButton) : "";
+        await Task.create({
+          founderId,
+          startupId: startup._id,
+          title: String(title).trim().slice(0, 200),
+          description:
+            typeof t === "object" && t?.description ? String(t.description).slice(0, 5000) : "",
+          status: "pending",
+          milestoneId: milestone._id,
+          actionButton,
+        });
+      }
     }
-    await syncMilestoneCounters(milestone._id);
+
+    for (const m of createdMilestones) {
+      await syncMilestoneCounters(m._id);
+    }
+
+    if (oldMilestoneIds.length) {
+      await Task.deleteMany({ milestoneId: { $in: oldMilestoneIds } });
+      await Milestone.deleteMany({ _id: { $in: oldMilestoneIds } });
+    }
+  } catch (error) {
+    const createdIds = createdMilestones.map((m) => m._id);
+    if (createdIds.length) {
+      await Task.deleteMany({ milestoneId: { $in: createdIds } });
+      await Milestone.deleteMany({ _id: { $in: createdIds } });
+    }
+    if (!existing && outcome?._id) {
+      await WeeklyOutcome.deleteOne({ _id: outcome._id, founderId });
+    }
+    throw error;
   }
 
   await appendLoopActivity({
@@ -616,6 +915,111 @@ export const createWeeklyPlan = async (req, res) => {
     },
     existing ? 200 : 201,
   );
+};
+
+export const parseFounderIntent = async (req, res) => {
+  const founderId = req.params.founderId;
+  if (!founderGuard(req, founderId)) {
+    return apiError(res, "Forbidden.", 403);
+  }
+  const input = String(req.body?.input || "").trim();
+  if (!input) {
+    return apiError(res, "input is required.", 400);
+  }
+  const parsed = parseIntentCategory(input);
+  return apiSuccess(res, {
+    ...parsed,
+    originalInput: input,
+  });
+};
+
+export const getFounderJourney = async (req, res) => {
+  const founderId = req.params.founderId;
+  if (!founderGuard(req, founderId)) {
+    return apiError(res, "Forbidden.", 403);
+  }
+  const startup = await Startup.findOne({ founderId });
+  if (!startup) {
+    return apiError(res, "Startup not found.", 404);
+  }
+  const data = startup.data || {};
+  return apiSuccess(res, {
+    journey: normalizeJourney(data.journey),
+    homeUi: data.homeUi && typeof data.homeUi === "object" ? data.homeUi : {},
+  });
+};
+
+export const putFounderJourney = async (req, res) => {
+  const founderId = req.params.founderId;
+  if (!founderGuard(req, founderId)) {
+    return apiError(res, "Forbidden.", 403);
+  }
+  const parsed = validateJourneyPut(req.body || {});
+  if (!parsed.ok) {
+    return apiError(res, parsed.errors.join(" "), 400);
+  }
+  if (!parsed.hasJourney && !parsed.hasHomeUi) {
+    return apiError(res, "Provide journey and/or homeUi.", 400);
+  }
+  const startup = await Startup.findOne({ founderId });
+  if (!startup) {
+    return apiError(res, "Startup not found.", 404);
+  }
+  const mergedData = { ...(startup.data || {}) };
+  if (parsed.hasJourney) {
+    mergedData.journey = parsed.journey;
+  }
+  if (parsed.hasHomeUi && parsed.homeUi) {
+    mergedData.homeUi = { ...(mergedData.homeUi || {}), ...parsed.homeUi };
+  }
+  await Startup.findByIdAndUpdate(startup._id, { data: mergedData });
+  return apiSuccess(res, {
+    journey: normalizeJourney(mergedData.journey),
+    homeUi: mergedData.homeUi && typeof mergedData.homeUi === "object" ? mergedData.homeUi : {},
+  });
+};
+
+export const getFounderExecutionState = async (req, res) => {
+  const founderId = req.params.founderId;
+  if (!founderGuard(req, founderId)) {
+    return apiError(res, "Forbidden.", 403);
+  }
+  const startup = await Startup.findOne({ founderId });
+  if (!startup) {
+    return apiError(res, "Startup not found.", 404);
+  }
+
+  const outcomes = await WeeklyOutcome.find({ founderId }).sort({ weekOf: -1 }).limit(24);
+
+  const activeOutcome =
+    outcomes.find((o) => String(o.status || "").toLowerCase() === "active") || null;
+  const activeId = activeOutcome?._id;
+  const outcomeIds = outcomes.map((o) => o._id);
+
+  const milestoneFilter = { founderId };
+  if (activeId) {
+    milestoneFilter.weeklyOutcomeId = activeId;
+  } else if (outcomeIds.length) {
+    milestoneFilter.weeklyOutcomeId = { $in: outcomeIds };
+  }
+
+  const milestones = await Milestone.find(milestoneFilter).sort({ sequence: 1 });
+  const milestoneIds = milestones.map((m) => m._id);
+  const tasks = milestoneIds.length
+    ? await Task.find({ founderId, milestoneId: { $in: milestoneIds } })
+    : [];
+
+  const metrics = computeExecutionScoreMetrics(tasks, outcomes);
+
+  return apiSuccess(res, {
+    journey: normalizeJourney(startup.data?.journey),
+    homeUi:
+      startup.data?.homeUi && typeof startup.data.homeUi === "object" ? startup.data.homeUi : {},
+    outcomes,
+    milestones,
+    tasks,
+    executionScore: { userId: founderId, ...metrics },
+  });
 };
 
 export const getPosts = async (req, res) => {
@@ -698,6 +1102,173 @@ export const getFounderResources = async (req, res) => {
   }
   const resources = await Resource.find({ founderId: req.params.founderId }).sort({ createdAt: -1 });
   return apiSuccess(res, { resources });
+};
+
+// ─── Stage Tasks ────────────────────────────────────────────────────────────
+
+export const getStageTaskResponses = async (req, res) => {
+  const founderId = req.params.founderId;
+  if (!founderGuard(req, founderId)) {
+    return apiError(res, "Forbidden.", 403);
+  }
+  const startup = await Startup.findOne({ founderId });
+  if (!startup) {
+    return apiError(res, "Startup not found.", 404);
+  }
+  const stageTaskResponses =
+    startup.data?.stageTaskResponses && typeof startup.data.stageTaskResponses === "object"
+      ? startup.data.stageTaskResponses
+      : {};
+  return apiSuccess(res, { stageTaskResponses });
+};
+
+export const putStageTaskResponses = async (req, res) => {
+  const founderId = req.params.founderId;
+  if (!founderGuard(req, founderId)) {
+    return apiError(res, "Forbidden.", 403);
+  }
+  const body = req.body || {};
+  const stageId = String(body.stageId ?? "");
+  const taskId = String(body.taskId ?? "");
+  const text = typeof body.text === "string" ? body.text.trim().slice(0, 10000) : "";
+  const completedAt = body.completedAt ? new Date(body.completedAt) : null;
+
+  if (!stageId || !taskId) {
+    return apiError(res, "stageId and taskId are required.", 400);
+  }
+
+  const startup = await Startup.findOne({ founderId });
+  if (!startup) {
+    return apiError(res, "Startup not found.", 404);
+  }
+
+  const mergedData = { ...(startup.data || {}) };
+  const existing = mergedData.stageTaskResponses || {};
+  const stageResponses = existing[stageId] && typeof existing[stageId] === "object"
+    ? { ...existing[stageId] }
+    : {};
+
+  stageResponses[taskId] = {
+    ...(stageResponses[taskId] || {}),
+    text,
+    updatedAt: new Date().toISOString(),
+    ...(completedAt ? { completedAt: completedAt.toISOString() } : {}),
+  };
+
+  mergedData.stageTaskResponses = { ...existing, [stageId]: stageResponses };
+  await Startup.findByIdAndUpdate(startup._id, { data: mergedData });
+  return apiSuccess(res, { stageTaskResponses: mergedData.stageTaskResponses });
+};
+
+// ─── Stage Completions ──────────────────────────────────────────────────────
+
+export const getStageCompletions = async (req, res) => {
+  const founderId = req.params.founderId;
+  if (!founderGuard(req, founderId)) {
+    return apiError(res, "Forbidden.", 403);
+  }
+  const completions = await StageCompletion.find({ founderId })
+    .sort({ completedAt: -1 })
+    .lean();
+  return apiSuccess(res, { stageCompletions: completions });
+};
+
+export const createStageCompletion = async (req, res) => {
+  const founderId = req.params.founderId;
+  if (!founderGuard(req, founderId)) {
+    return apiError(res, "Forbidden.", 403);
+  }
+  const body = req.body || {};
+  const stageId = Number(body.stageId);
+  if (!stageId || stageId < 1 || stageId > 6) {
+    return apiError(res, "Valid stageId (1–6) is required.", 400);
+  }
+
+  const startup = await Startup.findOne({ founderId });
+
+  const completion = await StageCompletion.create({
+    founderId,
+    startupId: startup?._id ?? null,
+    stageId,
+    stageName: String(body.stageName || "").trim().slice(0, 100),
+    method: ["completed", "skipped"].includes(body.method) ? body.method : "completed",
+    tasksCompletedCount: Number(body.tasksCompletedCount ?? 0),
+    tasksTotal: Number(body.tasksTotal ?? 0),
+    durationDays: Number(body.durationDays ?? 0),
+    completedAt: body.completedAt ? new Date(body.completedAt) : new Date(),
+    metadata: typeof body.metadata === "object" && body.metadata !== null ? body.metadata : {},
+  });
+
+  if (startup?._id) {
+    appendLoopActivity({
+      founderId,
+      startupId: startup._id,
+      type: "stage_completed",
+      text: `Stage ${stageId} (${completion.stageName || "Stage " + stageId}) ${completion.method === "skipped" ? "skipped" : "completed"}.`,
+      metadata: { stageId, method: completion.method },
+    }).catch(() => {});
+  }
+
+  return apiSuccess(res, { stageCompletion: completion }, 201);
+};
+
+// ─── Learning Resources (Videos) ───────────────────────────────────────────
+
+export const getLearningResources = async (req, res) => {
+  if (!founderGuard(req, req.params.founderId)) {
+    return apiError(res, "Forbidden.", 403);
+  }
+  const query = { type: "video" };
+  if (req.query.stageId != null && req.query.stageId !== "") {
+    query.stageId = Number(req.query.stageId);
+  }
+  const resources = await Resource.find(query)
+    .sort({ stageId: 1, recommended: -1, createdAt: 1 })
+    .lean();
+  return apiSuccess(res, { resources });
+};
+
+export const getLearningProgress = async (req, res) => {
+  const founderId = req.params.founderId;
+  if (!founderGuard(req, founderId)) {
+    return apiError(res, "Forbidden.", 403);
+  }
+  const progress = await LearningProgress.find({ founderId })
+    .sort({ watchedAt: -1 })
+    .lean();
+  return apiSuccess(res, { progress });
+};
+
+export const trackLearningWatch = async (req, res) => {
+  const founderId = req.params.founderId;
+  if (!founderGuard(req, founderId)) {
+    return apiError(res, "Forbidden.", 403);
+  }
+  const body = req.body || {};
+  const resourceId = body.resourceId;
+  if (!resourceId) {
+    return apiError(res, "resourceId is required.", 400);
+  }
+
+  const resource = await Resource.findById(resourceId).lean();
+  if (!resource) {
+    return apiError(res, "Resource not found.", 404);
+  }
+
+  const record = await LearningProgress.findOneAndUpdate(
+    { founderId, resourceId },
+    {
+      founderId,
+      resourceId,
+      stageId: resource.stageId ?? null,
+      watchedAt: new Date(),
+      watchDurationSeconds: Number(body.watchDurationSeconds ?? 0),
+      completed: Boolean(body.completed),
+    },
+    { upsert: true, new: true, runValidators: true },
+  );
+
+  return apiSuccess(res, { progress: record }, 201);
 };
 
 export const getFounderAnalyticsDashboard = async (req, res) => {

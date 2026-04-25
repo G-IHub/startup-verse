@@ -62,6 +62,12 @@ export default function AnalyticsDashboard({ founderId, founderName }) {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [lastUpdated, setLastUpdated] = useState(null);
   const fetchAnalytics = async (isManualRefresh = false) => {
+    if (!founderId) {
+      console.error("❌ [Analytics] No founderId provided");
+      setError("User ID not available");
+      setLoading(false);
+      return;
+    }
     try {
       if (isManualRefresh) {
         setIsRefreshing(true);
@@ -70,6 +76,7 @@ export default function AnalyticsDashboard({ founderId, founderName }) {
       }
       setError(null);
       const token = getAccessToken();
+      console.log("🔍 [Analytics] Fetching for founderId:", founderId);
       const response = await fetch(`${API_BASE}/founders/${founderId}/analytics`, {
         method: "GET",
         headers: {
@@ -78,15 +85,21 @@ export default function AnalyticsDashboard({ founderId, founderName }) {
         },
       });
       if (!response.ok) {
-        throw new Error("Failed to fetch analytics");
+        const errorText = await response.text();
+        console.error("❌ [Analytics] API error:", response.status, errorText);
+        throw new Error(`Failed to fetch analytics: ${response.status}`);
       }
       const data = unwrapData(await response.json());
       setAnalytics(data);
       setLastUpdated(new Date());
       console.log("✅ Analytics data loaded from backend:", data);
     } catch (err) {
-      console.error("Error fetching analytics:", err);
-      setError("Failed to load analytics data");
+      console.error("❌ [Analytics] Error fetching analytics:", {
+        error: err.message,
+        founderId,
+        timestamp: new Date().toISOString(),
+      });
+      setError(`Failed to load analytics data: ${err.message}`);
     } finally {
       setLoading(false);
       setIsRefreshing(false);

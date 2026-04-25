@@ -1,5 +1,4 @@
 import { motion, AnimatePresence } from "motion/react";
-import { onWeeklyOutcomeCompleted as onWeeklyOutcomeCompletedOld } from "../../utils/automaticStageProgression";
 import { onWeeklyReviewCompleted } from "../../utils/outcomeBasedProgression";
 import React, { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "../ui/dialog";
@@ -30,8 +29,10 @@ export function WeeklyReviewModal({
   open,
   onClose,
   outcome,
+  tasks = [],
   onComplete,
   currentStreak,
+  founderId,
 }) {
   const [step, setStep] = useState("summary");
   const [achievement, setAchievement] = useState("completed");
@@ -39,17 +40,13 @@ export function WeeklyReviewModal({
   const [whatDidnt, setWhatDidnt] = useState("");
   const [learnings, setLearnings] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submittedCompletionData, setSubmittedCompletionData] = useState(null);
 
-  // Calculate progress stats
-  const tasksCompleted =
-    outcome?.milestones?.reduce(
-      (acc, m) =>
-        acc + (m.tasks?.filter((t) => t.status === "completed").length || 0),
-      0,
-    ) || 0;
-  const tasksTotal =
-    outcome?.milestones?.reduce((acc, m) => acc + (m.tasks?.length || 0), 0) ||
-    0;
+  // Calculate progress stats from normalized task list (source of truth on dashboard).
+  const tasksCompleted = tasks.filter(
+    (t) => String(t?.status || "").toLowerCase() === "completed",
+  ).length;
+  const tasksTotal = tasks.length;
   const milestonesCompleted =
     outcome?.milestones?.filter((m) => m.status === "completed").length || 0;
   const milestonesTotal = outcome?.milestones?.length || 0;
@@ -59,6 +56,17 @@ export function WeeklyReviewModal({
     milestonesTotal > 0
       ? Math.round((milestonesCompleted / milestonesTotal) * 100)
       : 0;
+  const weekStartDate = (() => {
+    const raw = outcome?.weekOf || outcome?.weekStart;
+    const d = raw ? new Date(raw) : new Date();
+    if (Number.isNaN(d.getTime())) return new Date();
+    return d;
+  })();
+  const weekEndDate = (() => {
+    const d = new Date(weekStartDate);
+    d.setDate(d.getDate() + 6);
+    return d;
+  })();
 
   // Reset form when outcome changes
   useEffect(() => {
@@ -79,6 +87,7 @@ export function WeeklyReviewModal({
       setWhatWorked("");
       setWhatDidnt("");
       setLearnings("");
+      setSubmittedCompletionData(null);
     }
   }, [outcome, taskCompletionRate, milestoneCompletionRate]);
   const handleSubmit = async () => {
@@ -102,25 +111,25 @@ export function WeeklyReviewModal({
       milestonesTotal,
     };
 
-    // Simulate processing
-    await new Promise((resolve) => setTimeout(resolve, 1000));
-    onComplete(outcome.id, completionData);
-    setIsSubmitting(false);
-    setStep("result");
+    try {
+      await onComplete(outcome.id, completionData);
+      setSubmittedCompletionData(completionData);
+      setStep("result");
 
-    // 🎯 Trigger automatic stage progression check (OLD template-based system)
-    onWeeklyOutcomeCompletedOld();
-
-    // 🎯 NEW: Trigger outcome-based stage progression (COMPLETION phase)
-    onWeeklyReviewCompleted(
-      outcome.title,
-      outcome.description || "",
-      achievement,
-      whatWorked,
-      whatDidnt,
-      learnings,
-      outcome.id,
-    );
+      // Trigger progression checks only after backend completion succeeds.
+      await onWeeklyReviewCompleted(
+        outcome.title,
+        outcome.description || "",
+        achievement,
+        whatWorked,
+        whatDidnt,
+        learnings,
+        outcome.id,
+        founderId,
+      );
+    } finally {
+      setIsSubmitting(false);
+    }
   };
   const getAchievementIcon = (type) => {
     switch (type) {
@@ -152,6 +161,7 @@ export function WeeklyReviewModal({
     }
     return 0; // Streak broken
   };
+  const resultData = submittedCompletionData || outcome?.completionData || null;
   if (!outcome) return null;
   return (
     <Dialog open={open} onOpenChange={onClose}>
@@ -202,9 +212,9 @@ export function WeeklyReviewModal({
                   <div className="flex items-center gap-1">
                     <Calendar className="w-3 h-3" />
                     <span className="text-[10px]">
-                      {new Date(outcome.weekStart).toLocaleDateString()}
+                      {weekStartDate.toLocaleDateString()}
                       {" - "}
-                      {new Date(outcome.weekEnd).toLocaleDateString()}
+                      {weekEndDate.toLocaleDateString()}
                     </span>
                   </div>
                 </div>
@@ -492,7 +502,7 @@ export function WeeklyReviewModal({
               </div>
             </motion.div>
           )}
-          {step === "result" && outcome.completionData && (
+          {step === "result" && resultData && (
             <motion.div
               key="result"
               initial={{
@@ -510,7 +520,7 @@ export function WeeklyReviewModal({
               className="space-y-4"
             >
               <div
-                className={`p-4 rounded-lg border-2 text-center ${getAchievementColor(outcome.completionData.achievement)}`}
+                className={`p-4 rounded-lg border-2 text-center ${getAchievementColor(resultData.achievement)}`}
               >
                 <motion.div
                   initial={{
@@ -525,20 +535,20 @@ export function WeeklyReviewModal({
                   }}
                   className="flex justify-center mb-2"
                 >
-                  {outcome.completionData.achievement === "completed" ? (
+                  {resultData.achievement === "completed" ? (
                     <PartyPopper className="w-12 h-12 text-green-600" />
-                  ) : outcome.completionData.achievement === "partial" ? (
+                  ) : resultData.achievement === "partial" ? (
                     <TrendingUp className="w-12 h-12 text-yellow-600" />
                   ) : (
                     <TrendingDown className="w-12 h-12 text-red-600" />
                   )}
                 </motion.div>
                 <h3 className="text-base md:text-lg font-bold mb-1">
-                  {outcome.completionData.achievement === "completed" &&
+                  {resultData.achievement === "completed" &&
                     "Outcome Completed! 🎉"}
-                  {outcome.completionData.achievement === "partial" &&
+                  {resultData.achievement === "partial" &&
                     "Partial Progress Made"}
-                  {outcome.completionData.achievement === "not-achieved" &&
+                  {resultData.achievement === "not-achieved" &&
                     "Week Complete"}
                 </h3>
                 <p className="text-xs text-muted-foreground">
@@ -553,7 +563,7 @@ export function WeeklyReviewModal({
                       Weekly Outcome Streak
                     </span>
                   </div>
-                  {outcome.completionData.achievement !== "not-achieved" ? (
+                  {resultData.achievement !== "not-achieved" ? (
                     <Award className="w-4 h-4 text-orange-600" />
                   ) : (
                     <XCircle className="w-4 h-4 text-red-600" />
@@ -561,12 +571,12 @@ export function WeeklyReviewModal({
                 </div>
                 <div className="flex items-center gap-3">
                   <div className="text-2xl font-bold text-orange-600">
-                    {outcome.completionData.achievement !== "not-achieved"
+                    {resultData.achievement !== "not-achieved"
                       ? currentStreak + 1
                       : 0}
                   </div>
                   <div className="text-xs text-muted-foreground">
-                    {outcome.completionData.achievement !== "not-achieved" ? (
+                    {resultData.achievement !== "not-achieved" ? (
                       <>Weeks in a row! Keep the momentum going 🔥</>
                     ) : (
                       <>Streak reset. Start fresh next week! 💪</>
@@ -580,8 +590,8 @@ export function WeeklyReviewModal({
                     Milestones
                   </p>
                   <p className="text-base md:text-lg font-bold">
-                    {outcome.completionData.milestonesCompleted}/
-                    {outcome.completionData.milestonesTotal}
+                    {resultData.milestonesCompleted}/
+                    {resultData.milestonesTotal}
                   </p>
                 </div>
                 <div className="p-2 bg-purple-50 dark:bg-purple-950/20 rounded-lg border">
@@ -589,46 +599,46 @@ export function WeeklyReviewModal({
                     Tasks
                   </p>
                   <p className="text-base md:text-lg font-bold">
-                    {outcome.completionData.tasksCompleted}/
-                    {outcome.completionData.tasksTotal}
+                    {resultData.tasksCompleted}/
+                    {resultData.tasksTotal}
                   </p>
                 </div>
               </div>
-              {(outcome.completionData.whatWorked ||
-                outcome.completionData.whatDidnt ||
-                outcome.completionData.learnings) && (
+              {(resultData.whatWorked ||
+                resultData.whatDidnt ||
+                resultData.learnings) && (
                 <div className="space-y-2 p-3 bg-slate-50 dark:bg-slate-900/50 rounded-lg border">
                   <h4 className="font-semibold text-xs">Your Reflections</h4>
-                  {outcome.completionData.whatWorked && (
+                  {resultData.whatWorked && (
                     <div>
                       <p className="text-xs text-muted-foreground mb-1 flex items-center gap-1">
                         <CheckCircle2 className="w-3 h-3 text-green-600" />
                         What worked
                       </p>
                       <p className="text-sm">
-                        {outcome.completionData.whatWorked}
+                        {resultData.whatWorked}
                       </p>
                     </div>
                   )}
-                  {outcome.completionData.whatDidnt && (
+                  {resultData.whatDidnt && (
                     <div>
                       <p className="text-xs text-muted-foreground mb-1 flex items-center gap-1">
                         <AlertCircle className="w-3 h-3 text-orange-600" />
                         What didn't work
                       </p>
                       <p className="text-sm">
-                        {outcome.completionData.whatDidnt}
+                        {resultData.whatDidnt}
                       </p>
                     </div>
                   )}
-                  {outcome.completionData.learnings && (
+                  {resultData.learnings && (
                     <div>
                       <p className="text-xs text-muted-foreground mb-1 flex items-center gap-1">
                         <Lightbulb className="w-3 h-3 text-purple-600" />
                         Key learnings
                       </p>
                       <p className="text-sm">
-                        {outcome.completionData.learnings}
+                        {resultData.learnings}
                       </p>
                     </div>
                   )}

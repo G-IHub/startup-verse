@@ -21,7 +21,8 @@ export async function createMeeting(meeting) {
     }
 
     const data = await response.json();
-    return { success: true, meeting: data.meeting };
+    const payload = data.data || data;
+    return { success: true, meeting: payload.meeting || null, meetingCount: payload.meetingCount || 1 };
   } catch (error) {
     console.error("Error creating meeting:", error);
     return { success: false, error: error.message };
@@ -41,7 +42,8 @@ export async function getStartupMeetings(startupId) {
     }
 
     const data = await response.json();
-    return data.meetings || [];
+    const payload = data.data || data;
+    return payload.meetings || [];
   } catch (error) {
     console.error("Error fetching meetings:", error);
     return [];
@@ -65,7 +67,8 @@ export async function updateMeeting(meetingId, updates) {
     }
 
     const data = await response.json();
-    return { success: true, meeting: data.meeting };
+    const payload = data.data || data;
+    return { success: true, meeting: payload.meeting || null };
   } catch (error) {
     console.error("Error updating meeting:", error);
     return { success: false, error: error.message };
@@ -106,7 +109,8 @@ export async function getUserMeetings(userId) {
     }
 
     const data = await response.json();
-    return data.meetings || [];
+    const payload = data.data || data;
+    return payload.meetings || [];
   } catch (error) {
     console.error("Error fetching user meetings:", error);
     return [];

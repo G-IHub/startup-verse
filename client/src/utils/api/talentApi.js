@@ -62,9 +62,35 @@ function buildQueryString(params) {
  * Save or update talent profile
  */
 export async function saveTalentProfile(userId, profileData) {
+  // Normalize field names from the user object to TalentProfile schema names
+  const normalized = {
+    fullName: profileData?.fullName || profileData?.name || "",
+    professionalTitle: profileData?.professionalTitle || "",
+    headline: profileData?.headline || profileData?.professionalTitle || "",
+    location: profileData?.location || "",
+    bio: profileData?.bio || "",
+    professionalGoals: profileData?.professionalGoals || "",
+    skills: profileData?.skills || [],
+    yearsOfExperience: profileData?.yearsOfExperience || "",
+    availability: profileData?.availability || "open",
+    availabilityStatus: profileData?.availabilityStatus || "",
+    preferredCommitment: profileData?.preferredCommitment || "",
+    linkedinUrl: profileData?.linkedinUrl || profileData?.linkedin || "",
+    githubUrl: profileData?.githubUrl || profileData?.github || "",
+    websiteUrl: profileData?.websiteUrl || profileData?.website || "",
+    portfolioLinks: profileData?.portfolioLinks || [],
+    preferredRoles: profileData?.preferredRoles || [],
+    industryPreferences: profileData?.industryPreferences || [],
+    interests: profileData?.interests || [],
+    workExperiences: profileData?.workExperiences || profileData?.workExperience || [],
+    educationList: profileData?.educationList || profileData?.education || [],
+    certifications: profileData?.certifications || [],
+    portfolioItems: profileData?.portfolioItems || [],
+  };
+
   return apiCall("/talent/profile", {
     method: "POST",
-    body: JSON.stringify({ userId, profileData }),
+    body: JSON.stringify({ userId, profileData: normalized }),
   });
 }
 

@@ -14,16 +14,37 @@ export const createOrUpdateProfile = async (req, res) => {
     return apiError(res, "Forbidden.", 403);
   }
 
+  const b = req.body?.profileData || req.body || {};
+
+  const update = {
+    userId: targetUserId,
+    ...(b.fullName != null ? { fullName: String(b.fullName).trim().slice(0, 100) } : {}),
+    ...(b.professionalTitle != null ? { professionalTitle: String(b.professionalTitle).slice(0, 200) } : {}),
+    ...(b.headline != null ? { headline: String(b.headline).slice(0, 200) } : {}),
+    ...(b.location != null ? { location: String(b.location).slice(0, 200) } : {}),
+    ...(b.bio != null ? { bio: String(b.bio).slice(0, 2000) } : {}),
+    ...(b.professionalGoals != null ? { professionalGoals: String(b.professionalGoals).slice(0, 2000) } : {}),
+    ...(Array.isArray(b.skills) ? { skills: b.skills.map((s) => String(s).slice(0, 100)) } : {}),
+    ...(b.yearsOfExperience != null ? { yearsOfExperience: String(b.yearsOfExperience) } : {}),
+    ...(b.availability != null ? { availability: String(b.availability).slice(0, 50) } : {}),
+    ...(b.availabilityStatus != null ? { availabilityStatus: String(b.availabilityStatus) } : {}),
+    ...(b.preferredCommitment != null ? { preferredCommitment: String(b.preferredCommitment) } : {}),
+    ...(b.linkedinUrl != null ? { linkedinUrl: String(b.linkedinUrl).slice(0, 1000) } : {}),
+    ...(b.githubUrl != null ? { githubUrl: String(b.githubUrl).slice(0, 1000) } : {}),
+    ...(b.websiteUrl != null ? { websiteUrl: String(b.websiteUrl).slice(0, 1000) } : {}),
+    ...(Array.isArray(b.portfolioLinks) ? { portfolioLinks: b.portfolioLinks } : {}),
+    ...(Array.isArray(b.preferredRoles) ? { preferredRoles: b.preferredRoles } : {}),
+    ...(Array.isArray(b.industryPreferences) ? { industryPreferences: b.industryPreferences } : {}),
+    ...(Array.isArray(b.interests) ? { interests: b.interests } : {}),
+    ...(Array.isArray(b.workExperiences) ? { workExperiences: b.workExperiences } : {}),
+    ...(Array.isArray(b.educationList) ? { educationList: b.educationList } : {}),
+    ...(Array.isArray(b.certifications) ? { certifications: b.certifications } : {}),
+    ...(Array.isArray(b.portfolioItems) ? { portfolioItems: b.portfolioItems } : {}),
+  };
+
   const profile = await TalentProfile.findOneAndUpdate(
     { userId: targetUserId },
-    {
-      userId: targetUserId,
-      headline: req.body?.headline || "",
-      bio: req.body?.bio || "",
-      skills: req.body?.skills || [],
-      availability: req.body?.availability || "open",
-      portfolioLinks: req.body?.portfolioLinks || [],
-    },
+    update,
     { upsert: true, new: true, runValidators: true },
   );
   return apiSuccess(res, profile, 201);

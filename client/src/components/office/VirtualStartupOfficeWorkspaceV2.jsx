@@ -3,6 +3,7 @@ import {
   Calendar,
   CalendarDays,
   ChevronDown,
+  ChevronRight,
   CheckCircle2,
   CircleDot,
   Command,
@@ -13,6 +14,7 @@ import {
   PhoneCall,
   Sparkles,
   Target,
+  X,
 } from "lucide-react";
 import { Button } from "../ui/button";
 import { Badge } from "../ui/badge";
@@ -28,6 +30,7 @@ import {
 import { TaskManagementPanel } from "./TaskManagementPanel";
 import { SimpleTeamMessaging } from "./SimpleTeamMessaging";
 import { TeamHubPanel } from "./TeamHubPanel";
+import CalendarHubPanel from "./CalendarHubPanel";
 import MeetingScheduler from "../calendar/MeetingScheduler";
 import { useOfficePanels } from "../../domains/office/hooks/useOfficePanels";
 import { useOfficeWorkspaceData } from "../../domains/office/hooks/useOfficeWorkspaceData";
@@ -101,6 +104,208 @@ function buildMonthGrid(date = new Date()) {
   return weeks;
 }
 
+const ACTIVITY_PRESETS = [
+  { key: "today", label: "Today" },
+  { key: "yesterday", label: "Yesterday" },
+  { key: "3days", label: "Last 3 days" },
+];
+
+function getPresetRange(key) {
+  const now = new Date();
+  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
+  const endOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
+  if (key === "today") return { from: startOfToday, to: endOfToday };
+  if (key === "yesterday") {
+    const yStart = new Date(startOfToday); yStart.setDate(yStart.getDate() - 1);
+    const yEnd = new Date(endOfToday); yEnd.setDate(yEnd.getDate() - 1);
+    return { from: yStart, to: yEnd };
+  }
+  if (key === "3days") {
+    const d3 = new Date(startOfToday); d3.setDate(d3.getDate() - 2);
+    return { from: d3, to: endOfToday };
+  }
+  return null;
+}
+
+function parseInputDate(str, isEnd = false) {
+  if (!str) return null;
+  const parts = str.split("-");
+  if (parts.length !== 3) return null;
+  const [y, m, d] = parts.map(Number);
+  if (!y || !m || !d || Number.isNaN(y) || Number.isNaN(m) || Number.isNaN(d)) return null;
+  const date = isEnd
+    ? new Date(y, m - 1, d, 23, 59, 59, 999)
+    : new Date(y, m - 1, d, 0, 0, 0, 0);
+  if (Number.isNaN(date.getTime())) return null;
+  return date;
+}
+
+function toInputValue(date) {
+  if (!date) return "";
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const d = String(date.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
+
+function ActivityDateFilter({ activities, children }) {
+  const [preset, setPreset] = useState(null);
+  const [showCustom, setShowCustom] = useState(false);
+  const [fromStr, setFromStr] = useState("");
+  const [toStr, setToStr] = useState("");
+  const [customError, setCustomError] = useState("");
+
+  const todayStr = toInputValue(new Date());
+
+  const handlePreset = (key) => {
+    setPreset((prev) => (prev === key ? null : key));
+    setShowCustom(false);
+    setFromStr("");
+    setToStr("");
+    setCustomError("");
+  };
+
+  const handleFromChange = (val) => {
+    setFromStr(val);
+    setPreset(null);
+    setCustomError("");
+  };
+
+  const handleToChange = (val) => {
+    setToStr(val);
+    setPreset(null);
+    setCustomError("");
+  };
+
+  const customRange = useMemo(() => {
+    if (!fromStr && !toStr) return null;
+    const from = parseInputDate(fromStr, false);
+    const to = parseInputDate(toStr, true);
+    const now = new Date();
+    const endOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
+
+    if (fromStr && !from) return { error: "Invalid 'From' date." };
+    if (toStr && !to) return { error: "Invalid 'To' date." };
+    if (from && from > endOfToday) return { error: "'From' date cannot be in the future." };
+    if (to && to > endOfToday) return { error: "'To' cannot be after today." };
+    if (from && to && from > to) return { error: "'From' must be before 'To'." };
+    if (!fromStr) return { error: "Set a 'From' date to use a custom range." };
+    return { from, to: to || endOfToday };
+  }, [fromStr, toStr]);
+
+  const filtered = useMemo(() => {
+    let range = null;
+    if (preset) range = getPresetRange(preset);
+    else if (customRange && !customRange.error) range = customRange;
+    if (!range) return activities;
+    return activities.filter((a) => {
+      const ts = a.timestamp instanceof Date ? a.timestamp : new Date(a.timestamp);
+      if (Number.isNaN(ts.getTime())) return false;
+      return ts >= range.from && ts <= range.to;
+    });
+  }, [activities, preset, customRange]);
+
+  const hasActiveFilter = Boolean(preset) || Boolean(fromStr);
+  const error = customRange?.error || "";
+
+  return (
+    <div className="flex flex-col gap-2.5">
+      {/* Filter controls row */}
+      <div className="flex items-center justify-between gap-2">
+        {/* Segmented preset control */}
+        <div className="flex items-center rounded-lg border border-border bg-muted/60 p-0.5 gap-0.5">
+          {ACTIVITY_PRESETS.map((p) => (
+            <button
+              key={p.key}
+              type="button"
+              onClick={() => handlePreset(p.key)}
+              className={cn(
+                "rounded-md px-2.5 py-[3px] text-[10px] font-medium transition-all duration-150",
+                preset === p.key
+                  ? "bg-background text-foreground shadow-sm ring-1 ring-border/50"
+                  : "text-muted-foreground hover:text-foreground",
+              )}
+            >
+              {p.label}
+            </button>
+          ))}
+        </div>
+
+        {/* Right side: Custom + Clear */}
+        <div className="flex items-center gap-1.5">
+          <button
+            type="button"
+            onClick={() => { setShowCustom((v) => !v); setPreset(null); }}
+            className={cn(
+              "flex items-center gap-1 rounded-lg border px-2.5 py-[3px] text-[10px] font-medium transition-all duration-150",
+              showCustom
+                ? "border-primary/50 bg-primary/8 text-primary"
+                : "border-border bg-background text-muted-foreground hover:text-foreground hover:border-border",
+            )}
+          >
+            <Filter className="h-2.5 w-2.5" />
+            Custom
+            <ChevronRight className={cn("h-2.5 w-2.5 transition-transform duration-200", showCustom && "rotate-90")} />
+          </button>
+          {hasActiveFilter && (
+            <button
+              type="button"
+              onClick={() => { setPreset(null); setFromStr(""); setToStr(""); setCustomError(""); setShowCustom(false); }}
+              className="flex items-center gap-0.5 rounded-md px-1.5 py-[3px] text-[10px] font-medium text-muted-foreground hover:text-destructive transition-colors"
+            >
+              <X className="h-2.5 w-2.5" />
+              Reset
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Custom date range panel */}
+      {showCustom && (
+        <div className="rounded-xl border border-border/70 bg-muted/30 px-3 pt-2.5 pb-3 space-y-2">
+          <div className="flex items-center gap-1.5 mb-1">
+            <Calendar className="h-3 w-3 text-muted-foreground" />
+            <span className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">Custom range</span>
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <div className="flex flex-col gap-1">
+              <label className="text-[10px] font-medium text-muted-foreground">From</label>
+              <input
+                type="date"
+                value={fromStr}
+                max={todayStr}
+                onChange={(e) => handleFromChange(e.target.value)}
+                className="h-7 w-full rounded-lg border border-border bg-background px-2 text-[11px] text-foreground focus:outline-none focus:ring-2 focus:ring-primary/25 focus:border-primary transition-all"
+              />
+            </div>
+            <div className="flex flex-col gap-1">
+              <label className="text-[10px] font-medium text-muted-foreground">To</label>
+              <input
+                type="date"
+                value={toStr}
+                max={todayStr}
+                min={fromStr || undefined}
+                onChange={(e) => handleToChange(e.target.value)}
+                className="h-7 w-full rounded-lg border border-border bg-background px-2 text-[11px] text-foreground focus:outline-none focus:ring-2 focus:ring-primary/25 focus:border-primary transition-all"
+              />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Error banner */}
+      {error && (
+        <div className="flex items-center gap-1.5 rounded-lg border border-destructive/20 bg-destructive/5 px-2.5 py-1.5">
+          <span className="h-1.5 w-1.5 flex-shrink-0 rounded-full bg-destructive" />
+          <p className="text-[10px] text-destructive">{error}</p>
+        </div>
+      )}
+
+      {children(filtered, hasActiveFilter)}
+    </div>
+  );
+}
+
 function OfficePanelCard({ title, action, children, className = "" }) {
   return (
     <Card className={cn("office-card office-animate-in shadow-none", className)}>
@@ -119,6 +324,7 @@ function OfficePanelCard({ title, action, children, className = "" }) {
 
 export default function VirtualStartupOfficeWorkspaceV2({
   user,
+  onNavigate,
   taskToOpen,
   onTaskOpened,
   announcementToOpen,
@@ -179,7 +385,7 @@ export default function VirtualStartupOfficeWorkspaceV2({
     [],
   );
 
-  const recentActivities = office.activities.slice(0, 8);
+  const recentActivities = office.activities;
   const roster = office.teamRoster.slice(0, 10);
   const upcomingAgenda = office.agenda.slice(0, 8);
   const myTasks = office.myTasks.slice(0, 8);
@@ -283,8 +489,13 @@ export default function VirtualStartupOfficeWorkspaceV2({
       <div className="office-workspace-grid-top grid gap-2.5">
         <OfficePanelCard
           title="Live Activity"
-          action={<span className="text-[10px] text-muted-foreground">Real-time</span>}
-          className="min-h-[232px] office-workspace-grid-top__activity"
+          action={
+            <span className="flex items-center gap-1.5">
+              <span className="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-green-500" />
+              <span className="text-[10px] text-muted-foreground">Real-time</span>
+            </span>
+          }
+          className="office-workspace-grid-top__activity"
         >
           {office.loading && recentActivities.length === 0 ? (
             <div className="flex min-h-[145px] items-center justify-center text-[11px] text-muted-foreground">
@@ -297,20 +508,40 @@ export default function VirtualStartupOfficeWorkspaceV2({
               <p>Team activity will appear here</p>
             </div>
           ) : (
-            <div className="space-y-2">
-              {recentActivities.slice(0, 5).map((activity) => (
-                <div key={activity.id} className="rounded-md border border-border bg-card px-2.5 py-2">
-                  <p className="line-clamp-1 text-[11px]">
-                    <span className="font-medium">{activity.userName}</span>
-                    {" "}
-                    {activity.message}
-                  </p>
-                  <p className="mt-1 text-[10px] text-muted-foreground">
-                    {formatRelativeTime(activity.timestamp)}
-                  </p>
-                </div>
-              ))}
-            </div>
+            <ActivityDateFilter activities={recentActivities}>
+              {(filtered, hasActiveFilter) => (
+                <>
+                  <div className="mb-1 flex items-center justify-between">
+                    <span className="text-[10px] text-muted-foreground">
+                      {hasActiveFilter
+                        ? `${filtered.length} of ${recentActivities.length} activities`
+                        : `${recentActivities.length} activities`}
+                    </span>
+                  </div>
+                  {filtered.length === 0 ? (
+                    <div className="flex min-h-[80px] flex-col items-center justify-center gap-1 text-center">
+                      <CircleDot className="h-4 w-4 text-muted-foreground/50" />
+                      <p className="text-[11px] text-muted-foreground">No activity in this period</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-1.5 overflow-y-auto pr-0.5" style={{ maxHeight: 280 }}>
+                      {filtered.map((activity) => (
+                        <div key={activity.id} className="rounded-md border border-border bg-card px-2.5 py-2">
+                          <p className="line-clamp-2 text-[11px]">
+                            <span className="font-medium">{activity.userName}</span>
+                            {" "}
+                            {activity.message}
+                          </p>
+                          <p className="mt-1 text-[10px] text-muted-foreground">
+                            {formatRelativeTime(activity.timestamp)}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </>
+              )}
+            </ActivityDateFilter>
           )}
         </OfficePanelCard>
 
@@ -505,7 +736,11 @@ export default function VirtualStartupOfficeWorkspaceV2({
             <div className="flex min-h-[126px] flex-col items-center justify-center text-center">
               <CheckCircle2 className="h-4 w-4 text-muted-foreground" />
               <p className="mt-1.5 text-[11px] text-muted-foreground">No tasks yet</p>
-              <p className="text-[10px] text-muted-foreground">Create your first task to get started</p>
+              <p className="text-[10px] text-muted-foreground">
+                {user?.role === "founder"
+                  ? "Tasks from your milestones will appear here"
+                  : "No tasks assigned to you yet"}
+              </p>
             </div>
           ) : (
             <div className="space-y-1.5">
@@ -530,8 +765,8 @@ export default function VirtualStartupOfficeWorkspaceV2({
             className="h-6 w-full gap-1 rounded-md border border-border text-[11px]"
             onClick={() => panels.openPanel("tasks")}
           >
-            <Plus className="h-3.5 w-3.5" />
-            Add Task
+            <Target className="h-3.5 w-3.5" />
+            View All Tasks
           </Button>
         </OfficePanelCard>
       </div>
@@ -548,7 +783,7 @@ export default function VirtualStartupOfficeWorkspaceV2({
         <SimpleTeamMessaging
           onClose={() => panels.closePanel("chat")}
           onStartCall={() => panels.openPanel("calendar")}
-          currentUserId={user.id}
+          currentUserId={String(user._id ?? user.id ?? "")}
           currentUserName={user.name}
           currentUserRole={user.role}
           startupId={office.startupId}
@@ -561,7 +796,7 @@ export default function VirtualStartupOfficeWorkspaceV2({
       {!panels.isMobile && panels.isOpen("updates") && (
         <TeamHubPanel
           onClose={() => panels.closePanel("updates")}
-          currentUserId={user.id}
+          currentUserId={String(user._id ?? user.id ?? "")}
           currentUserName={user.name}
           startupId={office.startupId}
           strictMode={true}
@@ -569,6 +804,7 @@ export default function VirtualStartupOfficeWorkspaceV2({
           winsData={wins}
           onCreateAnnouncement={createAnnouncement}
           onCreateWin={createWin}
+          user={user}
         />
       )}
 
@@ -585,23 +821,18 @@ export default function VirtualStartupOfficeWorkspaceV2({
         initialTaskId={taskToOpen || null}
         strictMode={true}
         startupId={office.startupId}
-        founderIdOverride={founderId || user?.id}
-        onTasksSynced={() => office.refresh({ silent: true })}
+        founderIdOverride={founderId || String(user?._id ?? user?.id ?? "")}
+        onTasksSynced={() => office.refresh(user)}
+        onNavigate={onNavigate}
       />
 
-      <MeetingScheduler
-        open={calendarDialogOpen}
-        onClose={() => {
-          if (panels.isMobile) {
-            setMobileMeetingSchedulerOpen(false);
-            return;
-          }
-          panels.closePanel("calendar");
-        }}
-        user={user}
-        teamMembers={office.teamRoster}
-        onMeetingScheduled={() => office.refresh({ silent: true })}
-      />
+      {!panels.isMobile && panels.isOpen("calendar") && (
+        <CalendarHubPanel
+          user={user}
+          startupId={office.startupId}
+          onClose={() => panels.closePanel("calendar")}
+        />
+      )}
 
       {panels.isMobile && (
         <Drawer
@@ -626,7 +857,7 @@ export default function VirtualStartupOfficeWorkspaceV2({
                     panels.closeAll();
                     setMobileMeetingSchedulerOpen(true);
                   }}
-                  currentUserId={user.id}
+                  currentUserId={String(user._id ?? user.id ?? "")}
                   currentUserName={user.name}
                   currentUserRole={user.role}
                   startupId={office.startupId}
@@ -640,7 +871,7 @@ export default function VirtualStartupOfficeWorkspaceV2({
                 <TeamHubPanel
                   embedded
                   onClose={panels.closeAll}
-                  currentUserId={user.id}
+                  currentUserId={String(user._id ?? user.id ?? "")}
                   currentUserName={user.name}
                   startupId={office.startupId}
                   strictMode={true}
@@ -648,6 +879,7 @@ export default function VirtualStartupOfficeWorkspaceV2({
                   winsData={wins}
                   onCreateAnnouncement={createAnnouncement}
                   onCreateWin={createWin}
+                  user={user}
                 />
               )}
 
@@ -714,6 +946,16 @@ export default function VirtualStartupOfficeWorkspaceV2({
             </div>
           </DrawerContent>
         </Drawer>
+      )}
+
+      {panels.isMobile && (
+        <MeetingScheduler
+          open={mobileMeetingSchedulerOpen}
+          onClose={() => setMobileMeetingSchedulerOpen(false)}
+          user={user}
+          teamMembers={office.teamRoster}
+          onMeetingScheduled={() => setMobileMeetingSchedulerOpen(false)}
+        />
       )}
     </div>
   );

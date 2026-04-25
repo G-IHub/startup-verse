@@ -10,6 +10,7 @@ import { toast } from "sonner";
 import { getTalentProfileCompletionPercent } from "../../utils/talentProfileCompletion";
 import { TALENT_ACTIONS_MIN_COMPLETION } from "../../constants/talentProfile.js";
 import { useTalentHomeData } from "../../domains/talent/hooks/useTalentHomeData";
+import { getFirstName } from "../../utils/nameHelpers";
 import {
   Star,
   Heart,
@@ -23,6 +24,11 @@ import {
   LayoutGrid,
   List,
   X,
+  Search,
+  ArrowRight,
+  DollarSign,
+  Bookmark,
+  Sparkles,
 } from "lucide-react";
 import {
   Dialog,
@@ -137,6 +143,8 @@ function getMatchStyle(score) {
 export default function TalentDashboard({
   user,
   onUpdateUser,
+  onNavigate,
+  entryMode = "overview",
 }) {
   const [showProfileModal, setShowProfileModal] = useState(false);
   const talentCompletion = getTalentProfileCompletionPercent(user);
@@ -160,7 +168,6 @@ export default function TalentDashboard({
     refresh,
   } = useTalentHomeData({ user });
   const matchedOpportunities = viewModel.opportunities || [];
-
 
   const hasExpressedInterest = (startup) => {
     const startupId = String(startup?.startupId || startup?.id || "");
@@ -221,7 +228,6 @@ export default function TalentDashboard({
     toast.success(result.saved ? "Saved for later!" : "Removed from saved");
   };
 
-
   const displayedMatches = matchedOpportunities;
   const startupRows = useMemo(
     () =>
@@ -240,7 +246,8 @@ export default function TalentDashboard({
           posted: toRelativePosted(startup.postedDate, startup.posted),
         };
         return {
-          id: startup.id?.toString() || `${startup.title || "startup"}-${index}`,
+          id:
+            startup.id?.toString() || `${startup.title || "startup"}-${index}`,
           startupId:
             startup.startupId?.toString() ||
             startup.id?.toString() ||
@@ -312,10 +319,16 @@ export default function TalentDashboard({
         ) {
           return false;
         }
-        if (filters.equity.length > 0 && !filters.equity.includes(row.equityBucket)) {
+        if (
+          filters.equity.length > 0 &&
+          !filters.equity.includes(row.equityBucket)
+        ) {
           return false;
         }
-        if (filters.location.length > 0 && !filters.location.includes(row.location)) {
+        if (
+          filters.location.length > 0 &&
+          !filters.location.includes(row.location)
+        ) {
           return false;
         }
         if (
@@ -331,10 +344,12 @@ export default function TalentDashboard({
   const sortedRows = useMemo(() => {
     const rows = [...filteredRows];
     rows.sort((left, right) => {
-      if (sortBy === "newest") return right.postedDateValue - left.postedDateValue;
+      if (sortBy === "newest")
+        return right.postedDateValue - left.postedDateValue;
       if (sortBy === "equity") {
         return (
-          (right.equityRange?.midpoint || -1) - (left.equityRange?.midpoint || -1)
+          (right.equityRange?.midpoint || -1) -
+          (left.equityRange?.midpoint || -1)
         );
       }
       if (sortBy === "teamSize") return right.teamSize - left.teamSize;
@@ -371,6 +386,502 @@ export default function TalentDashboard({
       hint: `${viewModel.summary.pendingInvitationCount} pending`,
     },
   ];
+
+  const topMatches = sortedRows.slice(0, 6);
+
+  const today = new Date();
+  const dateLabel = today.toLocaleDateString("en-US", {
+    weekday: "long",
+    month: "long",
+    day: "numeric",
+  });
+
+  if (entryMode !== "opportunities") {
+    return (
+      <div className="min-h-full bg-background">
+        {showProfileModal && (
+          <ProfileCompletionModal
+            role={user.role}
+            user={user}
+            onUpdateUser={onUpdateUser}
+            onComplete={handleProfileComplete}
+            onClose={() => setShowProfileModal(false)}
+          />
+        )}
+
+        <div className="max-w-7xl mx-auto py-4 space-y-4 ">
+          {/* Welcome Header */}
+          <div className="flex items-start justify-between">
+            <div>
+              <h1 className="text-2xl font-bold text-foreground">
+                {"Welcome back, "}
+                {getFirstName(user?.name) || "New User"}
+              </h1>
+              <p className="text-sm text-muted-foreground mt-0.5">
+                {dateLabel}
+              </p>
+            </div>
+            <div className="flex items-center gap-6">
+              <div className="flex items-center gap-2">
+                <Star className="h-4 w-4 text-muted-foreground" />
+                <div className="flex items-center gap-1">
+                  <span className="text-base font-bold text-foreground">
+                    {viewModel.summary.sentInterestCount}
+                  </span>
+                  <p className="text-[11px] text-muted-foreground leading-none">
+                    New Matches
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <Bookmark className="h-4 w-4 text-muted-foreground" />
+                <div className="flex items-center gap-1"> 
+                  <span className="text-base font-bold text-foreground">
+                    {viewModel.summary.savedCount}
+                  </span>
+                  <p className="text-[11px] text-muted-foreground leading-none">
+                    Saved
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Hero Banner */}
+          <div className="rounded-xl bg-blue-600 px-6 py-4 text-white">
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <h2 className="text-base font-bold">
+                  Find Your Perfect Startup
+                </h2>
+                <p className="text-sm text-blue-200 mt-1 max-w-xl">
+                  Discover startups that match your skills, interests, and
+                  career goals. Connect with founders and join exciting teams.
+                </p>
+              </div>
+              <Button
+                onClick={() =>
+                  onNavigate?.("dashboard", { mode: "opportunities" })
+                }
+                className="shrink-0 bg-white text-blue-700 hover:bg-blue-50 font-semibold gap-2 rounded-lg px-4"
+                size="sm"
+              >
+                <Search className="h-4 w-4" />
+                Browse Startups
+                <ArrowRight className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+
+          {/* Top Matches Section */}
+          <div>
+            <div className="flex items-center gap-2 mb-0.5">
+              <Star className="h-4 w-4 text-muted-foreground" />
+              <h2 className="text-base font-semibold text-foreground">
+                Top Matches for You
+              </h2>
+            </div>
+            <p className="text-sm text-muted-foreground mb-5">
+              Startups looking for your skills
+            </p>
+
+            {isLoading && topMatches.length === 0 && (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+                {[1, 2, 3].map((n) => (
+                  <div
+                    key={n}
+                    className="rounded-xl border border-border bg-card p-5 space-y-4 animate-pulse"
+                  >
+                    <div className="flex gap-3">
+                      <div className="h-10 w-10 bg-muted rounded-lg shrink-0" />
+                      <div className="flex-1 space-y-2">
+                        <div className="h-4 bg-muted rounded w-3/4" />
+                        <div className="h-3 bg-muted rounded w-1/2" />
+                      </div>
+                    </div>
+                    <div className="h-14 bg-muted rounded" />
+                    <div className="h-8 bg-muted rounded" />
+                    <div className="grid grid-cols-2 gap-2">
+                      {[1, 2, 3, 4].map((i) => (
+                        <div key={i} className="h-3 bg-muted rounded" />
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {!isLoading && topMatches.length === 0 && (
+              <div className="rounded-xl border border-border bg-card px-6 py-12 text-center">
+                <Sparkles className="h-8 w-8 text-muted-foreground mx-auto mb-3" />
+                <p className="text-sm font-medium text-foreground">
+                  No matches yet
+                </p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Complete your profile to unlock personalized startup matches.
+                </p>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="mt-4"
+                  onClick={() => setShowProfileModal(true)}
+                >
+                  Complete Profile
+                </Button>
+              </div>
+            )}
+
+            {topMatches.length > 0 && (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {topMatches.map((row) => (
+                  <div
+                    key={row.id}
+                    className="rounded-xl border border-border bg-card hover:shadow-md transition-shadow cursor-pointer p-5 flex flex-col gap-3"
+                    onClick={() => setSelectedStartup(row.startup)}
+                  >
+                    {/* Card Header: avatar + title + match badge */}
+                    <div className="flex items-start gap-3">
+                      <Avatar className="h-10 w-10 rounded-lg flex-shrink-0">
+                        <AvatarFallback
+                          className={`rounded-lg text-[13px] font-bold ${row.avatarTone}`}
+                        >
+                          {getInitials(row.title)}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-[13px] font-semibold leading-tight">
+                          {row.title}
+                        </p>
+                        <p className="text-[12px] text-muted-foreground mt-0.5">
+                          by {row.founder}
+                        </p>
+                      </div>
+                      <div
+                        className={`shrink-0 text-center rounded-lg px-2.5 py-1.5 min-w-[52px] ${getMatchStyle(row.matchScore)}`}
+                      >
+                        <p className="text-[14px] font-bold leading-none">
+                          {row.matchScore}%
+                        </p>
+                        <p className="text-[10px] leading-none mt-0.5 opacity-80">
+                          Match
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Description */}
+                    <p className="text-[12px] text-muted-foreground leading-relaxed line-clamp-3">
+                      {row.startup?.description || row.shortDescription}
+                    </p>
+
+                    {/* Role chips */}
+                    {row.startup?.lookingFor?.length > 0 && (
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <Users className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                        <div className="flex items-center gap-1 flex-wrap">
+                          {row.startup.lookingFor.slice(0, 4).map((role, i) => (
+                            <span
+                              key={i}
+                              className="inline-flex items-center rounded-full border border-border bg-background px-2 py-0.5 text-[11px] text-foreground"
+                            >
+                              {role}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Industry tag */}
+                    {(row.startup?.industry || row.startup?.industryFocus) && (
+                      <p className="text-[11px] text-muted-foreground -mt-1">
+                        {row.startup.industry || row.startup.industryFocus}
+                      </p>
+                    )}
+
+                    {/* Meta Grid: 2 cols, icon + label left, value right */}
+                    <div className="grid grid-cols-2 gap-x-6 gap-y-2 text-[12px]">
+                      <div>
+                        <div className="flex items-center gap-1 text-muted-foreground mb-0.5">
+                          <TrendingUp className="h-3 w-3 shrink-0" />
+                          <span>Stage</span>
+                        </div>
+                        <p className="font-medium text-foreground">
+                          {row.stage}
+                        </p>
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-1 text-muted-foreground mb-0.5">
+                          <DollarSign className="h-3 w-3 shrink-0" />
+                          <span>Funding</span>
+                        </div>
+                        <p className="font-medium text-foreground">
+                          {row.funding}
+                        </p>
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-1 text-muted-foreground mb-0.5">
+                          <Users className="h-3 w-3 shrink-0" />
+                          <span>Team Size</span>
+                        </div>
+                        <p className="font-medium text-foreground">
+                          {row.teamSize > 0 ? `${row.teamSize} members` : "—"}
+                        </p>
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-1 text-muted-foreground mb-0.5">
+                          <MapPin className="h-3 w-3 shrink-0" />
+                          <span>Location</span>
+                        </div>
+                        <p className="font-medium text-foreground">
+                          {row.location}
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Footer: Equity + Commitment */}
+                    <div className="grid grid-cols-2 gap-4 pt-3 mt-auto border-t border-border">
+                      <div>
+                        <div className="flex items-center gap-1 text-muted-foreground mb-0.5">
+                          <DollarSign className="h-3 w-3 text-green-600 shrink-0" />
+                          <span className="text-[11px]">Equity Offer</span>
+                        </div>
+                        <p className="text-[13px] font-semibold text-green-600">
+                          {row.equityRange ? row.equityRange.label : "N/A"}
+                        </p>
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-1 text-muted-foreground mb-0.5">
+                          <Clock className="h-3 w-3 text-blue-500 shrink-0" />
+                          <span className="text-[11px]">Commitment</span>
+                        </div>
+                        <p className="text-[13px] font-semibold text-blue-600">
+                          {row.commitment}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {topMatches.length > 0 && sortedRows.length > 6 && (
+              <div className="mt-5 text-center">
+                <Button
+                  variant="outline"
+                  onClick={() =>
+                    onNavigate?.("dashboard", { mode: "opportunities" })
+                  }
+                  className="gap-2"
+                >
+                  View all {sortedRows.length} matches
+                  <ArrowRight className="h-4 w-4" />
+                </Button>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Complete Your Profile floating badge */}
+        {talentCompletion < 100 && (
+          <div
+            className="fixed bottom-6 right-6 flex items-center gap-3 rounded-2xl bg-card border border-border shadow-xl px-4 py-3 cursor-pointer hover:shadow-2xl transition-shadow max-w-[230px] z-50"
+            onClick={() => setShowProfileModal(true)}
+          >
+            <div className="h-9 w-9 rounded-full bg-amber-100 flex items-center justify-center shrink-0">
+              <Sparkles className="h-4 w-4 text-amber-500" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center justify-between mb-1">
+                <p className="text-[12px] font-semibold text-foreground leading-tight">
+                  Complete Your Profile
+                </p>
+                <ArrowRight className="h-3 w-3 text-muted-foreground shrink-0" />
+              </div>
+              <div className="flex items-center gap-1.5">
+                <Progress value={talentCompletion} className="h-1.5 flex-1" />
+                <span className="text-[11px] font-bold text-amber-600 shrink-0">
+                  {talentCompletion}%
+                </span>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Detail Dialog (shared with browse view) */}
+        <Dialog
+          open={selectedStartup !== null}
+          onOpenChange={() => {
+            setSelectedStartup(null);
+            setInterestMessage("");
+          }}
+        >
+          <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto overflow-x-hidden">
+            {selectedStartup && (
+              <>
+                <DialogHeader>
+                  <div className="flex items-start gap-4 pr-8">
+                    <Avatar className="w-16 h-16 flex-shrink-0">
+                      <AvatarFallback className="bg-primary/10 text-primary text-lg">
+                        {selectedStartup.title
+                          .split(" ")
+                          .map((w) => w[0])
+                          .join("")
+                          .slice(0, 2)}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="flex-1 min-w-0">
+                      <DialogTitle className="text-2xl mb-2 pr-0">
+                        {selectedStartup.title}
+                      </DialogTitle>
+                      <DialogDescription className="text-base">
+                        {"by "}
+                        {selectedStartup.founder}
+                        {" • "}
+                        {selectedStartup.posted}
+                      </DialogDescription>
+                      <div className="flex flex-wrap items-center gap-2 mt-3">
+                        <div className="flex items-center gap-1 bg-yellow-50 dark:bg-yellow-950/20 px-3 py-1.5 rounded-full">
+                          <Star className="w-4 h-4 text-yellow-500 fill-yellow-500" />
+                          <span className="text-lg font-semibold text-primary">
+                            {selectedStartup.match}%
+                          </span>
+                          <span className="text-sm text-muted-foreground">
+                            Match
+                          </span>
+                        </div>
+                        <Badge variant="outline">
+                          {selectedStartup.industry}
+                        </Badge>
+                      </div>
+                    </div>
+                  </div>
+                </DialogHeader>
+                <div className="space-y-6 mt-6">
+                  <div className="pb-4 border-b">
+                    <p className="text-muted-foreground leading-relaxed">
+                      {selectedStartup.description}
+                    </p>
+                  </div>
+                  <div>
+                    <div className="flex flex-wrap gap-2">
+                      {(selectedStartup.tags || []).map((tag, idx) => (
+                        <Badge
+                          key={idx}
+                          variant="secondary"
+                          className="text-xs"
+                        >
+                          {tag}
+                        </Badge>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="flex items-start gap-2 min-w-0">
+                      <TrendingUp className="w-4 h-4 text-muted-foreground flex-shrink-0 mt-1" />
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm text-muted-foreground">Stage</p>
+                        <p className="font-medium break-words">
+                          {selectedStartup.stage}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-start gap-2 min-w-0">
+                      <MapPin className="w-4 h-4 text-muted-foreground flex-shrink-0 mt-1" />
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm text-muted-foreground">
+                          Location
+                        </p>
+                        <p className="font-medium break-words">
+                          {selectedStartup.location}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-start gap-2 min-w-0">
+                      <Clock className="w-4 h-4 text-muted-foreground flex-shrink-0 mt-1" />
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm text-muted-foreground">
+                          Commitment
+                        </p>
+                        <p className="font-medium break-words">
+                          {selectedStartup.commitment}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-start gap-2 min-w-0">
+                      <Users className="w-4 h-4 text-muted-foreground flex-shrink-0 mt-1" />
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm text-muted-foreground">
+                          Interested
+                        </p>
+                        <p className="font-medium">
+                          {selectedStartup.interested}
+                          {" people"}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground mb-2">
+                      Looking for:
+                    </p>
+                    <div className="flex flex-wrap gap-2">
+                      {(selectedStartup.lookingFor || []).map((role, idx) => (
+                        <Badge key={idx} className="text-sm py-1.5 px-3">
+                          {role}
+                        </Badge>
+                      ))}
+                    </div>
+                  </div>
+                  {selectedStartup.offer && (
+                    <div className="w-full overflow-hidden">
+                      <OfferDisplay offer={selectedStartup.offer} />
+                    </div>
+                  )}
+                  {!hasExpressedInterest(selectedStartup) && (
+                    <div className="pt-4 border-t space-y-3">
+                      <div>
+                        <p className="text-sm font-medium mb-2">
+                          Why are you interested?
+                        </p>
+                        <Textarea
+                          placeholder={`Tell ${selectedStartup.founder} about your background, what excites you about this idea, and what value you can bring to the team...`}
+                          rows={5}
+                          value={interestMessage}
+                          onChange={(e) => setInterestMessage(e.target.value)}
+                          className="resize-none"
+                        />
+                      </div>
+                      <Button
+                        className="w-full"
+                        size="lg"
+                        onClick={handleExpressInterest}
+                        disabled={
+                          !interestMessage.trim() || isSubmittingApplication
+                        }
+                      >
+                        <Send className="w-5 h-5 mr-2" />
+                        {isSubmittingApplication
+                          ? "Sending..."
+                          : "Send Interest"}
+                      </Button>
+                    </div>
+                  )}
+                  {hasExpressedInterest(selectedStartup) && (
+                    <div className="pt-4 border-t">
+                      <Button className="w-full" size="lg" disabled={true}>
+                        <Target className="w-5 h-5 mr-2" />
+                        Interest Expressed
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              </>
+            )}
+          </DialogContent>
+        </Dialog>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-3 p-3">
       {showProfileModal && (
@@ -436,14 +947,17 @@ export default function TalentDashboard({
             <p className="text-[12px] uppercase tracking-[0.04em] text-muted-foreground">
               {card.label}
             </p>
-            <p className="text-[20px] font-semibold text-foreground">{card.value}</p>
+            <p className="text-[20px] font-semibold text-foreground">
+              {card.value}
+            </p>
             <p className="text-[12px] text-muted-foreground">{card.hint}</p>
           </article>
         ))}
       </div>
       {viewModel.fallbackUsed && (
         <div className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-[12px] text-amber-800">
-          Some sections are using cached fallback data while backend sync recovers.
+          Some sections are using cached fallback data while backend sync
+          recovers.
         </div>
       )}
       <div className="grid grid-cols-1 gap-3 lg:grid-cols-[280px_minmax(0,1fr)]">
@@ -596,7 +1110,9 @@ export default function TalentDashboard({
                     </Avatar>
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2">
-                        <p className="truncate text-[14px] font-medium">{row.title}</p>
+                        <p className="truncate text-[14px] font-medium">
+                          {row.title}
+                        </p>
                         <span
                           aria-label={`${row.matchScore}% match score`}
                           className={`inline-flex h-[22px] items-center rounded-[4px] px-2 text-[11px] font-semibold uppercase tracking-[0.03em] ${getMatchStyle(row.matchScore)}`}
@@ -631,7 +1147,9 @@ export default function TalentDashboard({
                         variant="ghost"
                         size="icon"
                         className="h-7 w-7"
-                        onClick={(event) => handleToggleSave(row.startup, event)}
+                        onClick={(event) =>
+                          handleToggleSave(row.startup, event)
+                        }
                         disabled={savingItems.has(String(row.id))}
                         aria-label={`Save ${row.title}`}
                         aria-pressed={isSaved(row.id, row.startupId)}
@@ -686,7 +1204,9 @@ export default function TalentDashboard({
                     </Avatar>
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2">
-                        <p className="truncate text-[14px] font-medium">{row.title}</p>
+                        <p className="truncate text-[14px] font-medium">
+                          {row.title}
+                        </p>
                         <span
                           aria-label={`${row.matchScore}% match score`}
                           className={`inline-flex h-[22px] items-center rounded-[4px] px-2 text-[11px] font-semibold uppercase tracking-[0.03em] ${getMatchStyle(row.matchScore)}`}

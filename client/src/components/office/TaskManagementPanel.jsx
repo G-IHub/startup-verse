@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import { Button } from "../ui/button";
 import { Card, CardContent } from "../ui/card";
 import { Avatar, AvatarFallback } from "../ui/avatar";
@@ -44,6 +44,7 @@ import {
   MoreVertical,
   Trash2,
   PlayCircle,
+  GripHorizontal,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -61,6 +62,7 @@ import * as teamMemberApi from "../../utils/api/teamMemberApi";
 import * as taskApi from "../../utils/api/taskApi";
 import { subscribeToTasks } from "../../utils/socketIoRealtime";
 import { STORAGE_KEYS } from "../../app/session";
+import { useWeeklyLoopStore } from "../../state/useWeeklyLoopStore";
 
 export function TaskManagementPanel({
   open,
@@ -73,10 +75,12 @@ export function TaskManagementPanel({
   startupId,
   founderIdOverride,
   onTasksSynced,
+  onNavigate,
 }) {
   const [localTasks, setLocalTasks] = useState([]);
   const [teamMembers, setTeamMembers] = useState([]);
   const [founderId, setFounderId] = useState("");
+  const [activeTab, setActiveTab] = useState("my-tasks");
   const [showCreateDialog, setShowCreateDialog] = useState(
     openAddDialog || false,
   );
@@ -87,6 +91,40 @@ export function TaskManagementPanel({
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
   const [taskNotFound, setTaskNotFound] = useState(false);
+  const [milestones, setMilestones] = useState([]);
+  const [activeOutcomeId, setActiveOutcomeId] = useState("");
+  const [showMilestoneDialog, setShowMilestoneDialog] = useState(false);
+  const [newMilestone, setNewMilestone] = useState({ title: "", description: "" });
+
+  const defaultKanbanHeight = () =>
+    Math.round(Math.min(window.innerHeight * 0.5, 420));
+
+  const [kanbanHeight, setKanbanHeight] = useState(defaultKanbanHeight);
+  const kanbanHeightRef = useRef(kanbanHeight);
+  const isDraggingHandle = useRef(false);
+  const panelRef = useRef(null);
+
+  const clampKanbanHeight = useCallback((raw) => {
+    const maxH = Math.round(window.innerHeight * 0.7);
+    return Math.max(180, Math.min(maxH, raw));
+  }, []);
+
+  const onHandlePointerDown = useCallback((e) => {
+    isDraggingHandle.current = true;
+    e.currentTarget.setPointerCapture(e.pointerId);
+    e.preventDefault();
+  }, []);
+
+  const onHandlePointerMove = useCallback((e) => {
+    if (!isDraggingHandle.current) return;
+    const next = clampKanbanHeight(window.innerHeight - e.clientY);
+    kanbanHeightRef.current = next;
+    setKanbanHeight(next);
+  }, [clampKanbanHeight]);
+
+  const onHandlePointerUp = useCallback(() => {
+    isDraggingHandle.current = false;
+  }, []);
 
   const normalizeTask = (task) => ({
     ...task,
@@ -105,6 +143,7 @@ export function TaskManagementPanel({
   // Load tasks and team members
   useEffect(() => {
     if (!open) return;
+    if (!founderIdOverride && user.role === "founder" && !String(user?._id ?? user?.id ?? "")) return;
     const loadData = async () => {
       setLoading(true);
 
@@ -113,19 +152,18 @@ export function TaskManagementPanel({
         : JSON.parse(localStorage.getItem(STORAGE_KEYS.teamMembers) || "[]");
 
       // Determine the founder ID (we don't need the full founder object)
+      const resolvedUserId = String(user?._id ?? user?.id ?? "");
       let founderIdValue = "";
       if (founderIdOverride) {
         founderIdValue = founderIdOverride;
         setFounderId(founderIdOverride);
       } else if (user.role === "founder") {
-        founderIdValue = user.id;
-        setFounderId(user.id);
+        founderIdValue = resolvedUserId;
+        setFounderId(resolvedUserId);
       } else if (user.role === "team-member" && user.startupId) {
-        // For team members, startupId should be the founder's ID
         founderIdValue = user.startupId;
         setFounderId(user.startupId);
       } else if (user.role === "team" && user.founderId) {
-        // Handle team member with founderId
         founderIdValue = user.founderId;
         setFounderId(user.founderId);
       }
@@ -136,6 +174,27 @@ export function TaskManagementPanel({
         setLoading(false);
         setLocalTasks([]);
         return;
+      }
+
+      if (user.role === "founder") {
+        try {
+          const [milestoneRows, outcomeRows] = await Promise.all([
+            taskApi.getFounderMilestones(founderIdValue),
+            taskApi.getFounderWeeklyOutcomes(founderIdValue),
+          ]);
+          setMilestones(milestoneRows || []);
+          const active = (outcomeRows || []).find((row) => row.status === "active");
+          setActiveOutcomeId(active?.id || "");
+        } catch (error) {
+          setMilestones([]);
+          setActiveOutcomeId("");
+          if (process.env.NODE_ENV === "development") {
+            console.debug("Failed to load milestones/outcomes:", error?.message || error);
+          }
+        }
+      } else {
+        setMilestones([]);
+        setActiveOutcomeId("");
       }
 
       // Load tasks for the founder - BACKEND FIRST
@@ -305,13 +364,20 @@ export function TaskManagementPanel({
       toast.error("No founder found");
       return;
     }
+    if (user.role === "founder" && !newTask.milestoneId) {
+      toast.error("Select a milestone before creating a task");
+      return;
+    }
     const assignee = teamMembers.find((m) => m.id === newTask.assigneeId);
     const task = {
       id: `task-${Date.now()}`,
       title: newTask.title,
       description: newTask.description,
       status: "pending",
-      milestoneId: newTask.milestoneId || "general",
+      milestoneId: newTask.milestoneId || null,
+      milestoneName:
+        milestones.find((m) => String(m.id) === String(newTask.milestoneId))
+          ?.title || "",
       assignedTo: assignee?.id,
       assignedToName: assignee?.name,
       createdAt: new Date().toISOString(),
@@ -347,6 +413,31 @@ export function TaskManagementPanel({
     onPlaySound?.();
     createTaskAssignedNotification(task, assignee?.name || "Unassigned");
   };
+  const handleCreateMilestone = async () => {
+    if (!newMilestone.title.trim()) {
+      toast.error("Please enter a milestone title");
+      return;
+    }
+    if (!founderId) {
+      toast.error("No founder found");
+      return;
+    }
+    try {
+      const created = await taskApi.createFounderMilestone(founderId, {
+        title: newMilestone.title.trim(),
+        description: newMilestone.description.trim(),
+        weeklyOutcomeId: activeOutcomeId || undefined,
+      });
+      setMilestones((prev) => [...prev, created]);
+      setNewTask((prev) => ({ ...prev, milestoneId: created.id }));
+      setShowMilestoneDialog(false);
+      setNewMilestone({ title: "", description: "" });
+      toast.success("Milestone created");
+      onTasksSynced?.();
+    } catch (error) {
+      toast.error(error?.message || "Failed to create milestone");
+    }
+  };
   const handleToggleTask = async (taskId) => {
     if (!founderId) return;
     let task = null;
@@ -374,9 +465,10 @@ export function TaskManagementPanel({
       }
     } else {
       const updatedTasks = toggleTask(founderId, taskId);
+      const resolvedUid = String(user?._id ?? user?.id ?? "");
       setLocalTasks(
         updatedTasks.filter(
-          (t) => user.role === "founder" || t.assignedTo === user.id,
+          (t) => user.role === "founder" || t.assignedTo === resolvedUid,
         ),
       );
       task = updatedTasks.find((t) => t.id === taskId);
@@ -415,6 +507,7 @@ export function TaskManagementPanel({
       toast.success("Task marked as pending");
     }
     onTasksSynced?.();
+    useWeeklyLoopStore.getState().refresh(founderId || undefined);
     onPlaySound?.();
   };
   const handleDeleteTask = async (taskId) => {
@@ -462,6 +555,7 @@ export function TaskManagementPanel({
         syncTasksToMilestones(founderId);
       }
       onTasksSynced?.();
+      useWeeklyLoopStore.getState().refresh(founderId || undefined);
       setLoadError("");
       const statusLabel =
         newStatus === "in-progress"
@@ -598,15 +692,24 @@ export function TaskManagementPanel({
           : t,
       );
       setLocalTasks(updatedTasks);
-      if (!strictMode) {
+      if (strictMode) {
+        taskApi
+          .updateTaskStatus(founderId, draggedTask.id, status, {
+            completedAt: status === "completed" ? new Date().toISOString() : null,
+          })
+          .then(() => {
+            onTasksSynced?.();
+            useWeeklyLoopStore.getState().refresh(founderId || undefined);
+          })
+          .catch((error) => {
+            setLocalTasks(localTasks);
+            setLoadError(error?.message || "Task status update failed.");
+          });
+      } else {
         saveTasks(founderId, updatedTasks);
-      }
-
-      // 🚀 Sync tasks to milestones when status changes
-      if (!strictMode) {
         syncTasksToMilestones(founderId);
+        onTasksSynced?.();
       }
-      onTasksSynced?.();
       setDraggedTask(null);
       const statusLabel =
         status === "in-progress"
@@ -649,8 +752,27 @@ export function TaskManagementPanel({
     }
   };
 
-  // Filter tasks
-  const filteredTasks = localTasks.filter((task) => {
+  // Filter tasks — scoped to active tab
+  const resolvedCurrentUserId = String(user?._id ?? user?.id ?? "");
+  const tabScopedTasks = localTasks.filter((task) => {
+    if (user.role !== "founder") {
+      // Team member: only tasks explicitly assigned to this user
+      return (
+        task.assignedTo === resolvedCurrentUserId ||
+        task.assigneeId === resolvedCurrentUserId
+      );
+    }
+    // Founder — guard: if founderId not yet resolved, treat unassigned as mine only
+    const fid = founderId || resolvedCurrentUserId;
+    if (activeTab === "team-tasks") {
+      // Only tasks explicitly assigned to someone who is NOT the founder
+      return Boolean(task.assignedTo) && task.assignedTo !== fid;
+    }
+    // My Tasks: unassigned tasks + tasks assigned to founder
+    return !task.assignedTo || task.assignedTo === fid;
+  });
+
+  const filteredTasks = tabScopedTasks.filter((task) => {
     const matchesSearch =
       task.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
       (task.description || "")
@@ -660,12 +782,41 @@ export function TaskManagementPanel({
       filterStatus === "all" || task.status === filterStatus;
     return matchesSearch && matchesStatus;
   });
+
+  const canEditTask = user.role === "founder";
+
+  // Group team tasks by assignee (for Team Tasks tab)
+  const teamTasksByAssignee = (() => {
+    const groups = new Map();
+    filteredTasks.forEach((task) => {
+      const key = task.assignedTo || "unassigned";
+      const name = task.assignedToName || "Unassigned";
+      if (!groups.has(key)) groups.set(key, { id: key, name, tasks: [] });
+      groups.get(key).tasks.push(task);
+    });
+    return Array.from(groups.values());
+  })();
   const pendingTasks = filteredTasks.filter((t) => t.status === "pending");
   const inProgressTasks = filteredTasks.filter(
     (t) => t.status === "in-progress",
   );
   const completedTasks = filteredTasks.filter((t) => t.status === "completed");
   const blockedTasks = filteredTasks.filter((t) => t.status === "blocked");
+  const milestoneProgressRows = milestones.map((milestone) => {
+    const related = localTasks.filter(
+      (task) => String(task.milestoneId || "") === String(milestone.id || ""),
+    );
+    const total = related.length || Number(milestone.totalTasks || 0);
+    const done =
+      related.filter((task) => String(task.status || "") === "completed").length ||
+      Number(milestone.tasksCompleted || 0);
+    return {
+      id: String(milestone.id || ""),
+      title: milestone.title || "Milestone",
+      total,
+      done,
+    };
+  });
   const columns = [
     {
       id: "pending",
@@ -729,8 +880,10 @@ export function TaskManagementPanel({
                 damping: 28,
                 stiffness: 260,
               }}
+              ref={panelRef}
               className="fixed right-0 top-0 h-full w-full md:w-[900px] office-panel office-panel-shell office-motion-soft z-[70] flex flex-col rounded-none md:rounded-l-xl"
             >
+              <div className="flex-1 overflow-y-auto min-h-0">
               <div className="p-3 office-panel-header">
                 <div className="flex items-center justify-between mb-3">
                   <div className="flex items-center gap-2">
@@ -751,10 +904,46 @@ export function TaskManagementPanel({
                     <X className="w-3.5 h-3.5" />
                   </Button>
                 </div>
+
+                {user.role === "founder" && (
+                  <div className="flex items-center gap-1 rounded-lg bg-muted p-1 mb-1">
+                    <button
+                      type="button"
+                      onClick={() => setActiveTab("my-tasks")}
+                      className={`flex-1 rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
+                        activeTab === "my-tasks"
+                          ? "bg-background text-foreground shadow-sm"
+                          : "text-muted-foreground hover:text-foreground"
+                      }`}
+                    >
+                      My Tasks
+                      {(() => { const fid = founderId || resolvedCurrentUserId; const n = localTasks.filter((t) => !t.assignedTo || t.assignedTo === fid).length; return n > 0 ? <span className="ml-1.5 rounded-full bg-primary/10 px-1.5 py-0.5 text-[10px] text-primary">{n}</span> : null; })()}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setActiveTab("team-tasks")}
+                      className={`flex-1 rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
+                        activeTab === "team-tasks"
+                          ? "bg-background text-foreground shadow-sm"
+                          : "text-muted-foreground hover:text-foreground"
+                      }`}
+                    >
+                      Team Tasks
+                      {(() => { const fid = founderId || resolvedCurrentUserId; const n = localTasks.filter((t) => Boolean(t.assignedTo) && t.assignedTo !== fid).length; return n > 0 ? <span className="ml-1.5 rounded-full bg-blue-100 px-1.5 py-0.5 text-[10px] text-blue-700">{n}</span> : null; })()}
+                    </button>
+                  </div>
+                )}
+
                 <p className="text-xs text-muted-foreground">
-                  {localTasks.length}
-                  {" total task"}
-                  {localTasks.length !== 1 ? "s" : ""}
+                  {(() => {
+                    const fid = founderId || resolvedCurrentUserId;
+                    if (activeTab === "team-tasks") {
+                      const n = localTasks.filter((t) => Boolean(t.assignedTo) && t.assignedTo !== fid).length;
+                      return `${n} task${n !== 1 ? "s" : ""} assigned to teammates`;
+                    }
+                    const n = localTasks.filter((t) => !t.assignedTo || t.assignedTo === fid).length;
+                    return `${n} personal task${n !== 1 ? "s" : ""}`;
+                  })()}
                 </p>
               </div>
               <div className="p-4 border-b border-border bg-surface-container-low space-y-3">
@@ -768,6 +957,27 @@ export function TaskManagementPanel({
                     The linked task could not be found. It may have been deleted or moved.
                   </div>
                 ) : null}
+
+                {user.role === "founder" && (
+                  <div className="flex items-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 dark:border-blue-900 dark:bg-blue-950/30">
+                    <AlertCircle className="w-3.5 h-3.5 flex-shrink-0 text-blue-600 dark:text-blue-400" />
+                    <p className="flex-1 text-[11px] text-blue-700 dark:text-blue-300">
+                      Tasks are created from the weekly milestone section on your dashboard.
+                    </p>
+                    {onNavigate && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="h-6 shrink-0 px-2 text-[11px] text-blue-700 hover:bg-blue-100 dark:text-blue-300"
+                        onClick={() => { onClose?.(); onNavigate("dashboard"); }}
+                      >
+                        Go to Dashboard
+                      </Button>
+                    )}
+                  </div>
+                )}
+
                 <div className="flex items-center gap-2">
                   <div className="relative flex-1">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
@@ -791,16 +1001,64 @@ export function TaskManagementPanel({
                       <SelectItem value="blocked">Blocked</SelectItem>
                     </SelectContent>
                   </Select>
-                  {user.role === "founder" && (
-                    <Button
-                      onClick={() => setShowCreateDialog(true)}
-                      className="bg-blue-600 hover:bg-blue-700 h-9"
-                    >
-                      <Plus className="w-4 h-4 mr-1" />
-                      New Task
-                    </Button>
-                  )}
                 </div>
+                {milestoneProgressRows.length > 0 && (
+                  <div className="rounded-xl border border-border bg-card shadow-sm overflow-hidden">
+                    <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-muted/40">
+                      <div className="flex items-center gap-2">
+                        <Target className="w-3.5 h-3.5 text-primary" />
+                        <span className="text-xs font-semibold tracking-wide text-foreground">Weekly Milestones</span>
+                      </div>
+                      <span className="text-[10px] text-muted-foreground">
+                        {milestoneProgressRows.filter((r) => r.total > 0 && r.done >= r.total).length}/{milestoneProgressRows.length} complete
+                      </span>
+                    </div>
+                    <div className="divide-y divide-border">
+                      {milestoneProgressRows.map((row) => {
+                        const pct =
+                          row.total > 0
+                            ? Math.max(0, Math.min(100, Math.round((row.done / row.total) * 100)))
+                            : 0;
+                        const isDone = row.total > 0 && row.done >= row.total;
+                        const isPartial = row.done > 0 && !isDone;
+                        const barColor = isDone
+                          ? "from-emerald-500 to-emerald-400"
+                          : isPartial
+                          ? "from-blue-600 to-blue-400"
+                          : "from-slate-300 to-slate-200 dark:from-slate-700 dark:to-slate-600";
+                        const pillStyle = isDone
+                          ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400"
+                          : isPartial
+                          ? "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400"
+                          : "bg-muted text-muted-foreground";
+                        return (
+                          <div key={row.id} className="px-4 py-3 space-y-2.5">
+                            <div className="flex items-start justify-between gap-3">
+                              <div className="flex items-center gap-2 min-w-0">
+                                <div className={`mt-0.5 h-2 w-2 flex-shrink-0 rounded-full ${isDone ? "bg-emerald-500" : isPartial ? "bg-blue-500" : "bg-slate-300 dark:bg-slate-600"}`} />
+                                <span className="text-xs font-medium leading-tight truncate text-foreground">{row.title}</span>
+                              </div>
+                              <div className="flex items-center gap-2 flex-shrink-0">
+                                <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${pillStyle}`}>
+                                  {pct}%
+                                </span>
+                                <span className="text-[10px] text-muted-foreground tabular-nums">
+                                  {row.done}/{row.total}
+                                </span>
+                              </div>
+                            </div>
+                            <div className="h-1.5 w-full rounded-full bg-muted overflow-hidden">
+                              <div
+                                className={`h-full rounded-full bg-gradient-to-r transition-all duration-500 ${barColor}`}
+                                style={{ width: `${pct}%` }}
+                              />
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
                 <div className="flex items-center gap-4 text-xs">
                   <div className="flex items-center gap-1.5">
                     <Circle className="w-3 h-3 text-gray-400" />
@@ -834,8 +1092,24 @@ export function TaskManagementPanel({
                   )}
                 </div>
               </div>
+              </div>
+              <div
+                role="separator"
+                aria-label="Drag up to expand task board"
+                onPointerDown={onHandlePointerDown}
+                onPointerMove={onHandlePointerMove}
+                onPointerUp={onHandlePointerUp}
+                onPointerCancel={onHandlePointerUp}
+                className="group relative flex h-7 w-full flex-shrink-0 cursor-ns-resize select-none items-center justify-center border-y border-border bg-muted/40 transition-colors hover:bg-primary/10 active:bg-primary/20"
+              >
+                <div className="flex items-center gap-1.5 rounded-full bg-background px-3 py-1 shadow-sm ring-1 ring-border transition-all group-hover:ring-primary/50 group-hover:shadow-md group-active:ring-primary">
+                  <GripHorizontal className="h-3.5 w-3.5 text-muted-foreground transition-colors group-hover:text-primary" />
+                  <span className="text-[10px] font-medium text-muted-foreground transition-colors group-hover:text-primary select-none">drag to expand</span>
+                </div>
+              </div>
+              <div className="flex-shrink-0 overflow-hidden" style={{ height: kanbanHeight }}>
               {loading ? (
-                <div className="flex-1 flex items-center justify-center">
+                <div className="flex h-full items-center justify-center">
                   <div className="text-center space-y-3">
                     <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto" />
                     <p className="text-sm text-muted-foreground">
@@ -844,21 +1118,94 @@ export function TaskManagementPanel({
                   </div>
                 </div>
               ) : filteredTasks.length === 0 ? (
-                <div className="flex-1 flex items-center justify-center">
+                <div className="flex h-full items-center justify-center">
                   <div className="text-center space-y-3 p-8">
                     <Target className="w-16 h-16 mx-auto text-muted-foreground opacity-20" />
                     <p className="text-lg font-medium text-muted-foreground">
                       No tasks found
                     </p>
                     <p className="text-sm text-muted-foreground max-w-sm">
-                      {user.role === "founder"
-                        ? "Create your first task to get started"
+                      {user.role === "founder" && activeTab === "team-tasks"
+                        ? "No tasks have been assigned to teammates yet"
+                        : user.role === "founder"
+                        ? "Tasks you add to milestones will appear here"
                         : "No tasks have been assigned to you yet"}
                     </p>
                   </div>
                 </div>
+              ) : activeTab === "team-tasks" ? (
+                <div className="h-full overflow-y-auto p-4 space-y-6">
+                  {teamTasksByAssignee.map((group) => (
+                    <div key={group.id}>
+                      <div className="mb-2 flex items-center gap-2">
+                        <div className="flex h-7 w-7 items-center justify-center rounded-full bg-blue-100 text-[11px] font-semibold text-blue-700 dark:bg-blue-900 dark:text-blue-200">
+                          {group.name.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase()}
+                        </div>
+                        <span className="text-sm font-medium">{group.name}</span>
+                        <Badge variant="secondary" className="h-5 px-1.5 text-[10px]">
+                          {group.tasks.length} task{group.tasks.length !== 1 ? "s" : ""}
+                        </Badge>
+                      </div>
+                      <div className="space-y-2 pl-9">
+                        {group.tasks.map((task) => (
+                          <Card key={task.id} className={`border-l-4 ${getStatusColor(task.status)}`}>
+                            <CardContent className="p-3 space-y-2">
+                              <div className="flex items-start justify-between gap-2">
+                                <h4 className="text-xs leading-tight flex-1 font-medium">{task.title}</h4>
+                                <div className="flex items-center gap-1.5 shrink-0">
+                                  <Badge variant={task.status === "completed" ? "default" : task.status === "blocked" ? "destructive" : "secondary"} className="text-[10px] h-5">
+                                    {task.status === "in-progress" ? "In Progress" : task.status === "pending" ? "To Do" : task.status.charAt(0).toUpperCase() + task.status.slice(1)}
+                                  </Badge>
+                                  {canEditTask && (
+                                    <DropdownMenu>
+                                      <DropdownMenuTrigger asChild={true}>
+                                        <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={(e) => e.stopPropagation()}>
+                                          <MoreVertical className="w-3.5 h-3.5" />
+                                        </Button>
+                                      </DropdownMenuTrigger>
+                                      <DropdownMenuContent align="end" className="w-40 z-[75]">
+                                        <DropdownMenuItem onClick={() => handleStatusChange(task.id, "pending")}>
+                                          <Circle className="w-3.5 h-3.5 mr-2 text-gray-400" />Mark as To Do
+                                        </DropdownMenuItem>
+                                        <DropdownMenuItem onClick={() => handleStatusChange(task.id, "in-progress")}>
+                                          <PlayCircle className="w-3.5 h-3.5 mr-2 text-blue-600" />Start Progress
+                                        </DropdownMenuItem>
+                                        <DropdownMenuItem onClick={() => handleStatusChange(task.id, "completed")}>
+                                          <CheckCircle2 className="w-3.5 h-3.5 mr-2 text-green-600" />Mark Complete
+                                        </DropdownMenuItem>
+                                        <DropdownMenuSeparator />
+                                        <DropdownMenuItem onClick={() => handleDeleteTask(task.id)} className="text-red-600 focus:text-red-600">
+                                          <Trash2 className="w-3.5 h-3.5 mr-2" />Delete Task
+                                        </DropdownMenuItem>
+                                      </DropdownMenuContent>
+                                    </DropdownMenu>
+                                  )}
+                                </div>
+                              </div>
+                              {task.description && (
+                                <p className="text-[10px] text-muted-foreground line-clamp-2">{task.description}</p>
+                              )}
+                              {task.status === "blocked" && task.blockerNote && (
+                                <div className="p-2 bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-800 rounded text-[10px]">
+                                  <div className="flex items-center gap-1 text-red-700 dark:text-red-300 font-medium mb-1">
+                                    <AlertCircle className="w-3 h-3" />
+                                    <span>Blocked: {task.blockerNote}</span>
+                                  </div>
+                                </div>
+                              )}
+                              <div className="flex items-center justify-between text-[10px] text-muted-foreground pt-1 border-t border-border">
+                                <span>{task.milestoneName || "No milestone"}</span>
+                                {task.dueDate && <span>Due {new Date(task.dueDate).toLocaleDateString()}</span>}
+                              </div>
+                            </CardContent>
+                          </Card>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
               ) : (
-                <div className="flex-1 overflow-hidden p-4 flex flex-col">
+                <div className="h-full overflow-hidden p-4 flex flex-col">
                   <div className="md:hidden flex-1 overflow-x-auto snap-x snap-mandatory flex gap-4">
                     {columns.map((column) => (
                       <div
@@ -1057,11 +1404,12 @@ export function TaskManagementPanel({
                   </div>
                 </div>
               )}
+              </div>
             </motion.div>
           </>
         )}
       </AnimatePresence>
-      {user.role === "founder" && (
+      {false && user.role === "founder" && (
         <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
           <DialogContent className="max-w-md z-[75] office-dialog-panel">
             <DialogHeader>
@@ -1098,6 +1446,29 @@ export function TaskManagementPanel({
                   }
                   className="mt-1 h-20"
                 />
+              </div>
+              <div>
+                <Label className="text-xs">Milestone *</Label>
+                <Select
+                  value={newTask.milestoneId}
+                  onValueChange={(v) =>
+                    setNewTask({
+                      ...newTask,
+                      milestoneId: v,
+                    })
+                  }
+                >
+                  <SelectTrigger className="mt-1">
+                    <SelectValue placeholder="Select milestone..." />
+                  </SelectTrigger>
+                  <SelectContent className="z-[80]">
+                    {milestones.map((milestone) => (
+                      <SelectItem key={milestone.id} value={milestone.id}>
+                        {milestone.title}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
               <div>
                 <Label className="text-xs">Assign To</Label>
@@ -1145,6 +1516,57 @@ export function TaskManagementPanel({
                   className="flex-1 bg-blue-600 hover:bg-blue-700"
                 >
                   Create Task
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
+      {false && user.role === "founder" && (
+        <Dialog open={showMilestoneDialog} onOpenChange={setShowMilestoneDialog}>
+          <DialogContent className="max-w-md z-[75] office-dialog-panel">
+            <DialogHeader>
+              <DialogTitle>Create Milestone</DialogTitle>
+              <DialogDescription>
+                Milestones organize weekly tasks and progress.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div>
+                <Label className="text-xs">Milestone Title *</Label>
+                <Input
+                  placeholder="Enter milestone title..."
+                  value={newMilestone.title}
+                  onChange={(e) =>
+                    setNewMilestone((prev) => ({ ...prev, title: e.target.value }))
+                  }
+                  className="mt-1"
+                />
+              </div>
+              <div>
+                <Label className="text-xs">Description</Label>
+                <Textarea
+                  placeholder="Describe this milestone..."
+                  value={newMilestone.description}
+                  onChange={(e) =>
+                    setNewMilestone((prev) => ({ ...prev, description: e.target.value }))
+                  }
+                  className="mt-1 h-20"
+                />
+              </div>
+              <div className="flex gap-2 pt-2">
+                <Button
+                  variant="outline"
+                  onClick={() => setShowMilestoneDialog(false)}
+                  className="flex-1"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={handleCreateMilestone}
+                  className="flex-1 bg-blue-600 hover:bg-blue-700"
+                >
+                  Create Milestone
                 </Button>
               </div>
             </div>

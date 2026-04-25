@@ -15,6 +15,8 @@ function formatHm(iso) {
 
 function colorForAgendaType(type) {
   switch (type) {
+    case "meeting":
+      return "#7c3aed";
     case "company-event":
       return "#8b5cf6";
     case "organization-deadline":

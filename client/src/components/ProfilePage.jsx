@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+Complete Your Profileimport React, { useState } from "react";
 import { Button } from "./ui/button";
 import {
   Card,
@@ -14,6 +14,27 @@ import { Badge } from "./ui/badge";
 import { Progress } from "./ui/progress";
 import { toast } from "sonner";
 import { getTalentProfileCompletionPercent } from "../utils/talentProfileCompletion";
+import * as founderApi from "../utils/api/founderApi";
+import {
+  FOUNDER_INDUSTRY_OPTIONS,
+  FOUNDER_TARGET_AUDIENCE_OPTIONS,
+  FOUNDER_ROLES_NEEDED_OPTIONS,
+  FOUNDER_TEAM_SIZE_OPTIONS,
+  FOUNDER_STAGE_OPTIONS,
+  FOUNDER_VALIDATED_IDEA_OPTIONS,
+  FOUNDER_MVP_OPTIONS,
+  FOUNDER_CUSTOMERS_OPTIONS,
+  getFounderEditableFields,
+  resolveIndustryForPersistence,
+  validateFounderStartupFields,
+} from "../domains/founder/founderProfileConfig";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "./ui/select";
 import {
   UserCircle,
   Briefcase,
@@ -67,11 +88,15 @@ export default function ProfilePage({ user, onUpdateUser }) {
     interests: user.interests || [],
     professionalGoals: user.professionalGoals || "",
     industryPreferences: user.industryPreferences || [],
-    // Founder fields
-    startupName: user.startupName || "",
-    startupStage: user.startupStage || "",
-    industry: user.industry || "",
-    teamSize: user.teamSize || 1,
+    // Founder fields (aligned with onboarding via getFounderEditableFields)
+    ...(user.role === "founder"
+      ? getFounderEditableFields(user)
+      : {
+          startupName: user.startupName || "",
+          startupStage: user.startupStage || "",
+          industry: user.industry || "",
+          teamSize: user.teamSize || 1,
+        }),
   });
   const [newSkill, setNewSkill] = useState("");
 
@@ -88,13 +113,92 @@ export default function ProfilePage({ user, onUpdateUser }) {
       return "Good progress! Add more details to attract founders.";
     return "Start building your profile to get discovered by startups.";
   };
-  const handleSave = () => {
-    if (onUpdateUser) {
+  const handleSave = async () => {
+    if (!onUpdateUser) return;
+
+    if (user.role === "founder") {
+      const v = validateFounderStartupFields({
+        startupName: editedProfile.startupName,
+        startupDescription: editedProfile.startupDescription,
+        industryFocus: editedProfile.industryFocus,
+        otherIndustry: editedProfile.otherIndustry,
+        teamSize: editedProfile.teamSize,
+        targetAudience: editedProfile.targetAudience,
+        hasValidatedIdea: editedProfile.hasValidatedIdea,
+        hasMVP: editedProfile.hasMVP,
+        hasCustomers: editedProfile.hasCustomers,
+      });
+      if (!v.ok) {
+        toast.error(v.errors[0]);
+        return;
+      }
+      const founderId = String(user._id ?? user.id);
+      const resolvedIndustry = resolveIndustryForPersistence(
+        editedProfile.industryFocus,
+        editedProfile.otherIndustry,
+      );
+      try {
+        const startup = await founderApi.upsertFounderStartup({
+          founderId,
+          name: String(editedProfile.startupName).trim(),
+          description: editedProfile.startupDescription || "",
+          industry: resolvedIndustry,
+          stage: editedProfile.startupStage || "",
+        });
+        const startupId = String(startup._id || startup.id);
+        await founderApi.saveFounderProfile({
+          userId: String(user._id ?? user.id),
+          startupId,
+          bio: editedProfile.bio || "",
+          background: "",
+          links: {},
+        });
+        const rolesResolved = editedProfile.rolesNeeded?.includes?.("Others")
+          ? [
+              ...editedProfile.rolesNeeded.filter((r) => r !== "Others"),
+              editedProfile.otherRole,
+            ].filter(Boolean)
+          : editedProfile.rolesNeeded || [];
+
+        onUpdateUser({
+          ...user,
+          ...editedProfile,
+          industry: resolvedIndustry,
+          rolesNeeded: rolesResolved,
+          startupId,
+          profile: {
+            ...user.profile,
+            startupName: editedProfile.startupName,
+            startupDescription: editedProfile.startupDescription,
+            industryFocus:
+              editedProfile.industryFocus === "Others"
+                ? editedProfile.otherIndustry
+                : editedProfile.industryFocus,
+            industry: resolvedIndustry,
+            startupStage: editedProfile.startupStage,
+            targetAudience: editedProfile.targetAudience,
+            rolesNeeded: rolesResolved,
+            teamSize: editedProfile.teamSize,
+            bio: editedProfile.bio,
+            hasValidatedIdea: editedProfile.hasValidatedIdea,
+            hasMVP: editedProfile.hasMVP,
+            hasCustomers: editedProfile.hasCustomers,
+            ...(editedProfile.industryFocus === "Others"
+              ? { otherIndustry: editedProfile.otherIndustry }
+              : {}),
+          },
+        });
+      } catch (err) {
+        toast.error(err?.message || "Failed to save startup profile");
+        return;
+      }
+    } else {
       onUpdateUser({
         ...user,
         ...editedProfile,
       });
     }
+
     setIsEditing(false);
     toast.success("Profile updated successfully!");
   };
@@ -203,9 +307,18 @@ export default function ProfilePage({ user, onUpdateUser }) {
           issueYear: "",
           credentialId: "",
           credentialUrl: "",
+          certificateImage: "",
         },
       ],
     });
+  };
+  const updateCertificationImage = (id, file) => {
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      updateCertification(id, "certificateImage", reader.result || "");
+    };
+    reader.readAsDataURL(file);
   };
   const updateCertification = (id, field, value) => {
     setEditedProfile({
@@ -954,8 +1067,8 @@ export default function ProfilePage({ user, onUpdateUser }) {
                           }
                         />
                         <Input
-                          placeholder="Credential ID"
-                          value={cert.credentialId}
+                          placeholder="Credential ID (Optional)"
+                          value={cert.credentialId || ""}
                           onChange={(e) =>
                             updateCertification(
                               cert.id,
@@ -966,8 +1079,8 @@ export default function ProfilePage({ user, onUpdateUser }) {
                         />
                         <div className="md:col-span-2">
                           <Input
-                            placeholder="Credential URL"
-                            value={cert.credentialUrl}
+                            placeholder="Credential URL (Optional)"
+                            value={cert.credentialUrl || ""}
                             onChange={(e) =>
                               updateCertification(
                                 cert.id,
@@ -976,6 +1089,42 @@ export default function ProfilePage({ user, onUpdateUser }) {
                               )
                             }
                           />
+                        </div>
+                        <div className="md:col-span-2 space-y-2">
+                          <Label>Certificate Image</Label>
+                          <Input
+                            type="file"
+                            accept="image/*"
+                            onChange={(e) =>
+                              updateCertificationImage(
+                                cert.id,
+                                e.target.files?.[0],
+                              )
+                            }
+                          />
+                          {cert.certificateImage && (
+                            <div className="flex items-center gap-3">
+                              <img
+                                src={cert.certificateImage}
+                                alt={cert.name || "Certificate"}
+                                className="h-20 w-28 rounded-md border object-cover"
+                              />
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="outline"
+                                onClick={() =>
+                                  updateCertification(
+                                    cert.id,
+                                    "certificateImage",
+                                    "",
+                                  )
+                                }
+                              >
+                                Remove Image
+                              </Button>
+                            </div>
+                          )}
                         </div>
                       </div>
                     </>
@@ -1461,101 +1610,348 @@ export default function ProfilePage({ user, onUpdateUser }) {
           </div>
         </CardContent>
       </Card>
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Building className="w-5 h-5" />
-            Startup Information
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid md:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="startupName">Startup Name</Label>
-              {isEditing ? (
-                <Input
-                  id="startupName"
-                  value={editedProfile.startupName}
-                  onChange={(e) =>
-                    setEditedProfile({
-                      ...editedProfile,
-                      startupName: e.target.value,
-                    })
-                  }
-                  placeholder="Your startup name"
-                />
-              ) : (
-                <p className="text-sm p-2 bg-muted rounded-md">
-                  {user.startupName || "Not specified"}
-                </p>
-              )}
+      {user.role === "founder" && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Building className="w-5 h-5" />
+              Startup Information
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid md:grid-cols-2 gap-4">
+              <div className="space-y-2 md:col-span-2">
+                <Label htmlFor="startupName">Startup name</Label>
+                {isEditing ? (
+                  <Input
+                    id="startupName"
+                    value={editedProfile.startupName}
+                    onChange={(e) =>
+                      setEditedProfile({
+                        ...editedProfile,
+                        startupName: e.target.value,
+                      })
+                    }
+                    placeholder="Your startup name"
+                  />
+                ) : (
+                  <p className="text-sm p-2 bg-muted rounded-md">
+                    {user.startupName ||
+                      user.profile?.startupName ||
+                      "Not specified"}
+                  </p>
+                )}
+              </div>
+              <div className="space-y-2 md:col-span-2">
+                <Label htmlFor="startupDescription">Startup description</Label>
+                {isEditing ? (
+                  <Textarea
+                    id="startupDescription"
+                    value={editedProfile.startupDescription || ""}
+                    onChange={(e) =>
+                      setEditedProfile({
+                        ...editedProfile,
+                        startupDescription: e.target.value,
+                      })
+                    }
+                    rows={4}
+                    placeholder="What you do and the problem you solve"
+                  />
+                ) : (
+                  <p className="text-sm p-2 bg-muted rounded-md whitespace-pre-wrap">
+                    {user.profile?.startupDescription ||
+                      user.startupDescription ||
+                      "Not specified"}
+                  </p>
+                )}
+              </div>
+              <div className="space-y-2 md:col-span-2">
+                <Label>Startup type (industry)</Label>
+                {isEditing ? (
+                  <>
+                    <Select
+                      value={editedProfile.industryFocus || ""}
+                      onValueChange={(v) =>
+                        setEditedProfile({
+                          ...editedProfile,
+                          industryFocus: v,
+                        })
+                      }
+                    >
+                      <SelectTrigger className="w-full">
+                        <SelectValue placeholder="Select industry" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {FOUNDER_INDUSTRY_OPTIONS.map((opt) => (
+                          <SelectItem key={opt} value={opt}>
+                            {opt}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    {editedProfile.industryFocus === "Others" && (
+                      <Input
+                        className="mt-2"
+                        value={editedProfile.otherIndustry || ""}
+                        onChange={(e) =>
+                          setEditedProfile({
+                            ...editedProfile,
+                            otherIndustry: e.target.value,
+                          })
+                        }
+                        placeholder="Specify your industry"
+                      />
+                    )}
+                  </>
+                ) : (
+                  <p className="text-sm p-2 bg-muted rounded-md">
+                    {user.industry ||
+                      user.profile?.industry ||
+                      user.profile?.industryFocus ||
+                      "Not specified"}
+                  </p>
+                )}
+              </div>
+              <div className="space-y-2 md:col-span-2">
+                <Label>Target audience</Label>
+                {isEditing ? (
+                  <div className="flex flex-wrap gap-2 border border-border rounded-md p-3">
+                    {FOUNDER_TARGET_AUDIENCE_OPTIONS.map((opt) => (
+                      <label
+                        key={opt}
+                        className="flex items-center gap-2 text-sm cursor-pointer"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={editedProfile.targetAudience?.includes?.(
+                            opt,
+                          )}
+                          onChange={() => {
+                            const cur = editedProfile.targetAudience || [];
+                            setEditedProfile({
+                              ...editedProfile,
+                              targetAudience: cur.includes(opt)
+                                ? cur.filter((x) => x !== opt)
+                                : [...cur, opt],
+                            });
+                          }}
+                        />
+                        {opt}
+                      </label>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-sm p-2 bg-muted rounded-md">
+                    {Array.isArray(user.profile?.targetAudience)
+                      ? user.profile.targetAudience.join(", ")
+                      : Array.isArray(user.targetAudience)
+                        ? user.targetAudience.join(", ")
+                        : "Not specified"}
+                  </p>
+                )}
+              </div>
+              <div className="space-y-2 md:col-span-2">
+                <Label>Roles needed</Label>
+                {isEditing ? (
+                  <div className="flex flex-wrap gap-2 border border-border rounded-md p-3 max-h-48 overflow-y-auto">
+                    {FOUNDER_ROLES_NEEDED_OPTIONS.map((opt) => (
+                      <label
+                        key={opt}
+                        className="flex items-center gap-2 text-xs cursor-pointer"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={editedProfile.rolesNeeded?.includes?.(opt)}
+                          onChange={() => {
+                            const cur = editedProfile.rolesNeeded || [];
+                            setEditedProfile({
+                              ...editedProfile,
+                              rolesNeeded: cur.includes(opt)
+                                ? cur.filter((x) => x !== opt)
+                                : [...cur, opt],
+                            });
+                          }}
+                        />
+                        {opt}
+                      </label>
+                    ))}
+                    {editedProfile.rolesNeeded?.includes?.("Others") && (
+                      <Input
+                        className="w-full mt-2"
+                        placeholder="Specify role"
+                        value={editedProfile.otherRole || ""}
+                        onChange={(e) =>
+                          setEditedProfile({
+                            ...editedProfile,
+                            otherRole: e.target.value,
+                          })
+                        }
+                      />
+                    )}
+                  </div>
+                ) : (
+                  <p className="text-sm p-2 bg-muted rounded-md">
+                    {Array.isArray(user.profile?.rolesNeeded)
+                      ? user.profile.rolesNeeded.join(", ")
+                      : Array.isArray(user.rolesNeeded)
+                        ? user.rolesNeeded.join(", ")
+                        : "Not specified"}
+                  </p>
+                )}
+              </div>
+              <div className="space-y-2">
+                <Label>Team size</Label>
+                {isEditing ? (
+                  <Select
+                    value={editedProfile.teamSize || ""}
+                    onValueChange={(v) =>
+                      setEditedProfile({ ...editedProfile, teamSize: v })
+                    }
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Team size" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {FOUNDER_TEAM_SIZE_OPTIONS.map((opt) => (
+                        <SelectItem key={opt} value={opt}>
+                          {opt}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                ) : (
+                  <p className="text-sm p-2 bg-muted rounded-md flex items-center gap-2">
+                    <Users className="w-4 h-4" />
+                    {user.profile?.teamSize || user.teamSize || "Not specified"}
+                  </p>
+                )}
+              </div>
+              <div className="space-y-2">
+                <Label>Execution stage</Label>
+                {isEditing ? (
+                  <Select
+                    value={editedProfile.startupStage || ""}
+                    onValueChange={(v) =>
+                      setEditedProfile({ ...editedProfile, startupStage: v })
+                    }
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Stage" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {FOUNDER_STAGE_OPTIONS.map((opt) => (
+                        <SelectItem key={opt} value={opt}>
+                          {opt}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                ) : (
+                  <p className="text-sm p-2 bg-muted rounded-md flex items-center gap-2">
+                    <Target className="w-4 h-4" />
+                    {user.startupStage ||
+                      user.profile?.startupStage ||
+                      "Not specified"}
+                  </p>
+                )}
+              </div>
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="industry">Industry</Label>
-              {isEditing ? (
-                <Input
-                  id="industry"
-                  value={editedProfile.industry}
-                  onChange={(e) =>
-                    setEditedProfile({
-                      ...editedProfile,
-                      industry: e.target.value,
-                    })
-                  }
-                  placeholder="e.g., FinTech, HealthTech"
-                />
-              ) : (
-                <p className="text-sm p-2 bg-muted rounded-md">
-                  {user.industry || "Not specified"}
-                </p>
-              )}
+            <div className="grid md:grid-cols-1 gap-4 border-t pt-4">
+              <p className="text-sm font-medium text-muted-foreground">
+                Where you are today
+              </p>
+              <div className="space-y-2">
+                <Label>Validated problem / idea</Label>
+                {isEditing ? (
+                  <Select
+                    value={editedProfile.hasValidatedIdea || ""}
+                    onValueChange={(v) =>
+                      setEditedProfile({
+                        ...editedProfile,
+                        hasValidatedIdea: v,
+                      })
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {FOUNDER_VALIDATED_IDEA_OPTIONS.map((opt) => (
+                        <SelectItem key={opt} value={opt}>
+                          {opt}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                ) : (
+                  <p className="text-sm p-2 bg-muted rounded-md">
+                    {user.profile?.hasValidatedIdea ||
+                      user.hasValidatedIdea ||
+                      "Not specified"}
+                  </p>
+                )}
+              </div>
+              <div className="space-y-2">
+                <Label>MVP or prototype</Label>
+                {isEditing ? (
+                  <Select
+                    value={editedProfile.hasMVP || ""}
+                    onValueChange={(v) =>
+                      setEditedProfile({ ...editedProfile, hasMVP: v })
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {FOUNDER_MVP_OPTIONS.map((opt) => (
+                        <SelectItem key={opt} value={opt}>
+                          {opt}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                ) : (
+                  <p className="text-sm p-2 bg-muted rounded-md">
+                    {user.profile?.hasMVP || user.hasMVP || "Not specified"}
+                  </p>
+                )}
+              </div>
+              <div className="space-y-2">
+                <Label>Customers or users</Label>
+                {isEditing ? (
+                  <Select
+                    value={editedProfile.hasCustomers || ""}
+                    onValueChange={(v) =>
+                      setEditedProfile({
+                        ...editedProfile,
+                        hasCustomers: v,
+                      })
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {FOUNDER_CUSTOMERS_OPTIONS.map((opt) => (
+                        <SelectItem key={opt} value={opt}>
+                          {opt}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                ) : (
+                  <p className="text-sm p-2 bg-muted rounded-md">
+                    {user.profile?.hasCustomers ||
+                      user.hasCustomers ||
+                      "Not specified"}
+                  </p>
+                )}
+              </div>
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="startupStage">Stage</Label>
-              {isEditing ? (
-                <Input
-                  id="startupStage"
-                  value={editedProfile.startupStage}
-                  onChange={(e) =>
-                    setEditedProfile({
-                      ...editedProfile,
-                      startupStage: e.target.value,
-                    })
-                  }
-                  placeholder="e.g., Ideation, MVP, Growth"
-                />
-              ) : (
-                <p className="text-sm p-2 bg-muted rounded-md flex items-center gap-2">
-                  <Target className="w-4 h-4" />
-                  {user.startupStage || "Not specified"}
-                </p>
-              )}
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="teamSize">Team Size</Label>
-              {isEditing ? (
-                <Input
-                  id="teamSize"
-                  type="number"
-                  value={editedProfile.teamSize}
-                  onChange={(e) =>
-                    setEditedProfile({
-                      ...editedProfile,
-                      teamSize: parseInt(e.target.value) || 1,
-                    })
-                  }
-                />
-              ) : (
-                <p className="text-sm p-2 bg-muted rounded-md flex items-center gap-2">
-                  <Users className="w-4 h-4" />
-                  {user.teamSize || 1}{" "}
-                  {user.teamSize === 1 ? "member" : "members"}
-                </p>
-              )}
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      )}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">

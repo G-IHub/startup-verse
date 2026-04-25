@@ -8,6 +8,7 @@ import migrationsRouter from "./migrations.routes.js";
 import eventsRouter from "./events.routes.js";
 import mentorsRouter from "./mentors.routes.js";
 import announcementsRouter from "./announcements.routes.js";
+import pollsRouter from "./polls.routes.js";
 import debugRouter from "./debug.routes.js";
 import cronRouter from "./cron.routes.js";
 import deliverablesRouter from "./deliverables.routes.js";
@@ -23,6 +24,7 @@ import presenceRouter from "./presence.routes.js";
 import talentRouter from "./talent.routes.js";
 import teamMembersRouter from "./teamMembers.routes.js";
 import usersRouter from "./users.routes.js";
+import meetingsRouter from "./meetings.routes.js";
 
 const apiRouter = Router();
 
@@ -46,6 +48,8 @@ apiRouter.use(cronRouter);
 apiRouter.use(eventsRouter);
 apiRouter.use(mentorsRouter);
 apiRouter.use(announcementsRouter);
+apiRouter.use(pollsRouter);
+apiRouter.use(meetingsRouter);
 apiRouter.use(emailsRouter);
 apiRouter.use(adminRouter);
 apiRouter.use(migrationsRouter);

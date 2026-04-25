@@ -916,3 +916,10 @@ html {
 [data-slot="dialog-content"] {
   z-index: 150 !important;
 }
+
+/* Hide native number input spinners (replaced by custom +/- buttons) */
+#poll-duration::-webkit-inner-spin-button,
+#poll-duration::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}

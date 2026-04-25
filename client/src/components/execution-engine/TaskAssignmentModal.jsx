@@ -9,6 +9,15 @@ import {
 import { Button } from "../ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "../ui/avatar";
 import { X, User, CheckCircle2, Search } from "lucide-react";
+
+function assigneeIdOnTask(t) {
+  const a = t?.assignedTo;
+  if (a == null || a === "") return "";
+  if (typeof a === "object")
+    return String(a._id || a.id || "").trim();
+  return String(a).trim();
+}
+
 export default function TaskAssignmentModal({
   isOpen,
   onClose,
@@ -16,10 +25,13 @@ export default function TaskAssignmentModal({
   teamMembers,
   founderId,
   founderName,
+  founderAvatar,
   onAssign,
 }) {
   const [searchQuery, setSearchQuery] = useState("");
   if (!isOpen) return null;
+
+  const taskPrimaryId = String(task?.id ?? task?._id ?? "").trim();
 
   // Combine founder + team members
   const allMembers = [
@@ -28,6 +40,7 @@ export default function TaskAssignmentModal({
       name: founderName,
       role: "Founder",
       status: "online",
+      avatar: founderAvatar || null,
     },
     ...teamMembers,
   ];
@@ -39,11 +52,16 @@ export default function TaskAssignmentModal({
       member.role.toLowerCase().includes(searchQuery.toLowerCase()),
   );
   const handleAssign = (member) => {
-    onAssign(task.id, member.id, member.name);
+    onAssign(
+      taskPrimaryId,
+      member.id,
+      member.name,
+      member.avatar || "",
+    );
     onClose();
   };
   const handleUnassign = () => {
-    onAssign(task.id, "", "");
+    onAssign(taskPrimaryId, "", "", "");
     onClose();
   };
   return (
@@ -106,7 +124,8 @@ export default function TaskAssignmentModal({
               </div>
             )}
             {filteredMembers.map((member) => {
-              const isAssigned = task.assignedTo === member.id;
+              const isAssigned =
+                assigneeIdOnTask(task) === String(member.id ?? "");
               return (
                 <div
                   key={member.id}

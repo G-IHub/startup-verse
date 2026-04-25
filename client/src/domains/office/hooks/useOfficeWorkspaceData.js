@@ -35,14 +35,16 @@ export function useOfficeWorkspaceData({ user }) {
 
   const [realtimeOnline, setRealtimeOnline] = useState(isRealtimeConnected());
 
+  const resolvedUserId = String(user?._id ?? user?.id ?? "");
+
   const loadInitial = useCallback(
     async ({ silent = false } = {}) => {
-      if (!startupId || !user?.id) {
+      if (!startupId || !resolvedUserId) {
         return;
       }
       await loadWorkspace(user, { silent });
     },
-    [startupId, user, loadWorkspace],
+    [startupId, resolvedUserId, user, loadWorkspace],
   );
 
   useEffect(() => {
@@ -50,9 +52,9 @@ export function useOfficeWorkspaceData({ user }) {
   }, [loadInitial]);
 
   useEffect(() => {
-    if (!startupId || !user?.id) return undefined;
+    if (!startupId || !resolvedUserId) return undefined;
     const stopHeartbeat = presenceApi.startPresenceHeartbeat(
-      user.id,
+      resolvedUserId,
       startupId,
       () => ({
         userName: user.name || "Team member",
@@ -67,10 +69,10 @@ export function useOfficeWorkspaceData({ user }) {
     return () => {
       stopHeartbeat?.();
     };
-  }, [startupId, user?.id, user?.name, user?.role]);
+  }, [startupId, resolvedUserId, user?.name, user?.role]);
 
   useEffect(() => {
-    if (!startupId || !user?.id) return undefined;
+    if (!startupId || !resolvedUserId) return undefined;
     let stopped = false;
     let fallbackInterval = null;
     let fallbackGraceTimeout = null;
@@ -114,7 +116,7 @@ export function useOfficeWorkspaceData({ user }) {
 
     const unsubscribePresence = subscribeToPresence(
       startupId,
-      user.id,
+      resolvedUserId,
       user.name || "",
       onPresenceRows,
     );
@@ -138,7 +140,7 @@ export function useOfficeWorkspaceData({ user }) {
       stopFallbackPolling();
       unsubscribePresence?.();
     };
-  }, [startupId, user?.id, user?.name]);
+  }, [startupId, resolvedUserId, user?.name]);
 
   useEffect(() => {
     if (!startupId) return undefined;
@@ -167,11 +169,11 @@ export function useOfficeWorkspaceData({ user }) {
   }, [startupId, patchAnnouncement]);
 
   useEffect(() => {
-    if (!startupId || !user?.id) return undefined;
+    if (!startupId || !resolvedUserId) return undefined;
     const pollContext = {
       role: user.role === "founder" ? "founder" : "team-member",
       founderId: startupId,
-      userId: user.id,
+      userId: resolvedUserId,
     };
     const unsubscribe = subscribeToTasks(
       startupId,
@@ -182,7 +184,7 @@ export function useOfficeWorkspaceData({ user }) {
       pollContext,
     );
     return () => unsubscribe?.();
-  }, [startupId, user?.id, user?.role, patchTask]);
+  }, [startupId, resolvedUserId, user?.role, patchTask]);
 
   const model = useMemo(
     () =>

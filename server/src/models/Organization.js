@@ -25,6 +25,8 @@ const organizationSchema = new mongoose.Schema(
       maxlength: [1000, "Website URL cannot exceed 1000 characters"]
     },
     createdBy: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true, index: true },
+    // Stores org-admin program configuration (organizationType, expectedCohorts, etc.)
+    settings: { type: mongoose.Schema.Types.Mixed, default: {} },
   },
   { timestamps: true },
 );

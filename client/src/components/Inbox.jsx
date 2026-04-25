@@ -35,7 +35,6 @@ import { Label } from "./ui/label";
 import * as inboxApi from "../utils/api/inboxApi";
 import { convertTalentToTeamMember } from "../utils/api/compensationApi";
 import CompensationSetupWizard from "./compensation/CompensationSetupWizard";
-import InboxDebugPanel from "./debug/InboxDebugPanel";
 import { getStartupId } from "../utils/startupId";
 import { getAccessToken } from "../app/session";
 
@@ -83,7 +82,7 @@ const hasNewActivity = (
   // Check if status was changed by the recipient (not initial pending status)
   // If status changed from pending and we haven't read it yet, show as NEW
   if (item.status !== "pending" && !lastReadAt) {
-    // Status was changed (accepted/rejected) and we haven't read it
+    // Status was changed (accepted/declined) and we haven't read it
     return hoursSinceActivity < 24; // Show as NEW if status change was recent
   }
 
@@ -126,6 +125,8 @@ export const countUnreadMessages = (messages, userId) => {
   ).length;
 };
 export default function Inbox({ user, onBack, initialTab = "received" }) {
+  // Handle both _id (MongoDB) and id fields
+  const userId = user?._id || user?.id;
   const [activeTab, setActiveTab] = useState(initialTab);
   const [receivedItems, setReceivedItems] = useState([]);
   const [sentItems, setSentItems] = useState([]);
@@ -146,8 +147,10 @@ export default function Inbox({ user, onBack, initialTab = "received" }) {
     message: "",
   });
   useEffect(() => {
-    loadInboxData();
-  }, [user]);
+    if (userId) {
+      loadInboxData();
+    }
+  }, [user, userId]);
 
   // Refresh data when initialTab changes (e.g., navigating from TeamMatching)
   useEffect(() => {
@@ -156,38 +159,43 @@ export default function Inbox({ user, onBack, initialTab = "received" }) {
     loadInboxData();
   }, [initialTab]);
   const loadInboxData = async () => {
+    if (!userId) {
+      console.error("❌ [Inbox] No userId available, skipping load");
+      setIsLoading(false);
+      return;
+    }
     setIsLoading(true);
     console.log(
       "🔄 [Inbox] Loading inbox data for user:",
-      user.id,
+      userId,
       "role:",
-      user.role,
+      user?.role,
     );
     try {
-      if (user.role === "talent") {
+      if (user?.role === "talent") {
         // Talent receives invitations from founders
-        const invitations = await inboxApi.getReceivedInvitations(user.id);
+        const invitations = await inboxApi.getReceivedInvitations(userId);
         setReceivedItems(invitations);
 
         // Talent sends interests to founders
-        const interests = await inboxApi.getSentInterests(user.id);
+        const interests = await inboxApi.getSentInterests(userId);
         setSentItems(interests);
         console.log("✅ [Inbox] Loaded talent inbox data:", {
           receivedInvitations: invitations.length,
           sentInterests: interests.length,
         });
-      } else if (user.role === "founder") {
+      } else if (user?.role === "founder") {
         // Founders receive interests from talent
         console.log(
           "🔍 [Inbox-Founder] Fetching received interests for:",
-          user.id,
+          userId,
         );
-        const interests = await inboxApi.getReceivedInterests(user.id);
+        const interests = await inboxApi.getReceivedInterests(userId);
         console.log("📥 [Inbox-Founder] Received interests:", interests);
         setReceivedItems(interests);
 
         // Founders send invitations to talent
-        const invitations = await inboxApi.getSentInvitations(user.id);
+        const invitations = await inboxApi.getSentInvitations(userId);
         console.log(
           "📤 [Inbox-Founder] Sent invitations (should only be to talent):",
           invitations,
@@ -211,16 +219,16 @@ export default function Inbox({ user, onBack, initialTab = "received" }) {
         // Founders also receive organization invitations
         console.log(
           "🔍 [Inbox-Founder] Fetching organization invitations for:",
-          user.id,
+          userId,
         );
-        const orgInvites = await inboxApi.getOrganizationInvitations(user.id);
+        const orgInvites = await inboxApi.getOrganizationInvitations(userId);
         console.log("📥 [Inbox-Founder] Organization invitations:", orgInvites);
         setOrgInvitations(orgInvites);
 
         // Load organization messages for founder
         try {
           const messagesResponse = await fetch(
-            `${API_BASE_URL}/messages/${user.id}`,
+            `${API_BASE_URL}/messages/${userId}`,
             {
               headers: {
                 Authorization: `Bearer ${getAccessToken()}`,
@@ -241,7 +249,7 @@ export default function Inbox({ user, onBack, initialTab = "received" }) {
 
         // Load founder cohorts for message composer
         try {
-          const cohortsKey = `founder:${user.id}:cohorts`;
+          const cohortsKey = `founder:${userId}:cohorts`;
           const cohortIds = JSON.parse(
             localStorage.getItem(cohortsKey) || "[]",
           );
@@ -273,8 +281,14 @@ export default function Inbox({ user, onBack, initialTab = "received" }) {
         });
       }
     } catch (error) {
-      console.error("❌ [Inbox] Error loading inbox data:", error);
-      toast.error("Failed to load inbox data");
+      console.error("❌ [Inbox] Error loading inbox data:", {
+        error: error.message,
+        stack: error.stack,
+        userId: userId,
+        role: user?.role,
+        timestamp: new Date().toISOString(),
+      });
+      toast.error(`Failed to load inbox data: ${error.message || "Unknown error"}`);
     } finally {
       setIsLoading(false);
     }
@@ -289,14 +303,14 @@ export default function Inbox({ user, onBack, initialTab = "received" }) {
     try {
       const responseText =
         message ||
-        (action === "reject"
+        (action === "decline"
           ? "Thank you for your interest, but we're moving forward with other candidates."
           : "");
       if (user.role === "founder") {
         // Founder responding to interest
         await inboxApi.updateInterestStatus(
           item.id,
-          action === "accept" ? "accepted" : "rejected",
+          action === "accept" ? "accepted" : "declined",
           responseText,
         );
       } else {
@@ -330,13 +344,13 @@ export default function Inbox({ user, onBack, initialTab = "received" }) {
       itemId: item.id,
       isInvitation: "talentId" in item,
       activeTab,
-      userRole: user.role,
+      userRole: user?.role,
     });
     try {
       const messageObj = {
         text: message,
         sender: user.name,
-        senderId: user.id,
+        senderId: userId,
         timestamp: new Date().toISOString(),
       };
 
@@ -359,7 +373,7 @@ export default function Inbox({ user, onBack, initialTab = "received" }) {
         // For invitations: check if we're viewing sent or received
         if (activeTab === "sent") {
           // Founder viewing sent invitation
-          const updated = await inboxApi.getSentInvitations(user.id);
+          const updated = await inboxApi.getSentInvitations(userId);
           const updatedItem = updated.find((i) => i.id === item.id);
           if (updatedItem) {
             setSelectedItem(updatedItem);
@@ -367,7 +381,7 @@ export default function Inbox({ user, onBack, initialTab = "received" }) {
           }
         } else {
           // Talent viewing received invitation
-          const updated = await inboxApi.getReceivedInvitations(user.id);
+          const updated = await inboxApi.getReceivedInvitations(userId);
           const updatedItem = updated.find((i) => i.id === item.id);
           if (updatedItem) {
             setSelectedItem(updatedItem);
@@ -378,7 +392,7 @@ export default function Inbox({ user, onBack, initialTab = "received" }) {
         // For interests: check if we're viewing sent or received
         if (activeTab === "sent") {
           // Talent viewing sent interest
-          const updated = await inboxApi.getSentInterests(user.id);
+          const updated = await inboxApi.getSentInterests(userId);
           const updatedItem = updated.find((i) => i.id === item.id);
           if (updatedItem) {
             setSelectedItem(updatedItem);
@@ -386,7 +400,7 @@ export default function Inbox({ user, onBack, initialTab = "received" }) {
           }
         } else {
           // Founder viewing received interest
-          const updated = await inboxApi.getReceivedInterests(user.id);
+          const updated = await inboxApi.getReceivedInterests(userId);
           const updatedItem = updated.find((i) => i.id === item.id);
           if (updatedItem) {
             setSelectedItem(updatedItem);
@@ -416,15 +430,15 @@ export default function Inbox({ user, onBack, initialTab = "received" }) {
     try {
       const responseText =
         message ||
-        (action === "reject"
+        (action === "decline"
           ? "Thank you for the invitation, but I'm not interested."
           : "");
-      if (user.role === "talent") {
+      if (user?.role === "talent") {
         // Talent responding to invitation
         console.log("📤 Calling updateInvitationStatus API...");
         await inboxApi.updateInvitationStatus(
           item.id,
-          action === "accept" ? "accepted" : "rejected",
+          action === "accept" ? "accepted" : "declined",
           responseText,
         );
         console.log("✅ API call successful");
@@ -459,7 +473,7 @@ export default function Inbox({ user, onBack, initialTab = "received" }) {
     try {
       await inboxApi.respondToOrganizationInvitation(
         item.id,
-        user.id,
+        userId,
         action === "accept",
       );
       toast.success(
@@ -507,9 +521,9 @@ export default function Inbox({ user, onBack, initialTab = "received" }) {
           body: JSON.stringify({
             cohortId: cohort.id,
             organizationId: cohort.organizationId,
-            founderId: user.id,
-            founderName: user.name,
-            startupName: user.companyName || user.name + "'s Startup",
+            founderId: userId,
+            founderName: user?.name || "Unknown",
+            startupName: user?.companyName || user?.name + "'s Startup" || "Startup",
             subject: orgMessageData.subject,
             message: orgMessageData.message,
           }),
@@ -540,7 +554,7 @@ export default function Inbox({ user, onBack, initialTab = "received" }) {
             Accepted
           </Badge>
         );
-      case "rejected":
+      case "declined":
         return (
           <Badge variant="destructive">
             <XCircle className="w-3 h-3 mr-1" />
@@ -652,17 +666,17 @@ export default function Inbox({ user, onBack, initialTab = "received" }) {
 
     // Combine received items and organization invitations/messages for founders
     const receivedOrgMessages =
-      user.role === "founder"
+      user?.role === "founder"
         ? orgMessages.filter(
             (msg) => msg.type === "received" || !msg.type || !msg.fromFounder,
           )
         : [];
     const allReceivedItems =
-      user.role === "founder"
+      user?.role === "founder"
         ? [...receivedItems, ...orgInvitations, ...receivedOrgMessages]
         : receivedItems;
     console.log("📊 [Inbox-RenderReceived] Displaying received items:", {
-      role: user.role,
+      role: user?.role,
       receivedCount: receivedItems.length,
       orgInvitationsCount: orgInvitations.length,
       orgMessagesCount: receivedOrgMessages.length,
@@ -778,7 +792,7 @@ export default function Inbox({ user, onBack, initialTab = "received" }) {
               orgInvite.respondedAt || orgInvite.sentAt || orgInvite.createdAt,
               orgInvite.sentAt || orgInvite.createdAt,
               orgInvite,
-              user.id,
+              userId,
             );
             return (
               <Card
@@ -872,7 +886,7 @@ export default function Inbox({ user, onBack, initialTab = "received" }) {
             item.lastActivityAt || item.sentAt || item.createdAt,
             item.sentAt || item.createdAt,
             item,
-            user.id,
+            userId,
           );
 
           // Get talent details for interests (when founder receives interest from talent)
@@ -903,7 +917,7 @@ export default function Inbox({ user, onBack, initialTab = "received" }) {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-start justify-between gap-2 mb-1">
                       <div className="flex items-center gap-2 flex-1">
-                        {user.role === "talent" ? (
+                        {user?.role === "talent" ? (
                           <UserPlus className="w-4 h-4 text-primary flex-shrink-0" />
                         ) : (
                           <Heart className="w-4 h-4 text-primary flex-shrink-0" />
@@ -1016,7 +1030,7 @@ export default function Inbox({ user, onBack, initialTab = "received" }) {
           <Send className="w-16 h-16 text-muted-foreground mb-4" />
           <h3 className="text-lg font-medium mb-2">No sent messages</h3>
           <p className="text-sm text-muted-foreground max-w-sm">
-            {user.role === "talent"
+            {user?.role === "talent"
               ? "Express interest in startups to connect with founders."
               : "Send invitations to talent to build your team."}
           </p>
@@ -1027,7 +1041,7 @@ export default function Inbox({ user, onBack, initialTab = "received" }) {
     // Sort messages by date - newest first
     const sortedItems = sortMessagesByDate(sentItems);
     console.log("📤 [Inbox-RenderSent] Displaying sent items:", {
-      role: user.role,
+      role: user?.role,
       sentCount: sentItems.length,
       items: sortedItems.map((item) => ({
         id: item.id.slice(0, 8),
@@ -1048,7 +1062,7 @@ export default function Inbox({ user, onBack, initialTab = "received" }) {
             item.lastActivityAt || item.sentAt || item.createdAt,
             item.sentAt || item.createdAt,
             item,
-            user.id,
+            userId,
           );
           return (
             <Card
@@ -1241,7 +1255,7 @@ export default function Inbox({ user, onBack, initialTab = "received" }) {
                     </Button>
                     <Button
                       onClick={() =>
-                        handleRespondToOrgInvitation(orgInvite, "reject")
+                        handleRespondToOrgInvitation(orgInvite, "decline")
                       }
                       className="flex-1"
                       variant="outline"
@@ -1349,7 +1363,7 @@ export default function Inbox({ user, onBack, initialTab = "received" }) {
             {selectedItem.messages && selectedItem.messages.length > 0 && (
               <div className="space-y-3">
                 {selectedItem.messages.map((msg, idx) => {
-                  const isCurrentUser = msg.senderId === user.id;
+                  const isCurrentUser = msg.senderId === userId;
                   return (
                     <div
                       key={idx}
@@ -1400,7 +1414,7 @@ export default function Inbox({ user, onBack, initialTab = "received" }) {
                   rows={4}
                   disabled={isSending}
                 />
-                {user.role === "talent" ? (
+                {user?.role === "talent" ? (
                   <div className="space-y-2">
                     <Button
                       onClick={() => handleSendMessage(selectedItem)}
@@ -1439,7 +1453,7 @@ export default function Inbox({ user, onBack, initialTab = "received" }) {
                         </Button>
                         <Button
                           onClick={() =>
-                            handleRespondToInvitation(selectedItem, "reject")
+                            handleRespondToInvitation(selectedItem, "decline")
                           }
                           className="flex-1"
                           variant="outline"
@@ -1471,7 +1485,7 @@ export default function Inbox({ user, onBack, initialTab = "received" }) {
                       Accept & Send
                     </Button>
                     <Button
-                      onClick={() => handleRespond(selectedItem, "reject")}
+                      onClick={() => handleRespond(selectedItem, "decline")}
                       className="flex-1"
                       variant="outline"
                       disabled={isSending}
@@ -1509,7 +1523,7 @@ export default function Inbox({ user, onBack, initialTab = "received" }) {
                   </p>
                 )}
                 {selectedItem.status === "accepted" &&
-                  user.role === "founder" &&
+                  user?.role === "founder" &&
                   activeTab === "received" &&
                   !isInvitation(selectedItem) && (
                     <div className="mt-3 pt-3 border-t border-green-200 dark:border-green-800">
@@ -1574,7 +1588,7 @@ export default function Inbox({ user, onBack, initialTab = "received" }) {
           }}
           teamMemberName={onboardingTalent.talentName}
           teamMemberId={onboardingTalent.talentId}
-          founderId={user.id}
+          founderId={userId}
           startupId={getStartupId(user)}
           onComplete={async (compensationConfig) => {
             try {
@@ -1586,7 +1600,7 @@ export default function Inbox({ user, onBack, initialTab = "received" }) {
               // Convert talent to team member (includes role conversion and compensation contract)
               const result = await convertTalentToTeamMember(
                 onboardingTalent.talentId,
-                user.id,
+                userId,
                 getStartupId(user),
                 compensationConfig,
               );
@@ -1633,7 +1647,7 @@ export default function Inbox({ user, onBack, initialTab = "received" }) {
           </p>
         </div>
       </div>
-      {user.role === "founder" && founderCohorts.length > 0 && (
+      {user?.role === "founder" && founderCohorts.length > 0 && (
         <Card className="mb-4">
           <CardContent className="p-3 flex items-center justify-between">
             <div>
@@ -1772,11 +1786,6 @@ export default function Inbox({ user, onBack, initialTab = "received" }) {
         <TabsContent value="received">{renderReceivedTab()}</TabsContent>
         <TabsContent value="sent">{renderSentTab()}</TabsContent>
       </Tabs>
-      <InboxDebugPanel
-        userId={user.id}
-        userEmail={user.email}
-        role={user.role}
-      />
     </div>
   );
 }

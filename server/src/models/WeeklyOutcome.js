@@ -44,6 +44,24 @@ const weeklyOutcomeSchema = new mongoose.Schema(
       min: [0, "Score cannot be less than 0"],
       max: [100, "Score cannot exceed 100"],
     },
+    weekNumber: {
+      type: Number,
+      default: undefined,
+    },
+    completionPercentage: {
+      type: Number,
+      default: 0,
+      min: [0, "completionPercentage cannot be less than 0"],
+      max: [100, "completionPercentage cannot exceed 100"],
+    },
+    completedAt: {
+      type: Date,
+      default: null,
+    },
+    completionData: {
+      type: mongoose.Schema.Types.Mixed,
+      default: undefined,
+    },
   },
   { timestamps: true },
 );

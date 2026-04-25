@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Dialog,
   DialogContent,
@@ -8,7 +8,7 @@ import {
 } from "../ui/dialog";
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
-import { PlayCircle, ExternalLink, BookOpen, Video } from "lucide-react";
+import { PlayCircle, ExternalLink, BookOpen, Video, CheckCircle2, Loader2 } from "lucide-react";
 import {
   Card,
   CardContent,
@@ -16,6 +16,7 @@ import {
   CardHeader,
   CardTitle,
 } from "../ui/card";
+import { useLearningStore } from "../../state/useLearningStore";
 
 // Curated video resources for each stage
 const stageVideos = {
@@ -215,15 +216,46 @@ export default function StageLearningModal({
   onClose,
   stageName,
   stageKey,
+  founderId,
 }) {
   const [selectedVideo, setSelectedVideo] = useState(null);
-  const videos = stageVideos[stageKey] || [];
+
+  const loadResources = useLearningStore((s) => s.loadResources);
+  const loadProgress = useLearningStore((s) => s.loadProgress);
+  const trackWatch = useLearningStore((s) => s.trackWatch);
+  const isWatched = useLearningStore((s) => s.isWatched);
+  const storeResources = useLearningStore((s) => s.resources);
+  const loadingResources = useLearningStore((s) => s.loadingResources);
+
+  const stageIdNum = Number(stageKey) || 1;
+  const fallbackVideos = (stageVideos[stageIdNum] || []).map((v) => ({
+    ...v,
+    _id: v.id,
+    youtubeId: v.youtubeId,
+  }));
+
+  const backendVideos = storeResources.filter(
+    (r) => r.stageId === stageIdNum || String(r.stageId) === String(stageKey),
+  );
+  const videos = backendVideos.length > 0 ? backendVideos : fallbackVideos;
+
+  useEffect(() => {
+    if (!isOpen || !founderId) return;
+    loadResources(founderId, stageIdNum);
+    loadProgress(founderId);
+  }, [isOpen, founderId, stageIdNum, loadResources, loadProgress]);
+
   const handleVideoSelect = (video) => {
     setSelectedVideo(video);
+    if (founderId && video._id) {
+      trackWatch(founderId, video._id);
+    }
   };
+
   const handleBackToList = () => {
     setSelectedVideo(null);
   };
+
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="h-[85vh] p-0 flex flex-col">
@@ -307,7 +339,12 @@ export default function StageLearningModal({
             </div>
           ) : (
             <div className="p-4 space-y-3 w-full pb-16">
-              {videos.length === 0 ? (
+              {loadingResources ? (
+                <div className="flex items-center justify-center py-8 text-muted-foreground">
+                  <Loader2 className="w-6 h-6 animate-spin mr-2" />
+                  <span className="text-sm">Loading resources…</span>
+                </div>
+              ) : videos.length === 0 ? (
                 <div className="text-center py-8 text-muted-foreground">
                   <BookOpen className="w-12 h-12 mx-auto mb-3 opacity-50" />
                   <p className="text-sm">
@@ -320,63 +357,77 @@ export default function StageLearningModal({
                     Watch these curated videos to learn best practices from
                     successful founders and top startup programs.
                   </p>
-                  {videos.map((video) => (
-                    <Card
-                      key={video.id}
-                      className="cursor-pointer hover:border-primary/50 transition-colors w-full"
-                      onClick={() => handleVideoSelect(video)}
-                    >
-                      <CardContent className="p-3">
-                        <div className="flex gap-3 w-full">
-                          <div className="relative w-32 h-20 flex-shrink-0 bg-gradient-to-br from-primary/20 to-primary/10 rounded overflow-hidden group">
-                            <img
-                              src={`https://img.youtube.com/vi/${video.youtubeId}/mqdefault.jpg`}
-                              alt={video.title}
-                              className="w-full h-full object-cover"
-                              onError={(e) => {
-                                // Fallback for videos without thumbnails
-                                const target = e.target;
-                                target.style.display = "none";
-                              }}
-                            />
-                            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                              <PlayCircle className="w-10 h-10 text-primary opacity-70" />
+                  {videos.map((video) => {
+                    const videoId = String(video._id || video.id || "");
+                    const watched = videoId ? isWatched(videoId) : false;
+                    return (
+                      <Card
+                        key={videoId || video.youtubeId}
+                        className="cursor-pointer hover:border-primary/50 transition-colors w-full"
+                        onClick={() => handleVideoSelect(video)}
+                      >
+                        <CardContent className="p-3">
+                          <div className="flex gap-3 w-full">
+                            <div className="relative w-32 h-20 flex-shrink-0 bg-gradient-to-br from-primary/20 to-primary/10 rounded overflow-hidden group">
+                              <img
+                                src={`https://img.youtube.com/vi/${video.youtubeId}/mqdefault.jpg`}
+                                alt={video.title}
+                                className="w-full h-full object-cover"
+                                onError={(e) => {
+                                  const target = e.target;
+                                  target.style.display = "none";
+                                }}
+                              />
+                              <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                                <PlayCircle className="w-10 h-10 text-primary opacity-70" />
+                              </div>
+                              <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors" />
+                              <div className="absolute bottom-1 right-1 bg-black/80 text-white text-[9px] px-1 py-0.5 rounded">
+                                {video.duration}
+                              </div>
                             </div>
-                            <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors" />
-                            <div className="absolute bottom-1 right-1 bg-black/80 text-white text-[9px] px-1 py-0.5 rounded">
-                              {video.duration}
-                            </div>
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-start justify-between gap-2 mb-1">
-                              <h4 className="text-xs font-medium line-clamp-2 leading-snug">
-                                {video.title}
-                              </h4>
-                              {video.recommended && (
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-start justify-between gap-2 mb-1">
+                                <h4 className="text-xs font-medium line-clamp-2 leading-snug">
+                                  {video.title}
+                                </h4>
+                                <div className="flex flex-col gap-0.5 flex-shrink-0 items-end">
+                                  {video.recommended && (
+                                    <Badge
+                                      variant="default"
+                                      className="text-[9px] h-4"
+                                    >
+                                      Recommended
+                                    </Badge>
+                                  )}
+                                  {watched && (
+                                    <Badge
+                                      variant="secondary"
+                                      className="text-[9px] h-4 flex items-center gap-0.5 bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 border-green-200 dark:border-green-800"
+                                    >
+                                      <CheckCircle2 className="w-2.5 h-2.5" />
+                                      Watched
+                                    </Badge>
+                                  )}
+                                </div>
+                              </div>
+                              <p className="text-[10px] text-muted-foreground line-clamp-2 mb-1.5">
+                                {video.description}
+                              </p>
+                              <div className="flex items-center gap-2">
                                 <Badge
-                                  variant="default"
-                                  className="text-[9px] h-4 flex-shrink-0"
+                                  variant="secondary"
+                                  className="text-[9px] h-4"
                                 >
-                                  Recommended
+                                  {video.source}
                                 </Badge>
-                              )}
-                            </div>
-                            <p className="text-[10px] text-muted-foreground line-clamp-2 mb-1.5">
-                              {video.description}
-                            </p>
-                            <div className="flex items-center gap-2">
-                              <Badge
-                                variant="secondary"
-                                className="text-[9px] h-4"
-                              >
-                                {video.source}
-                              </Badge>
+                              </div>
                             </div>
                           </div>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ))}
+                        </CardContent>
+                      </Card>
+                    );
+                  })}
                 </>
               )}
             </div>

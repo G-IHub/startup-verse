@@ -145,7 +145,7 @@ export function mapOfficeWorkspaceModel({
   const memberById = new Map(normalizedTeamMembers.map((member) => [member.id, member]));
   const presenceById = new Map(presence.map((member) => [member.id, member]));
 
-  const userId = String(user?.id || "");
+  const userId = String(user?._id ?? user?.id ?? "");
   const ensureCurrentUser = userId
     ? {
         id: userId,
@@ -204,6 +204,10 @@ export function mapOfficeWorkspaceModel({
     return task.assignedTo === userId;
   });
 
+  const teamTasks = user?.role === "founder"
+    ? tasks.filter((task) => task.assignedTo && task.assignedTo !== userId)
+    : [];
+
   const agenda = mergeByIdInternal(
     (agendaRows || []).map(normalizeAgendaItem).filter(Boolean),
     (row) => row.id,
@@ -220,6 +224,7 @@ export function mapOfficeWorkspaceModel({
     announcements,
     tasks,
     myTasks,
+    teamTasks,
     agenda,
     teamEnergy: {
       onlineCount,

@@ -1,5 +1,4 @@
 import { create } from "zustand";
-import { apiGet } from "../utils/apiClient.js";
 import { useWeeklyLoopStore } from "./useWeeklyLoopStore.js";
 import { useExecutionScoreStore } from "./useExecutionScoreStore.js";
 import { useTeamStore } from "./useTeamStore.js";
@@ -7,6 +6,7 @@ import { useDeliverablesStore } from "./useDeliverablesStore.js";
 import { useMembershipsStore } from "./useMembershipsStore.js";
 import { useJourneyStore } from "./useJourneyStore.js";
 import { useNotificationsStore } from "./useNotificationsStore.js";
+import { useStageTaskStore } from "./useStageTaskStore.js";
 
 /**
  * Home orchestrator store.
@@ -40,7 +40,7 @@ export const useHomeStore = create((set, get) => ({
       set({ loading: true, error: null, userId, startupId: startupId || userId });
     }
 
-    useJourneyStore.getState().hydrate(userId);
+    await useJourneyStore.getState().hydrate(userId);
 
     try {
       const memberships = await useMembershipsStore.getState().load(userId);
@@ -51,7 +51,10 @@ export const useHomeStore = create((set, get) => ({
         : [];
 
       await Promise.allSettled([
-        useWeeklyLoopStore.getState().load(userId),
+        useWeeklyLoopStore.getState().load(userId, {
+          silent: hadPrevious,
+          bustCache: hadPrevious,
+        }),
         useExecutionScoreStore.getState().load(userId),
         useTeamStore.getState().load({
           founderId: userId,
@@ -60,16 +63,8 @@ export const useHomeStore = create((set, get) => ({
         }),
         useDeliverablesStore.getState().load(userId),
         useNotificationsStore.getState().load(userId),
+        useStageTaskStore.getState().load(userId),
       ]);
-
-      try {
-        const startup = await apiGet(`/founders/${userId}/startup`);
-        if (startup?.data?.journey) {
-          useJourneyStore.getState().mergeFromStartup(startup, userId);
-        }
-      } catch {
-        // startup may not exist yet; journey stays local-only
-      }
 
       const weeklyScore = useWeeklyLoopStore.getState().executionScore;
       if (weeklyScore) {

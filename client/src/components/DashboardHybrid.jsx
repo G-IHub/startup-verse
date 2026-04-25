@@ -5,11 +5,8 @@
 import React, { useState, lazy, Suspense, useCallback } from "react";
 import AppLayoutHybrid from "./layout/AppLayoutHybrid";
 import AdaptiveVirtualOffice from "./office/AdaptiveVirtualOffice";
-import { featureFlags } from "../config/featureFlags";
-
 // ⚡ LAZY LOAD HEAVY COMPONENTS - Only load when navigating to them
 const FounderDashboard = lazy(() => import("./dashboards/FounderDashboard"));
-const FounderHomeV2 = lazy(() => import("./founder/FounderHomeV2"));
 const TeamMemberDashboard = lazy(
   () => import("./dashboards/TeamMemberDashboard"),
 );
@@ -132,21 +129,13 @@ export default function DashboardHybrid({ user, onLogout, onUpdateUser }) {
           case "founder":
             return (
               <Suspense fallback={<PageLoadingFallback />}>
-                {featureFlags.redesignedFounderHome ? (
-                  <FounderHomeV2
-                    user={user}
-                    onNavigate={handleNavigate}
-                    onVirtualOfficeViewChange={setVirtualOfficeView}
-                  />
-                ) : (
-                  <FounderDashboard
-                    user={user}
-                    onLogout={onLogout}
-                    onUpdateUser={onUpdateUser}
-                    onNavigate={handleNavigate}
-                    onVirtualOfficeViewChange={setVirtualOfficeView}
-                  />
-                )}
+                <FounderDashboard
+                  user={user}
+                  onLogout={onLogout}
+                  onUpdateUser={onUpdateUser}
+                  onNavigate={handleNavigate}
+                  onVirtualOfficeViewChange={setVirtualOfficeView}
+                />
               </Suspense>
             );
           case "team-member":
@@ -329,7 +318,10 @@ export default function DashboardHybrid({ user, onLogout, onUpdateUser }) {
       case "analytics":
         return (
           <Suspense fallback={<PageLoadingFallback />}>
-            <AnalyticsDashboard founderId={user.id} founderName={user.name} />
+            <AnalyticsDashboard
+              founderId={user._id || user.id}
+              founderName={user?.name || "Founder"}
+            />
           </Suspense>
         );
 

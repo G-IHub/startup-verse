@@ -1,5 +1,5 @@
 import mongoose from "mongoose";
-import { TASK_STATUSES } from "../utils/enums.js";
+import { TASK_STATUSES, TASK_PRIORITIES } from "../utils/enums.js";
 
 const taskSchema = new mongoose.Schema(
   {
@@ -27,7 +27,18 @@ const taskSchema = new mongoose.Schema(
       index: true 
     },
     assignedTo: { type: mongoose.Schema.Types.ObjectId, ref: "User", index: true },
+    assignedToName: { type: String, default: "", trim: true, maxlength: 200 },
+    assignedToAvatar: { type: String, default: "", trim: true, maxlength: 2000 },
     milestoneId: { type: mongoose.Schema.Types.ObjectId, ref: "Milestone", index: true },
+    priority: {
+      type: String,
+      enum: {
+        values: TASK_PRIORITIES,
+        message: "{VALUE} is not a valid task priority",
+      },
+      default: "medium",
+      index: true,
+    },
     comments: { type: [mongoose.Schema.Types.Mixed], default: [] },
     incentive: { 
       type: String, 

@@ -1,4 +1,4 @@
-import { request } from "../backendClient";
+import { request, API_BASE_URL } from "../backendClient";
 
 // Pagination types
 
@@ -39,7 +39,7 @@ export async function getOrganizationInvitations(founderId) {
   );
   console.log(
     "🔍 [InboxAPI] URL:",
-    `${BASE_URL}/invitations/founder/${founderId}`,
+    `${API_BASE_URL}/invitations/founder/${founderId}`,
   );
 
   const result = await apiRequest(`/invitations/founder/${founderId}`);

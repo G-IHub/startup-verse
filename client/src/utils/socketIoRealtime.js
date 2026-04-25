@@ -601,6 +601,32 @@ export function subscribeToStartupWins(startupId, onUpdate) {
 }
 
 // ========================================
+// POLLS — poll:created / poll:updated
+// ========================================
+
+export function subscribeToPolls(startupId, onUpdate) {
+  const socket = SocketEngine.getSocket();
+  const roomId = startupSocketRoom(startupId);
+
+  const onCreated = (poll) => {
+    if (poll?.id) onUpdate({ action: "created", poll });
+  };
+  const onUpdated = (poll) => {
+    if (poll?.id) onUpdate({ action: "updated", poll });
+  };
+
+  joinRoom(roomId);
+  socket.on("poll:created", onCreated);
+  socket.on("poll:updated", onUpdated);
+
+  return () => {
+    socket.off("poll:created", onCreated);
+    socket.off("poll:updated", onUpdated);
+    leaveRoom(roomId);
+  };
+}
+
+// ========================================
 // PRESENCE — presence:updated / presence:removed
 // ========================================
 

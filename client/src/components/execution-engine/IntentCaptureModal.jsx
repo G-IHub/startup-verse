@@ -36,6 +36,7 @@ export default function IntentCaptureModal({
   onClose,
   stageName,
   weekNumber,
+  onParseIntent,
   onConfirmIntent,
 }) {
   const [step, setStep] = useState("input");
@@ -57,28 +58,39 @@ export default function IntentCaptureModal({
     }
   }, [isOpen]);
   if (!isOpen) return null;
-  const handleAnalyzeIntent = () => {
+  const handleAnalyzeIntent = async () => {
     if (!userInput.trim()) return;
     setIsAnalyzing(true);
-
-    // Simulate AI processing delay for better UX
-    setTimeout(() => {
+    try {
+      const parsed =
+        typeof onParseIntent === "function"
+          ? await onParseIntent(userInput.trim())
+          : parseFounderIntent(userInput.trim());
+      setParsedIntent(parsed);
+      setCustomTitle(parsed.suggestedTitle);
+      setCustomDescription(parsed.suggestedDescription);
+      setStep("review");
+    } catch {
       const parsed = parseFounderIntent(userInput.trim());
       setParsedIntent(parsed);
       setCustomTitle(parsed.suggestedTitle);
       setCustomDescription(parsed.suggestedDescription);
-      setIsAnalyzing(false);
       setStep("review");
-    }, 800);
+    } finally {
+      setIsAnalyzing(false);
+    }
   };
-  const handleConfirm = () => {
+  const handleConfirm = async () => {
     if (!parsedIntent) return;
-    onConfirmIntent(
-      parsedIntent,
-      isEditing ? customTitle : undefined,
-      isEditing ? customDescription : undefined,
-    );
-    onClose();
+    try {
+      await onConfirmIntent(
+        parsedIntent,
+        isEditing ? customTitle : undefined,
+        isEditing ? customDescription : undefined,
+      );
+    } catch {
+      /* parent toasts; modal stays open unless parent closed on success */
+    }
   };
   const handleUseExample = (example) => {
     setUserInput(example);

@@ -43,14 +43,16 @@ export default function OutcomeSelectionModal({
     setSelectedTemplateId(templateId);
     setStep("review");
   };
-  const handleConfirmOutcome = () => {
-    if (selectedTemplateId) {
-      onSelectOutcome(
+  const handleConfirmOutcome = async () => {
+    if (!selectedTemplateId) return;
+    try {
+      await onSelectOutcome(
         selectedTemplateId,
         customMode ? customTitle : undefined,
         customMode ? customDescription : undefined,
       );
-      onClose();
+    } catch {
+      /* parent toasts and may re-open modal */
     }
   };
   const handleCustomOutcome = () => {
@@ -88,9 +90,10 @@ export default function OutcomeSelectionModal({
           {step === "select" && (
             <>
               {onOpenIntentCapture && (
-                <div
+                <button
+                  type="button"
+                  aria-label="Describe in Your Own Words"
                   onClick={() => {
-                    onClose();
                     onOpenIntentCapture();
                   }}
                   className="p-3 border-2 border-primary rounded-lg bg-gradient-to-r from-primary/10 to-purple-50 dark:from-primary/20 dark:to-purple-950/20 cursor-pointer hover:shadow-lg transition-all group"
@@ -120,7 +123,7 @@ export default function OutcomeSelectionModal({
                       </div>
                     </div>
                   </div>
-                </div>
+                </button>
               )}
               <div className="relative">
                 <div className="absolute inset-0 flex items-center">
@@ -356,11 +359,16 @@ export default function OutcomeSelectionModal({
                   Back to Templates
                 </Button>
                 <Button
-                  onClick={() => {
-                    // For custom outcomes, we'll need to handle milestone creation differently
-                    // For now, just set a placeholder
-                    onSelectOutcome("custom", customTitle, customDescription);
-                    onClose();
+                  onClick={async () => {
+                    try {
+                      await onSelectOutcome(
+                        "custom",
+                        customTitle,
+                        customDescription,
+                      );
+                    } catch {
+                      /* parent toasts */
+                    }
                   }}
                   disabled={!customTitle.trim() || !customDescription.trim()}
                   className="flex-1 h-7 text-[10px]"

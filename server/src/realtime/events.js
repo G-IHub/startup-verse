@@ -7,4 +7,6 @@ export const SOCKET_EVENTS = Object.freeze({
   TASK_UPDATED: "task:updated",
   ACTIVITY_CREATED: "activity:created",
   WIN_CREATED: "win:created",
+  POLL_CREATED: "poll:created",
+  POLL_UPDATED: "poll:updated",
 });

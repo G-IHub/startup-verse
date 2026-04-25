@@ -1,7 +1,7 @@
 /**
  * Stage Roadmap Modal - Shows all 6 stages with detailed information
  */
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Dialog,
   DialogContent,
@@ -12,14 +12,40 @@ import {
 import { Badge } from "../ui/badge";
 import { Check, Lock, ChevronDown, ChevronUp } from "lucide-react";
 import { JOURNEY_STAGES } from "../../utils/journeyProgress";
+import { apiGet } from "../../utils/apiClient";
 export default function StageRoadmapModal({
   isOpen,
   onClose,
   journeyProgress,
   currentStageId,
+  founderId,
 }) {
-  // Track which stages are expanded
   const [expandedStages, setExpandedStages] = useState(new Set());
+  const [stageCompletions, setStageCompletions] = useState([]);
+
+  useEffect(() => {
+    if (!isOpen || !founderId) return;
+    apiGet(`/founders/${founderId}/stage-completions`)
+      .then((data) => {
+        if (Array.isArray(data?.stageCompletions)) {
+          setStageCompletions(data.stageCompletions);
+        }
+      })
+      .catch(() => {});
+  }, [isOpen, founderId]);
+
+  const getCompletionRecord = (stageId) =>
+    stageCompletions.find((c) => c.stageId === stageId) || null;
+
+  const formatDate = (iso) => {
+    if (!iso) return "";
+    try {
+      return new Date(iso).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
+    } catch {
+      return "";
+    }
+  };
+
   const toggleStage = (stageId) => {
     const newExpanded = new Set(expandedStages);
     if (newExpanded.has(stageId)) {
@@ -132,11 +158,33 @@ export default function StageRoadmapModal({
                 </div>
                 {!isLocked && isExpanded && (
                   <div className="px-3 pb-3 pt-0 space-y-2.5 border-t border-border/50 mt-1">
-                    <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground pt-2">
+                    <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground pt-2 flex-wrap">
                       <span className="font-medium">
                         {"⏱️ Estimated: "}
                         {stage.estimatedDuration}
                       </span>
+                      {(() => {
+                        const rec = getCompletionRecord(stage.id);
+                        if (!rec) return null;
+                        const dateStr = formatDate(rec.completedAt);
+                        const wasSkipped = rec.method === "skipped";
+                        return (
+                          <span className="flex items-center gap-1 ml-auto">
+                            {dateStr && (
+                              <span className="text-[9px] text-muted-foreground">{dateStr}</span>
+                            )}
+                            {wasSkipped ? (
+                              <Badge variant="outline" className="text-[8px] px-1 py-0 h-3.5 border-amber-400 text-amber-600 dark:text-amber-400">
+                                skipped
+                              </Badge>
+                            ) : (
+                              <Badge variant="outline" className="text-[8px] px-1 py-0 h-3.5 border-green-500 text-green-600 dark:text-green-400">
+                                completed
+                              </Badge>
+                            )}
+                          </span>
+                        );
+                      })()}
                     </div>
                     <div className="space-y-1.5">
                       <h4 className="text-[9px] font-semibold text-muted-foreground uppercase tracking-wide">
