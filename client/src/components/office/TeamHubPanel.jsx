@@ -362,7 +362,7 @@ export function TeamHubPanel({
           ? "h-[72vh] w-full office-panel office-panel-shell office-motion-soft flex flex-col"
           : "fixed top-0 right-0 h-screen office-panel office-panel-shell office-motion-soft z-[70] flex flex-col rounded-none md:rounded-l-xl"
       }
-      style={embedded ? {} : { width: "50vw", minWidth: 480 }}
+      style={embedded ? {} : { width: "50vw", minWidth: 480, maxWidth: 760 }}
     >
       {/* ── Header ── */}
       <div className="flex-shrink-0 bg-white" style={{ borderBottom: "1px solid #e9eef6", position: "relative" }}>

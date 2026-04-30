@@ -11,6 +11,7 @@ import {
   Inbox,
   BarChart3,
   X,
+  MessageCircle,
 } from "lucide-react";
 
 export default function VerticalSidebar({
@@ -22,6 +23,7 @@ export default function VerticalSidebar({
   unreadCount = 0,
   notificationCount = 0,
   talentDashboardMode = "overview",
+  hasSentInterest = false,
   isOpen = false,
   onClose,
 }) {
@@ -44,15 +46,36 @@ export default function VerticalSidebar({
       roles: ["founder", "team-member", "team"],
     },
     {
-      id: "team",
+      id: user.role === "talent" ? "browse" : "browse",
       icon: Users,
-      label: "Team",
-      page: user.role === "talent" ? "dashboard" : "startup-office",
+      label: user.role === "talent" ? "Browse" : "Browse",
+      page: user.role === "talent" ? "team-matching" : "startup-office",
       view: user.role === "talent" ? undefined : "matching",
-      options: user.role === "talent" ? { mode: "opportunities" } : undefined,
       badge: null,
       roles: ["founder", "talent"],
     },
+    // Chat icon — only for talents who have sent at least one interest
+    ...(user.role === "talent" && hasSentInterest
+      ? [{
+          id: "talent-chat",
+          icon: MessageCircle,
+          label: "Chat",
+          page: "talent-chat",
+          badge: null,
+          roles: ["talent"],
+        }]
+      : []),
+    // Chat icon for founders and team members
+    ...(user.role === "founder" || user.role === "team-member" || user.role === "team"
+      ? [{
+          id: "founder-chat",
+          icon: MessageCircle,
+          label: "Chat",
+          page: "founder-chat",
+          badge: null,
+          roles: ["founder", "team-member", "team"],
+        }]
+      : []),
   ];
 
   const primaryNavItems = allNavItems.filter((item) => item.roles.includes(user.role));
@@ -89,11 +112,11 @@ export default function VerticalSidebar({
   );
 
   const isActive = (item) => {
-    if (user.role === "talent" && item.id === "team") {
-      return currentPage === "dashboard" && talentDashboardMode === "opportunities";
+    if (user.role === "talent" && item.id === "browse") {
+      return currentPage === "team-matching";
     }
     if (user.role === "talent" && item.id === "dashboard") {
-      return currentPage === "dashboard" && talentDashboardMode !== "opportunities";
+      return currentPage === "dashboard";
     }
     if (item.page && item.view) {
       return currentPage === item.page && virtualOfficeView === item.view;
@@ -169,7 +192,7 @@ export default function VerticalSidebar({
       ) : null}
       <aside
         className={[
-          "fixed left-0 top-0 z-50 flex h-screen w-24 flex-col border-r border-border/60 bg-background/95 backdrop-blur",
+          "fixed left-0 top-0 z-50 flex h-screen w-24 flex-col bg-background/95 backdrop-blur",
           "transition-transform duration-300 ease-out md:static",
           isOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0",
         ].join(" ")}

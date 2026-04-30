@@ -73,6 +73,24 @@ import {
   UserPlus,
   Edit,
 } from "lucide-react";
+function normalizeTalentProfile(profile) {
+  if (!profile || typeof profile !== "object") return null;
+  const toArr = (v) => (Array.isArray(v) ? v : []);
+  return {
+    ...profile,
+    id: String(profile._id || profile.id || ""),
+    interests: toArr(profile.interests),
+    skills: toArr(profile.skills),
+    industryPreferences: toArr(profile.industryPreferences),
+    preferredRoles: toArr(profile.preferredRoles),
+    workExperiences: toArr(profile.workExperiences),
+    educationList: toArr(profile.educationList),
+    certifications: toArr(profile.certifications),
+    portfolioItems: toArr(profile.portfolioItems),
+    portfolioLinks: toArr(profile.portfolioLinks),
+  };
+}
+
 export default function TeamMatching({ user, onNavigate }) {
   const [searchQuery, setSearchQuery] = useState("");
   const [isPostIdeaOpen, setIsPostIdeaOpen] = useState(false);
@@ -123,8 +141,8 @@ export default function TeamMatching({ user, onNavigate }) {
 
   // Load data from localStorage on mount
   React.useEffect(() => {
+    loadStartupIdeas();
     if (user.role === "founder") {
-      loadStartupIdeas();
       loadPendingOnboarding();
     }
     loadTalentProfiles();
@@ -227,15 +245,17 @@ export default function TeamMatching({ user, onNavigate }) {
       cachedProfiles.length,
     );
 
+    const normalizedCached = cachedProfiles.map(normalizeTalentProfile).filter(Boolean);
+
     // If user is founder, sort by match score
     if (user.role === "founder") {
       const founderProfiles = JSON.parse(
         localStorage.getItem("startupverse_founder_profiles") || "[]",
       );
-      const myProfile = founderProfiles.find((p) => p.founderId === user.id);
+      const myProfile = founderProfiles.find((p) => p.founderId === String(user._id ?? user.id ?? ""));
       if (myProfile) {
         // Calculate match scores and sort
-        const scoredProfiles = cachedProfiles.map((talent) => ({
+        const scoredProfiles = normalizedCached.map((talent) => ({
           ...talent,
           matchScore: calculateTalentMatchScore(talent, myProfile),
         }));
@@ -247,10 +267,10 @@ export default function TeamMatching({ user, onNavigate }) {
           "⚠️ [TeamMatching] No founder profile found for user:",
           user.id,
         );
-        setAvailableTalent(cachedProfiles);
+        setAvailableTalent(normalizedCached);
       }
     } else {
-      setAvailableTalent(cachedProfiles);
+      setAvailableTalent(normalizedCached);
     }
 
     // **NEW: Fetch fresh data from backend**
@@ -266,17 +286,20 @@ export default function TeamMatching({ user, onNavigate }) {
       .then((res) => res.json())
       .then((data) => {
         console.log("✅ [TeamMatching] Backend talent response:", data);
-        if (data.success && data.profiles) {
+        const rawProfiles = data.data || data.profiles || [];
+        if (data.success && Array.isArray(rawProfiles) && rawProfiles.length > 0) {
           console.log(
             "📊 [TeamMatching] Received",
-            data.profiles.length,
+            rawProfiles.length,
             "profiles from backend",
           );
+
+          const normalized = rawProfiles.map(normalizeTalentProfile).filter(Boolean);
 
           // Save to localStorage for caching
           localStorage.setItem(
             "startupverse_talent_profiles",
-            JSON.stringify(data.profiles),
+            JSON.stringify(normalized),
           );
 
           // Sort and display
@@ -288,17 +311,17 @@ export default function TeamMatching({ user, onNavigate }) {
               (p) => p.founderId === user.id,
             );
             if (myProfile) {
-              const scoredProfiles = data.profiles.map((talent) => ({
+              const scoredProfiles = normalized.map((talent) => ({
                 ...talent,
                 matchScore: calculateTalentMatchScore(talent, myProfile),
               }));
               scoredProfiles.sort((a, b) => b.matchScore - a.matchScore);
               setAvailableTalent(scoredProfiles);
             } else {
-              setAvailableTalent(data.profiles);
+              setAvailableTalent(normalized);
             }
           } else {
-            setAvailableTalent(data.profiles);
+            setAvailableTalent(normalized);
           }
         }
       })
@@ -390,15 +413,28 @@ export default function TeamMatching({ user, onNavigate }) {
 
   // Calculate how well a startup matches talent's profile
   const handlePostIdea = () => {
-    if (!postFormData.title || !postFormData.description) {
-      toast.error("Please fill in title and description");
+    const missing = [];
+    if (!postFormData.title?.trim()) missing.push("Startup Title");
+    if (!postFormData.description?.trim()) missing.push("Description");
+    if (!postFormData.industry) missing.push("Industry");
+    if (!postFormData.stage) missing.push("Stage");
+    if (!postFormData.lookingFor?.trim()) missing.push("Looking For (roles)");
+    if (!postFormData.commitment) missing.push("Commitment");
+
+    if (missing.length > 0) {
+      toast.error(`Please fill in: ${missing.join(", ")}`);
+      return;
+    }
+
+    if (postFormData.description.trim().length < 50) {
+      toast.error("Description must be at least 50 characters so talent can evaluate your startup.");
       return;
     }
 
     // Show preview instead of posting immediately
     setShowPreview(true);
   };
-  const handleConfirmPost = () => {
+  const handleConfirmPost = async () => {
     // Build offer object from form data if compensationPhilosophy is selected
     let offer = undefined;
     if (postFormData.compensationPhilosophy) {
@@ -418,8 +454,13 @@ export default function TeamMatching({ user, onNavigate }) {
     }
 
     // Check if we're editing an existing post
+    const resolvedUserId = String(user._id ?? user.id ?? "");
+    if (!resolvedUserId || resolvedUserId === "undefined") {
+      toast.error("Session error: could not identify your account. Please log out and log back in.");
+      return;
+    }
     const existingPost = startupIdeas.find(
-      (idea) => idea.founderId === user.id,
+      (idea) => idea.founderId === resolvedUserId,
     );
     const ideaData = {
       id: existingPost?.id || Date.now().toString(),
@@ -427,7 +468,7 @@ export default function TeamMatching({ user, onNavigate }) {
       title: postFormData.title,
       description: postFormData.description,
       founder: user.name,
-      founderId: user.id,
+      founderId: resolvedUserId,
       founderAvatar: user.profile?.avatar,
       industry: postFormData.industry || "Other",
       stage: postFormData.stage || "Idea Stage",
@@ -466,89 +507,25 @@ export default function TeamMatching({ user, onNavigate }) {
         pitchDeckUrl: postFormData.pitchDeckUrl,
       }),
     };
-    if (isEditingExisting) {
-      console.log(
-        "📝 [TeamMatching] Updating existing startup post:",
-        ideaData,
+    try {
+      const savedPost = await founderApi.saveStartupPost(String(user._id ?? user.id), ideaData);
+      const canonical = savedPost || ideaData;
+      if (isEditingExisting) {
+        setStartupIdeas((prev) =>
+          prev.map((idea) => (idea.founderId === resolvedUserId ? canonical : idea)),
+        );
+        toast.success("Your startup post has been updated!");
+      } else {
+        setStartupIdeas((prev) => [canonical, ...prev]);
+        toast.success("Startup posted! Now visible to all talent.");
+      }
+    } catch (error) {
+      console.error("❌ [TeamMatching] Failed to save startup post:", error);
+      toast.error(
+        error?.message || "Failed to save post. Please try again.",
       );
-
-      // Update in localStorage
-      const ideas = JSON.parse(
-        localStorage.getItem("startupverse_startup_posts") || "[]",
-      );
-      const updatedIdeas = ideas.map((idea) =>
-        idea.founderId === user.id ? ideaData : idea,
-      );
-      localStorage.setItem(
-        "startupverse_startup_posts",
-        JSON.stringify(updatedIdeas),
-      );
-      console.log("✅ [TeamMatching] Updated in localStorage");
-
-      // Update in backend
-      console.log("🌐 [TeamMatching] Updating in backend...");
-      founderApi
-        .saveStartupPost(user.id, ideaData)
-        .then((response) => {
-          console.log(
-            "✅ [TeamMatching] Startup post updated in backend successfully",
-          );
-          console.log("Backend response:", response);
-          toast.success("Your startup post has been updated!");
-        })
-        .catch((error) => {
-          console.error(
-            "❌ [TeamMatching] CRITICAL: Failed to update startup post in backend",
-          );
-          console.error("Error details:", {
-            message: error.message,
-            stack: error.stack,
-          });
-          toast.error(
-            "Warning: Post updated locally but may not sync to other users.",
-          );
-        });
-    } else {
-      console.log("💾 [TeamMatching] Saving new startup post:", ideaData);
-
-      // Save to localStorage immediately for instant UI
-      const ideas = JSON.parse(
-        localStorage.getItem("startupverse_startup_posts") || "[]",
-      );
-      ideas.push(ideaData);
-      localStorage.setItem("startupverse_startup_posts", JSON.stringify(ideas));
-      console.log(
-        "✅ [TeamMatching] Saved to localStorage. Total posts now:",
-        ideas.length,
-      );
-
-      // Save to backend (CRITICAL for cross-user visibility)
-      console.log("🌐 [TeamMatching] Saving to backend...");
-      founderApi
-        .saveStartupPost(user.id, ideaData)
-        .then((response) => {
-          console.log(
-            "✅ [TeamMatching] Startup post saved to backend successfully",
-          );
-          console.log("Backend response:", response);
-          toast.success(
-            "Startup posted successfully! Now visible to all talent.",
-          );
-        })
-        .catch((error) => {
-          console.error(
-            "❌ [TeamMatching] CRITICAL: Failed to save startup post to backend",
-          );
-          console.error("Error details:", {
-            message: error.message,
-            stack: error.stack,
-          });
-          toast.error(
-            "Warning: Post saved locally but may not be visible to other users. Check console for details.",
-          );
-        });
+      return;
     }
-    loadStartupIdeas();
     setShowPreview(false);
     setIsPostIdeaOpen(false);
     setIsEditingExisting(false);
@@ -607,13 +584,14 @@ export default function TeamMatching({ user, onNavigate }) {
       }
 
       // Send interest via backend API
+      const talentUserId = String(user._id ?? user.id ?? "");
       const interest = {
-        id: `interest_${Date.now()}_${user.id}`,
+        id: `interest_${Date.now()}_${talentUserId}`,
         startupId: selectedIdea.id,
         startupTitle: selectedIdea.title,
         founderName: selectedIdea.founder,
         founderId: selectedIdea.founderId,
-        talentId: user.id,
+        talentId: talentUserId,
         talentName: user.name,
         talentArea: user.professionalTitle || undefined,
         // Add talent's professional area
@@ -881,40 +859,18 @@ export default function TeamMatching({ user, onNavigate }) {
     "user.role:",
     user.role,
   );
-  if (user.role === "talent") {
-    return (
-      <div className="p-4">
-        <Card className="mx-auto max-w-2xl border border-border">
-          <CardHeader>
-            <CardTitle className="text-xl">Talent Browse Moved</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <p className="text-sm text-muted-foreground">
-              Opportunities are now canonical on Talent Home. Use Home/Browse to discover startups, save items, and send interests.
-            </p>
-            <Button
-              type="button"
-              onClick={() => onNavigate?.("dashboard", { mode: "opportunities" })}
-            >
-              Open Talent Home
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
   return (
     <div className="p-2 md:p-3 lg:p-4 space-y-3 md:space-y-4">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 mb-4 md:mb-6">
         <div>
           <h2 className="text-xl md:text-2xl text-gray-900 dark:text-white mb-1">
             {user.role === "founder"
-              ? "Smart Team Matching"
+              ? "Browse Talent"
               : "Browse Startups"}
           </h2>
           <p className="text-xs md:text-sm text-gray-600 dark:text-gray-400">
             {user.role === "founder"
-              ? "Find your dream team"
+              ? "Discover talent that can grow into your team"
               : user.role === "team-member"
                 ? "Already committed to a startup"
                 : "Find your next startup opportunity"}
@@ -924,7 +880,7 @@ export default function TeamMatching({ user, onNavigate }) {
           (() => {
             // Check if founder has an existing post
             const founderPost = startupIdeas.find(
-              (idea) => idea.founderId === user.id,
+              (idea) => idea.founderId === String(user._id ?? user.id ?? ""),
             );
             const hasExistingPost = !!founderPost;
             return (
@@ -1283,7 +1239,7 @@ export default function TeamMatching({ user, onNavigate }) {
               <div className="border-t pt-4">
                 <h3 className="text-base font-semibold mb-3 flex items-center gap-2">
                   <Search className="w-4 h-4" />
-                  Browse All Talent
+                  Browse Talent
                 </h3>
                 {filteredTalent.length === 0 ? (
                   <Card className="border-2 border-dashed">
@@ -1733,23 +1689,24 @@ export default function TeamMatching({ user, onNavigate }) {
         </DialogContent>
       </Dialog>
       <Dialog open={isPostIdeaOpen} onOpenChange={setIsPostIdeaOpen}>
-        <DialogContent className="max-w-3xl max-h-[90vh]">
-          <ScrollArea className="max-h-[80vh] pr-4">
-            <DialogHeader>
-              <DialogTitle>
-                {isEditingExisting
-                  ? "Edit Your Startup Post"
-                  : "Post Your Startup Idea"}
-              </DialogTitle>
-              <DialogDescription>
-                {isEditingExisting
-                  ? "Update your startup post to keep talent informed about your latest opportunities."
-                  : "Share your startup vision and attract talented co-founders and early team members."}
-              </DialogDescription>
-            </DialogHeader>
-            <div className="space-y-4 mt-6">
+        <DialogContent className="max-w-3xl flex flex-col max-h-[90vh]">
+          <DialogHeader className="shrink-0">
+            <DialogTitle>
+              {isEditingExisting
+                ? "Edit Your Startup Post"
+                : "Post Your Startup Idea"}
+            </DialogTitle>
+            <DialogDescription>
+              {isEditingExisting
+                ? "Update your startup post to keep talent informed about your latest opportunities."
+                : "Share your startup vision and attract talented co-founders and early team members."}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex-1 overflow-y-auto pr-2">
+            <div className="space-y-4 mt-2 pb-2">
+              <p className="text-xs text-muted-foreground"><span className="text-red-500">*</span> Required fields</p>
               <div>
-                <Label htmlFor="title">Startup Title *</Label>
+                <Label htmlFor="title">Startup Title <span className="text-red-500">*</span></Label>
                 <Input
                   id="title"
                   placeholder="e.g., AI-Powered Healthcare Platform"
@@ -1764,10 +1721,10 @@ export default function TeamMatching({ user, onNavigate }) {
                 />
               </div>
               <div>
-                <Label htmlFor="description">Description *</Label>
+                <Label htmlFor="description">Description <span className="text-red-500">*</span></Label>
                 <Textarea
                   id="description"
-                  placeholder="Describe your startup idea, vision, and what problem you're solving..."
+                  placeholder="Describe your startup idea, the problem you solve, your traction so far, and why someone should join you. Min 50 characters."
                   value={postFormData.description}
                   onChange={(e) =>
                     setPostFormData({
@@ -1777,64 +1734,47 @@ export default function TeamMatching({ user, onNavigate }) {
                   }
                   className="mt-1 min-h-[120px]"
                 />
+                <p className="text-xs text-muted-foreground mt-1">{postFormData.description.length}/5000 — min 50 characters</p>
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <Label htmlFor="industry">Industry</Label>
-                  <Select
+                  <Label htmlFor="industry">Industry <span className="text-red-500">*</span></Label>
+                  <select
+                    id="industry"
                     value={postFormData.industry}
-                    onValueChange={(value) =>
-                      setPostFormData({
-                        ...postFormData,
-                        industry: value,
-                      })
-                    }
+                    onChange={(e) => setPostFormData({ ...postFormData, industry: e.target.value })}
+                    className="mt-1 flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
                   >
-                    <SelectTrigger id="industry" className="mt-1">
-                      <SelectValue placeholder="Select industry" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="HealthTech">HealthTech</SelectItem>
-                      <SelectItem value="EdTech">EdTech</SelectItem>
-                      <SelectItem value="FinTech">FinTech</SelectItem>
-                      <SelectItem value="E-Commerce">E-Commerce</SelectItem>
-                      <SelectItem value="CleanTech">CleanTech</SelectItem>
-                      <SelectItem value="SaaS">SaaS</SelectItem>
-                      <SelectItem value="AI/ML">AI/ML</SelectItem>
-                      <SelectItem value="Other">Other</SelectItem>
-                    </SelectContent>
-                  </Select>
+                    <option value="">Select industry</option>
+                    <option value="HealthTech">HealthTech</option>
+                    <option value="EdTech">EdTech</option>
+                    <option value="FinTech">FinTech</option>
+                    <option value="E-Commerce">E-Commerce</option>
+                    <option value="CleanTech">CleanTech</option>
+                    <option value="SaaS">SaaS</option>
+                    <option value="AI/ML">AI/ML</option>
+                    <option value="Other">Other</option>
+                  </select>
                 </div>
                 <div>
-                  <Label htmlFor="stage">Stage</Label>
-                  <Select
+                  <Label htmlFor="stage">Stage <span className="text-red-500">*</span></Label>
+                  <select
+                    id="stage"
                     value={postFormData.stage}
-                    onValueChange={(value) =>
-                      setPostFormData({
-                        ...postFormData,
-                        stage: value,
-                      })
-                    }
+                    onChange={(e) => setPostFormData({ ...postFormData, stage: e.target.value })}
+                    className="mt-1 flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
                   >
-                    <SelectTrigger id="stage" className="mt-1">
-                      <SelectValue placeholder="Select stage" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="Idea Stage">Idea Stage</SelectItem>
-                      <SelectItem value="MVP Development">
-                        MVP Development
-                      </SelectItem>
-                      <SelectItem value="Early Traction">
-                        Early Traction
-                      </SelectItem>
-                      <SelectItem value="Growth">Growth</SelectItem>
-                    </SelectContent>
-                  </Select>
+                    <option value="">Select stage</option>
+                    <option value="Idea Stage">Idea Stage</option>
+                    <option value="MVP Development">MVP Development</option>
+                    <option value="Early Traction">Early Traction</option>
+                    <option value="Growth">Growth</option>
+                  </select>
                 </div>
               </div>
               <div>
                 <Label htmlFor="lookingFor">
-                  Looking For (comma-separated roles)
+                  Looking For <span className="text-red-500">*</span> <span className="font-normal text-muted-foreground">(comma-separated roles)</span>
                 </Label>
                 <Input
                   id="lookingFor"
@@ -1851,7 +1791,7 @@ export default function TeamMatching({ user, onNavigate }) {
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <Label htmlFor="location">Location</Label>
+                  <Label htmlFor="location">Location <span className="text-muted-foreground font-normal text-xs">(e.g. Remote)</span></Label>
                   <Input
                     id="location"
                     placeholder="e.g., Remote, San Francisco, etc."
@@ -1866,26 +1806,19 @@ export default function TeamMatching({ user, onNavigate }) {
                   />
                 </div>
                 <div>
-                  <Label htmlFor="commitment">Commitment</Label>
-                  <Select
+                  <Label htmlFor="commitment">Commitment <span className="text-red-500">*</span></Label>
+                  <select
+                    id="commitment"
                     value={postFormData.commitment}
-                    onValueChange={(value) =>
-                      setPostFormData({
-                        ...postFormData,
-                        commitment: value,
-                      })
-                    }
+                    onChange={(e) => setPostFormData({ ...postFormData, commitment: e.target.value })}
+                    className="mt-1 flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
                   >
-                    <SelectTrigger id="commitment" className="mt-1">
-                      <SelectValue placeholder="Select commitment" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="Full-time">Full-time</SelectItem>
-                      <SelectItem value="Part-time">Part-time</SelectItem>
-                      <SelectItem value="Contract">Contract</SelectItem>
-                      <SelectItem value="Flexible">Flexible</SelectItem>
-                    </SelectContent>
-                  </Select>
+                    <option value="">Select commitment</option>
+                    <option value="Full-time">Full-time</option>
+                    <option value="Part-time">Part-time</option>
+                    <option value="Contract">Contract</option>
+                    <option value="Flexible">Flexible</option>
+                  </select>
                 </div>
               </div>
               <div>
@@ -2031,33 +1964,17 @@ export default function TeamMatching({ user, onNavigate }) {
                     <Label htmlFor="compensationPhilosophy">
                       Compensation Philosophy
                     </Label>
-                    <Select
+                    <select
+                      id="compensationPhilosophy"
                       value={postFormData.compensationPhilosophy}
-                      onValueChange={(value) =>
-                        setPostFormData({
-                          ...postFormData,
-                          compensationPhilosophy: value,
-                        })
-                      }
+                      onChange={(e) => setPostFormData({ ...postFormData, compensationPhilosophy: e.target.value })}
+                      className="mt-1 flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
                     >
-                      <SelectTrigger
-                        id="compensationPhilosophy"
-                        className="mt-1"
-                      >
-                        <SelectValue placeholder="Select approach" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="equity-focused">
-                          Equity-Focused (High equity, lower cash)
-                        </SelectItem>
-                        <SelectItem value="balanced">
-                          Balanced (Mix of equity and cash)
-                        </SelectItem>
-                        <SelectItem value="cash-focused">
-                          Cash-Focused (Competitive salary, lower equity)
-                        </SelectItem>
-                      </SelectContent>
-                    </Select>
+                      <option value="">Select approach</option>
+                      <option value="equity-focused">Equity-Focused (High equity, lower cash)</option>
+                      <option value="balanced">Balanced (Mix of equity and cash)</option>
+                      <option value="cash-focused">Cash-Focused (Competitive salary, lower equity)</option>
+                    </select>
                   </div>
                   {postFormData.compensationPhilosophy && (
                     <>
@@ -2103,30 +2020,17 @@ export default function TeamMatching({ user, onNavigate }) {
                       </div>
                       <div>
                         <Label htmlFor="salaryApproach">Salary Approach</Label>
-                        <Select
+                        <select
+                          id="salaryApproach"
                           value={postFormData.salaryApproach}
-                          onValueChange={(value) =>
-                            setPostFormData({
-                              ...postFormData,
-                              salaryApproach: value,
-                            })
-                          }
+                          onChange={(e) => setPostFormData({ ...postFormData, salaryApproach: e.target.value })}
+                          className="mt-1 flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
                         >
-                          <SelectTrigger id="salaryApproach" className="mt-1">
-                            <SelectValue placeholder="Select approach" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="deferred">
-                              Deferred (No salary now, equity only)
-                            </SelectItem>
-                            <SelectItem value="startup-friendly">
-                              Startup-Friendly (Below market rate)
-                            </SelectItem>
-                            <SelectItem value="competitive">
-                              Competitive (Market rate)
-                            </SelectItem>
-                          </SelectContent>
-                        </Select>
+                          <option value="">Select approach</option>
+                          <option value="deferred">Deferred (No salary now, equity only)</option>
+                          <option value="startup-friendly">Startup-Friendly (Below market rate)</option>
+                          <option value="competitive">Competitive (Market rate)</option>
+                        </select>
                       </div>
                       {postFormData.salaryApproach !== "deferred" && (
                         <div className="grid grid-cols-2 gap-4">
@@ -2258,21 +2162,21 @@ export default function TeamMatching({ user, onNavigate }) {
                   )}
                 </div>
               </div>
-              <div className="flex gap-2 pt-4 border-t">
-                <Button
-                  variant="outline"
-                  onClick={() => setIsPostIdeaOpen(false)}
-                  className="flex-1"
-                >
-                  Cancel
-                </Button>
-                <Button onClick={handlePostIdea} className="flex-1">
-                  <Eye className="w-4 h-4 mr-2" />
-                  Preview Post
-                </Button>
-              </div>
             </div>
-          </ScrollArea>
+          </div>
+          <div className="flex gap-2 pt-4 border-t shrink-0">
+            <Button
+              variant="outline"
+              onClick={() => setIsPostIdeaOpen(false)}
+              className="flex-1"
+            >
+              Cancel
+            </Button>
+            <Button onClick={handlePostIdea} className="flex-1">
+              <Eye className="w-4 h-4 mr-2" />
+              Preview Post
+            </Button>
+          </div>
         </DialogContent>
       </Dialog>
       <Dialog open={showPreview} onOpenChange={setShowPreview}>

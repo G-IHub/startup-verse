@@ -78,10 +78,27 @@ export const getStartupPostsFeed = async (req, res) => {
   const page = Math.max(1, Number(req.query.page) || 1);
   const pageSize = Math.min(100, Math.max(1, Number(req.query.pageSize) || 50));
   const skip = (page - 1) * pageSize;
-  const [posts, total] = await Promise.all([
-    StartupPost.find({}).sort({ createdAt: -1 }).skip(skip).limit(pageSize).lean(),
+  const [rawPosts, total] = await Promise.all([
+    StartupPost.find({})
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(pageSize)
+      .populate("founderId", "name")
+      .lean(),
     StartupPost.countDocuments({}),
   ]);
+  const posts = rawPosts.map((post) => {
+    const resolvedName =
+      post.founderName ||
+      post.founderId?.name ||
+      "";
+    return {
+      ...post,
+      founderId: post.founderId?._id ?? post.founderId,
+      founderName: resolvedName,
+      founder: resolvedName,
+    };
+  });
   return apiSuccess(res, { posts, total, page, pageSize });
 };
 

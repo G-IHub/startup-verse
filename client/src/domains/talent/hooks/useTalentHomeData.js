@@ -312,6 +312,7 @@ export function useTalentHomeData({ user }) {
             talentId,
             founderId,
             startupId,
+            startupTitle: String(opportunity?.title || opportunity?.name || ""),
             message: String(message || "").trim(),
           }),
         });

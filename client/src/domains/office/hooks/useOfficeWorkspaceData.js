@@ -21,6 +21,7 @@ export function useOfficeWorkspaceData({ user }) {
   const loadWorkspace = useOfficeStore((s) => s.loadWorkspace);
   const refreshWorkspace = useOfficeStore((s) => s.refresh);
   const teamMembers = useOfficeStore((s) => s.teamMembers);
+  const pendingTalents = useOfficeStore((s) => s.pendingTalents);
   const presenceRows = useOfficeStore((s) => s.presenceRows);
   const activityRows = useOfficeStore((s) => s.activities);
   const winRows = useOfficeStore((s) => s.wins);
@@ -191,6 +192,7 @@ export function useOfficeWorkspaceData({ user }) {
       mapOfficeWorkspaceModel({
         user,
         teamMembers,
+        pendingTalents,
         presenceRows,
         activityRows,
         winRows,
@@ -201,6 +203,7 @@ export function useOfficeWorkspaceData({ user }) {
     [
       user,
       teamMembers,
+      pendingTalents,
       presenceRows,
       activityRows,
       winRows,

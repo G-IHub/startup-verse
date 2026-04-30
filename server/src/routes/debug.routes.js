@@ -11,4 +11,10 @@ debugRouter.get(
   asyncHandler(debugController.getStartupDebug),
 );
 
+// Dev-only: reset a team-member back to talent without needing auth (for quick testing)
+debugRouter.get(
+  "/debug/leave-startup/:userId",
+  asyncHandler(debugController.leaveStartupDebug),
+);
+
 export default debugRouter;

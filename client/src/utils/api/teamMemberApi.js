@@ -79,46 +79,79 @@ export async function getTeamMemberProfile(userId) {
 }
 
 /**
- * Get all team members in a startup
+ * Get all team members in a startup.
+ *
+ * Primary source: GET /founders/:founderId/team-members — queries User records
+ * with role=team-member and founderId set, so it works immediately after
+ * onboarding without relying on expiring Presence records.
+ *
+ * Presence rows are fetched in parallel and merged in to enrich isOnline /
+ * statusText fields. Falls back to presence-only if the primary fails.
  */
 export async function getStartupTeamMembers(startupId, params = {}) {
   console.log(`Fetching team members for startup: ${startupId}`);
 
-  // Primary contract: derive active team context from presence rows.
   try {
-    const presenceRows = await apiRequest(`/presence/${startupId}`, {
-      method: "GET",
-    });
-    const members = (Array.isArray(presenceRows) ? presenceRows : [])
-      .map((row) => ({
-        id: String(row.userId || row.id || ""),
-        userId: String(row.userId || row.id || ""),
-        name: String(row.userName || row.name || "Team member"),
-        role: String(row.role || "team-member"),
-        isOnline: Boolean(row.isOnline),
-        statusText: String(row.statusText || ""),
-        mood: String(row.mood || ""),
-        startupId: String(row.startupId || startupId || ""),
-        lastSeenAt: row.lastSeenAt || row.updatedAt || null,
-      }))
-      .filter((row) => row.id);
+    const [membersRaw, presenceRaw] = await Promise.allSettled([
+      apiRequest(`/founders/${startupId}/team-members`, { method: "GET" }),
+      apiRequest(`/presence/${startupId}`, { method: "GET" }),
+    ]);
 
-    console.log(`Team context fetched from presence: ${members.length}`);
+    const baseMembers = Array.isArray(membersRaw.value) ? membersRaw.value : [];
+    const presenceRows = Array.isArray(presenceRaw.value) ? presenceRaw.value : [];
+
+    const presenceById = new Map(
+      presenceRows.map((row) => [String(row.userId || row.id || ""), row]),
+    );
+
+    const members = baseMembers
+      .map((m) => {
+        const id = String(m.id || m.userId || m._id || "");
+        if (!id) return null;
+        const presence = presenceById.get(id);
+        return {
+          id,
+          userId: id,
+          name: String(m.name || "Team member"),
+          role: String(m.role || "team-member"),
+          email: String(m.email || ""),
+          avatar: m.avatar || "",
+          title: m.title || "",
+          skills: Array.isArray(m.skills) ? m.skills : [],
+          isOnline: presence ? Boolean(presence.isOnline) : false,
+          statusText: presence ? String(presence.statusText || "") : "",
+          mood: presence ? String(presence.mood || "") : "",
+          startupId: String(m.startupId || startupId || ""),
+          founderId: String(m.founderId || startupId || ""),
+          lastSeenAt: presence?.lastSeenAt || m.lastSeenAt || null,
+        };
+      })
+      .filter(Boolean);
+
+    console.log(`Team members fetched: ${members.length}`);
     return members;
   } catch {
-    // Backward-compatible fallback for older environments.
-    const queryString = buildQueryString(params);
-    const result = await apiRequest(
-      `/startups/${startupId}/team-members${queryString}`,
-      {
-        method: "GET",
-      },
-    );
-
-    console.log(
-      `Team members fetched: ${result.pagination?.total || result.count} members`,
-    );
-    return result.teamMembers || result.items || [];
+    // Last-resort fallback: presence-only (legacy behaviour).
+    try {
+      const presenceRows = await apiRequest(`/presence/${startupId}`, { method: "GET" });
+      const members = (Array.isArray(presenceRows) ? presenceRows : [])
+        .map((row) => ({
+          id: String(row.userId || row.id || ""),
+          userId: String(row.userId || row.id || ""),
+          name: String(row.userName || row.name || "Team member"),
+          role: String(row.role || "team-member"),
+          isOnline: Boolean(row.isOnline),
+          statusText: String(row.statusText || ""),
+          mood: String(row.mood || ""),
+          startupId: String(row.startupId || startupId || ""),
+          lastSeenAt: row.lastSeenAt || null,
+        }))
+        .filter((row) => row.id);
+      console.log(`Team context fetched from presence fallback: ${members.length}`);
+      return members;
+    } catch {
+      return [];
+    }
   }
 }
 
@@ -293,6 +326,13 @@ export async function getTeamMemberStatus(teamMemberId) {
   };
 }
 
+/**
+ * Leave the current startup — reverts role to 'talent', preserves all profile data.
+ */
+export async function leaveStartup(userId) {
+  return apiRequest(`/team-members/${userId}/leave`, { method: "POST" });
+}
+
 export default {
   // Profile
   saveTeamMemberProfile,
@@ -310,4 +350,7 @@ export default {
   // Status
   saveTeamMemberStatus,
   getTeamMemberStatus,
+
+  // Membership
+  leaveStartup,
 };

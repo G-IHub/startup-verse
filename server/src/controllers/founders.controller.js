@@ -20,10 +20,16 @@ import {
   validateBlockedTaskPayload,
   computeExecutionScoreMetrics,
 } from "../domain/weeklyLoopRules.js";
-import { normalizeJourney, validateJourneyPut } from "../domain/founderJourney.js";
+import {
+  normalizeJourney,
+  validateJourneyPut,
+} from "../domain/founderJourney.js";
 import { WEEKLY_OUTCOME_STATUSES, TASK_PRIORITIES } from "../utils/enums.js";
 import { mapActivityToDto } from "../utils/activityDto.js";
-import { error as apiError, success as apiSuccess } from "../utils/apiResponse.js";
+import {
+  error as apiError,
+  success as apiSuccess,
+} from "../utils/apiResponse.js";
 import { emitRealtime } from "../services/realtime.service.js";
 import { SOCKET_EVENTS } from "../realtime/events.js";
 import { startupRoom } from "../realtime/rooms.js";
@@ -35,7 +41,12 @@ function founderGuard(req, founderId) {
 
 function unwrapPayload(req, key) {
   const body = req.body || {};
-  if (body && typeof body === "object" && body[key] && typeof body[key] === "object") {
+  if (
+    body &&
+    typeof body === "object" &&
+    body[key] &&
+    typeof body[key] === "object"
+  ) {
     return body[key];
   }
   return body;
@@ -45,11 +56,7 @@ async function syncMilestoneCounters(milestoneId) {
   if (!milestoneId) return;
   const milestoneTasks = await Task.find({ milestoneId }, { status: 1 });
   const counters = computeMilestoneCounters(milestoneTasks);
-  await Milestone.findByIdAndUpdate(
-    milestoneId,
-    counters,
-    { new: false },
-  );
+  await Milestone.findByIdAndUpdate(milestoneId, counters, { new: false });
 }
 
 const MAX_COMPLETION_JSON = 32000;
@@ -66,7 +73,13 @@ function sanitizeCompletionData(data) {
   }
 }
 
-async function appendLoopActivity({ founderId, startupId, type, text, metadata = {} }) {
+async function appendLoopActivity({
+  founderId,
+  startupId,
+  type,
+  text,
+  metadata = {},
+}) {
   if (!startupId) return;
   const doc = await Activity.create({
     startupId,
@@ -76,15 +89,19 @@ async function appendLoopActivity({ founderId, startupId, type, text, metadata =
     metadata: { ...metadata, userName: metadata?.userName || "" },
   });
   const sid = String(startupId);
-  emitRealtime(
-    SOCKET_EVENTS.ACTIVITY_CREATED,
-    mapActivityToDto(doc),
-    [startupRoom(sid)],
-  );
+  emitRealtime(SOCKET_EVENTS.ACTIVITY_CREATED, mapActivityToDto(doc), [
+    startupRoom(sid),
+  ]);
 }
 
 export const createOrUpdateProfile = async (req, res) => {
-  const { userId, startupId, bio = "", background = "", links = {} } = req.body || {};
+  const {
+    userId,
+    startupId,
+    bio = "",
+    background = "",
+    links = {},
+  } = req.body || {};
 
   if (!userId || !startupId) {
     return apiError(res, "userId and startupId are required.", 400);
@@ -112,7 +129,8 @@ export const getProfileByUserId = async (req, res) => {
 };
 
 export const createOrUpdateStartup = async (req, res) => {
-  const { founderId, name, description, industry, stage, website, logo, data } = req.body || {};
+  const { founderId, name, description, industry, stage, website, logo, data } =
+    req.body || {};
 
   const normalizedFounderId = founderId || req.user.id;
 
@@ -180,12 +198,18 @@ export const getMilestones = async (req, res) => {
   const milestones = await Milestone.find(filter).sort({ sequence: 1 });
   const milestoneIds = milestones.map((m) => String(m._id));
   const tasks = milestoneIds.length
-    ? await Task.find({ milestoneId: { $in: milestoneIds } }, { milestoneId: 1, status: 1 })
+    ? await Task.find(
+        { milestoneId: { $in: milestoneIds } },
+        { milestoneId: 1, status: 1 },
+      )
     : [];
   const countsByMilestone = new Map();
   for (const task of tasks) {
     const key = String(task.milestoneId || "");
-    const prev = countsByMilestone.get(key) || { totalTasks: 0, tasksCompleted: 0 };
+    const prev = countsByMilestone.get(key) || {
+      totalTasks: 0,
+      tasksCompleted: 0,
+    };
     prev.totalTasks += 1;
     if (task.status === "completed") prev.tasksCompleted += 1;
     countsByMilestone.set(key, prev);
@@ -223,7 +247,12 @@ export const createMilestone = async (req, res) => {
     }
     const mutability = ensureOutcomeMutable(outcome);
     if (!mutability.ok) {
-      return apiError(res, mutability.message, mutability.code, mutability.errors);
+      return apiError(
+        res,
+        mutability.message,
+        mutability.code,
+        mutability.errors,
+      );
     }
   }
 
@@ -266,7 +295,12 @@ export const updateMilestone = async (req, res) => {
     if (outcome) {
       const mutability = ensureOutcomeMutable(outcome);
       if (!mutability.ok) {
-        return apiError(res, mutability.message, mutability.code, mutability.errors);
+        return apiError(
+          res,
+          mutability.message,
+          mutability.code,
+          mutability.errors,
+        );
       }
     }
   }
@@ -277,7 +311,11 @@ export const updateMilestone = async (req, res) => {
   if (payload.title != null) {
     const t = String(payload.title).trim();
     if (t.length < 2) {
-      return apiError(res, "Milestone title must be at least 2 characters.", 400);
+      return apiError(
+        res,
+        "Milestone title must be at least 2 characters.",
+        400,
+      );
     }
     updates.title = t.slice(0, 200);
   }
@@ -329,7 +367,12 @@ export const deleteMilestone = async (req, res) => {
     if (outcome) {
       const mutability = ensureOutcomeMutable(outcome);
       if (!mutability.ok) {
-        return apiError(res, mutability.message, mutability.code, mutability.errors);
+        return apiError(
+          res,
+          mutability.message,
+          mutability.code,
+          mutability.errors,
+        );
       }
     }
   }
@@ -343,7 +386,9 @@ export const getTasks = async (req, res) => {
   if (!founderGuard(req, req.params.founderId)) {
     return apiError(res, "Forbidden.", 403);
   }
-  const tasks = await Task.find({ founderId: req.params.founderId }).sort({ createdAt: -1 });
+  const tasks = await Task.find({ founderId: req.params.founderId }).sort({
+    createdAt: -1,
+  });
   return apiSuccess(res, tasks);
 };
 
@@ -363,10 +408,16 @@ export const createTask = async (req, res) => {
     description: payload?.description || "",
     status: payload?.status || "pending",
     assignedTo: payload?.assignedTo || null,
-    assignedToName: String(payload?.assignedToName || "").trim().slice(0, 200),
-    assignedToAvatar: String(payload?.assignedToAvatar || "").trim().slice(0, 2000),
+    assignedToName: String(payload?.assignedToName || "")
+      .trim()
+      .slice(0, 200),
+    assignedToAvatar: String(payload?.assignedToAvatar || "")
+      .trim()
+      .slice(0, 2000),
     milestoneId: payload?.milestoneId || null,
-    priority: TASK_PRIORITIES.includes(String(payload?.priority || "").toLowerCase())
+    priority: TASK_PRIORITIES.includes(
+      String(payload?.priority || "").toLowerCase(),
+    )
       ? String(payload.priority).toLowerCase()
       : "medium",
     incentive: payload?.incentive || "",
@@ -391,7 +442,9 @@ export const createTask = async (req, res) => {
   });
 
   if (task.startupId) {
-    emitRealtime(SOCKET_EVENTS.TASK_UPDATED, task, [startupRoom(task.startupId)]);
+    emitRealtime(SOCKET_EVENTS.TASK_UPDATED, task, [
+      startupRoom(task.startupId),
+    ]);
   }
 
   return apiSuccess(res, task, 201);
@@ -409,12 +462,18 @@ export const updateTask = async (req, res) => {
     return apiError(res, blockedValidation.message, blockedValidation.code);
   }
 
-  const existingTask = await Task.findOne({ _id: req.params.taskId, founderId });
+  const existingTask = await Task.findOne({
+    _id: req.params.taskId,
+    founderId,
+  });
   if (!existingTask) {
     return apiError(res, "Task not found.", 404);
   }
   if (payload?.status) {
-    const transition = validateTaskStatusTransition(existingTask.status, payload.status);
+    const transition = validateTaskStatusTransition(
+      existingTask.status,
+      payload.status,
+    );
     if (!transition.ok) {
       return apiError(res, transition.message, transition.code);
     }
@@ -438,7 +497,9 @@ export const updateTask = async (req, res) => {
   }
 
   if (updatedTask.startupId) {
-    emitRealtime(SOCKET_EVENTS.TASK_UPDATED, updatedTask, [startupRoom(updatedTask.startupId)]);
+    emitRealtime(SOCKET_EVENTS.TASK_UPDATED, updatedTask, [
+      startupRoom(updatedTask.startupId),
+    ]);
   }
 
   return apiSuccess(res, updatedTask);
@@ -475,7 +536,10 @@ export const updateTaskStatus = async (req, res) => {
     updates.blockerReason = "";
     updates.blockerNote = "";
   }
-  const existingTask = await Task.findOne({ _id: req.params.taskId, founderId });
+  const existingTask = await Task.findOne({
+    _id: req.params.taskId,
+    founderId,
+  });
   if (!existingTask) {
     return apiError(res, "Task not found.", 404);
   }
@@ -504,7 +568,9 @@ export const updateTaskStatus = async (req, res) => {
   });
 
   if (updatedTask.startupId) {
-    emitRealtime(SOCKET_EVENTS.TASK_UPDATED, updatedTask, [startupRoom(updatedTask.startupId)]);
+    emitRealtime(SOCKET_EVENTS.TASK_UPDATED, updatedTask, [
+      startupRoom(updatedTask.startupId),
+    ]);
   }
 
   return apiSuccess(res, updatedTask);
@@ -517,12 +583,22 @@ export const assignTask = async (req, res) => {
   }
 
   const body = req.body || {};
-  const { assignedTo, assigneeId, assigneeName, assignedToName, assignedToAvatar } = body;
+  const {
+    assignedTo,
+    assigneeId,
+    assigneeName,
+    assignedToName,
+    assignedToAvatar,
+  } = body;
   const nextAssigned = assignedTo || assigneeId || null;
   const name =
-    String(assigneeName || assignedToName || "").trim().slice(0, 200) || "";
+    String(assigneeName || assignedToName || "")
+      .trim()
+      .slice(0, 200) || "";
   const avatar =
-    String(assignedToAvatar || "").trim().slice(0, 2000) || "";
+    String(assignedToAvatar || "")
+      .trim()
+      .slice(0, 2000) || "";
   const assignUpdate = {
     assignedTo: nextAssigned,
     assignedToName: nextAssigned ? name : "",
@@ -545,7 +621,9 @@ export const assignTask = async (req, res) => {
   });
 
   if (task.startupId) {
-    emitRealtime(SOCKET_EVENTS.TASK_UPDATED, task, [startupRoom(task.startupId)]);
+    emitRealtime(SOCKET_EVENTS.TASK_UPDATED, task, [
+      startupRoom(task.startupId),
+    ]);
   }
 
   return apiSuccess(res, task);
@@ -557,7 +635,10 @@ export const deleteTask = async (req, res) => {
     return apiError(res, "Forbidden.", 403);
   }
 
-  const deleted = await Task.findOneAndDelete({ _id: req.params.taskId, founderId });
+  const deleted = await Task.findOneAndDelete({
+    _id: req.params.taskId,
+    founderId,
+  });
   if (deleted) {
     await syncMilestoneCounters(deleted.milestoneId);
     await appendLoopActivity({
@@ -575,7 +656,9 @@ export const getWeeklyOutcomes = async (req, res) => {
   if (!founderGuard(req, req.params.founderId)) {
     return apiError(res, "Forbidden.", 403);
   }
-  const outcomes = await WeeklyOutcome.find({ founderId: req.params.founderId }).sort({ weekOf: -1 });
+  const outcomes = await WeeklyOutcome.find({
+    founderId: req.params.founderId,
+  }).sort({ weekOf: -1 });
   return apiSuccess(res, outcomes);
 };
 
@@ -590,11 +673,16 @@ export const createWeeklyOutcome = async (req, res) => {
   const incomingWeek = payload?.weekOf ? new Date(payload.weekOf) : new Date();
   const weekStart = new Date(incomingWeek);
   weekStart.setHours(0, 0, 0, 0);
-  const existing = await WeeklyOutcome.findOne({ founderId, weekOf: weekStart });
+  const existing = await WeeklyOutcome.findOne({
+    founderId,
+    weekOf: weekStart,
+  });
 
   const requestedLower = String(payload?.status || "active").toLowerCase();
   const requestedStatus =
-    WEEKLY_OUTCOME_STATUSES.find((s) => String(s).toLowerCase() === requestedLower) || null;
+    WEEKLY_OUTCOME_STATUSES.find(
+      (s) => String(s).toLowerCase() === requestedLower,
+    ) || null;
   if (!requestedStatus) {
     return apiError(
       res,
@@ -605,7 +693,12 @@ export const createWeeklyOutcome = async (req, res) => {
 
   const mutability = ensureOutcomeMutable(existing);
   if (!mutability.ok) {
-    return apiError(res, mutability.message, mutability.code, mutability.errors);
+    return apiError(
+      res,
+      mutability.message,
+      mutability.code,
+      mutability.errors,
+    );
   }
 
   const goalText = String(payload?.goal || payload?.title || "").trim();
@@ -614,7 +707,11 @@ export const createWeeklyOutcome = async (req, res) => {
   }
 
   if (!startup?._id) {
-    return apiError(res, "Startup is required before saving weekly outcomes.", 400);
+    return apiError(
+      res,
+      "Startup is required before saving weekly outcomes.",
+      400,
+    );
   }
 
   const update = {
@@ -622,7 +719,9 @@ export const createWeeklyOutcome = async (req, res) => {
     startupId: payload?.startupId || startup._id,
     weekOf: weekStart,
     goal: goalText,
-    summary: String(payload?.summary || payload?.notes || payload?.description || "").trim(),
+    summary: String(
+      payload?.summary || payload?.notes || payload?.description || "",
+    ).trim(),
     status: requestedStatus,
     score: Number(payload?.score || 0),
   };
@@ -686,13 +785,37 @@ function parseIntentCategory(input) {
   const defs = [
     {
       category: "validation",
-      keywords: ["validate", "interview", "survey", "feedback", "assumption", "test"],
+      keywords: [
+        "validate",
+        "interview",
+        "survey",
+        "feedback",
+        "assumption",
+        "test",
+      ],
       title: "Validate core assumptions with real users",
       description: "Test and validate key assumptions with target users.",
       milestones: [
-        { title: "Define validation criteria", tasks: ["List assumptions", "Define success metrics", "Create interview/survey guide"] },
-        { title: "Recruit participants", tasks: ["Define participant profile", "Reach out to candidates", "Schedule sessions"] },
-        { title: "Conduct validation", tasks: ["Run sessions", "Document findings", "Synthesize insights"] },
+        {
+          title: "Define validation criteria",
+          tasks: [
+            "List assumptions",
+            "Define success metrics",
+            "Create interview/survey guide",
+          ],
+        },
+        {
+          title: "Recruit participants",
+          tasks: [
+            "Define participant profile",
+            "Reach out to candidates",
+            "Schedule sessions",
+          ],
+        },
+        {
+          title: "Conduct validation",
+          tasks: ["Run sessions", "Document findings", "Synthesize insights"],
+        },
       ],
     },
     {
@@ -701,20 +824,65 @@ function parseIntentCategory(input) {
       title: "Build and ship core product scope",
       description: "Deliver the highest-impact product work for this week.",
       milestones: [
-        { title: "Finalize scope", tasks: ["Prioritize must-have items", "Define acceptance criteria", "Plan implementation"] },
-        { title: "Implement core work", tasks: ["Build features", "Test critical paths", "Fix blockers"] },
-        { title: "Ship and review", tasks: ["Deploy/update release", "Collect early feedback", "Capture learnings"] },
+        {
+          title: "Finalize scope",
+          tasks: [
+            "Prioritize must-have items",
+            "Define acceptance criteria",
+            "Plan implementation",
+          ],
+        },
+        {
+          title: "Implement core work",
+          tasks: ["Build features", "Test critical paths", "Fix blockers"],
+        },
+        {
+          title: "Ship and review",
+          tasks: [
+            "Deploy/update release",
+            "Collect early feedback",
+            "Capture learnings",
+          ],
+        },
       ],
     },
     {
       category: "team-building",
-      keywords: ["team", "hire", "cofounder", "co-founder", "talent", "recruit"],
+      keywords: [
+        "team",
+        "hire",
+        "cofounder",
+        "co-founder",
+        "talent",
+        "recruit",
+      ],
       title: "Find and onboard the right team members",
       description: "Identify, engage, and move forward with critical talent.",
       milestones: [
-        { title: "Define roles", tasks: ["List required roles", "Clarify responsibilities", "Set selection criteria"] },
-        { title: "Source candidates", tasks: ["Shortlist candidates", "Reach out and screen", "Schedule conversations"] },
-        { title: "Close and onboard", tasks: ["Select top candidates", "Align on terms", "Start onboarding"] },
+        {
+          title: "Define roles",
+          tasks: [
+            "List required roles",
+            "Clarify responsibilities",
+            "Set selection criteria",
+          ],
+        },
+        {
+          title: "Source candidates",
+          tasks: [
+            "Shortlist candidates",
+            "Reach out and screen",
+            "Schedule conversations",
+          ],
+        },
+        {
+          title: "Close and onboard",
+          tasks: [
+            "Select top candidates",
+            "Align on terms",
+            "Start onboarding",
+          ],
+        },
       ],
     },
   ];
@@ -739,13 +907,32 @@ function parseIntentCategory(input) {
     return {
       category: "general",
       confidence: 0.5,
-      suggestedTitle: String(input || "").slice(0, 70) || "Set a focused weekly outcome",
-      suggestedDescription: "Define a concrete, measurable outcome for this week.",
+      suggestedTitle:
+        String(input || "").slice(0, 70) || "Set a focused weekly outcome",
+      suggestedDescription:
+        "Define a concrete, measurable outcome for this week.",
       detectedKeywords: [],
       suggestedMilestones: [
-        { title: "Plan", tasks: ["Define success criteria", "Break work into tasks", "Assign ownership"] },
-        { title: "Execute", tasks: ["Complete core tasks", "Track progress daily", "Resolve blockers quickly"] },
-        { title: "Review", tasks: ["Measure results", "Document learnings", "Plan next steps"] },
+        {
+          title: "Plan",
+          tasks: [
+            "Define success criteria",
+            "Break work into tasks",
+            "Assign ownership",
+          ],
+        },
+        {
+          title: "Execute",
+          tasks: [
+            "Complete core tasks",
+            "Track progress daily",
+            "Resolve blockers quickly",
+          ],
+        },
+        {
+          title: "Review",
+          tasks: ["Measure results", "Document learnings", "Plan next steps"],
+        },
       ],
     };
   }
@@ -773,17 +960,29 @@ export const createWeeklyPlan = async (req, res) => {
 
   const startup = await Startup.findOne({ founderId });
   if (!startup?._id) {
-    return apiError(res, "Startup is required before setting a weekly plan.", 400);
+    return apiError(
+      res,
+      "Startup is required before setting a weekly plan.",
+      400,
+    );
   }
 
   const incomingWeek = plan.weekOf ? new Date(plan.weekOf) : new Date();
   const weekStart = new Date(incomingWeek);
   weekStart.setHours(0, 0, 0, 0);
 
-  const existing = await WeeklyOutcome.findOne({ founderId, weekOf: weekStart });
+  const existing = await WeeklyOutcome.findOne({
+    founderId,
+    weekOf: weekStart,
+  });
   const mutability = ensureOutcomeMutable(existing);
   if (!mutability.ok) {
-    return apiError(res, mutability.message, mutability.code, mutability.errors);
+    return apiError(
+      res,
+      mutability.message,
+      mutability.code,
+      mutability.errors,
+    );
   }
 
   const milestonesInput = Array.isArray(plan.milestones) ? plan.milestones : [];
@@ -791,7 +990,9 @@ export const createWeeklyPlan = async (req, res) => {
 
   const planStatusLower = String(plan.status || "active").toLowerCase();
   const planStatusCanonical =
-    WEEKLY_OUTCOME_STATUSES.find((s) => String(s).toLowerCase() === planStatusLower) || "active";
+    WEEKLY_OUTCOME_STATUSES.find(
+      (s) => String(s).toLowerCase() === planStatusLower,
+    ) || "active";
 
   const update = {
     founderId,
@@ -852,7 +1053,9 @@ export const createWeeklyPlan = async (req, res) => {
         founderId,
         startupId: startup._id,
         weeklyOutcomeId: outcome._id,
-        title: String(m?.title || "Milestone").trim().slice(0, 200),
+        title: String(m?.title || "Milestone")
+          .trim()
+          .slice(0, 200),
         description: String(m?.description || "").slice(0, 5000),
         dueDate: m?.dueDate ? new Date(m.dueDate) : null,
         sequence: sequence++,
@@ -865,13 +1068,17 @@ export const createWeeklyPlan = async (req, res) => {
         const title = typeof t === "string" ? t : t?.title;
         if (!title || !String(title).trim()) continue;
         const actionButton =
-          typeof t === "object" && t !== null ? serializeTaskActionButton(t.actionButton) : "";
+          typeof t === "object" && t !== null
+            ? serializeTaskActionButton(t.actionButton)
+            : "";
         await Task.create({
           founderId,
           startupId: startup._id,
           title: String(title).trim().slice(0, 200),
           description:
-            typeof t === "object" && t?.description ? String(t.description).slice(0, 5000) : "",
+            typeof t === "object" && t?.description
+              ? String(t.description).slice(0, 5000)
+              : "",
           status: "pending",
           milestoneId: milestone._id,
           actionButton,
@@ -904,7 +1111,10 @@ export const createWeeklyPlan = async (req, res) => {
     startupId: outcome.startupId,
     type: "status-change",
     text: "Weekly goal set.",
-    metadata: { outcomeId: outcome._id, milestoneCount: createdMilestones.length },
+    metadata: {
+      outcomeId: outcome._id,
+      milestoneCount: createdMilestones.length,
+    },
   });
 
   return apiSuccess(
@@ -975,7 +1185,10 @@ export const putFounderJourney = async (req, res) => {
   await Startup.findByIdAndUpdate(startup._id, { data: mergedData });
   return apiSuccess(res, {
     journey: normalizeJourney(mergedData.journey),
-    homeUi: mergedData.homeUi && typeof mergedData.homeUi === "object" ? mergedData.homeUi : {},
+    homeUi:
+      mergedData.homeUi && typeof mergedData.homeUi === "object"
+        ? mergedData.homeUi
+        : {},
   });
 };
 
@@ -989,10 +1202,13 @@ export const getFounderExecutionState = async (req, res) => {
     return apiError(res, "Startup not found.", 404);
   }
 
-  const outcomes = await WeeklyOutcome.find({ founderId }).sort({ weekOf: -1 }).limit(24);
+  const outcomes = await WeeklyOutcome.find({ founderId })
+    .sort({ weekOf: -1 })
+    .limit(24);
 
   const activeOutcome =
-    outcomes.find((o) => String(o.status || "").toLowerCase() === "active") || null;
+    outcomes.find((o) => String(o.status || "").toLowerCase() === "active") ||
+    null;
   const activeId = activeOutcome?._id;
   const outcomeIds = outcomes.map((o) => o._id);
 
@@ -1003,7 +1219,9 @@ export const getFounderExecutionState = async (req, res) => {
     milestoneFilter.weeklyOutcomeId = { $in: outcomeIds };
   }
 
-  const milestones = await Milestone.find(milestoneFilter).sort({ sequence: 1 });
+  const milestones = await Milestone.find(milestoneFilter).sort({
+    sequence: 1,
+  });
   const milestoneIds = milestones.map((m) => m._id);
   const tasks = milestoneIds.length
     ? await Task.find({ founderId, milestoneId: { $in: milestoneIds } })
@@ -1014,7 +1232,9 @@ export const getFounderExecutionState = async (req, res) => {
   return apiSuccess(res, {
     journey: normalizeJourney(startup.data?.journey),
     homeUi:
-      startup.data?.homeUi && typeof startup.data.homeUi === "object" ? startup.data.homeUi : {},
+      startup.data?.homeUi && typeof startup.data.homeUi === "object"
+        ? startup.data.homeUi
+        : {},
     outcomes,
     milestones,
     tasks,
@@ -1026,7 +1246,9 @@ export const getPosts = async (req, res) => {
   if (!founderGuard(req, req.params.founderId)) {
     return apiError(res, "Forbidden.", 403);
   }
-  const posts = await StartupPost.find({ founderId: req.params.founderId }).sort({ createdAt: -1 });
+  const posts = await StartupPost.find({
+    founderId: req.params.founderId,
+  }).sort({ createdAt: -1 });
   return apiSuccess(res, posts);
 };
 
@@ -1035,13 +1257,54 @@ export const createPost = async (req, res) => {
   if (!founderGuard(req, founderId)) {
     return apiError(res, "Forbidden.", 403);
   }
-  const startup = await Startup.findOne({ founderId });
 
-  const post = await StartupPost.create({
+  const p = req.body?.post || req.body || {};
+  const startup = await Startup.findOne({ founderId });
+  const resolvedStartupId = p.startupId || req.body?.startupId || startup?._id || null;
+
+  const buildOffer = (src) => {
+    if (!src || typeof src !== "object") return undefined;
+    return {
+      compensationPhilosophy: src.compensationPhilosophy || "",
+      equityMin: src.equityMin != null ? String(src.equityMin) : "",
+      equityMax: src.equityMax != null ? String(src.equityMax) : "",
+      salaryMin: src.salaryMin != null ? String(src.salaryMin) : "",
+      salaryMax: src.salaryMax != null ? String(src.salaryMax) : "",
+      currency: src.currency || "",
+      notes: src.notes || "",
+    };
+  };
+
+  const fields = {
     founderId,
-    startupId: req.body?.startupId || startup?._id,
-    content: req.body?.content || "",
-    visibility: req.body?.visibility || "team",
+    startupId: resolvedStartupId,
+    title: String(p.title || "").slice(0, 200),
+    description: String(p.description || "").slice(0, 5000),
+    founderName: String(p.founder || p.founderName || "").slice(0, 200),
+    industry: String(p.industry || "").slice(0, 100),
+    stage: String(p.stage || "").slice(0, 100),
+    funding: String(p.funding || "").slice(0, 100),
+    location: String(p.location || "").slice(0, 200),
+    commitment: String(p.commitment || "").slice(0, 100),
+    teamSize: Math.max(0, Number(p.teamSize) || 0),
+    lookingFor: Array.isArray(p.lookingFor) ? p.lookingFor.map(String) : [],
+    tags: Array.isArray(p.tags) ? p.tags.map(String) : [],
+    offer: buildOffer(p.offer),
+    interested: Math.max(0, Number(p.interested) || 0),
+    postedDate: p.postedDate ? new Date(p.postedDate) : new Date(),
+    website: String(p.website || "").slice(0, 1000),
+    linkedinUrl: String(p.linkedinUrl || "").slice(0, 1000),
+    githubUrl: String(p.githubUrl || "").slice(0, 1000),
+    contactEmail: String(p.contactEmail || "").slice(0, 200),
+    pitchDeckUrl: String(p.pitchDeckUrl || "").slice(0, 1000),
+    content: p.content || JSON.stringify(p),
+    visibility: p.visibility || req.body?.visibility || "public",
+  };
+
+  const post = await StartupPost.findOneAndUpdate({ founderId }, fields, {
+    upsert: true,
+    new: true,
+    runValidators: true,
   });
 
   return apiSuccess(res, post, 201);
@@ -1051,7 +1314,10 @@ export const deletePost = async (req, res) => {
   if (!founderGuard(req, req.params.founderId)) {
     return apiError(res, "Forbidden.", 403);
   }
-  await StartupPost.findOneAndDelete({ _id: req.params.postId, founderId: req.params.founderId });
+  await StartupPost.findOneAndDelete({
+    _id: req.params.postId,
+    founderId: req.params.founderId,
+  });
   return apiSuccess(res, { deleted: true });
 };
 
@@ -1059,7 +1325,9 @@ export const getInvitations = async (req, res) => {
   if (!founderGuard(req, req.params.founderId)) {
     return apiError(res, "Forbidden.", 403);
   }
-  const invitations = await FounderTalentInvitation.find({ founderId: req.params.founderId }).sort({ createdAt: -1 });
+  const invitations = await FounderTalentInvitation.find({
+    founderId: req.params.founderId,
+  }).sort({ createdAt: -1 });
   return apiSuccess(res, invitations);
 };
 
@@ -1084,7 +1352,9 @@ export const getEvents = async (req, res) => {
   if (!founderGuard(req, req.params.founderId)) {
     return apiError(res, "Forbidden.", 403);
   }
-  const events = await Event.find({ founderId: req.params.founderId }).sort({ startsAt: 1 });
+  const events = await Event.find({ founderId: req.params.founderId }).sort({
+    startsAt: 1,
+  });
   return apiSuccess(res, events);
 };
 
@@ -1092,7 +1362,9 @@ export const getAnnouncements = async (req, res) => {
   if (!founderGuard(req, req.params.founderId)) {
     return apiError(res, "Forbidden.", 403);
   }
-  const announcements = await Announcement.find({ founderId: req.params.founderId }).sort({ createdAt: -1 });
+  const announcements = await Announcement.find({
+    founderId: req.params.founderId,
+  }).sort({ createdAt: -1 });
   return apiSuccess(res, announcements);
 };
 
@@ -1100,7 +1372,9 @@ export const getFounderResources = async (req, res) => {
   if (!founderGuard(req, req.params.founderId)) {
     return apiError(res, "Forbidden.", 403);
   }
-  const resources = await Resource.find({ founderId: req.params.founderId }).sort({ createdAt: -1 });
+  const resources = await Resource.find({
+    founderId: req.params.founderId,
+  }).sort({ createdAt: -1 });
   return apiSuccess(res, { resources });
 };
 
@@ -1116,7 +1390,8 @@ export const getStageTaskResponses = async (req, res) => {
     return apiError(res, "Startup not found.", 404);
   }
   const stageTaskResponses =
-    startup.data?.stageTaskResponses && typeof startup.data.stageTaskResponses === "object"
+    startup.data?.stageTaskResponses &&
+    typeof startup.data.stageTaskResponses === "object"
       ? startup.data.stageTaskResponses
       : {};
   return apiSuccess(res, { stageTaskResponses });
@@ -1130,7 +1405,8 @@ export const putStageTaskResponses = async (req, res) => {
   const body = req.body || {};
   const stageId = String(body.stageId ?? "");
   const taskId = String(body.taskId ?? "");
-  const text = typeof body.text === "string" ? body.text.trim().slice(0, 10000) : "";
+  const text =
+    typeof body.text === "string" ? body.text.trim().slice(0, 10000) : "";
   const completedAt = body.completedAt ? new Date(body.completedAt) : null;
 
   if (!stageId || !taskId) {
@@ -1144,9 +1420,10 @@ export const putStageTaskResponses = async (req, res) => {
 
   const mergedData = { ...(startup.data || {}) };
   const existing = mergedData.stageTaskResponses || {};
-  const stageResponses = existing[stageId] && typeof existing[stageId] === "object"
-    ? { ...existing[stageId] }
-    : {};
+  const stageResponses =
+    existing[stageId] && typeof existing[stageId] === "object"
+      ? { ...existing[stageId] }
+      : {};
 
   stageResponses[taskId] = {
     ...(stageResponses[taskId] || {}),
@@ -1190,13 +1467,20 @@ export const createStageCompletion = async (req, res) => {
     founderId,
     startupId: startup?._id ?? null,
     stageId,
-    stageName: String(body.stageName || "").trim().slice(0, 100),
-    method: ["completed", "skipped"].includes(body.method) ? body.method : "completed",
+    stageName: String(body.stageName || "")
+      .trim()
+      .slice(0, 100),
+    method: ["completed", "skipped"].includes(body.method)
+      ? body.method
+      : "completed",
     tasksCompletedCount: Number(body.tasksCompletedCount ?? 0),
     tasksTotal: Number(body.tasksTotal ?? 0),
     durationDays: Number(body.durationDays ?? 0),
     completedAt: body.completedAt ? new Date(body.completedAt) : new Date(),
-    metadata: typeof body.metadata === "object" && body.metadata !== null ? body.metadata : {},
+    metadata:
+      typeof body.metadata === "object" && body.metadata !== null
+        ? body.metadata
+        : {},
   });
 
   if (startup?._id) {
@@ -1282,12 +1566,16 @@ export const getFounderAnalyticsDashboard = async (req, res) => {
     TeamMemberProfile.countDocuments({ founderId }),
   ]);
 
-  const completedOutcomes = outcomes.filter((o) => o.status === "completed").length;
+  const completedOutcomes = outcomes.filter(
+    (o) => o.status === "completed",
+  ).length;
   const partialOutcomes = outcomes.filter((o) => o.status === "partial").length;
   const missedOutcomes = outcomes.filter((o) => o.status === "missed").length;
   const totalOutcomes = outcomes.length;
   const achievementRate =
-    totalOutcomes === 0 ? 0 : Math.round((completedOutcomes / totalOutcomes) * 100);
+    totalOutcomes === 0
+      ? 0
+      : Math.round((completedOutcomes / totalOutcomes) * 100);
 
   const completedTasks = tasks.filter((t) => t.status === "completed").length;
   const blockedTasks = tasks.filter((t) => t.status === "blocked");
@@ -1308,7 +1596,9 @@ export const getFounderAnalyticsDashboard = async (req, res) => {
       weekLabel: "Latest",
       tasksCompleted: completedTasks,
       completionRate:
-        tasks.length === 0 ? 0 : Math.round((completedTasks / tasks.length) * 100),
+        tasks.length === 0
+          ? 0
+          : Math.round((completedTasks / tasks.length) * 100),
       averageCompletionTime: 0,
     },
   ];

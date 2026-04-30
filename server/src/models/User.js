@@ -39,6 +39,11 @@ const userSchema = new mongoose.Schema(
       ref: "Startup",
       index: true,
     },
+    founderId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      index: true,
+    },
     onboardingComplete: { type: Boolean, default: false },
     /** Virtual Office Joyride tour; set true when user finishes the tour (server source of truth). */
     virtualOfficeTourCompleted: { type: Boolean, default: false },

@@ -28,6 +28,7 @@ import {
   DropdownMenuTrigger,
 } from "../ui/dropdown-menu";
 import { getAccessToken } from "../../app/session";
+import { getSentInterests } from "../../utils/api/inboxApi";
 
 const PAGE_META = {
   dashboard: {
@@ -39,8 +40,8 @@ const PAGE_META = {
     description: "Live startup workspace",
   },
   "team-matching": {
-    title: "Team Matching",
-    description: "Find and evaluate the right people",
+    title: "Browse Talent",
+    description: "Discover talent that can grow into your team",
   },
   inbox: {
     title: "Inbox",
@@ -53,6 +54,14 @@ const PAGE_META = {
   settings: {
     title: "Settings",
     description: "Profile, preferences, and account controls",
+  },
+  "talent-chat": {
+    title: "My Chats",
+    description: "Conversations with startups you expressed interest in",
+  },
+  "founder-chat": {
+    title: "Team Chat",
+    description: "Messages with team members and interested talents",
   },
   "my-performance": {
     title: "My Performance",
@@ -107,8 +116,12 @@ export default function AppLayoutHybrid({
 }) {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [unreadMessagesCount, setUnreadMessagesCount] = useState(0);
+  const [hasSentInterest, setHasSentInterest] = useState(false);
   const pageMeta = resolvePageMeta(currentPage, user.role);
-  const isWorkspacePage = currentPage === "startup-office";
+  const isWorkspacePage =
+    currentPage === "startup-office" ||
+    currentPage === "talent-chat" ||
+    currentPage === "founder-chat";
 
   useEffect(() => {
     const fetchInboxCount = async () => {
@@ -197,6 +210,17 @@ export default function AppLayoutHybrid({
     };
 
     fetchInboxCount();
+  }, [user.id, user.role]);
+
+  useEffect(() => {
+    if (user.role !== "talent") return;
+    const talentId = String(user._id ?? user.id ?? "");
+    if (!talentId) return;
+    getSentInterests(talentId)
+      .then((interests) => {
+        setHasSentInterest(Array.isArray(interests) && interests.length > 0);
+      })
+      .catch(() => {});
   }, [user.id, user.role]);
 
   const getNotificationCount = () => {
@@ -295,6 +319,7 @@ export default function AppLayoutHybrid({
           unreadCount={unreadMessagesCount}
           notificationCount={notificationCount}
           talentDashboardMode={talentDashboardMode}
+          hasSentInterest={hasSentInterest}
           isOpen={isMobileMenuOpen}
           onClose={() => setIsMobileMenuOpen(false)}
         />

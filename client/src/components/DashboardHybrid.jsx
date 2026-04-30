@@ -44,6 +44,8 @@ const AdminDebugIndicator = lazy(() =>
 const FounderDeliverablesView = lazy(
   () => import("./founders/FounderDeliverablesView"),
 );
+const TalentChatPage = lazy(() => import("./talent/TalentChatPage"));
+const FounderChatPage = lazy(() => import("./office/FounderChatPage"));
 
 // ⚡ LOADING FALLBACK - Minimal spinner for fast perceived performance
 const PageLoadingFallback = () => (
@@ -67,6 +69,7 @@ export default function DashboardHybrid({ user, onLogout, onUpdateUser }) {
   const [messageUserToOpen, setMessageUserToOpen] = useState(null);
   const [winToOpen, setWinToOpen] = useState(null);
   const [talentDashboardMode, setTalentDashboardMode] = useState("overview");
+  const [initialProfileEditing, setInitialProfileEditing] = useState(false);
 
   const handleVirtualOfficeViewChange = useCallback(
     (view) => {
@@ -115,6 +118,7 @@ export default function DashboardHybrid({ user, onLogout, onUpdateUser }) {
       if (page === "dashboard" && user.role === "talent") {
         setTalentDashboardMode(options?.mode || "overview");
       }
+      setInitialProfileEditing(page === "settings" && options?.editProfile === true);
       setCurrentPage(page);
     }
     console.log("✅ [DashboardHybrid] Page navigation triggered to:", page);
@@ -183,15 +187,23 @@ export default function DashboardHybrid({ user, onLogout, onUpdateUser }) {
       case "settings":
         return (
           <Suspense fallback={<PageLoadingFallback />}>
-            <SettingsPage user={user} onUpdateUser={onUpdateUser} />
+            <SettingsPage
+              user={user}
+              onUpdateUser={onUpdateUser}
+              initialProfileEditing={initialProfileEditing}
+            />
           </Suspense>
         );
       case "profile":
         // Redirect to settings (profile is now inside settings)
-        handleNavigate("settings");
+        handleNavigate("settings", { editProfile: true });
         return (
           <Suspense fallback={<PageLoadingFallback />}>
-            <SettingsPage user={user} onUpdateUser={onUpdateUser} />
+            <SettingsPage
+              user={user}
+              onUpdateUser={onUpdateUser}
+              initialProfileEditing={true}
+            />
           </Suspense>
         );
       // Placeholder for now
@@ -278,22 +290,31 @@ export default function DashboardHybrid({ user, onLogout, onUpdateUser }) {
 
       // Team Matching
       case "team-matching":
-        if (user.role === "talent") {
-          return (
-            <Suspense fallback={<PageLoadingFallback />}>
-              <TalentDashboard
-                user={user}
-                onLogout={onLogout}
-                onUpdateUser={onUpdateUser}
-                onNavigate={handleNavigate}
-                entryMode="opportunities"
-              />
-            </Suspense>
-          );
-        }
         return (
           <Suspense fallback={<PageLoadingFallback />}>
             <TeamMatching user={user} onNavigate={handleNavigate} />
+          </Suspense>
+        );
+
+      // Founder/Team Chat — full-page two-pane chat for founders and team members
+      case "founder-chat":
+        return (
+          <Suspense fallback={<PageLoadingFallback />}>
+            <FounderChatPage
+              user={user}
+              onNavigate={handleNavigate}
+            />
+          </Suspense>
+        );
+
+      // Talent Chat — real-time chat with founders the talent expressed interest in
+      case "talent-chat":
+        return (
+          <Suspense fallback={<PageLoadingFallback />}>
+            <TalentChatPage
+              user={user}
+              onNavigate={handleNavigate}
+            />
           </Suspense>
         );
 
@@ -310,6 +331,7 @@ export default function DashboardHybrid({ user, onLogout, onUpdateUser }) {
               user={user}
               onBack={() => handleNavigate("dashboard")}
               initialTab={initialTab}
+              onNavigate={handleNavigate}
             />
           </Suspense>
         );

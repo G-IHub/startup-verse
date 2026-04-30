@@ -29,6 +29,8 @@ import {
   Heart,
   Calendar,
   Building2,
+  MessageCircle,
+  Handshake,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Label } from "./ui/label";
@@ -37,6 +39,21 @@ import { convertTalentToTeamMember } from "../utils/api/compensationApi";
 import CompensationSetupWizard from "./compensation/CompensationSetupWizard";
 import { getStartupId } from "../utils/startupId";
 import { getAccessToken } from "../app/session";
+
+// Normalize MongoDB _id to id so all item.id references work
+const normalizeItem = (item) => {
+  if (!item) return item;
+  const id = String(item._id ?? item.id ?? "");
+  // MongoDB may populate founderId/talentId as objects — extract name if missing
+  const founderName = item.founderName ||
+    (item.founderId && typeof item.founderId === "object" ? item.founderId.name : "") ||
+    "Founder";
+  const talentName = item.talentName ||
+    (item.talentId && typeof item.talentId === "object" ? item.talentId.name : "") ||
+    "Talent";
+  return { ...item, id, _id: id, founderName, talentName };
+};
+const normalizeItems = (arr) => (Array.isArray(arr) ? arr.map(normalizeItem) : []);
 
 // Track read messages with timestamps in localStorage
 const READ_MESSAGES_KEY = "startupverse_read_messages_timestamps";
@@ -124,7 +141,7 @@ export const countUnreadMessages = (messages, userId) => {
     ),
   ).length;
 };
-export default function Inbox({ user, onBack, initialTab = "received" }) {
+export default function Inbox({ user, onBack, initialTab = "received", onNavigate }) {
   // Handle both _id (MongoDB) and id fields
   const userId = user?._id || user?.id;
   const [activeTab, setActiveTab] = useState(initialTab);
@@ -156,7 +173,9 @@ export default function Inbox({ user, onBack, initialTab = "received" }) {
   useEffect(() => {
     setActiveTab(initialTab);
     // Refresh data when navigating to inbox
-    loadInboxData();
+    if (userId) {
+      loadInboxData();
+    }
   }, [initialTab]);
   const loadInboxData = async () => {
     if (!userId) {
@@ -175,11 +194,11 @@ export default function Inbox({ user, onBack, initialTab = "received" }) {
       if (user?.role === "talent") {
         // Talent receives invitations from founders
         const invitations = await inboxApi.getReceivedInvitations(userId);
-        setReceivedItems(invitations);
+        setReceivedItems(normalizeItems(invitations));
 
         // Talent sends interests to founders
         const interests = await inboxApi.getSentInterests(userId);
-        setSentItems(interests);
+        setSentItems(normalizeItems(interests));
         console.log("✅ [Inbox] Loaded talent inbox data:", {
           receivedInvitations: invitations.length,
           sentInterests: interests.length,
@@ -192,10 +211,11 @@ export default function Inbox({ user, onBack, initialTab = "received" }) {
         );
         const interests = await inboxApi.getReceivedInterests(userId);
         console.log("📥 [Inbox-Founder] Received interests:", interests);
-        setReceivedItems(interests);
+        setReceivedItems(normalizeItems(interests));
 
         // Founders send invitations to talent
-        const invitations = await inboxApi.getSentInvitations(userId);
+        const rawInvitations = await inboxApi.getSentInvitations(userId);
+        const invitations = normalizeItems(rawInvitations);
         console.log(
           "📤 [Inbox-Founder] Sent invitations (should only be to talent):",
           invitations,
@@ -313,6 +333,16 @@ export default function Inbox({ user, onBack, initialTab = "received" }) {
           action === "accept" ? "accepted" : "declined",
           responseText,
         );
+        // On accept: trigger full onboarding — converts talent role to team-member,
+        // sets startupId/founderId on their account, adds them to Presence so they
+        // appear immediately in the dashboard team list.
+        if (action === "accept") {
+          try {
+            await inboxApi.markInterestAsOnboarded(item.id);
+          } catch (onboardErr) {
+            console.error("⚠️ Onboarding step failed (team member may need manual onboarding):", onboardErr);
+          }
+        }
       } else {
         // This shouldn't happen as talent doesn't accept/reject, but keeping for completeness
         toast.error("Invalid action for your role");
@@ -320,7 +350,7 @@ export default function Inbox({ user, onBack, initialTab = "received" }) {
       }
       toast.success(
         action === "accept"
-          ? "✅ Accepted and response sent!"
+          ? "✅ Accepted! They've been added to your team."
           : "❌ Declined and response sent",
       );
       setSelectedItem(null);
@@ -559,6 +589,20 @@ export default function Inbox({ user, onBack, initialTab = "received" }) {
           <Badge variant="destructive">
             <XCircle className="w-3 h-3 mr-1" />
             Declined
+          </Badge>
+        );
+      case "proposed-by-founder":
+        return (
+          <Badge className="bg-blue-500">
+            <Handshake className="w-3 h-3 mr-1" />
+            Offer Sent
+          </Badge>
+        );
+      case "proposed-by-talent":
+        return (
+          <Badge className="bg-purple-500">
+            <Handshake className="w-3 h-3 mr-1" />
+            Proposed
           </Badge>
         );
       default:
@@ -907,7 +951,7 @@ export default function Inbox({ user, onBack, initialTab = "received" }) {
                   <div className="relative">
                     <Avatar className="w-12 h-12">
                       <AvatarFallback className="bg-primary/10 text-primary font-semibold">
-                        {sentBy[0].toUpperCase()}
+                        {(sentBy || "?")[0].toUpperCase()}
                       </AvatarFallback>
                     </Avatar>
                     {isNewMessage && (
@@ -1006,6 +1050,24 @@ export default function Inbox({ user, onBack, initialTab = "received" }) {
                         </Badge>
                       )}
                     </div>
+                    {/* Open Chat button — only for founder viewing a talent interest */}
+                    {user?.role === "founder" && !isInvitation(item) && onNavigate && (
+                      <div className="mt-3">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="gap-1.5 text-xs h-7"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            const talentId = String(item.talentId?._id || item.talentId || "");
+                            onNavigate("startup-office", { messageUserId: talentId });
+                          }}
+                        >
+                          <MessageCircle className="w-3 h-3" />
+                          Open Chat
+                        </Button>
+                      </div>
+                    )}
                   </div>
                 </div>
               </CardContent>
@@ -1078,7 +1140,7 @@ export default function Inbox({ user, onBack, initialTab = "received" }) {
                   <div className="relative">
                     <Avatar className="w-12 h-12">
                       <AvatarFallback className="bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 font-semibold">
-                        {recipientName[0].toUpperCase()}
+                        {(recipientName || "?")[0].toUpperCase()}
                       </AvatarFallback>
                     </Avatar>
                     {isNewActivity && (
@@ -1404,14 +1466,15 @@ export default function Inbox({ user, onBack, initialTab = "received" }) {
                 })}
               </div>
             )}
+            {/* ── Pending interest (not yet a proposal) ── */}
             {selectedItem.status === "pending" && activeTab === "received" && (
               <div className="space-y-3 pt-4 border-t">
-                <Label>Your Response</Label>
+                <Label>Reply</Label>
                 <Textarea
                   value={responseMessage}
                   onChange={(e) => setResponseMessage(e.target.value)}
                   placeholder="Write your response..."
-                  rows={4}
+                  rows={3}
                   disabled={isSending}
                 />
                 {user?.role === "talent" ? (
@@ -1470,38 +1533,227 @@ export default function Inbox({ user, onBack, initialTab = "received" }) {
                     )}
                   </div>
                 ) : (
-                  <div className="flex gap-2">
-                    <Button
-                      onClick={() => handleRespond(selectedItem, "accept")}
-                      className="flex-1"
-                      variant="default"
-                      disabled={isSending}
-                    >
-                      {isSending ? (
-                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      ) : (
-                        <CheckCircle2 className="w-4 h-4 mr-2" />
+                  /* Founder sees pending interest — reply or propose team membership */
+                  <div className="space-y-2">
+                    <div className="flex gap-2">
+                      <Button
+                        onClick={() => handleSendMessage(selectedItem)}
+                        className="flex-1"
+                        variant="outline"
+                        disabled={isSending}
+                      >
+                        {isSending ? (
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        ) : (
+                          <Send className="w-4 h-4 mr-2" />
+                        )}
+                        Send Reply
+                      </Button>
+                      {onNavigate && (
+                        <Button
+                          variant="outline"
+                          className="gap-1.5"
+                          disabled={isSending}
+                          onClick={() => {
+                            const talentId = String(selectedItem.talentId?._id || selectedItem.talentId || "");
+                            setSelectedItem(null);
+                            onNavigate("startup-office", { messageUserId: talentId });
+                          }}
+                        >
+                          <MessageCircle className="w-4 h-4" />
+                          Chat
+                        </Button>
                       )}
-                      Accept & Send
-                    </Button>
-                    <Button
-                      onClick={() => handleRespond(selectedItem, "decline")}
-                      className="flex-1"
-                      variant="outline"
-                      disabled={isSending}
-                    >
-                      {isSending ? (
-                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      ) : (
-                        <XCircle className="w-4 h-4 mr-2" />
-                      )}
-                      Decline & Send
-                    </Button>
+                    </div>
+                    <div className="p-3 bg-blue-50 dark:bg-blue-950/20 rounded-lg border border-blue-200 dark:border-blue-800">
+                      <p className="text-xs text-blue-700 dark:text-blue-300 mb-2 font-medium">
+                        Ready to bring them on board?
+                      </p>
+                      <Button
+                        onClick={async () => {
+                          setIsSending(true);
+                          try {
+                            await inboxApi.proposeTeamMembership(selectedItem.id, "founder");
+                            toast.success("Team membership offer sent!");
+                            setSelectedItem(null);
+                            await loadInboxData();
+                          } catch (err) {
+                            toast.error("Failed to send offer.");
+                          } finally {
+                            setIsSending(false);
+                          }
+                        }}
+                        className="w-full bg-blue-600 hover:bg-blue-700"
+                        disabled={isSending}
+                      >
+                        {isSending ? (
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        ) : (
+                          <Handshake className="w-4 h-4 mr-2" />
+                        )}
+                        Propose Team Membership
+                      </Button>
+                    </div>
                   </div>
                 )}
               </div>
             )}
-            {selectedItem.status !== "pending" && (
+            {/* ── Talent viewing their sent interest: propose themselves ── */}
+            {selectedItem.status === "pending" && activeTab === "sent" && user?.role === "talent" && !isInvitation(selectedItem) && (
+              <div className="space-y-3 pt-4 border-t">
+                <Label>Continue Conversation</Label>
+                <Textarea
+                  value={responseMessage}
+                  onChange={(e) => setResponseMessage(e.target.value)}
+                  placeholder="Write a follow-up message..."
+                  rows={3}
+                  disabled={isSending}
+                />
+                <div className="flex gap-2">
+                  <Button
+                    onClick={() => handleSendMessage(selectedItem)}
+                    className="flex-1"
+                    variant="outline"
+                    disabled={isSending}
+                  >
+                    {isSending ? (
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    ) : (
+                      <Send className="w-4 h-4 mr-2" />
+                    )}
+                    Send Message
+                  </Button>
+                </div>
+                <div className="p-3 bg-purple-50 dark:bg-purple-950/20 rounded-lg border border-purple-200 dark:border-purple-800">
+                  <p className="text-xs text-purple-700 dark:text-purple-300 mb-2 font-medium">
+                    Confident this is the right fit?
+                  </p>
+                  <Button
+                    onClick={async () => {
+                      setIsSending(true);
+                      try {
+                        await inboxApi.proposeTeamMembership(selectedItem.id, "talent");
+                        toast.success("Team membership proposal sent!");
+                        setSelectedItem(null);
+                        await loadInboxData();
+                      } catch (err) {
+                        toast.error("Failed to send proposal.");
+                      } finally {
+                        setIsSending(false);
+                      }
+                    }}
+                    className="w-full bg-purple-600 hover:bg-purple-700"
+                    disabled={isSending}
+                  >
+                    {isSending ? (
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    ) : (
+                      <Handshake className="w-4 h-4 mr-2" />
+                    )}
+                    Propose Myself as Team Member
+                  </Button>
+                </div>
+              </div>
+            )}
+            {/* ── Talent receives a "proposed-by-founder" offer ── */}
+            {selectedItem.status === "proposed-by-founder" && user?.role === "talent" && (
+              <div className="p-4 rounded-lg border bg-blue-50 dark:bg-blue-950/20 border-blue-200 dark:border-blue-800 mt-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <Handshake className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+                  <p className="font-semibold text-blue-900 dark:text-blue-100">Team Membership Offer</p>
+                </div>
+                <p className="text-sm text-blue-700 dark:text-blue-300 mb-3">
+                  {selectedItem.founderName || "The founder"} has proposed you as a team member. Accept to join their startup.
+                </p>
+                <div className="flex gap-2">
+                  <Button
+                    onClick={async () => {
+                      setIsSending(true);
+                      try {
+                        await inboxApi.acceptTeamMembershipProposal(selectedItem.id);
+                        toast.success("Welcome to the team!");
+                        setSelectedItem(null);
+                        await loadInboxData();
+                      } catch (err) {
+                        toast.error("Failed to accept offer.");
+                      } finally {
+                        setIsSending(false);
+                      }
+                    }}
+                    className="flex-1 bg-green-600 hover:bg-green-700"
+                    disabled={isSending}
+                  >
+                    {isSending ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <CheckCircle2 className="w-4 h-4 mr-2" />}
+                    Accept
+                  </Button>
+                  <Button
+                    onClick={async () => {
+                      setIsSending(true);
+                      try {
+                        await inboxApi.declineTeamMembershipProposal(selectedItem.id);
+                        toast.success("Offer declined.");
+                        setSelectedItem(null);
+                        await loadInboxData();
+                      } catch (err) {
+                        toast.error("Failed to decline offer.");
+                      } finally {
+                        setIsSending(false);
+                      }
+                    }}
+                    className="flex-1"
+                    variant="outline"
+                    disabled={isSending}
+                  >
+                    {isSending ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <XCircle className="w-4 h-4 mr-2" />}
+                    Decline
+                  </Button>
+                </div>
+              </div>
+            )}
+            {/* ── Founder receives a "proposed-by-talent" offer ── */}
+            {selectedItem.status === "proposed-by-talent" && user?.role === "founder" && (
+              <div className="p-4 rounded-lg border bg-purple-50 dark:bg-purple-950/20 border-purple-200 dark:border-purple-800 mt-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <Handshake className="w-5 h-5 text-purple-600 dark:text-purple-400" />
+                  <p className="font-semibold text-purple-900 dark:text-purple-100">Team Membership Proposal</p>
+                </div>
+                <p className="text-sm text-purple-700 dark:text-purple-300 mb-3">
+                  {selectedItem.talentName || "This talent"} is proposing to join your team. Accept to onboard them.
+                </p>
+                <div className="flex gap-2">
+                  <Button
+                    onClick={handleOpenCompensationWizard}
+                    className="flex-1 bg-green-600 hover:bg-green-700"
+                    disabled={isSending}
+                  >
+                    <UserPlus className="w-4 h-4 mr-2" />
+                    Accept & Onboard
+                  </Button>
+                  <Button
+                    onClick={async () => {
+                      setIsSending(true);
+                      try {
+                        await inboxApi.declineTeamMembershipProposal(selectedItem.id);
+                        toast.success("Proposal declined.");
+                        setSelectedItem(null);
+                        await loadInboxData();
+                      } catch (err) {
+                        toast.error("Failed to decline.");
+                      } finally {
+                        setIsSending(false);
+                      }
+                    }}
+                    className="flex-1"
+                    variant="outline"
+                    disabled={isSending}
+                  >
+                    {isSending ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <XCircle className="w-4 h-4 mr-2" />}
+                    Decline
+                  </Button>
+                </div>
+              </div>
+            )}
+            {(selectedItem.status === "accepted" || selectedItem.status === "declined") && (
               <div
                 className={`p-4 rounded-lg border ${selectedItem.status === "accepted" ? "bg-green-50 dark:bg-green-950/20 border-green-200 dark:border-green-800" : "bg-red-50 dark:bg-red-950/20 border-red-200 dark:border-red-800"}`}
               >
@@ -1543,7 +1795,7 @@ export default function Inbox({ user, onBack, initialTab = "received" }) {
                   )}
               </div>
             )}
-            {selectedItem.status !== "pending" && (
+            {(selectedItem.status === "accepted" || selectedItem.status === "declined") && (
               <div className="space-y-3 pt-4 border-t">
                 <Label>Continue Conversation</Label>
                 <Textarea

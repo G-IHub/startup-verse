@@ -213,18 +213,21 @@ function ActivityDateFilter({ activities, children }) {
       {/* Filter controls row */}
       <div className="flex items-center justify-between gap-2">
         {/* Segmented preset control */}
-        <div className="flex items-center rounded-lg border border-border bg-muted/60 p-0.5 gap-0.5">
+        <div className="flex items-center gap-1">
           {ACTIVITY_PRESETS.map((p) => (
             <button
               key={p.key}
               type="button"
               onClick={() => handlePreset(p.key)}
-              className={cn(
-                "rounded-md px-2.5 py-[3px] text-[10px] font-medium transition-all duration-150",
-                preset === p.key
-                  ? "bg-background text-foreground shadow-sm ring-1 ring-border/50"
-                  : "text-muted-foreground hover:text-foreground",
-              )}
+              className="text-[12px] font-medium transition-all duration-150"
+              style={{
+                borderRadius: 6,
+                padding: '4px 10px',
+                background: preset === p.key ? '#1C4ED8' : '#F0EEE8',
+                color: preset === p.key ? '#FFFFFF' : '#1a1a1a',
+                border: 'none',
+                cursor: 'pointer',
+              }}
             >
               {p.label}
             </button>
@@ -236,12 +239,15 @@ function ActivityDateFilter({ activities, children }) {
           <button
             type="button"
             onClick={() => { setShowCustom((v) => !v); setPreset(null); }}
-            className={cn(
-              "flex items-center gap-1 rounded-lg border px-2.5 py-[3px] text-[10px] font-medium transition-all duration-150",
-              showCustom
-                ? "border-primary/50 bg-primary/8 text-primary"
-                : "border-border bg-background text-muted-foreground hover:text-foreground hover:border-border",
-            )}
+            className="flex items-center gap-1 text-[12px] font-medium transition-all duration-150"
+            style={{
+              borderRadius: 6,
+              padding: '4px 10px',
+              border: showCustom ? '1px solid #1C4ED8' : '1px solid rgba(0,0,0,0.07)',
+              background: '#FFFFFF',
+              color: showCustom ? '#1C4ED8' : '#6B6860',
+              cursor: 'pointer',
+            }}
           >
             <Filter className="h-2.5 w-2.5" />
             Custom
@@ -308,16 +314,18 @@ function ActivityDateFilter({ activities, children }) {
 
 function OfficePanelCard({ title, action, children, className = "" }) {
   return (
-    <Card className={cn("office-card office-animate-in shadow-none", className)}>
-      <CardHeader className="pb-2 pt-2.5 office-panel-header">
+    <Card className={cn("office-card office-animate-in shadow-none rounded-[10px] transition-shadow duration-150 hover:shadow-[0_1px_8px_rgba(0,0,0,0.06)]", className)}
+      style={{background: '#FFFFFF', border: '1px solid rgba(0,0,0,0.07)', boxShadow: 'none'}}
+    >
+      <CardHeader className="pb-2 pt-4 px-5 office-panel-header">
         <div className="flex items-center justify-between gap-3">
-          <CardTitle className="text-[12px] font-semibold tracking-tight text-foreground">
+          <CardTitle className="text-[14px] font-semibold text-gray-900" style={{fontFamily: '"Bricolage Grotesque", "Segoe UI", sans-serif'}}>
             {title}
           </CardTitle>
           {action}
         </div>
       </CardHeader>
-      <CardContent className="space-y-2.5 px-2.5 pb-2.5 sm:px-3 sm:pb-3">{children}</CardContent>
+      <CardContent className="space-y-2.5 px-5 pb-5">{children}</CardContent>
     </Card>
   );
 }
@@ -400,81 +408,76 @@ export default function VirtualStartupOfficeWorkspaceV2({
     : panels.isOpen("calendar");
 
   return (
-    <div className="space-y-2.5 bg-background p-2.5 md:p-3 lg:p-3.5 office-panel">
+    <div className="office-panel" style={{background: '#F7F6F3', fontFamily: '"Instrument Sans", "Segoe UI", sans-serif', padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: 20}}>
       <section
-        className="relative overflow-hidden rounded-xl border px-3 py-3 text-white sm:px-4 sm:py-3.5"
-        style={{
-          background: "linear-gradient(120deg, #1f3dff 0%, #3a5afe 48%, #6f89ff 100%)",
-          borderColor: "#6f86ff",
-        }}
+        className="rounded-[10px] bg-white px-5 py-4 flex flex-wrap items-center justify-between gap-3"
+        style={{border: '1px solid rgba(0,0,0,0.07)', boxShadow: 'none', background: '#FFFFFF'}}
       >
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_100%_0%,rgba(255,255,255,0.24),transparent_52%)]" />
-        <div className="absolute -left-8 -bottom-14 h-28 w-28 rounded-full bg-white/15 blur-2xl" />
-        <div className="absolute -right-8 -top-12 h-32 w-32 rounded-full bg-indigo-200/25 blur-2xl" />
-
-        <div className="relative flex flex-wrap items-center justify-between gap-3">
-          <div className="min-w-0 space-y-1.5">
-            <div className="flex flex-wrap items-center gap-2.5">
-              <p className="truncate text-[13px] font-bold sm:text-[15px]">
-                {getDayGreeting()}, {user?.name || "New User"}!
-              </p>
-              <Badge className="h-5 rounded-full border border-white/35 bg-white/20 px-2 text-[10px] font-semibold text-white hover:bg-white/20">
-                {office.teamEnergy.onlineCount} teammates online
-              </Badge>
-            </div>
-            <div className="flex flex-wrap items-center gap-2 text-[11px] text-white/90 sm:text-[12px]">
-              <span className="inline-flex items-center gap-1 rounded-full border border-white/30 bg-white/12 px-2 py-0.5">
-                <Sparkles className="h-3.5 w-3.5" />
-                Live startup workspace
-              </span>
-              <span>Keep up the great work!</span>
-            </div>
+        <div className="min-w-0 space-y-1.5">
+          <div className="flex flex-wrap items-center gap-2.5">
+            <p className="truncate text-[18px] font-semibold text-gray-900" style={{fontFamily: '"Bricolage Grotesque", "Segoe UI", sans-serif'}}>
+              {getDayGreeting()}, {user?.name || "New User"}!
+            </p>
+            <span className="inline-flex items-center rounded-full px-[10px] py-[3px] text-[11px] font-medium" style={{background: '#EEF2FF', color: '#1C4ED8'}}>
+              {office.teamEnergy.onlineCount} teammates online
+            </span>
           </div>
-
-          <div className="flex items-center gap-2">
-            <span className="text-[10px] font-medium text-white/90 sm:text-[11px]">Status</span>
-            <button
-              type="button"
-              className="h-6 rounded-full border border-white/40 bg-white/14 px-2.5 text-[10px] font-semibold uppercase tracking-wide text-white backdrop-blur-sm"
-            >
-              available
-            </button>
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px]" style={{background: '#F0EEE8', color: '#6B6860'}}>
+              <Sparkles className="h-3 w-3" />
+              Live startup workspace
+            </span>
+            <span className="text-[11px]" style={{color: '#6B6860'}}>Keep up the great work!</span>
           </div>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="text-[11px]" style={{color: '#6B6860'}}>Status</span>
+          <button
+            type="button"
+            className="rounded-full px-3 py-0.5 text-[10px] font-semibold uppercase tracking-wide transition-colors duration-150"
+            style={{background: '#DCFCE7', color: '#166534', border: 'none'}}
+          >
+            available
+          </button>
         </div>
       </section>
 
-      <div className="rounded-lg border border-border bg-card px-2 py-1.5 sm:px-3">
-        <div className="flex flex-wrap items-center gap-1">
-          {actionButtons.map((item) => {
-            const Icon = item.icon;
-            const active = panels.isOpen(item.panel);
-            return (
-              <Button
-                key={item.key}
-                type="button"
-                variant="ghost"
-                onClick={() => panels.openPanel(item.panel)}
-                className={cn(
-                  "h-6 gap-1.5 rounded-md px-2.5 text-[11px] font-medium text-muted-foreground hover:bg-muted hover:text-foreground",
-                  active && "bg-muted text-foreground",
-                )}
-              >
-                <Icon className="h-3.5 w-3.5" />
-                {item.label}
-              </Button>
-            );
-          })}
-          <div className="ml-auto flex items-center gap-1.5">
-            <Button
+      <div className="bg-white flex flex-wrap items-center gap-0 px-3" style={{background: '#FFFFFF', borderBottom: '1px solid rgba(0,0,0,0.07)', borderTop: 'none', borderLeft: 'none', borderRight: 'none'}}>
+        {actionButtons.map((item) => {
+          const Icon = item.icon;
+          const active = panels.isOpen(item.panel);
+          return (
+            <button
+              key={item.key}
               type="button"
-              variant="ghost"
-              className="h-6 gap-1 rounded-md px-2 text-[11px]"
-              onClick={() => panels.openPanel("calendar")}
+              onClick={() => panels.openPanel(item.panel)}
+              className="inline-flex items-center gap-1.5 px-3 h-10 text-[13px] font-medium transition-colors duration-150"
+              style={{
+                color: active ? '#1a1a1a' : '#6B6860',
+                borderBottom: active ? '2px solid #1C4ED8' : '2px solid transparent',
+                background: 'transparent',
+                border: 'none',
+                borderBottomWidth: 2,
+                borderBottomStyle: 'solid',
+                borderBottomColor: active ? '#1C4ED8' : 'transparent',
+                cursor: 'pointer',
+              }}
             >
-              <Command className="h-3.5 w-3.5" />
-              Shortcuts
-            </Button>
-          </div>
+              <Icon className="h-4 w-4" />
+              {item.label}
+            </button>
+          );
+        })}
+        <div className="ml-auto flex items-center gap-1.5 pl-2">
+          <button
+            type="button"
+            className="inline-flex items-center gap-1 px-2 h-10 text-[12px] transition-colors duration-150"
+            style={{color: '#6B6860', background: 'transparent', border: 'none', cursor: 'pointer'}}
+            onClick={() => panels.openPanel("calendar")}
+          >
+            <Command className="h-3.5 w-3.5" />
+            Shortcuts
+          </button>
         </div>
       </div>
 
@@ -486,13 +489,14 @@ export default function VirtualStartupOfficeWorkspaceV2({
         </Card>
       ) : null}
 
-      <div className="office-workspace-grid-top grid gap-2.5">
+      <div className="office-workspace-grid-top" style={{display: 'grid', gridTemplateColumns: '280px 1fr 300px', gap: 16, alignItems: 'start'}}>
+        <div style={{position: 'relative'}}>
         <OfficePanelCard
           title="Live Activity"
           action={
             <span className="flex items-center gap-1.5">
-              <span className="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-green-500" />
-              <span className="text-[10px] text-muted-foreground">Real-time</span>
+              <span className="inline-block h-1.5 w-1.5 animate-pulse rounded-full" style={{background: '#22C55E'}} />
+              <span className="text-[11px]" style={{color: '#6B6860'}}>Real-time</span>
             </span>
           }
           className="office-workspace-grid-top__activity"
@@ -512,7 +516,7 @@ export default function VirtualStartupOfficeWorkspaceV2({
               {(filtered, hasActiveFilter) => (
                 <>
                   <div className="mb-1 flex items-center justify-between">
-                    <span className="text-[10px] text-muted-foreground">
+                    <span className="text-[11px]" style={{color: '#6B6860'}}>
                       {hasActiveFilter
                         ? `${filtered.length} of ${recentActivities.length} activities`
                         : `${recentActivities.length} activities`}
@@ -524,15 +528,21 @@ export default function VirtualStartupOfficeWorkspaceV2({
                       <p className="text-[11px] text-muted-foreground">No activity in this period</p>
                     </div>
                   ) : (
-                    <div className="space-y-1.5 overflow-y-auto pr-0.5" style={{ maxHeight: 280 }}>
-                      {filtered.map((activity) => (
-                        <div key={activity.id} className="rounded-md border border-border bg-card px-2.5 py-2">
-                          <p className="line-clamp-2 text-[11px]">
+                    <div className="overflow-y-auto" style={{ maxHeight: 280 }}>
+                      {filtered.map((activity, idx) => (
+                        <div
+                          key={activity.id}
+                          className="py-2.5"
+                          style={{
+                            borderBottom: idx < filtered.length - 1 ? '1px solid rgba(0,0,0,0.05)' : 'none',
+                          }}
+                        >
+                          <p className="line-clamp-2 text-[13px]" style={{color: '#1a1a1a'}}>
                             <span className="font-medium">{activity.userName}</span>
                             {" "}
                             {activity.message}
                           </p>
-                          <p className="mt-1 text-[10px] text-muted-foreground">
+                          <p className="mt-0.5 text-[11px]" style={{color: '#9C9A93'}}>
                             {formatRelativeTime(activity.timestamp)}
                           </p>
                         </div>
@@ -544,18 +554,20 @@ export default function VirtualStartupOfficeWorkspaceV2({
             </ActivityDateFilter>
           )}
         </OfficePanelCard>
+        </div>
 
+        <div style={{position: 'relative'}}>
         <OfficePanelCard
           title="Team Grid View"
           action={
-            <Button
+            <button
               type="button"
-              variant="outline"
-              className="h-6 rounded-md border-[#D1D5DB] px-2 text-[10px] hover:border-indigo-500"
+              className="inline-flex items-center h-7 rounded-[6px] px-2.5 text-[12px] font-medium transition-colors duration-150"
+              style={{border: '1px solid rgba(0,0,0,0.07)', background: '#FFFFFF', color: '#6B6860', cursor: 'pointer'}}
               onClick={() => panels.openPanel("chat")}
             >
               + Invite Team
-            </Button>
+            </button>
           }
           className="min-h-[232px] office-workspace-grid-top__team"
         >
@@ -566,112 +578,114 @@ export default function VirtualStartupOfficeWorkspaceV2({
           ) : (
             <div className="grid h-[164px] grid-cols-1">
               {roster.slice(0, 1).map((member) => (
-                <div key={member.id} className="h-fit w-[195px] rounded-md border border-border bg-muted/20 p-2.5">
-                  <div className="mb-2 flex items-center gap-2">
-                    <div className="relative flex h-8 w-8 items-center justify-center rounded-md bg-slate-100 text-[12px] font-medium text-slate-700">
+                <div key={member.id} className="h-fit rounded-[8px]" style={{background: '#F7F6F3', border: '1px solid rgba(0,0,0,0.06)', padding: '14px 16px'}}>
+                  <div className="mb-2 flex items-center gap-2.5">
+                    <div className="relative flex-shrink-0 flex items-center justify-center rounded-full text-[13px] font-medium" style={{width: 38, height: 38, background: '#EEF2FF', color: '#1C4ED8', fontFamily: '"Instrument Sans", "Segoe UI", sans-serif'}}>
                       {getInitials(member.name)}
                       {member.isOnline && (
-                        <span className="absolute -right-0.5 -bottom-0.5 h-2.5 w-2.5 rounded-full border border-white bg-emerald-500" />
+                        <span className="absolute -right-0.5 -bottom-0.5 h-2.5 w-2.5 rounded-full border-2 border-white bg-emerald-500" />
                       )}
                     </div>
                     <div className="min-w-0">
-                      <p className="truncate text-[11px] font-medium">{member.name}</p>
-                      <p className="truncate text-[10px] text-muted-foreground">
+                      <p className="truncate text-[14px] font-medium text-gray-900">{member.name}</p>
+                      <p className="truncate text-[12px]" style={{color: '#6B6860'}}>
                         {member.title || member.role}
                       </p>
                     </div>
                   </div>
-                  <p className="truncate text-[10px] text-muted-foreground">
-                    {member.statusText || "available"}
-                  </p>
+                  <div className="flex items-center gap-1.5">
+                    <span className="inline-block h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                    <p className="truncate text-[11px]" style={{color: '#6B6860'}}>
+                      {member.statusText || "available"}
+                    </p>
+                  </div>
                 </div>
               ))}
             </div>
           )}
         </OfficePanelCard>
+        </div>
 
+        <div style={{position: 'relative'}}>
         <OfficePanelCard
           title="Team Energy & Pulse"
           className="min-h-[232px] office-workspace-grid-top__energy"
         >
-          <div className="space-y-2.5">
-            <div className="space-y-0.5 text-center">
-              <p className="text-[20px] leading-none">{"\u{1F973}"}</p>
-              <p className="text-[13px] font-medium">
+          <div style={{display: 'flex', flexDirection: 'column', gap: 12}}>
+            <div style={{textAlign: 'center', padding: '16px 0'}}>
+              <p style={{fontFamily: '"Bricolage Grotesque", "Segoe UI", sans-serif', fontSize: 22, fontWeight: 600, color: '#1a1a1a', lineHeight: 1}}>
                 {office.teamEnergy.percentage >= 70
-                  ? "High"
+                  ? "HIGH"
                   : office.teamEnergy.percentage >= 40
-                    ? "Moderate"
-                    : "Low"}
+                    ? "MODERATE"
+                    : "LOW"}
               </p>
-              <p className="text-[10px] text-muted-foreground">Team is winding down</p>
+              <p style={{fontSize: 12, color: '#9C9A93', marginTop: 4}}>Team is winding down</p>
             </div>
-            <div className="border-t border-border pt-2">
-              <p className="text-[10px] text-muted-foreground">Live Stats</p>
-              <div className="mt-1.5 grid grid-cols-4 gap-1.5">
-                <div className="rounded-md border border-border bg-muted/20 p-1.5 text-center">
-                  <p className="text-[11px] font-medium">{office.teamEnergy.totalCount}</p>
-                  <p className="text-[9px] text-muted-foreground">People</p>
+            <div style={{borderTop: '1px solid rgba(0,0,0,0.06)', paddingTop: 12}}>
+              <p style={{fontSize: 11, fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.06em', color: '#9C9A93', marginBottom: 8}}>Live Stats</p>
+              <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8}}>
+                <div style={{background: '#F7F6F3', borderRadius: 8, border: '1px solid rgba(0,0,0,0.06)', padding: 12, textAlign: 'center'}}>
+                  <p style={{fontSize: 18, fontWeight: 600, color: '#1a1a1a'}}>{office.teamEnergy.totalCount}</p>
+                  <p style={{fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#9C9A93', marginTop: 2}}>People</p>
                 </div>
-                <div className="rounded-md border border-border bg-muted/20 p-1.5 text-center">
-                  <p className="text-[11px] font-medium">{office.teamEnergy.workingCount}</p>
-                  <p className="text-[9px] text-muted-foreground">Working</p>
+                <div style={{background: '#F7F6F3', borderRadius: 8, border: '1px solid rgba(0,0,0,0.06)', padding: 12, textAlign: 'center'}}>
+                  <p style={{fontSize: 18, fontWeight: 600, color: '#1a1a1a'}}>{office.teamEnergy.workingCount}</p>
+                  <p style={{fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#9C9A93', marginTop: 2}}>Working</p>
                 </div>
-                <div className="rounded-md border border-border bg-muted/20 p-1.5 text-center">
-                  <p className="text-[11px] font-medium">{office.teamEnergy.inCallCount}</p>
-                  <p className="text-[9px] text-muted-foreground">In Calls</p>
+                <div style={{background: '#F7F6F3', borderRadius: 8, border: '1px solid rgba(0,0,0,0.06)', padding: 12, textAlign: 'center'}}>
+                  <p style={{fontSize: 18, fontWeight: 600, color: '#1a1a1a'}}>{office.teamEnergy.inCallCount}</p>
+                  <p style={{fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#9C9A93', marginTop: 2}}>In Calls</p>
                 </div>
-                <div className="rounded-md border border-border bg-muted/20 p-1.5 text-center">
-                  <p className="text-[11px] font-medium">{office.realtimeOnline ? "On" : "Off"}</p>
-                  <p className="text-[9px] text-muted-foreground">Live</p>
+                <div style={{background: '#F7F6F3', borderRadius: 8, border: '1px solid rgba(0,0,0,0.06)', padding: 12, textAlign: 'center'}}>
+                  <p style={{fontSize: 18, fontWeight: 600, color: '#1a1a1a'}}>{office.realtimeOnline ? "On" : "Off"}</p>
+                  <p style={{fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#9C9A93', marginTop: 2}}>Live</p>
                 </div>
               </div>
             </div>
-            <div className="space-y-1 border-t border-border pt-2">
-              <div className="flex items-center justify-between text-[10px]">
-                <span className="text-muted-foreground">Energy level</span>
-                <span>{office.teamEnergy.percentage}%</span>
+            <div style={{borderTop: '1px solid rgba(0,0,0,0.06)', paddingTop: 12, display: 'flex', flexDirection: 'column', gap: 6}}>
+              <div style={{display: 'flex', alignItems: 'center', justifyContent: 'space-between'}}>
+                <span style={{fontSize: 12, color: '#6B6860'}}>Energy level</span>
+                <span style={{fontSize: 12, fontWeight: 500, color: '#1C4ED8'}}>{office.teamEnergy.percentage}%</span>
               </div>
-              <div className="h-1 rounded-full bg-muted">
-                <div
-                  className="h-1 rounded-full bg-foreground/80"
-                  style={{ width: `${office.teamEnergy.percentage}%` }}
-                />
+              <div style={{height: 4, background: '#EAE8E2', borderRadius: 999}}>
+                <div style={{height: 4, width: `${office.teamEnergy.percentage}%`, background: '#1C4ED8', borderRadius: 999}} />
               </div>
-              <div className="flex items-center justify-between text-[9px] text-muted-foreground">
+              <div style={{display: 'flex', justifyContent: 'space-between', fontSize: 12, color: '#6B6860'}}>
                 <span>{office.teamEnergy.onlineCount} online</span>
                 <span>{Math.max(0, office.teamEnergy.totalCount - office.teamEnergy.onlineCount)} away</span>
               </div>
             </div>
           </div>
         </OfficePanelCard>
+        </div>
       </div>
 
-      <div className="office-workspace-grid-bottom grid gap-2.5">
+      <div className="office-workspace-grid-bottom" style={{display: 'grid', gridTemplateColumns: '1fr 300px', gap: 16, marginTop: 0}}>
         <OfficePanelCard
           title="Team Calendar"
           action={
-            <Button
+            <button
               type="button"
-              variant="ghost"
-              className="h-6 gap-1 rounded-md px-2 text-[10px]"
+              className="inline-flex items-center gap-1 h-7 rounded-[6px] px-2.5 text-[12px] font-medium transition-colors duration-150"
+              style={{border: '1px solid rgba(0,0,0,0.07)', background: '#FFFFFF', color: '#1C4ED8', cursor: 'pointer'}}
               onClick={() => panels.openPanel("calendar")}
             >
               <Plus className="h-3.5 w-3.5" />
               Schedule
-            </Button>
+            </button>
           }
           className="min-h-[208px] office-workspace-grid-bottom__calendar"
         >
           <div className="office-calendar-split grid gap-2.5">
-            <div className="rounded-md border border-border p-2.5 office-calendar-split__month">
+            <div className="rounded-[6px] p-2.5 office-calendar-split__month" style={{border: '1px solid rgba(0,0,0,0.07)'}}>
               <div className="mb-2 flex items-center justify-between">
-                <p className="text-[10px] font-medium text-muted-foreground">{monthLabel}</p>
-                <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
+                <p className="text-[14px] font-medium text-gray-900">{monthLabel}</p>
+                <ChevronDown className="h-4 w-4" style={{color: '#6B6860'}} />
               </div>
               <div className="grid grid-cols-7 gap-0.5 text-center">
                 {["S", "M", "T", "W", "T", "F", "S"].map((day, index) => (
-                  <span key={`${day}-${index}`} className="text-[9px] text-muted-foreground">
+                  <span key={`${day}-${index}`} className="text-[12px]" style={{color: '#6B6860'}}>
                     {day}
                   </span>
                 ))}
@@ -679,43 +693,48 @@ export default function VirtualStartupOfficeWorkspaceV2({
                   <span
                     key={`${day || "blank"}-${index}`}
                     className={cn(
-                      "rounded text-[10px] leading-5",
+                      "text-[12px] leading-6 flex items-center justify-center mx-auto",
                       day === todayDate
-                        ? "bg-indigo-600 text-white"
-                        : "text-foreground",
+                        ? "rounded-full text-white font-medium"
+                        : "text-gray-800",
                       day == null && "text-transparent",
                     )}
+                    style={day === todayDate ? {background: '#1C4ED8', width: 24, height: 24, borderRadius: '50%'} : {}}
                   >
                     {day || "."}
                   </span>
                 ))}
               </div>
             </div>
-            <div className="rounded-md border border-border p-2.5 office-calendar-split__agenda">
+            <div className="rounded-[6px] p-2.5 office-calendar-split__agenda" style={{border: '1px solid rgba(0,0,0,0.07)'}}>
               <div className="mb-2 flex items-center justify-between">
-                <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
+                <div className="flex items-center gap-1.5 text-[12px]" style={{color: '#6B6860'}}>
                   <Calendar className="h-3.5 w-3.5" />
                   Agenda
                 </div>
-                <Button type="button" variant="ghost" className="h-6 gap-1 px-2 text-[10px]">
-                  <Filter className="h-3.5 w-3.5" />
+                <button type="button" className="inline-flex items-center gap-1 text-[11px] px-1.5 py-0.5 rounded transition-colors" style={{color: '#6B6860', background: 'transparent', border: 'none', cursor: 'pointer'}}>
+                  <Filter className="h-3 w-3" />
                   Filter
-                </Button>
+                </button>
               </div>
               {upcomingAgenda.length === 0 ? (
                 <div className="flex min-h-[126px] flex-col items-center justify-center text-center">
-                  <CalendarDays className="h-4 w-4 text-muted-foreground" />
-                  <p className="mt-1.5 text-[11px] text-muted-foreground">No agenda items</p>
-                  <p className="text-[10px] text-muted-foreground">
+                  <CalendarDays className="h-4 w-4" style={{color: '#9C9A93'}} />
+                  <p className="mt-1.5 text-[11px]" style={{color: '#9C9A93'}}>No agenda items</p>
+                  <p className="text-[10px]" style={{color: '#9C9A93'}}>
                     Nothing scheduled for this period
                   </p>
                 </div>
               ) : (
-                <div className="space-y-1.5">
-                  {upcomingAgenda.slice(0, 4).map((item) => (
-                    <div key={item.id} className="rounded-md border border-border px-2 py-1.5">
-                      <p className="truncate text-[11px] font-medium">{item.title}</p>
-                      <p className="text-[10px] text-muted-foreground">
+                <div>
+                  {upcomingAgenda.slice(0, 4).map((item, idx) => (
+                    <div
+                      key={item.id}
+                      className="py-2"
+                      style={{borderBottom: idx < Math.min(upcomingAgenda.length, 4) - 1 ? '1px solid rgba(0,0,0,0.05)' : 'none'}}
+                    >
+                      <p className="truncate text-[13px] font-medium text-gray-900">{item.title}</p>
+                      <p className="text-[11px]" style={{color: '#6B6860'}}>
                         {item.date.toLocaleDateString()}
                         {" "}
                         {item.date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
@@ -734,46 +753,57 @@ export default function VirtualStartupOfficeWorkspaceV2({
         >
           {myTasks.length === 0 ? (
             <div className="flex min-h-[126px] flex-col items-center justify-center text-center">
-              <CheckCircle2 className="h-4 w-4 text-muted-foreground" />
-              <p className="mt-1.5 text-[11px] text-muted-foreground">No tasks yet</p>
-              <p className="text-[10px] text-muted-foreground">
+              <CheckCircle2 className="h-4 w-4" style={{color: '#9C9A93'}} />
+              <p className="mt-1.5 text-[11px]" style={{color: '#9C9A93'}}>No tasks yet</p>
+              <p className="text-[10px]" style={{color: '#9C9A93'}}>
                 {user?.role === "founder"
                   ? "Tasks from your milestones will appear here"
                   : "No tasks assigned to you yet"}
               </p>
             </div>
           ) : (
-            <div className="space-y-1.5">
-              {myTasks.slice(0, 4).map((task) => (
-                <div key={task.id} className="rounded-md border border-border px-2.5 py-2">
-                  <div className="flex items-start justify-between gap-2">
-                    <p className="line-clamp-1 text-[11px] font-medium">{task.title}</p>
-                    <Badge variant={getTaskBadgeVariant(task.status)} className="text-[9px]">
-                      {task.status}
-                    </Badge>
+            <div>
+              {myTasks.slice(0, 4).map((task, idx) => (
+                <div
+                  key={task.id}
+                  className="py-3 flex items-start justify-between gap-2"
+                  style={{borderBottom: idx < Math.min(myTasks.length, 4) - 1 ? '1px solid rgba(0,0,0,0.05)' : 'none'}}
+                >
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-[13px] font-medium text-gray-900">{task.title}</p>
+                    <p className="mt-0.5 text-[11px]" style={{color: '#9C9A93'}}>
+                      {task.dueDate ? `Due ${task.dueDate.toLocaleDateString()}` : "No due date"}
+                    </p>
                   </div>
-                  <p className="mt-1 text-[10px] text-muted-foreground">
-                    {task.dueDate ? `Due ${task.dueDate.toLocaleDateString()}` : "No due date"}
-                  </p>
+                  <span
+                    className="flex-shrink-0 text-[11px] font-medium rounded-full px-[10px] py-[2px]"
+                    style={{
+                      background: task.status === 'completed' ? '#DCFCE7' : task.status === 'in-progress' ? '#FEF3C7' : '#F0EEE8',
+                      color: task.status === 'completed' ? '#166534' : task.status === 'in-progress' ? '#92400E' : '#6B6860',
+                    }}
+                  >
+                    {task.status}
+                  </span>
                 </div>
               ))}
             </div>
           )}
-          <Button
+          <button
             type="button"
-            variant="ghost"
-            className="h-6 w-full gap-1 rounded-md border border-border text-[11px]"
+            className="w-full h-9 rounded-[8px] text-[13px] font-medium flex items-center justify-center gap-1.5 transition-colors duration-150"
+            style={{border: '1px solid rgba(0,0,0,0.07)', background: '#FFFFFF', color: '#6B6860', cursor: 'pointer'}}
             onClick={() => panels.openPanel("tasks")}
           >
             <Target className="h-3.5 w-3.5" />
             View All Tasks
-          </Button>
+          </button>
         </OfficePanelCard>
       </div>
 
       <button
         type="button"
-        className="fixed bottom-4 right-4 z-40 flex h-11 w-11 items-center justify-center rounded-full bg-violet-600 text-white shadow-md hover:bg-violet-500 md:bottom-5 md:right-5"
+        className="fixed bottom-4 right-4 z-40 flex h-11 w-11 items-center justify-center rounded-full text-white shadow-md transition-colors duration-150 md:bottom-5 md:right-5"
+        style={{background: '#1C4ED8'}}
         aria-label="Open office help"
       >
         <HelpCircle className="h-4.5 w-4.5" />
@@ -787,7 +817,7 @@ export default function VirtualStartupOfficeWorkspaceV2({
           currentUserName={user.name}
           currentUserRole={user.role}
           startupId={office.startupId}
-          teamMembers={office.teamRoster}
+          teamMembers={office.chatRoster}
           initialSelectedUserId={selectedMessageUserId}
           strictMode={true}
         />
@@ -861,7 +891,7 @@ export default function VirtualStartupOfficeWorkspaceV2({
                   currentUserName={user.name}
                   currentUserRole={user.role}
                   startupId={office.startupId}
-                  teamMembers={office.teamRoster}
+                  teamMembers={office.chatRoster}
                   initialSelectedUserId={selectedMessageUserId}
                   strictMode={true}
                 />

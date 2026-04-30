@@ -120,6 +120,7 @@ export function mergeRowsById(previousRows, incomingRows, getId = (row) => row.i
 export function mapOfficeWorkspaceModel({
   user,
   teamMembers = [],
+  pendingTalents = [],
   presenceRows = [],
   activityRows = [],
   winRows = [],
@@ -217,8 +218,31 @@ export function mapOfficeWorkspaceModel({
   const inCallCount = teamRoster.filter((row) => row.activity === "in-call").length;
   const workingCount = teamRoster.filter((row) => row.activity === "working").length;
 
+  // chatRoster extends teamRoster with pending talents (interests not yet accepted)
+  // so founders can chat with interested talents before they become team members
+  const teamRosterIds = new Set(teamRoster.map((m) => m.id));
+  const pendingForChat = (Array.isArray(pendingTalents) ? pendingTalents : [])
+    .filter((t) => Boolean(t.id) && !teamRosterIds.has(t.id))
+    .map((t) => ({
+      id: t.id,
+      name: String(t.name || "Interested Talent"),
+      role: "talent",
+      title: String(t.title || ""),
+      avatar: t.avatar || "",
+      status: "away",
+      isOnline: false,
+      activity: "working",
+      statusText: "",
+      mood: "",
+      lastSeenAt: new Date(0),
+      cameraEnabled: false,
+      isPendingTalent: true,
+    }));
+  const chatRoster = [...teamRoster, ...pendingForChat];
+
   return {
     teamRoster,
+    chatRoster,
     presence,
     activities,
     announcements,

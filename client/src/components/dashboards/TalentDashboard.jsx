@@ -4,7 +4,6 @@ import { Button } from "../ui/button";
 import { Avatar, AvatarFallback } from "../ui/avatar";
 import { Textarea } from "../ui/textarea";
 import { Progress } from "../ui/progress";
-import ProfileCompletionModal from "../ProfileCompletionModal";
 import OfferDisplay from "../OfferDisplay";
 import { toast } from "sonner";
 import { getTalentProfileCompletionPercent } from "../../utils/talentProfileCompletion";
@@ -146,7 +145,6 @@ export default function TalentDashboard({
   onNavigate,
   entryMode = "overview",
 }) {
-  const [showProfileModal, setShowProfileModal] = useState(false);
   const talentCompletion = getTalentProfileCompletionPercent(user);
   const canUsePrimaryTalentActions =
     talentCompletion >= TALENT_ACTIONS_MIN_COMPLETION;
@@ -165,7 +163,6 @@ export default function TalentDashboard({
     viewModel,
     toggleSaved,
     sendInterest,
-    refresh,
   } = useTalentHomeData({ user });
   const matchedOpportunities = viewModel.opportunities || [];
 
@@ -174,9 +171,8 @@ export default function TalentDashboard({
     return viewModel.sentInterestStartupIds.includes(startupId);
   };
 
-  const handleProfileComplete = async () => {
-    await refresh();
-    setShowProfileModal(false);
+  const handleCompleteProfileClick = () => {
+    onNavigate?.("settings", { editProfile: true });
   };
 
   const handleExpressInterest = async () => {
@@ -185,7 +181,7 @@ export default function TalentDashboard({
       toast.info("Complete your profile first", {
         description: `Reach at least ${TALENT_ACTIONS_MIN_COMPLETION}% profile depth to send interest.`,
       });
-      setShowProfileModal(true);
+      handleCompleteProfileClick();
       return;
     }
     if (!interestMessage.trim()) {
@@ -399,16 +395,6 @@ export default function TalentDashboard({
   if (entryMode !== "opportunities") {
     return (
       <div className="min-h-full bg-background">
-        {showProfileModal && (
-          <ProfileCompletionModal
-            role={user.role}
-            user={user}
-            onUpdateUser={onUpdateUser}
-            onComplete={handleProfileComplete}
-            onClose={() => setShowProfileModal(false)}
-          />
-        )}
-
         <div className="max-w-7xl mx-auto py-4 space-y-4 ">
           {/* Welcome Header */}
           <div className="flex items-start justify-between">
@@ -460,9 +446,7 @@ export default function TalentDashboard({
                 </p>
               </div>
               <Button
-                onClick={() =>
-                  onNavigate?.("dashboard", { mode: "opportunities" })
-                }
+                onClick={() => onNavigate?.("team-matching")}
                 className="shrink-0 bg-white text-blue-700 hover:bg-blue-50 font-semibold gap-2 rounded-lg px-4"
                 size="sm"
               >
@@ -524,7 +508,7 @@ export default function TalentDashboard({
                   size="sm"
                   variant="outline"
                   className="mt-4"
-                  onClick={() => setShowProfileModal(true)}
+                  onClick={handleCompleteProfileClick}
                 >
                   Complete Profile
                 </Button>
@@ -667,9 +651,7 @@ export default function TalentDashboard({
               <div className="mt-5 text-center">
                 <Button
                   variant="outline"
-                  onClick={() =>
-                    onNavigate?.("dashboard", { mode: "opportunities" })
-                  }
+                  onClick={() => onNavigate?.("team-matching")}
                   className="gap-2"
                 >
                   View all {sortedRows.length} matches
@@ -684,7 +666,7 @@ export default function TalentDashboard({
         {talentCompletion < 100 && (
           <div
             className="fixed bottom-6 right-6 flex items-center gap-3 rounded-2xl bg-card border border-border shadow-xl px-4 py-3 cursor-pointer hover:shadow-2xl transition-shadow max-w-[230px] z-50"
-            onClick={() => setShowProfileModal(true)}
+            onClick={handleCompleteProfileClick}
           >
             <div className="h-9 w-9 rounded-full bg-amber-100 flex items-center justify-center shrink-0">
               <Sparkles className="h-4 w-4 text-amber-500" />
@@ -884,15 +866,6 @@ export default function TalentDashboard({
 
   return (
     <div className="space-y-3 p-3">
-      {showProfileModal && (
-        <ProfileCompletionModal
-          role={user.role}
-          user={user}
-          onUpdateUser={onUpdateUser}
-          onComplete={handleProfileComplete}
-          onClose={() => setShowProfileModal(false)}
-        />
-      )}
       {showProfileBanner && (
         <div className="rounded-md border border-blue-200 bg-blue-50 px-4 py-3">
           <div className="flex items-start gap-3">
@@ -929,7 +902,7 @@ export default function TalentDashboard({
                   size="sm"
                   variant="outline"
                   className="h-7 rounded-[4px] border-blue-300 px-3 text-[12px] hover:border-indigo-500"
-                  onClick={() => setShowProfileModal(true)}
+                  onClick={handleCompleteProfileClick}
                 >
                   Continue profile
                 </Button>

@@ -2,6 +2,7 @@ import { Router } from "express";
 import asyncHandler from "../utils/asyncHandler.js";
 import requireAuth from "../middleware/requireAuth.js";
 import * as foundersController from "../controllers/founders.controller.js";
+import * as teamMembersController from "../controllers/teamMembers.controller.js";
 
 const foundersRouter = Router();
 
@@ -61,5 +62,7 @@ foundersRouter.post("/founders/:founderId/stage-completions", requireAuth, async
 foundersRouter.get("/founders/:founderId/learning-resources", requireAuth, asyncHandler(foundersController.getLearningResources));
 foundersRouter.get("/founders/:founderId/learning-progress", requireAuth, asyncHandler(foundersController.getLearningProgress));
 foundersRouter.post("/founders/:founderId/learning-progress", requireAuth, asyncHandler(foundersController.trackLearningWatch));
+
+foundersRouter.get("/founders/:founderId/team-members", requireAuth, asyncHandler(teamMembersController.getFounderTeamMembers));
 
 export default foundersRouter;

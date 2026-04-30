@@ -13,6 +13,14 @@ import { Switch } from "./ui/switch";
 import { Badge } from "./ui/badge";
 import { Separator } from "./ui/separator";
 import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "./ui/dialog";
+import {
   UserCircle,
   Monitor,
   Database,
@@ -26,18 +34,53 @@ import {
   Bell,
   CheckCircle2,
   Calendar,
+  LogOut,
+  Building2,
+  Loader2,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useOfficeSettings } from "../hooks/useOfficeSettings";
 import * as authApi from "../utils/api/authApi";
+import { leaveStartup } from "../utils/api/teamMemberApi";
 import { AdminDatabaseClear } from "./AdminDatabaseClear";
 import ProfilePage from "./ProfilePage";
-export default function SettingsPage({ user, onUpdateUser }) {
+export default function SettingsPage({
+  user,
+  onUpdateUser,
+  initialProfileEditing = false,
+}) {
   const [showConfirmClear, setShowConfirmClear] = useState(false);
   const [showConfirmDeleteAccount, setShowConfirmDeleteAccount] =
     useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [showLeaveConfirm, setShowLeaveConfirm] = useState(false);
+  const [isLeaving, setIsLeaving] = useState(false);
   const officeSettings = useOfficeSettings();
+
+  const isTeamMember = user?.role === "team-member";
+
+  const handleLeaveStartup = async () => {
+    const userId = String(user?._id ?? user?.id ?? "");
+    if (!userId) return;
+    setIsLeaving(true);
+    try {
+      const result = await leaveStartup(userId);
+      const updatedUser = {
+        ...user,
+        role: "talent",
+        startupId: null,
+        founderId: null,
+        onboardingComplete: false,
+      };
+      setShowLeaveConfirm(false);
+      toast.success("You have left the startup. Your profile data is preserved.");
+      if (onUpdateUser) onUpdateUser(updatedUser);
+    } catch (err) {
+      toast.error(err?.message || "Failed to leave startup. Please try again.");
+    } finally {
+      setIsLeaving(false);
+    }
+  };
 
   // Determine if user has access to Virtual Office (founders and team members only)
   const hasVirtualOffice =
@@ -224,7 +267,11 @@ export default function SettingsPage({ user, onUpdateUser }) {
         )}
         <TabsContent value="profile" className="space-y-0">
           {user && onUpdateUser ? (
-            <ProfilePage user={user} onUpdateUser={onUpdateUser} />
+            <ProfilePage
+              user={user}
+              onUpdateUser={onUpdateUser}
+              initialEditing={initialProfileEditing}
+            />
           ) : (
             <Card>
               <CardContent className="pt-6">
@@ -234,7 +281,95 @@ export default function SettingsPage({ user, onUpdateUser }) {
               </CardContent>
             </Card>
           )}
+          {isTeamMember && (
+            <Card className="mt-4 border-orange-200 dark:border-orange-800">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-orange-700 dark:text-orange-400">
+                  <Building2 className="w-5 h-5" />
+                  Startup Membership
+                </CardTitle>
+                <CardDescription>
+                  You are currently an active team member of a startup.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex flex-wrap items-center gap-3">
+                  <div className="flex items-center gap-2">
+                    <Users className="w-4 h-4 text-muted-foreground" />
+                    <span className="text-sm text-muted-foreground">Role:</span>
+                    <Badge variant="secondary">Team Member</Badge>
+                  </div>
+                  {user?.startupId && (
+                    <div className="flex items-center gap-2">
+                      <Building2 className="w-4 h-4 text-muted-foreground" />
+                      <span className="text-sm text-muted-foreground">Startup ID:</span>
+                      <Badge variant="outline" className="font-mono text-xs">
+                        {String(user.startupId).slice(-8)}
+                      </Badge>
+                    </div>
+                  )}
+                </div>
+                <Separator />
+                <div className="space-y-2">
+                  <p className="text-sm text-muted-foreground">
+                    Leaving will revert your role to <strong>talent</strong> and detach you from the startup.
+                    All your profile data — skills, experience, education, and certifications — will be fully preserved.
+                    You can be re-onboarded to a startup at any time.
+                  </p>
+                  <Button
+                    variant="outline"
+                    className="border-red-300 text-red-600 hover:bg-red-50 dark:border-red-800 dark:text-red-400 dark:hover:bg-red-950/20"
+                    onClick={() => setShowLeaveConfirm(true)}
+                  >
+                    <LogOut className="w-4 h-4 mr-2" />
+                    Leave Startup
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          )}
         </TabsContent>
+
+        {/* Leave Startup Confirmation Dialog */}
+        <Dialog open={showLeaveConfirm} onOpenChange={setShowLeaveConfirm}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <LogOut className="w-5 h-5 text-red-500" />
+                Leave Startup?
+              </DialogTitle>
+              <DialogDescription className="space-y-2 pt-1">
+                <p>
+                  You will be removed from the startup team and your role will revert to <strong>talent</strong>.
+                </p>
+                <p className="text-sm">
+                  Your profile data (skills, experience, education, certifications) will <strong>not</strong> be deleted.
+                  You can join a new startup at any time without re-filling your profile.
+                </p>
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter className="gap-2">
+              <Button
+                variant="outline"
+                onClick={() => setShowLeaveConfirm(false)}
+                disabled={isLeaving}
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="destructive"
+                onClick={handleLeaveStartup}
+                disabled={isLeaving}
+              >
+                {isLeaving ? (
+                  <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Leaving...</>
+                ) : (
+                  <><LogOut className="w-4 h-4 mr-2" />Yes, Leave Startup</>
+                )}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
         {hasVirtualOffice && (
           <TabsContent value="virtual-office" className="space-y-4">
             <Card>

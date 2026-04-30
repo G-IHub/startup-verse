@@ -8,11 +8,12 @@ import User from "../models/User.js";
 import TeamMemberProfile from "../models/TeamMemberProfile.js";
 import Presence from "../models/Presence.js";
 import Activity from "../models/Activity.js";
+import Message from "../models/Message.js";
 import { error as apiError, success as apiSuccess } from "../utils/apiResponse.js";
 import { sendTokenResponse } from "../utils/sendToken.js";
 import { emitRealtime } from "../services/realtime.service.js";
 import { SOCKET_EVENTS } from "../realtime/events.js";
-import { startupRoom } from "../realtime/rooms.js";
+import { startupRoom, userRoom } from "../realtime/rooms.js";
 import { mapActivityToDto } from "../utils/activityDto.js";
 
 const isAdmin = (req) => req.user?.isAdmin === true;
@@ -217,18 +218,55 @@ export const addMessageToFounderTalentInvitation = async (req, res) => {
 };
 
 export const createInterest = async (req, res) => {
-  const talentId = req.body?.talentId || req.user.id;
+  const body = req.body?.interest || req.body || {};
+  const talentId = body.talentId || req.user.id;
   if (!isSelfOrAdmin(req, talentId)) {
     return apiError(res, "Forbidden.", 403);
   }
+  if (!body.founderId) {
+    return apiError(res, "founderId is required.", 400);
+  }
   const interest = await Interest.create({
     talentId,
-    founderId: req.body?.founderId,
-    startupId: req.body?.startupId || null,
-    message: req.body?.message || "",
+    founderId: body.founderId,
+    startupId: body.startupId || null,
+    message: body.message || "",
     status: "pending",
     messages: [],
   });
+
+  // Auto-send DM to founder so the interest appears in the Virtual Office chat
+  try {
+    const talent = await User.findById(talentId, { name: 1 }).lean();
+    const talentName = talent?.name || "A talent";
+    const startupLabel = body.startupTitle ? ` in "${body.startupTitle}"` : "";
+    const dmBody = body.message
+      ? `${talentName} is interested${startupLabel}: ${body.message}`
+      : `${talentName} expressed interest${startupLabel}.`;
+    const dm = await Message.create({
+      startupId: null,
+      fromUserId: talentId,
+      toUserId: body.founderId,
+      body: dmBody,
+      attachments: [],
+      metadata: { type: "interest", interestId: String(interest._id), startupTitle: body.startupTitle || "" },
+    });
+    const dmDto = {
+      id: String(dm._id),
+      fromUserId: String(dm.fromUserId),
+      toUserId: String(dm.toUserId),
+      body: dm.body,
+      metadata: dm.metadata,
+      createdAt: dm.createdAt,
+    };
+    emitRealtime(SOCKET_EVENTS.MESSAGE_CREATED, dmDto, [
+      userRoom(body.founderId),
+      userRoom(talentId),
+    ]);
+  } catch (dmErr) {
+    console.error("[createInterest] Failed to send interest DM:", dmErr.message);
+  }
+
   return apiSuccess(res, interest, 201);
 };
 
@@ -300,15 +338,7 @@ export const onboardInterest = async (req, res) => {
         throw forbidden;
       }
 
-      const startupId =
-        interest.startupId ||
-        (await Startup.findOne({ founderId: interest.founderId }, { _id: 1 }).session(session))?._id;
-
-      if (!startupId) {
-        const err = new Error("Unable to resolve startup for onboarding.");
-        err.statusCode = 422;
-        throw err;
-      }
+      const startupId = interest.founderId;
 
       const talent = await User.findById(interest.talentId).session(session);
       if (!talent) {

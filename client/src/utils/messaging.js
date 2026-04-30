@@ -118,12 +118,34 @@ export async function sendMessage(
 // Get conversation between two users or team chat
 export async function getConversation(userId, otherUserId, startupId, options = {}) {
   try {
-    const payload = await request(
-      `/messages/conversation/${startupId}/${userId}/${otherUserId}`,
-      { method: "GET" },
-    );
-    const rows = payload?.data || payload?.messages || [];
-    return rows.map(mapMessageDto).filter(Boolean);
+    const results = [];
+
+    // Always fetch direct (null-startupId) DMs — includes interest origin message
+    try {
+      const directPayload = await request(
+        `/messages/direct/${userId}/${otherUserId}`,
+        { method: "GET" },
+      );
+      const directRows = directPayload?.data || directPayload?.messages || [];
+      results.push(...directRows.map(mapMessageDto).filter(Boolean));
+    } catch (_) { }
+
+    // Also fetch startup-scoped messages when startupId is present
+    if (startupId) {
+      try {
+        const payload = await request(
+          `/messages/conversation/${startupId}/${userId}/${otherUserId}`,
+          { method: "GET" },
+        );
+        const rows = payload?.data || payload?.messages || [];
+        results.push(...rows.map(mapMessageDto).filter(Boolean));
+      } catch (_) { }
+    }
+
+    // De-dup by id, sort chronologically
+    const byId = new Map();
+    for (const m of results) { if (m?.id) byId.set(m.id, m); }
+    return Array.from(byId.values()).sort((a, b) => a.timestamp - b.timestamp);
   } catch (error) {
     if (options?.strict) throw error;
     if (process.env.NODE_ENV === "development") {
@@ -136,16 +158,59 @@ export async function getConversation(userId, otherUserId, startupId, options = 
 // Get all conversations for a user
 export async function getUserConversations(userId, startupId, teamMembers, options = {}) {
   try {
-    const payload = await request(`/messages/conversations/${startupId}/${userId}`, {
-      method: "GET",
-    });
-    const rows = payload?.data || payload?.conversations || [];
-    return rows.map(mapMessageDto).filter(Boolean).map((row) => {
-      const teammate =
-        teamMembers.find((m) => String(m.id) === String(row.senderId)) ||
-        teamMembers.find((m) => String(m.id) === String(row.recipientId));
+    let rows = [];
+
+    // 1. Startup-scoped conversations (team members)
+    if (startupId) {
+      try {
+        const payload = await request(`/messages/conversations/${startupId}/${userId}`, {
+          method: "GET",
+        });
+        rows = payload?.data || payload?.conversations || [];
+      } catch (err) {
+        if (options?.strict) throw err;
+      }
+    }
+
+    // 2. Direct DMs (pending talents / pre-team conversations)
+    try {
+      const directPayload = await request(`/messages/${userId}`, { method: "GET" });
+      const allDirect = (directPayload?.data || directPayload?.messages || [])
+        .map(mapMessageDto)
+        .filter(Boolean);
+
+      // De-dup by other-user-id — keep latest
+      const directByPeer = new Map();
+      for (const m of allDirect) {
+        const peerId = String(m.senderId) === String(userId) ? m.recipientId : m.senderId;
+        if (!directByPeer.has(peerId) || m.timestamp > directByPeer.get(peerId).timestamp) {
+          directByPeer.set(peerId, m);
+        }
+      }
+
+      for (const [peerId, m] of directByPeer.entries()) {
+        // Only include if the peer is in teamMembers (i.e. known to this chat roster)
+        const teammate = teamMembers.find((t) => String(t.id) === peerId);
+        if (!teammate) continue;
+        // Avoid duplicate if already in startup-scoped rows
+        const alreadyPresent = rows.some((r) => {
+          const mapped = mapMessageDto(r);
+          const otherId = String(mapped?.senderId) === String(userId)
+            ? mapped?.recipientId
+            : mapped?.senderId;
+          return otherId === peerId;
+        });
+        if (!alreadyPresent) rows.push(m);
+      }
+    } catch (err) {
+      // Non-critical — skip direct DM merge on error
+    }
+
+    const mapped = (Array.isArray(rows) ? rows : []).map(mapMessageDto).filter(Boolean);
+    const entries = mapped.map((row) => {
       const otherId =
         String(row.senderId) === String(userId) ? row.recipientId : row.senderId;
+      const teammate = teamMembers.find((m) => String(m.id) === String(otherId));
       return {
         userId: String(otherId),
         userName: teammate?.name || "Team Member",
@@ -155,6 +220,17 @@ export async function getUserConversations(userId, startupId, teamMembers, optio
         unreadCount: 0,
       };
     });
+
+    // Dedup by peer userId — keep entry with the latest message
+    const byPeer = new Map();
+    for (const conv of entries) {
+      if (!conv.userId) continue;
+      const prev = byPeer.get(conv.userId);
+      if (!prev || conv.lastMessageTime > prev.lastMessageTime) {
+        byPeer.set(conv.userId, conv);
+      }
+    }
+    return Array.from(byPeer.values()).sort((a, b) => b.lastMessageTime - a.lastMessageTime);
   } catch (error) {
     if (options?.strict) throw error;
     if (process.env.NODE_ENV === "development") {

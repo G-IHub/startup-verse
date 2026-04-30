@@ -52,9 +52,9 @@ export default function AdaptiveVirtualOffice({
               <div className="mt-4">
                 <Button
                   type="button"
-                  onClick={() => onNavigate("dashboard", { mode: "opportunities" })}
+                  onClick={() => onNavigate("team-matching")}
                 >
-                  Open Talent Home
+                  Open Browse
                 </Button>
               </div>
             </div>

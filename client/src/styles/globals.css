@@ -106,8 +106,8 @@ html {
   --sidebar-hover: #f3f7ff;
 
   /* Typography system */
-  --font-heading: "Syne", "Segoe UI", sans-serif;
-  --font-body: "DM Sans", "Segoe UI", sans-serif;
+  --font-heading: "Bricolage Grotesque", "Segoe UI", sans-serif;
+  --font-body: "Instrument Sans", "Segoe UI", sans-serif;
 
   /* Spacing System (8px grid) */
   --spacing-1: 0.5rem; /* 8px */

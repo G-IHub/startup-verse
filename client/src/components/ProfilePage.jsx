@@ -1,4 +1,4 @@
-Complete Your Profileimport React, { useState } from "react";
+import React, { useState } from "react";
 import { Button } from "./ui/button";
 import {
   Card,
@@ -60,8 +60,8 @@ import {
   ExternalLink,
   Trash2,
 } from "lucide-react";
-export default function ProfilePage({ user, onUpdateUser }) {
-  const [isEditing, setIsEditing] = useState(false);
+export default function ProfilePage({ user, onUpdateUser, initialEditing = false }) {
+  const [isEditing, setIsEditing] = useState(initialEditing);
   const [showPreview, setShowPreview] = useState(false);
 
   // Initialize all fields from user
