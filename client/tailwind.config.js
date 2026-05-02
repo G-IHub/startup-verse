@@ -1,0 +1,49 @@
+/** @type {import('tailwindcss').Config} */
+export default {
+  theme: {
+    extend: {
+      colors: {
+        primary: {
+          DEFAULT: "#3a5afe",
+          hover: "#304ffe",
+          dark: "#1a237e",
+          tint: "#e8ebff",
+        },
+        accent: {
+          DEFAULT: "#7c4dff",
+          tint: "#ede7f6",
+          dark: "#4527a0",
+        },
+        text: {
+          heading: "#0d0d0d",
+          body: "#4a4a5a",
+          muted: "#a0a0b0",
+        },
+        surface: {
+          page: "#f4f5ff",
+          card: "#ffffff",
+          border: "#e2e4f0",
+        },
+        status: {
+          success: "#00c896",
+          warning: "#ffb300",
+          error: "#ff4f6b",
+        },
+      },
+      fontFamily: {
+        heading: ["Sora", "sans-serif"],
+        body: ["IBM Plex Sans", "sans-serif"],
+      },
+      borderRadius: {
+        input: "10px",
+        card: "14px",
+        pill: "999px",
+      },
+      boxShadow: {
+        soft: "0 2px 12px rgba(0, 0, 0, 0.06)",
+        focus: "0 0 0 3px rgba(58, 90, 254, 0.10)",
+        card: "0 4px 24px rgba(58, 90, 254, 0.08)",
+      },
+    },
+  },
+};

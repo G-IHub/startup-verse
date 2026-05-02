@@ -235,9 +235,9 @@ export default function NotificationCenter({ onNavigate }) {
         <Button
           variant="ghost"
           size="sm"
-          className="relative h-8 w-8 p-0 rounded-full bg-muted/80 hover:bg-accent/20 transition-colors cursor-pointer"
+          className="relative h-8 w-8 cursor-pointer rounded-full bg-transparent p-0 transition-colors duration-200 ease-in-out hover:bg-surface-page"
         >
-          <Bell className="w-3.5 h-3.5" />
+          <Bell className="h-3.5 w-3.5 text-text-body" />
           {unreadCount > 0 && (
             <Badge className="absolute -top-1 -right-1 h-4 min-w-4 flex items-center justify-center p-0 bg-red-600 text-white text-[10px]">
               {unreadCount > 9 ? "9+" : unreadCount}

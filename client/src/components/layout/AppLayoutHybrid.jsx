@@ -27,8 +27,14 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "../ui/dropdown-menu";
-import { getAccessToken } from "../../app/session";
 import { getSentInterests } from "../../utils/api/inboxApi";
+
+// Default fetch options for cookie-based auth
+
+const defaultOptions = {
+  credentials: "include",
+  headers: { "Content-Type": "application/json" },
+};
 
 const PAGE_META = {
   dashboard: {
@@ -130,11 +136,8 @@ export default function AppLayoutHybrid({
           const invitationsRes = await fetch(
             `${API_BASE_URL}/invitations/received/${user.id}`,
             {
-              headers: {
-                Authorization: `Bearer ${getAccessToken()}`,
-                "Content-Type": "application/json",
-              },
-            },
+             ...defaultOptions,
+                          },
           );
           if (!invitationsRes.ok) {
             setUnreadMessagesCount(0);
@@ -150,11 +153,8 @@ export default function AppLayoutHybrid({
           const interestsRes = await fetch(
             `${API_BASE_URL}/interests/received/${user.id}`,
             {
-              headers: {
-                Authorization: `Bearer ${getAccessToken()}`,
-                "Content-Type": "application/json",
-              },
-            },
+             ...defaultOptions,
+                          },
           );
           if (!interestsRes.ok) {
             setUnreadMessagesCount(0);
@@ -167,11 +167,8 @@ export default function AppLayoutHybrid({
           const orgInvitationsRes = await fetch(
             `${API_BASE_URL}/invitations/founder/${user.id}`,
             {
-              headers: {
-                Authorization: `Bearer ${getAccessToken()}`,
-                "Content-Type": "application/json",
-              },
-            },
+             ...defaultOptions,
+                          },
           );
           let pendingOrgInvitations = 0;
           if (orgInvitationsRes.ok) {
@@ -187,11 +184,8 @@ export default function AppLayoutHybrid({
           const invitationsRes = await fetch(
             `${API_BASE_URL}/invitations/received/${user.id}`,
             {
-              headers: {
-                Authorization: `Bearer ${getAccessToken()}`,
-                "Content-Type": "application/json",
-              },
-            },
+             ...defaultOptions,
+                          },
           );
           if (!invitationsRes.ok) {
             setUnreadMessagesCount(0);
@@ -325,7 +319,7 @@ export default function AppLayoutHybrid({
         />
       )}
       <div className="flex flex-1 flex-col overflow-hidden">
-        <header className="z-50 border-b border-border bg-background shadow-sm">
+        <header className="z-50 border-b border-surface-border bg-surface-card shadow-[0_1px_8px_rgba(0,0,0,0.05)] transition-shadow duration-200 ease-in-out">
           <PageViewport>
             <div className="flex items-center gap-3 py-2">
               {user.role === "organization-admin" ? (
@@ -334,7 +328,7 @@ export default function AppLayoutHybrid({
                 <Button
                   variant="ghost"
                   size="sm"
-                  className="h-9 w-9 p-0 md:hidden"
+                  className="h-9 w-9 p-0 md:hidden transition-colors duration-200 ease-in-out [&_svg]:text-text-body"
                   onClick={() => setIsMobileMenuOpen(true)}
                 >
                   <Menu className="h-5 w-5" />
@@ -342,10 +336,10 @@ export default function AppLayoutHybrid({
               )}
               {user.role !== "organization-admin" ? (
                 <div className="min-w-0">
-                  <p className="truncate text-sm font-semibold text-foreground">
+                  <p className="truncate font-heading text-sm font-bold text-text-heading">
                     {pageMeta.title}
                   </p>
-                  <p className="truncate text-xs text-muted-foreground">
+                  <p className="truncate font-body text-xs text-text-body">
                     {pageMeta.description}
                   </p>
                 </div>
@@ -356,7 +350,7 @@ export default function AppLayoutHybrid({
                   <ThemeToggle
                     variant="ghost"
                     size="sm"
-                    className="bg-muted/80 transition-colors hover:bg-muted"
+                    className="transition-colors duration-200 ease-in-out hover:bg-surface-page [&_svg]:text-text-body"
                   />
                 </div>
                 <NotificationCenter onNavigate={onPageChange} />
@@ -367,15 +361,15 @@ export default function AppLayoutHybrid({
                         <Button
                           variant="ghost"
                           size="sm"
-                          className="h-9 gap-2 rounded-full bg-muted/80 px-2 transition-colors hover:bg-muted"
+                          className="h-9 gap-2 rounded-full bg-transparent px-2 transition-colors duration-200 ease-in-out hover:bg-surface-page"
                         >
                           <Avatar className="h-7 w-7">
                             <AvatarImage src={user.profile?.avatar} />
-                            <AvatarFallback className="text-xs">
+                            <AvatarFallback className="bg-primary font-body text-xs font-semibold text-primary-foreground">
                               {user.name.substring(0, 2).toUpperCase()}
                             </AvatarFallback>
                           </Avatar>
-                          <ChevronDown className="hidden h-3 w-3 text-muted-foreground sm:block" />
+                          <ChevronDown className="hidden h-3 w-3 text-text-body sm:block" />
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end" className="w-64">

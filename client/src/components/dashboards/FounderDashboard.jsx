@@ -29,7 +29,6 @@ import OutcomeSelectionModal from "../execution-engine/OutcomeSelectionModal";
 import MilestoneDetailView from "../execution-engine/MilestoneDetailView";
 import IntentCaptureModal from "../execution-engine/IntentCaptureModal";
 import { WeeklyReviewModal } from "../execution-engine/WeeklyReviewModal";
-import Phase3Welcome from "../execution-engine/Phase3Welcome";
 import StageLearningModal from "../learning/StageLearningModal";
 import StageRoadmapModal from "../roadmap/StageRoadmapModal";
 import CohortMembershipBadge from "../organizations/CohortMembershipBadge";
@@ -303,10 +302,10 @@ function ExecutionScoreInlineCard({ userId }) {
     }
   }, [userId, storeUserId, loadScore]);
   const getScoreColor = (score) => {
-    if (score >= 80) return "text-green-600";
-    if (score >= 60) return "text-[#1C4ED8]";
-    if (score >= 40) return "text-yellow-600";
-    return "text-[#1C4ED8]";
+    if (score >= 80) return "text-status-success";
+    if (score >= 60) return "text-primary";
+    if (score >= 40) return "text-status-warning";
+    return "text-primary";
   };
   const generateShareText = () => {
     const percentileText =
@@ -350,12 +349,12 @@ https://startupverse.com/12-week-challenge
   };
   return (
     <>
-      <Card className="bg-white border border-[#E5E2DA] rounded-xl shadow-none transition-shadow duration-150 hover:shadow-[0_1px_4px_rgba(0,0,0,0.06)] flex flex-col">
-        <CardContent className="p-4 flex flex-col flex-1 min-h-[80px] md:min-h-[90px]">
-          <div className="flex flex-col space-y-0.5 items-center text-center flex-1 justify-center">
+      <Card className="flex flex-col rounded-card border border-surface-border bg-white shadow-soft transition-shadow duration-200 ease-in-out hover:shadow-[0_4px_24px_rgba(58,90,254,0.08)]">
+        <CardContent className="flex min-h-[80px] flex-1 flex-col p-4 md:min-h-[90px]">
+          <div className="flex flex-1 flex-col items-center justify-center space-y-0.5 text-center">
             <div className="flex items-center gap-1">
-              <Zap className="w-4 h-4 text-primary" />
-              <span className="text-[8px] font-medium text-muted-foreground uppercase">
+              <Zap className="h-4 w-4 text-status-warning" />
+              <span className="font-body text-[11px] font-semibold uppercase tracking-[0.08em] text-text-muted">
                 Score
               </span>
             </div>
@@ -366,7 +365,7 @@ https://startupverse.com/12-week-challenge
             ) : scoreData ? (
               <>
                 <span
-                  className={`text-3xl font-bold ${getScoreColor(scoreData.score)}`}
+                  className={`font-heading text-3xl font-extrabold ${getScoreColor(scoreData.score)}`}
                 >
                   {scoreData.score}
                 </span>
@@ -374,11 +373,11 @@ https://startupverse.com/12-week-challenge
                   {scoreData.weeklyChange !== 0 && (
                     <>
                       {scoreData.weeklyChange > 0 ? (
-                        <TrendingUp className="w-2 h-2 text-green-600" />
+                        <TrendingUp className="h-2 w-2 text-status-success" />
                       ) : (
-                        <TrendingUp className="w-2 h-2 text-red-600 rotate-180" />
+                        <TrendingUp className="h-2 w-2 rotate-180 text-status-error" />
                       )}
-                      <span className="text-[8px] font-medium">
+                      <span className="font-body text-[8px] font-medium text-text-body">
                         {scoreData.weeklyChange > 0 ? "+" : ""}
                         {scoreData.weeklyChange}
                       </span>
@@ -400,7 +399,7 @@ https://startupverse.com/12-week-challenge
           {scoreData && (
             <button
               onClick={() => setShowBreakdown(true)}
-              className="text-[8px] text-primary hover:text-primary/80 font-medium py-0.5 flex items-center justify-center gap-0.5 transition-colors"
+              className="flex items-center justify-center gap-0.5 py-0.5 font-body text-[8px] font-medium text-primary transition-colors duration-200 ease-in-out hover:text-primary/80"
             >
               View Breakdown
               <ChevronRight className="w-2 h-2" />
@@ -596,9 +595,8 @@ export default function FounderDashboard({
   onNavigate,
   onVirtualOfficeViewChange,
 }) {
-  const [showProfileModal, setShowProfileModal] = useState(
-    !user.onboardingComplete,
-  );
+  /* Avoid auto-opening over App.jsx profile-setup route (race / double overlay). */
+  const [showProfileModal, setShowProfileModal] = useState(false);
   const [activeTaskId, setActiveTaskId] = useState(null);
   const [showSkipWarning, setShowSkipWarning] = useState(false);
   const [teamRecommendations, setTeamRecommendations] = useState([]);
@@ -652,7 +650,6 @@ export default function FounderDashboard({
   const journeyProgress = useJourneyStore((s) => s.progress);
   const overallProgress = useJourneyStore((s) => s.overallProgress);
   const timeInStage = useJourneyStore((s) => s.timeInStage);
-  const phase3WelcomeSeen = useJourneyStore((s) => s.homeUi?.phase3WelcomeSeen === true);
 
   const stageTaskGetResponse = useStageTaskStore((s) => s.getResponse);
   const stageTaskIsCompleted = useStageTaskStore((s) => s.isCompleted);
@@ -800,12 +797,6 @@ export default function FounderDashboard({
       return false;
     });
   }, [weeklyTasksRaw, executionData]);
-
-  const [phase3Dismissed, setPhase3Dismissed] = useState(false);
-  const showPhase3Welcome =
-    Boolean(user.onboardingComplete) &&
-    !phase3WelcomeSeen &&
-    !phase3Dismissed;
 
   // Stage Learning Modal State
   const [showStageLearningModal, setShowStageLearningModal] = useState(false);
@@ -1702,11 +1693,11 @@ export default function FounderDashboard({
     );
   }
   return (
-    <div className="min-h-screen flex flex-col pt-2 pb-12 md:pb-16" style={{background: '#F7F6F3', fontFamily: '"Instrument Sans", "Segoe UI", sans-serif'}}>
+    <div className="flex min-h-screen flex-col bg-surface-page pb-12 pt-2 font-body md:pb-16">
       {isRefreshing && (
         <div className="fixed top-16 right-4 z-50">
-          <span className="inline-flex items-center gap-1.5 bg-[#EEF2FF] text-[#1C4ED8] text-[10px] font-medium rounded-full px-3 py-1 border border-[#C7D7FD] shadow-sm">
-            <div className="inline-block animate-spin rounded-full h-2.5 w-2.5 border border-[#1C4ED8] border-t-transparent" />
+          <span className="inline-flex items-center gap-1.5 rounded-pill border border-primary/20 bg-primary-tint px-3 py-1 font-body text-[10px] font-medium text-primary shadow-sm">
+            <div className="inline-block h-2.5 w-2.5 animate-spin rounded-full border border-primary border-t-transparent" />
             Syncing
           </span>
         </div>
@@ -1791,17 +1782,17 @@ export default function FounderDashboard({
           </Card>
         </div>
       )}
-      <div className="rounded-lg bg-white border border-[#E5E2DA] border-l-4 border-l-[#1C4ED8] px-4 py-3 flex-shrink-0 flex items-center justify-between" style={{boxShadow: 'none'}}>
+      <div className="flex flex-shrink-0 items-center justify-between rounded-card bg-[linear-gradient(135deg,#3a5afe_0%,#7c4dff_100%)] px-4 py-3 shadow-[0_4px_24px_rgba(58,90,254,0.18)] transition-shadow duration-200 ease-in-out">
         <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-lg bg-[#EEF2FF] flex items-center justify-center flex-shrink-0">
-            <Rocket className="w-4 h-4 text-[#1C4ED8]" />
+          <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-input bg-white/15">
+            <Rocket className="h-4 w-4 text-white" />
           </div>
           <div>
-            <h1 className="text-sm md:text-base font-semibold text-gray-900" style={{fontFamily: '"Bricolage Grotesque", "Segoe UI", sans-serif'}}>
+            <h1 className="font-heading text-sm font-bold text-white md:text-base">
               {"Welcome back, "}
               {user.name}
             </h1>
-            <p className="text-[10px] md:text-xs mt-0.5" style={{color: '#6B6860'}}>
+            <p className="mt-0.5 font-body text-[10px] text-white/80 md:text-xs">
               {"Building "}
               {user.profile?.startupName || "Your Startup"}
               {" · Let's make progress today!"}
@@ -1853,40 +1844,40 @@ export default function FounderDashboard({
           >
             <div className="flex flex-col gap-6 mt-3 mb-2 lg:grid lg:grid-cols-5 shrink-0">
             <div className="flex flex-col lg:col-span-2 min-h-0 lg:max-h-[calc(100vh-140px)]">
-              <Card className="bg-white border border-[#E5E2DA] flex flex-col h-full overflow-hidden transition-shadow duration-150 hover:shadow-[0_1px_4px_rgba(0,0,0,0.06)]" style={{boxShadow: 'none'}}>
-                <CardHeader className="pb-1.5 pt-2 px-4 border-b border-[#E5E2DA] flex-shrink-0">
+              <Card className="flex h-full flex-col overflow-hidden rounded-card border border-surface-border bg-white shadow-soft transition-all duration-200 ease-in-out hover:border-primary hover:shadow-[0_4px_24px_rgba(58,90,254,0.08)]">
+                <CardHeader className="flex-shrink-0 border-b border-surface-border px-4 pb-1.5 pt-2">
                   <Button
                     variant="outline"
                     size="sm"
                     onClick={() => setShowRoadmapModal(true)}
-                    className="w-full h-7 text-[10px] border border-[#E5E2DA] bg-white hover:bg-[#F7F6F3] text-gray-700 flex items-center justify-between px-2.5 transition-colors duration-150"
+                    className="flex h-7 w-full items-center justify-between border-0 bg-transparent px-2.5 text-[10px] font-body font-medium text-text-body shadow-none transition-all duration-200 ease-in-out hover:bg-surface-page"
                   >
                     <span className="flex items-center gap-1.5">
-                      <Rocket className="w-3.5 h-3.5 text-primary" />
-                      <span className="font-semibold">Your Startup Stage</span>
-                      <span className="text-[8px] text-muted-foreground">
+                      <Rocket className="h-3.5 w-3.5 text-primary" />
+                      <span className="font-medium">Your Startup Stage</span>
+                      <span className="text-[8px] text-primary">
                         • View all 6 stages
                       </span>
                     </span>
-                    <ChevronRight className="w-3 h-3" />
+                    <ChevronRight className="h-3 w-3 text-primary" />
                   </Button>
                 </CardHeader>
                 <CardContent className="py-3 px-4 flex-1 flex flex-col overflow-y-auto min-h-0 scrollbar-thin scrollbar-thumb-gray-300 dark:scrollbar-thumb-gray-700 scrollbar-track-transparent">
                   <TooltipProvider>
                     <div className="flex items-start justify-between gap-1.5 mb-2">
                       <div className="flex items-center gap-1.5 flex-1 min-w-0">
-                        <div className="w-7 h-7 md:w-7.5 md:h-7.5 rounded-xl bg-[#EEF2FF] flex items-center justify-center flex-shrink-0">
-                          <currentStage.icon className="w-3.5 h-3.5 text-[#1C4ED8]" />
+                        <div className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-xl bg-primary-tint md:h-8 md:w-8">
+                          <currentStage.icon className="h-3.5 w-3.5 text-primary" />
                         </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-0.5 mb-0.5">
-                            <span className="text-[11px] font-medium uppercase tracking-widest" style={{color: '#6B6860'}}>
+                        <div className="min-w-0 flex-1">
+                          <div className="mb-0.5 flex items-center gap-0.5">
+                            <span className="font-body text-[11px] font-medium uppercase tracking-[0.08em] text-text-muted">
                               Current Stage
                             </span>
                             <Tooltip delayDuration={0}>
                               <TooltipTrigger asChild={true}>
                                 <button className="focus:outline-none">
-                                  <Info className="w-2.5 h-2.5 text-blue-600 cursor-help" />
+                                  <Info className="h-2.5 w-2.5 cursor-help text-primary" />
                                 </button>
                               </TooltipTrigger>
                               <TooltipContent
@@ -1899,31 +1890,30 @@ export default function FounderDashboard({
                               </TooltipContent>
                             </Tooltip>
                           </div>
-                          <h3 className="text-xs md:text-sm font-bold">
+                          <h3 className="font-heading text-xs font-bold text-text-heading md:text-sm">
                             {currentStage.name}
                           </h3>
                         </div>
                       </div>
-                      <span className="text-[9px] font-medium text-[#1C4ED8] border border-[#C7D7FD] bg-white rounded-full px-2 py-0.5 flex-shrink-0 flex items-center gap-0.5">
+                      <span className="flex flex-shrink-0 items-center gap-0.5 rounded-pill bg-primary-tint px-2.5 py-0.5 font-body text-[9px] font-semibold text-primary">
                         Stage {currentStageId}/6
                       </span>
                     </div>
                   </TooltipProvider>
                   <div className="space-y-1 mb-2">
                     <div className="flex items-center justify-between text-[9px] md:text-[10px]">
-                      <span className="" style={{color: '#6B6860'}}>
+                      <span className="font-body text-text-muted">
                         Startup Stage Progress
                       </span>
-                      <span className="font-semibold" style={{color: '#1C4ED8'}}>
+                      <span className="font-body font-semibold text-primary">
                         {startupStageProgress}%
                       </span>
                     </div>
                     <Progress
                       value={startupStageProgress}
-                      className="bg-[#EAE8E2] [&>div]:bg-[#1C4ED8]"
-                      style={{height: '4px'}}
+                      className="h-1.5 border-0 bg-surface-border [&_[data-slot=progress-indicator]]:!bg-gradient-to-r [&_[data-slot=progress-indicator]]:!from-primary [&_[data-slot=progress-indicator]]:!to-accent"
                     />
-                    <p className="text-[8px] text-muted-foreground mt-0.5">
+                    <p className="mt-0.5 font-body text-[8px] text-text-muted">
                       {startupStageProgress >= 100
                         ? "Journey Complete! 🎉"
                         : `${executionData?.weekHistory.length || 0} outcomes completed • ${currentStage.name}`}
@@ -1933,45 +1923,45 @@ export default function FounderDashboard({
                     variant="outline"
                     size="sm"
                     onClick={() => setShowStageLearningModal(true)}
-                    className="w-full h-8 text-[10px] border border-[#E5E2DA] bg-white hover:bg-[#EEF2FF] text-[#1C4ED8] mb-2 flex items-center justify-between px-3 transition-colors duration-150 rounded-lg"
+                    className="mb-2 flex h-8 w-full items-center justify-between rounded-input border border-surface-border bg-surface-page px-3 font-body text-[10px] font-medium text-primary transition-all duration-200 ease-in-out hover:border-primary hover:bg-primary-tint"
                   >
                     <span className="flex items-center">
                       Learn About This Stage from YC Experts
                     </span>
-                    <ChevronRight className="w-3.5 h-3.5 text-[#1C4ED8]" />
+                    <ChevronRight className="h-3.5 w-3.5 text-primary" />
                   </Button>
                   <div className="mb-2">
                     <CohortMembershipBadge startupId={user.startupId || founderId} />
                   </div>
-                  <div className="border-t my-2" />
+                  <div className="my-2 border-t border-surface-border" />
                   <div className="flex-1 flex flex-col gap-2 py-2">
-                    <h3 className="text-[11px] font-medium uppercase tracking-widest" style={{color: '#6B6860'}}>
+                    <h3 className="font-body text-[11px] font-medium uppercase tracking-[0.08em] text-text-muted">
                       Weekly Outcome Streak
                     </h3>
                     <div className="grid grid-cols-3 gap-2">
-                      <Card className="bg-white border border-[#E5E2DA] rounded-xl shadow-none transition-shadow duration-150 hover:shadow-[0_1px_4px_rgba(0,0,0,0.06)]">
-                        <CardContent className="p-4 flex items-center justify-center min-h-[80px] md:min-h-[90px]">
-                          <div className="flex flex-col space-y-0.5 items-center text-center">
+                      <Card className="rounded-card border border-surface-border bg-white shadow-soft transition-shadow duration-200 ease-in-out hover:shadow-[0_4px_24px_rgba(58,90,254,0.08)]">
+                        <CardContent className="flex min-h-[80px] items-center justify-center p-4 md:min-h-[90px]">
+                          <div className="flex flex-col items-center space-y-0.5 text-center">
                             <div className="flex items-center gap-1">
                               <Flame
-                                className={`w-5 h-5 ${(executionData?.streak || 0) === 0 ? "text-muted-foreground" : (executionData?.streak || 0) < 4 ? "text-orange-500" : (executionData?.streak || 0) < 8 ? "text-orange-600" : "text-red-500"}`}
+                                className={`h-5 w-5 ${(executionData?.streak || 0) === 0 ? "text-text-muted/40" : "text-[#ff6b00]"}`}
                               />
-                              <span className="text-3xl font-bold" style={{color: '#1C4ED8'}}>
+                              <span className="font-heading text-3xl font-extrabold text-primary">
                                 {executionData?.streak || 0}
                               </span>
-                              <span className="text-xs text-muted-foreground">
+                              <span className="font-body text-xs text-text-muted">
                                 {(executionData?.streak || 0) === 1
                                   ? "wk"
                                   : "wks"}
                               </span>
                             </div>
-                            <div className="flex items-center gap-1 mt-1">
-                              <TrendingUp className="w-2.5 h-2.5" style={{color: '#6B6860'}} />
-                              <span className="text-[9px] font-medium" style={{color: '#6B6860'}}>
+                            <div className="mt-1 flex items-center gap-1">
+                              <TrendingUp className="h-2.5 w-2.5 text-status-success" />
+                              <span className="font-body text-[9px] font-medium text-text-body">
                                 {outcomeProgress}% this week
                               </span>
                             </div>
-                            <p className="text-[8px]" style={{color: '#9CA3AF'}}>
+                            <p className="font-body text-[8px] text-text-muted">
                               {(executionData?.streak || 0) === 0
                                 ? "Start your first week"
                                 : "Keep it going!"}
@@ -1979,21 +1969,21 @@ export default function FounderDashboard({
                           </div>
                         </CardContent>
                       </Card>
-                      <Card className="bg-white border border-[#E5E2DA] rounded-xl shadow-none transition-shadow duration-150 hover:shadow-[0_1px_4px_rgba(0,0,0,0.06)]">
-                        <CardContent className="p-4 flex items-center justify-center min-h-[80px] md:min-h-[90px]">
+                      <Card className="rounded-card border border-surface-border bg-white shadow-soft transition-shadow duration-200 ease-in-out hover:shadow-[0_4px_24px_rgba(58,90,254,0.08)]">
+                        <CardContent className="flex min-h-[80px] items-center justify-center p-4 md:min-h-[90px]">
                           <div className="relative flex flex-col items-center gap-1">
                             <div className="relative">
                               <svg
                                 width="60"
                                 height="60"
                                 viewBox="0 0 60 60"
-                                className="transform -rotate-90"
+                                className="-rotate-90 transform"
                               >
                                 <circle
                                   cx="30"
                                   cy="30"
                                   r="25"
-                                  stroke="#EAE8E2"
+                                  className="stroke-surface-border"
                                   strokeWidth="3"
                                   fill="none"
                                 />
@@ -2001,7 +1991,7 @@ export default function FounderDashboard({
                                   cx="30"
                                   cy="30"
                                   r="25"
-                                  stroke="#1C4ED8"
+                                  className="stroke-primary"
                                   strokeWidth="3"
                                   fill="none"
                                   strokeLinecap="round"
@@ -2013,7 +2003,7 @@ export default function FounderDashboard({
                                 />
                               </svg>
                               <div className="absolute inset-0 flex items-center justify-center">
-                                <span className="text-sm font-bold">
+                                <span className="font-heading text-sm font-bold text-primary">
                                   {outcomeProgress}%
                                 </span>
                               </div>
@@ -2036,10 +2026,10 @@ export default function FounderDashboard({
               </Card>
             </div>
             <div className="flex flex-col min-h-0 lg:col-span-3 lg:max-h-[calc(100vh-140px)]">
-              <Card className="relative bg-white border border-[#E5E2DA] flex flex-col h-full overflow-hidden transition-shadow duration-150 hover:shadow-[0_1px_4px_rgba(0,0,0,0.06)]" style={{boxShadow: 'none'}}>
-                <CardHeader className="flex-shrink-0 pb-2 pt-3 px-4 border-b border-[#E5E2DA]">
+              <Card className="relative flex h-full flex-col overflow-hidden rounded-card border border-surface-border bg-white shadow-soft transition-all duration-200 ease-in-out hover:shadow-[0_4px_24px_rgba(58,90,254,0.08)]">
+                <CardHeader className="flex-shrink-0 border-b border-surface-border px-4 pb-2 pt-3">
                   <div className="flex items-center justify-between">
-                    <CardTitle className="text-[11px] font-medium uppercase tracking-widest" style={{color: '#6B6860'}}>
+                    <CardTitle className="font-body text-[11px] font-medium uppercase tracking-[0.08em] text-text-muted">
                       This Week&#39;s Focus
                     </CardTitle>
                     <div className="flex items-center gap-1">
@@ -2064,14 +2054,14 @@ export default function FounderDashboard({
                         </Tooltip>
                       )}
                       {executionData?.currentOutcome && tasks.length > 0 && (
-                        <span className="text-[9px] font-medium text-[#1C4ED8] border border-[#C7D7FD] bg-white rounded-full px-2 py-0.5">
+                        <span className="rounded-pill bg-primary-tint px-2 py-0.5 font-body text-[9px] font-semibold text-primary">
                           Week {(executionData?.weekHistory.length || 0) + 1}
                         </span>
                       )}
                     </div>
                   </div>
                   {executionData?.currentOutcome && tasks.length > 0 && (
-                    <p className="mt-1 text-[13px] md:text-[14px] font-medium text-gray-900 leading-snug">
+                    <p className="mt-1 font-body text-[13px] font-medium leading-snug text-text-heading md:text-[14px]">
                       {executionData.currentOutcome.title}
                     </p>
                   )}
@@ -2124,10 +2114,10 @@ export default function FounderDashboard({
                       <div className="space-y-1.5 md:space-y-2 pb-0.5">
                         <div className="space-y-1 md:space-y-1.5">
                           <div className="flex items-center justify-between">
-                            <h4 className="text-[11px] font-medium uppercase tracking-widest" style={{color: '#6B6860'}}>
+                            <h4 className="font-body text-[11px] font-medium uppercase tracking-[0.08em] text-text-muted">
                               Milestones
                             </h4>
-                            <span className="text-[9px] font-medium border border-[#E5E2DA] bg-white rounded-full px-2 py-0.5" style={{color: '#6B6860'}}>
+                            <span className="rounded-pill border border-surface-border bg-white px-2 py-0.5 font-body text-[9px] font-medium text-text-muted">
                               {
                                 executionData.currentOutcome.milestones.filter(
                                   (m) => m.tasksCompleted === m.totalTasks,
@@ -2148,18 +2138,19 @@ export default function FounderDashboard({
                                     : 0;
                                 const dotColor =
                                   milestone.status === 'completed'
-                                    ? '#16A34A'
+                                    ? '#00c896'
                                     : milestone.status === 'in-progress'
-                                    ? '#1C4ED8'
-                                    : '#9CA3AF';
+                                      ? '#3a5afe'
+                                      : '#a0a0b0';
                                 return (
                                   <div
                                     key={milestone.id}
-                                    className="space-y-1.5 p-2 md:p-2.5 rounded-lg border border-[#E5E2DA]"
-                                    style={{
-                                      background: milestoneIdx % 2 === 1 ? '#F0EEE8' : '#FFFFFF',
-                                      marginBottom: '6px',
-                                    }}
+                                    className={`space-y-1.5 rounded-input border border-surface-border p-2 md:p-2.5 ${
+                                      milestoneIdx % 2 === 1
+                                        ? 'bg-surface-page'
+                                        : 'bg-white'
+                                    }`}
+                                    style={{ marginBottom: '6px' }}
                                   >
                                     <div className="flex items-center justify-between gap-2">
                                       <div className="flex items-center gap-2 flex-1 min-w-0">
@@ -2170,7 +2161,7 @@ export default function FounderDashboard({
                                         <Tooltip>
                                           <TooltipTrigger asChild={true}>
                                             <button className="focus:outline-none text-left">
-                                              <p className="font-medium text-[9px] md:text-[10px] text-gray-800">
+                                              <p className="font-body text-[9px] font-medium text-text-heading md:text-[10px]">
                                                 {milestone.title}
                                               </p>
                                             </button>
@@ -2185,14 +2176,13 @@ export default function FounderDashboard({
                                           </TooltipContent>
                                         </Tooltip>
                                       </div>
-                                      <span className="text-[9px] font-medium border border-[#E5E2DA] bg-white rounded-full px-1.5 py-0.5 flex-shrink-0" style={{color: '#6B6860'}}>
+                                      <span className="flex-shrink-0 rounded-pill border border-surface-border bg-white px-1.5 py-0.5 font-body text-[9px] font-medium text-text-muted">
                                         {milestone.tasksCompleted}/{milestone.totalTasks}
                                       </span>
                                     </div>
                                     <Progress
                                       value={progress}
-                                      className="bg-[#EAE8E2] [&>div]:bg-[#1C4ED8] rounded-full"
-                                      style={{height: '3px'}}
+                                      className="h-1 rounded-full border-0 bg-surface-border [&_[data-slot=progress-indicator]]:!bg-gradient-to-r [&_[data-slot=progress-indicator]]:!from-primary [&_[data-slot=progress-indicator]]:!to-accent"
                                     />
                                   </div>
                                 );
@@ -2204,7 +2194,7 @@ export default function FounderDashboard({
                           <div className="space-y-1 md:space-y-1.5 pt-2 mt-2 border-t">
                             <div className="flex items-center justify-between">
                               <h4 className="text-[9px] md:text-[10px] font-semibold flex items-center gap-1">
-                                <FileText className="w-3 h-3 text-blue-600" />
+                                <FileText className="h-3 w-3 text-primary" />
                                 Organization Deliverables
                               </h4>
                               <span className="text-[8px] md:text-[9px] text-muted-foreground">
@@ -2371,39 +2361,39 @@ export default function FounderDashboard({
                             </div>
                           </div>
                         )}
-                        <div className="flex gap-2 pt-2 border-t border-[#E5E2DA]">
+                        <div className="flex gap-2 border-t border-surface-border pt-2">
                           <Button
                             size="sm"
                             onClick={() => setShowMilestoneDetailView(true)}
-                            className="flex-1 h-11 text-[11px] font-medium rounded-lg bg-[#1C4ED8] hover:bg-[#1C4ED8]/90 text-white transition-colors duration-150"
+                            className="flex-1 h-11 rounded-input bg-primary font-body text-[11px] font-semibold text-white shadow-[0_4px_16px_rgba(58,90,254,0.25)] transition-all duration-200 ease-in-out hover:bg-primary-hover"
                           >
-                            <Eye className="w-3 h-3 mr-1.5" />
+                            <Eye className="mr-1.5 h-3 w-3" />
                             View Tasks
                           </Button>
                           <Button
                             size="sm"
                             variant="outline"
                             onClick={() => setShowWeeklyReviewModal(true)}
-                            className="h-11 text-[11px] font-medium rounded-lg border border-[#E5E2DA] bg-white text-[#1C4ED8] hover:bg-[#EEF2FF] transition-colors duration-150"
+                            className="h-11 rounded-input border border-surface-border bg-white font-body text-[11px] font-medium text-primary transition-all duration-200 ease-in-out hover:bg-primary-tint"
                           >
-                            <CheckCircle2 className="w-3 h-3 mr-1.5" />
+                            <CheckCircle2 className="mr-1.5 h-3 w-3" />
                             Complete Week
                           </Button>
                         </div>
                       </div>
                       ) : (
-                        <div className="flex flex-col items-center justify-center py-4 md:py-5 px-2 md:px-3 text-center min-h-[120px]">
-                          <Target className="w-8 h-8 md:w-9 md:h-9 text-muted-foreground/30 mb-1.5 md:mb-2" />
-                          <h3 className="text-xs md:text-sm font-semibold mb-1">
+                        <div className="flex min-h-[120px] flex-col items-center justify-center px-2 py-4 text-center md:px-3 md:py-5">
+                          <Target className="mb-1.5 h-8 w-8 text-surface-border md:mb-2 md:h-9 md:w-9" />
+                          <h3 className="mb-1 font-heading text-xs font-semibold text-text-heading md:text-sm">
                             No weekly outcome set yet
                           </h3>
-                          <p className="text-[9px] md:text-[10px] text-muted-foreground mb-2 md:mb-3 max-w-md">
+                          <p className="mb-2 max-w-md font-body text-[9px] text-text-body md:mb-3 md:text-[10px]">
                             Set a clear, achievable goal for this week to drive your
                             startup forward
                           </p>
                           <Button
                             onClick={() => setShowOutcomeModal(true)}
-                            className="gap-1.5 h-6 md:h-6.5 text-[9px] md:text-[10px]"
+                            className="h-6 gap-1.5 rounded-input bg-primary font-body text-[9px] font-semibold text-white shadow-[0_4px_16px_rgba(58,90,254,0.25)] transition-all duration-200 ease-in-out hover:bg-primary-hover md:h-7 md:text-[10px]"
                           >
                             <PlayCircle className="w-2.5 h-2.5" />
                             Set This Week's Goal
@@ -2417,12 +2407,9 @@ export default function FounderDashboard({
             </div>
           </div>
             <div className="min-h-6 flex-1 basis-0 sm:min-h-8" aria-hidden />
-            <div className="flex-shrink-0 mb-12 md:mb-16">
-              <div
-                className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between md:gap-4 py-3"
-                style={{ paddingLeft: '16px', borderLeft: '2px solid #1C4ED8' }}
-              >
-                <p className="text-[14px] leading-relaxed flex-1 italic" style={{color: '#6B6860'}}>
+            <div className="mb-12 flex-shrink-0 md:mb-16">
+              <div className="flex flex-col gap-3 border-t border-surface-border bg-surface-page py-3 md:flex-row md:items-center md:justify-between md:gap-4 md:px-1">
+                <p className="flex-1 font-body text-[14px] italic leading-relaxed text-text-body">
                   {smartInsight.message}
                 </p>
                 {smartInsight.action && smartInsight.actionLabel && (
@@ -2430,7 +2417,7 @@ export default function FounderDashboard({
                     <Button
                       size="sm"
                       variant="outline"
-                      className="h-8 text-[10px] md:text-[11px] px-4 border border-[#E5E2DA] bg-white text-[#1C4ED8] hover:bg-[#EEF2FF] transition-colors duration-150 rounded-lg"
+                      className="h-8 rounded-input border border-surface-border bg-white px-4 font-body text-[10px] font-semibold text-primary transition-all duration-200 ease-in-out hover:bg-primary-tint md:text-[11px]"
                       onClick={() => {
                         if (smartInsight.action === "set-outcome") {
                           setShowOutcomeModal(true);
@@ -2504,19 +2491,6 @@ export default function FounderDashboard({
               founderAvatar={user.avatar || user.profileImage || ""}
               onNavigate={onNavigate}
               onVirtualOfficeViewChange={onVirtualOfficeViewChange}
-            />
-          )}
-          {showPhase3Welcome && (
-            <Phase3Welcome
-              onDismiss={() => {
-                setPhase3Dismissed(true);
-                useJourneyStore.getState().scheduleHomeUiPersist({ phase3WelcomeSeen: true });
-              }}
-              onStartFlow={() => {
-                setPhase3Dismissed(true);
-                useJourneyStore.getState().scheduleHomeUiPersist({ phase3WelcomeSeen: true });
-                setShowOutcomeModal(true);
-              }}
             />
           )}
           {executionData?.currentOutcome && (

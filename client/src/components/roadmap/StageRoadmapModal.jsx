@@ -10,6 +10,7 @@ import {
   DialogTitle,
 } from "../ui/dialog";
 import { Badge } from "../ui/badge";
+import { cn } from "../ui/utils";
 import { Check, Lock, ChevronDown, ChevronUp } from "lucide-react";
 import { JOURNEY_STAGES } from "../../utils/journeyProgress";
 import { apiGet } from "../../utils/apiClient";
@@ -57,12 +58,16 @@ export default function StageRoadmapModal({
   };
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+      <DialogContent
+        overlayClassName="bg-[rgba(10,10,30,0.45)] backdrop-blur-sm"
+        closeClassName="text-text-muted hover:text-text-heading hover:opacity-100"
+        className="max-h-[85vh] max-w-2xl gap-4 overflow-y-auto rounded-2xl border border-surface-border bg-white p-6 shadow-[0_8px_40px_rgba(58,90,254,0.15)] sm:max-w-2xl"
+      >
         <DialogHeader>
-          <DialogTitle className="text-[10px] font-semibold flex items-center gap-2">
-            🚀 Your Startup Stage
+          <DialogTitle className="flex items-center gap-2 font-heading text-lg font-bold text-text-heading">
+            Your Startup Stage
           </DialogTitle>
-          <DialogDescription className="text-[10px]">
+          <DialogDescription className="font-body text-sm text-text-body">
             Your complete startup journey across 6 algorithmic stages. Stages
             unlock automatically as you hit progress milestones.
           </DialogDescription>
@@ -78,36 +83,51 @@ export default function StageRoadmapModal({
             return (
               <div
                 key={stage.id}
-                className={`
-                  relative rounded-lg border-2 transition-all overflow-hidden
-                  ${isCurrent ? "border-primary bg-primary/5" : ""}
-                  ${isCompleted ? "border-green-500 bg-green-50 dark:bg-green-950/20" : ""}
-                  ${isLocked ? "border-gray-200 dark:border-gray-800 bg-gray-50/50 dark:bg-gray-900/20 opacity-60" : ""}
-                  ${!isCurrent && !isCompleted && !isLocked ? "border-gray-200 dark:border-gray-700" : ""}
-                `}
+                className={cn(
+                  "relative overflow-hidden rounded-xl transition-all duration-200 ease-in-out",
+                  isLocked &&
+                    "border border-surface-border bg-surface-page opacity-70 dark:bg-surface-page",
+                  isCurrent && "border-[1.5px] border-primary bg-primary-tint",
+                  !isLocked &&
+                    !isCurrent &&
+                    "border border-surface-border bg-white dark:bg-card",
+                )}
               >
                 <div className="flex items-start gap-2.5 p-3">
                   <div
-                    className={`
-                    w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0
-                    ${isCurrent ? "bg-primary text-white" : ""}
-                    ${isCompleted ? "bg-green-600 text-white" : ""}
-                    ${isLocked ? "bg-gray-300 dark:bg-gray-700 text-gray-500" : ""}
-                    ${!isCurrent && !isCompleted && !isLocked ? "bg-gray-200 dark:bg-gray-800 text-gray-600" : ""}
-                  `}
+                    className={cn(
+                      "flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl",
+                      isLocked && "bg-surface-border text-text-muted",
+                      isCurrent && "bg-primary text-white",
+                      !isLocked &&
+                        !isCurrent &&
+                        isCompleted &&
+                        "bg-primary-tint text-status-success",
+                      !isLocked &&
+                        !isCurrent &&
+                        !isCompleted &&
+                        "bg-primary-tint text-primary",
+                    )}
                   >
                     {isCompleted ? (
-                      <Check className="w-4 h-4" />
+                      <Check className="h-4 w-4" />
                     ) : isLocked ? (
-                      <Lock className="w-4 h-4" />
+                      <Lock className="h-4 w-4 text-text-muted" />
                     ) : (
-                      <stage.icon className="w-4 h-4" />
+                      <stage.icon className="h-4 w-4" />
                     )}
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-1.5 mb-0.5">
+                  <div className="min-w-0 flex-1">
+                    <div className="mb-0.5 flex flex-wrap items-center gap-1.5">
                       <h3
-                        className={`text-[10px] font-bold ${isCurrent ? "text-primary" : isCompleted ? "text-green-700 dark:text-green-400" : ""}`}
+                        className={cn(
+                          "font-heading text-[10px] font-semibold md:text-xs",
+                          isLocked && "text-text-muted",
+                          isCurrent && "font-bold text-primary",
+                          !isLocked &&
+                            !isCurrent &&
+                            "text-text-heading dark:text-foreground",
+                        )}
                       >
                         {"Stage "}
                         {stage.id}
@@ -115,49 +135,46 @@ export default function StageRoadmapModal({
                         {stage.name}
                       </h3>
                       {isCurrent && (
-                        <Badge
-                          variant="default"
-                          className="text-[8px] px-1.5 py-0 h-4"
-                        >
+                        <Badge className="h-auto rounded-pill bg-primary px-2.5 py-0.5 font-body text-[11px] font-semibold text-white hover:bg-primary">
                           CURRENT
-                        </Badge>
-                      )}
-                      {isCompleted && (
-                        <Badge className="text-[8px] px-1.5 py-0 h-4 bg-green-600">
-                          COMPLETED
                         </Badge>
                       )}
                       {isLocked && (
                         <Badge
                           variant="outline"
-                          className="text-[8px] px-1.5 py-0 h-4"
+                          className="h-auto rounded-pill border-0 bg-surface-border px-2.5 py-0.5 font-body text-[11px] font-semibold text-text-muted"
                         >
                           LOCKED
                         </Badge>
                       )}
                     </div>
-                    <p className="text-[10px] text-muted-foreground leading-relaxed">
+                    <p
+                      className={cn(
+                        "font-body text-[10px] leading-relaxed md:text-xs",
+                        isLocked ? "text-text-muted" : "text-text-body",
+                      )}
+                    >
                       {stage.description}
                     </p>
                   </div>
                   {!isLocked && (
                     <button
                       onClick={() => toggleStage(stage.id)}
-                      className="flex-shrink-0 w-6 h-6 rounded hover:bg-muted/50 flex items-center justify-center transition-colors"
+                      className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-input transition-colors duration-200 ease-in-out hover:bg-surface-page"
                       aria-label={
                         isExpanded ? "Collapse details" : "Expand details"
                       }
                     >
                       {isExpanded ? (
-                        <ChevronUp className="w-4 h-4 text-muted-foreground" />
+                        <ChevronUp className="h-4 w-4 text-text-muted" />
                       ) : (
-                        <ChevronDown className="w-4 h-4 text-muted-foreground" />
+                        <ChevronDown className="h-4 w-4 text-text-muted" />
                       )}
                     </button>
                   )}
                 </div>
                 {!isLocked && isExpanded && (
-                  <div className="px-3 pb-3 pt-0 space-y-2.5 border-t border-border/50 mt-1">
+                  <div className="mt-1 space-y-2.5 border-t border-surface-border px-3 pb-3 pt-0">
                     <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground pt-2 flex-wrap">
                       <span className="font-medium">
                         {"⏱️ Estimated: "}
@@ -247,8 +264,8 @@ export default function StageRoadmapModal({
                   </div>
                 )}
                 {isLocked && (
-                  <div className="px-3 pb-3 text-[10px] text-muted-foreground italic">
-                    🔒 Complete your current stage to unlock this stage and see
+                  <div className="px-3 pb-3 font-body text-[10px] italic text-text-muted">
+                    Complete your current stage to unlock this stage and see
                     details
                   </div>
                 )}
@@ -256,9 +273,9 @@ export default function StageRoadmapModal({
             );
           })}
         </div>
-        <div className="mt-4 pt-3 border-t text-center text-[10px] text-muted-foreground">
-          💡 Stages are algorithmically determined based on your progress
-          metrics and execution outcomes
+        <div className="mt-4 border-t border-surface-border pt-3 text-center font-body text-[10px] text-text-muted">
+          Stages are algorithmically determined based on your progress metrics
+          and execution outcomes
         </div>
       </DialogContent>
     </Dialog>

@@ -25,7 +25,7 @@ function Card({ className, ...props }) {
         {
           "data-slot": "card",
           className: cn(
-            "bg-card text-card-foreground flex flex-col gap-3 rounded-xl border transition-shadow",
+            "flex flex-col gap-3 rounded-xl border bg-[var(--card)] text-[var(--card-foreground)] transition-shadow",
             className,
           ),
         },

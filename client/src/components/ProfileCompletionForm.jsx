@@ -1,4 +1,11 @@
-import React, { useState, useRef, useEffect } from "react";
+import React, {
+  useState,
+  useRef,
+  useEffect,
+  useLayoutEffect,
+  useCallback,
+} from "react";
+import { createPortal } from "react-dom";
 import { Button } from "./ui/button";
 import {
   Card,
@@ -10,7 +17,7 @@ import {
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
 import { Textarea } from "./ui/textarea";
-import { ArrowLeft, ChevronDown, ChevronUp } from "lucide-react";
+import { ArrowLeft, ChevronDown } from "lucide-react";
 import TalentProfileForm from "./TalentProfileForm";
 import {
   determineInitialStage,
@@ -39,7 +46,35 @@ const rolesOptions = FOUNDER_ROLES_NEEDED_OPTIONS;
 const teamSizeOptions = FOUNDER_TEAM_SIZE_OPTIONS;
 const startupStagesOptions = ORG_ADMIN_PROGRAM_STAGE_OPTIONS;
 
-// Single-select dropdown component with scroll indicators
+/** Panel width from trigger + longest option; opaque surface scrolls as one block */
+function computeMenuPanelBox(buttonRect, optionStrings, gap = 4, pad = 12) {
+  const r = buttonRect;
+  const vw = window.innerWidth;
+  const vh = window.innerHeight;
+  const maxPanelWidth = Math.max(260, vw - pad * 2);
+  const triggerW = Math.max(r.width, 160);
+  let longest = 0;
+  for (let i = 0; i < optionStrings.length; i++) {
+    const len = String(optionStrings[i]).length;
+    if (len > longest) longest = len;
+  }
+  const estFromText = Math.min(longest * 7 + 56, maxPanelWidth);
+  const menuWidth = Math.min(Math.max(triggerW, estFromText), maxPanelWidth);
+  let left = r.left;
+  if (left + menuWidth > vw - pad) {
+    left = Math.max(pad, vw - pad - menuWidth);
+  }
+  if (left < pad) left = pad;
+  const availBelow = vh - r.bottom - gap - pad;
+  const maxHeight = Math.min(360, Math.max(160, availBelow));
+  return {
+    top: r.bottom + gap,
+    left,
+    width: menuWidth,
+    maxHeight,
+  };
+}
+
 function SingleSelectDropdown({
   label,
   options,
@@ -51,49 +86,86 @@ function SingleSelectDropdown({
 }) {
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef(null);
-  const listRef = useRef(null);
-  const [showScrollTop, setShowScrollTop] = useState(false);
-  const [showScrollBottom, setShowScrollBottom] = useState(false);
+  const buttonRef = useRef(null);
+  const menuRef = useRef(null);
+  const [menuBox, setMenuBox] = useState(null);
+
+  const layoutMenu = useCallback(() => {
+    if (!isOpen || !buttonRef.current) {
+      setMenuBox(null);
+      return;
+    }
+    const r = buttonRef.current.getBoundingClientRect();
+    setMenuBox(computeMenuPanelBox(r, options));
+  }, [isOpen, options]);
+
+  useLayoutEffect(() => {
+    if (!isOpen) setMenuBox(null);
+    else layoutMenu();
+  }, [isOpen, layoutMenu]);
+
+  useEffect(() => {
+    if (!isOpen) return undefined;
+    layoutMenu();
+    window.addEventListener("resize", layoutMenu);
+    window.addEventListener("scroll", layoutMenu, true);
+    return () => {
+      window.removeEventListener("resize", layoutMenu);
+      window.removeEventListener("scroll", layoutMenu, true);
+    };
+  }, [isOpen, layoutMenu]);
+
   useEffect(() => {
     function handleClickOutside(event) {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
-        setIsOpen(false);
+      const t = event.target;
+      if (
+        dropdownRef.current?.contains(t) ||
+        menuRef.current?.contains(t)
+      ) {
+        return;
       }
+      setIsOpen(false);
     }
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
-  const handleScroll = () => {
-    if (listRef.current) {
-      const { scrollTop, scrollHeight, clientHeight } = listRef.current;
-      setShowScrollTop(scrollTop > 0);
-      setShowScrollBottom(scrollTop + clientHeight < scrollHeight - 5);
-    }
-  };
-  useEffect(() => {
-    if (isOpen && listRef.current) {
-      const { scrollHeight, clientHeight } = listRef.current;
-      setShowScrollBottom(scrollHeight > clientHeight);
-    }
-  }, [isOpen]);
-  const scrollUp = () => {
-    if (listRef.current) {
-      listRef.current.scrollBy({
-        top: -100,
-        behavior: "smooth",
-      });
-    }
-  };
-  const scrollDown = () => {
-    if (listRef.current) {
-      listRef.current.scrollBy({
-        top: 100,
-        behavior: "smooth",
-      });
-    }
-  };
+
   const displayValue = value || placeholder;
   const isPlaceholder = !value;
+
+  const menuPortal =
+    isOpen &&
+    menuBox &&
+    createPortal(
+      <div
+        ref={menuRef}
+        className="fixed z-[10000] overflow-y-auto overflow-x-hidden rounded-md border border-border text-popover-foreground"
+        style={{
+          top: menuBox.top,
+          left: menuBox.left,
+          width: menuBox.width,
+          maxHeight: menuBox.maxHeight,
+          backgroundColor: "var(--popover)",
+          boxShadow: "var(--elevation-3)",
+        }}
+      >
+        {options.map((option) => (
+          <button
+            type="button"
+            key={option}
+            onClick={() => {
+              onChange(option);
+              setIsOpen(false);
+            }}
+            className={`flex w-full px-3 py-2.5 text-left text-xs leading-snug whitespace-normal break-words transition-colors hover:bg-muted ${value === option ? "bg-muted" : ""}`}
+          >
+            {option}
+          </button>
+        ))}
+      </div>,
+      document.body,
+    );
+
   return (
     <div className="space-y-2">
       <Label>
@@ -101,10 +173,14 @@ function SingleSelectDropdown({
       </Label>
       <div ref={dropdownRef} className="relative">
         <button
+          ref={buttonRef}
           type="button"
-          onClick={() => !disabled && setIsOpen(!isOpen)}
+          onClick={() => {
+            if (disabled) return;
+            setIsOpen(!isOpen);
+          }}
           disabled={disabled}
-          className="w-full h-10 px-3 rounded-md border border-border/70 bg-background text-foreground flex items-center justify-between text-left disabled:opacity-50"
+          className="flex h-10 w-full items-center justify-between rounded-md border border-border/70 bg-background px-3 text-left text-foreground disabled:opacity-50"
         >
           <span
             className={`truncate ${isPlaceholder ? "text-xs text-muted-foreground" : "text-xs"}`}
@@ -112,56 +188,15 @@ function SingleSelectDropdown({
             {displayValue}
           </span>
           <ChevronDown
-            className={`w-4 h-4 flex-shrink-0 transition-transform ${isOpen ? "rotate-180" : ""}`}
+            className={`h-4 w-4 shrink-0 transition-transform ${isOpen ? "rotate-180" : ""}`}
           />
         </button>
-        {isOpen && (
-          <div className="absolute z-50 w-full mt-1 bg-background border border-border/70 rounded-md shadow-lg overflow-hidden">
-            {showScrollTop && (
-              <button
-                type="button"
-                onClick={scrollUp}
-                className="w-full py-1.5 bg-muted/50 hover:bg-muted flex items-center justify-center border-b border-border/70"
-              >
-                <ChevronUp className="w-4 h-4 text-muted-foreground" />
-              </button>
-            )}
-            <div
-              ref={listRef}
-              onScroll={handleScroll}
-              className="max-h-48 overflow-y-auto"
-            >
-              {options.map((option) => (
-                <button
-                  type="button"
-                  key={option}
-                  onClick={() => {
-                    onChange(option);
-                    setIsOpen(false);
-                  }}
-                  className={`w-full px-3 py-2 text-left text-xs hover:bg-muted transition-colors ${value === option ? "bg-muted/50" : ""}`}
-                >
-                  {option}
-                </button>
-              ))}
-            </div>
-            {showScrollBottom && (
-              <button
-                type="button"
-                onClick={scrollDown}
-                className="w-full py-1.5 bg-muted/50 hover:bg-muted flex items-center justify-center border-t border-border/70"
-              >
-                <ChevronDown className="w-4 h-4 text-muted-foreground" />
-              </button>
-            )}
-          </div>
-        )}
       </div>
+      {menuPortal}
     </div>
   );
 }
 
-// Multi-select dropdown component
 function MultiSelectDropdown({
   label,
   options,
@@ -172,61 +207,105 @@ function MultiSelectDropdown({
 }) {
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef(null);
-  const listRef = useRef(null);
-  const [showScrollTop, setShowScrollTop] = useState(false);
-  const [showScrollBottom, setShowScrollBottom] = useState(false);
+  const buttonRef = useRef(null);
+  const menuRef = useRef(null);
+  const [menuBox, setMenuBox] = useState(null);
+
+  const layoutMenu = useCallback(() => {
+    if (!isOpen || !buttonRef.current) {
+      setMenuBox(null);
+      return;
+    }
+    const r = buttonRef.current.getBoundingClientRect();
+    setMenuBox(computeMenuPanelBox(r, options));
+  }, [isOpen, options]);
+
+  useLayoutEffect(() => {
+    if (!isOpen) setMenuBox(null);
+    else layoutMenu();
+  }, [isOpen, layoutMenu]);
+
+  useEffect(() => {
+    if (!isOpen) return undefined;
+    layoutMenu();
+    window.addEventListener("resize", layoutMenu);
+    window.addEventListener("scroll", layoutMenu, true);
+    return () => {
+      window.removeEventListener("resize", layoutMenu);
+      window.removeEventListener("scroll", layoutMenu, true);
+    };
+  }, [isOpen, layoutMenu]);
+
   useEffect(() => {
     function handleClickOutside(event) {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
-        setIsOpen(false);
+      const t = event.target;
+      if (
+        dropdownRef.current?.contains(t) ||
+        menuRef.current?.contains(t)
+      ) {
+        return;
       }
+      setIsOpen(false);
     }
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
-  const handleScroll = () => {
-    if (listRef.current) {
-      const { scrollTop, scrollHeight, clientHeight } = listRef.current;
-      setShowScrollTop(scrollTop > 0);
-      setShowScrollBottom(scrollTop + clientHeight < scrollHeight - 5);
-    }
-  };
-  useEffect(() => {
-    if (isOpen && listRef.current) {
-      const { scrollHeight, clientHeight } = listRef.current;
-      setShowScrollBottom(scrollHeight > clientHeight);
-    }
-  }, [isOpen]);
-  const scrollUp = () => {
-    if (listRef.current) {
-      listRef.current.scrollBy({
-        top: -100,
-        behavior: "smooth",
-      });
-    }
-  };
-  const scrollDown = () => {
-    if (listRef.current) {
-      listRef.current.scrollBy({
-        top: 100,
-        behavior: "smooth",
-      });
-    }
-  };
+
   const displayValue =
     selected.length > 0
       ? `${selected.length} item${selected.length !== 1 ? "s" : ""} selected`
       : placeholder;
   const isPlaceholder = selected.length === 0;
+
+  const menuPortal =
+    isOpen &&
+    menuBox &&
+    createPortal(
+      <div
+        ref={menuRef}
+        className="fixed z-[10000] overflow-y-auto overflow-x-hidden rounded-md border border-border text-popover-foreground"
+        style={{
+          top: menuBox.top,
+          left: menuBox.left,
+          width: menuBox.width,
+          maxHeight: menuBox.maxHeight,
+          backgroundColor: "var(--popover)",
+          boxShadow: "var(--elevation-3)",
+        }}
+      >
+        {options.map((option) => (
+          <label
+            key={option}
+            className="flex cursor-pointer items-start gap-2 px-3 py-2.5 text-xs leading-snug hover:bg-muted"
+          >
+            <input
+              type="checkbox"
+              checked={selected.includes(option)}
+              onChange={() => onChange(option)}
+              className="mt-0.5 h-4 w-4 shrink-0"
+            />
+            <span className="min-w-0 flex-1 whitespace-normal break-words">
+              {option}
+            </span>
+          </label>
+        ))}
+      </div>,
+      document.body,
+    );
+
   return (
     <div className="space-y-2">
       <Label>{label}</Label>
       <div ref={dropdownRef} className="relative">
         <button
+          ref={buttonRef}
           type="button"
-          onClick={() => !disabled && setIsOpen(!isOpen)}
+          onClick={() => {
+            if (disabled) return;
+            setIsOpen(!isOpen);
+          }}
           disabled={disabled}
-          className="w-full h-10 px-3 rounded-md border border-border/70 bg-background text-foreground flex items-center justify-between text-left disabled:opacity-50"
+          className="flex h-10 w-full items-center justify-between rounded-md border border-border/70 bg-background px-3 text-left text-foreground disabled:opacity-50"
         >
           <span
             className={`truncate ${isPlaceholder ? "text-xs text-muted-foreground" : "text-xs"}`}
@@ -234,51 +313,9 @@ function MultiSelectDropdown({
             {displayValue}
           </span>
           <ChevronDown
-            className={`w-4 h-4 flex-shrink-0 transition-transform ${isOpen ? "rotate-180" : ""}`}
+            className={`h-4 w-4 shrink-0 transition-transform ${isOpen ? "rotate-180" : ""}`}
           />
         </button>
-        {isOpen && (
-          <div className="absolute z-50 w-full mt-1 bg-background border border-border/70 rounded-md shadow-lg overflow-hidden">
-            {showScrollTop && (
-              <button
-                type="button"
-                onClick={scrollUp}
-                className="w-full py-1.5 bg-muted/50 hover:bg-muted flex items-center justify-center border-b border-border/70"
-              >
-                <ChevronUp className="w-4 h-4 text-muted-foreground" />
-              </button>
-            )}
-            <div
-              ref={listRef}
-              onScroll={handleScroll}
-              className="max-h-48 overflow-y-auto"
-            >
-              {options.map((option) => (
-                <label
-                  key={option}
-                  className="flex items-center gap-2 px-3 py-2 hover:bg-muted cursor-pointer text-xs"
-                >
-                  <input
-                    type="checkbox"
-                    checked={selected.includes(option)}
-                    onChange={() => onChange(option)}
-                    className="w-4 h-4"
-                  />
-                  <span>{option}</span>
-                </label>
-              ))}
-            </div>
-            {showScrollBottom && (
-              <button
-                type="button"
-                onClick={scrollDown}
-                className="w-full py-1.5 bg-muted/50 hover:bg-muted flex items-center justify-center border-t border-border/70"
-              >
-                <ChevronDown className="w-4 h-4 text-muted-foreground" />
-              </button>
-            )}
-          </div>
-        )}
       </div>
       {selected.length > 0 && (
         <p className="text-xs text-muted-foreground">
@@ -288,6 +325,7 @@ function MultiSelectDropdown({
           {" selected"}
         </p>
       )}
+      {menuPortal}
     </div>
   );
 }
