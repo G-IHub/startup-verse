@@ -28,10 +28,17 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { Dialog, DialogContent } from "../ui/dialog";
-import { getAccessToken } from "../../app/session";
 import { unwrapData } from "../../utils/apiEnvelope";
 
 const API_BASE = API_BASE_URL;
+
+// Default fetch options for cookie-based auth
+const defaultOptions = {
+  credentials: "include",
+  headers: {
+    "Content-Type": "application/json",
+  },
+};
 
 export default function MentorAssignmentManager({
   cohortId,
@@ -72,21 +79,18 @@ export default function MentorAssignmentManager({
       setLoading(true);
 
       // Load mentors for organization
-      const token = getAccessToken();
-      const auth = token ? { Authorization: `Bearer ${token}` } : {};
-
       const mentorsRes = await fetch(
         `${API_BASE}/organizations/${organizationId}/mentors`,
-        { headers: { ...auth } },
+        defaultOptions,
       );
       const mentorsInner = unwrapData(await mentorsRes.json());
       const mentorList = mentorsInner.mentors || [];
       setMentors(mentorList);
 
       // Load founders in cohort - FIXED URL
-      const foundersRes = await fetch(`${API_BASE}/cohorts/${cohortId}/members`, {
-        headers: { ...auth },
-      });
+      const foundersRes = await fetch(`${API_BASE}/cohorts/${cohortId}/members`,
+        defaultOptions,
+      );
       const foundersRaw = unwrapData(await foundersRes.json());
       const memberRows = Array.isArray(foundersRaw)
         ? foundersRaw
@@ -130,15 +134,11 @@ export default function MentorAssignmentManager({
       console.log(
         `📌 [Frontend] Assigning founder ${founderId} to mentor ${mentorId}`,
       );
-      const token = getAccessToken();
       const response = await fetch(
         `${API_BASE}/mentors/${mentorId}/assign-founder`,
         {
+          ...defaultOptions,
           method: "POST",
-          headers: {
-            ...(token ? { Authorization: `Bearer ${token}` } : {}),
-            "Content-Type": "application/json",
-          },
           body: JSON.stringify({
             founderId,
             cohortId,
@@ -168,14 +168,11 @@ export default function MentorAssignmentManager({
   const handleUnassignFounder = async (mentorId, founderId) => {
     try {
       setAssigning(true);
-      const token = getAccessToken();
       const response = await fetch(
         `${API_BASE}/mentors/${mentorId}/unassign-founder/${founderId}`,
         {
+          ...defaultOptions,
           method: "DELETE",
-          headers: {
-            ...(token ? { Authorization: `Bearer ${token}` } : {}),
-          },
         },
       );
       if (!response.ok) throw new Error("Failed to unassign founder");
@@ -216,15 +213,11 @@ export default function MentorAssignmentManager({
   const handleInviteMentor = async () => {
     try {
       setInviting(true);
-      const token = getAccessToken();
       const response = await fetch(
         `${API_BASE}/organizations/${organizationId}/mentors`,
         {
+          ...defaultOptions,
           method: "POST",
-          headers: {
-            ...(token ? { Authorization: `Bearer ${token}` } : {}),
-            "Content-Type": "application/json",
-          },
           body: JSON.stringify({
             email: inviteEmail,
             name: inviteName,

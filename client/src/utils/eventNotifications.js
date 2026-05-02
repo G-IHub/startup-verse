@@ -2,16 +2,16 @@
  * Event notification system.
  */
 
-import { getAccessToken } from "../app/session";
 import { API_BASE_URL } from "../config/apiBase.js";
 import { get as backendGet } from "./backendClient.js";
 
-function getAuthHeaders() {
-  return {
-    Authorization: `Bearer ${getAccessToken()}`,
+// Default fetch options for cookie-based auth
+const defaultOptions = {
+  credentials: "include",
+  headers: {
     "Content-Type": "application/json",
-  };
-}
+  },
+};
 
 /**
  * Send notification when a new event is created.
@@ -19,7 +19,7 @@ function getAuthHeaders() {
 export async function notifyEventCreated(cohortId, organizationId, eventData) {
   try {
     const response = await fetch(`${API_BASE_URL}/cohorts/${cohortId}/members`, {
-      headers: getAuthHeaders(),
+      ...defaultOptions,
     });
 
     if (!response.ok) {
@@ -47,7 +47,7 @@ export async function notifyEventCreated(cohortId, organizationId, eventData) {
 
     const notificationResponse = await fetch(`${API_BASE_URL}/notifications/batch`, {
       method: "POST",
-      headers: getAuthHeaders(),
+      ...defaultOptions,
       body: JSON.stringify({ notifications }),
     });
 
@@ -89,7 +89,7 @@ export async function notifyEventUpdated(cohortId, eventData) {
 
     const notificationResponse = await fetch(`${API_BASE_URL}/notifications/batch`, {
       method: "POST",
-      headers: getAuthHeaders(),
+      ...defaultOptions,
       body: JSON.stringify({ notifications }),
     });
 
@@ -131,7 +131,7 @@ export async function notifyEventCancelled(eventData) {
 
     const notificationResponse = await fetch(`${API_BASE_URL}/notifications/batch`, {
       method: "POST",
-      headers: getAuthHeaders(),
+      ...defaultOptions,
       body: JSON.stringify({ notifications }),
     });
 
@@ -183,7 +183,7 @@ export async function sendEventReminder(eventData) {
 
     const notificationResponse = await fetch(`${API_BASE_URL}/notifications/batch`, {
       method: "POST",
-      headers: getAuthHeaders(),
+      ...defaultOptions,
       body: JSON.stringify({ notifications }),
     });
 
@@ -213,7 +213,7 @@ export async function notifyOrganizationRSVP(
     const response = await fetch(
       `${API_BASE_URL}/organizations/${organizationId}/admins`,
       {
-        headers: getAuthHeaders(),
+        ...defaultOptions,
       },
     );
 
@@ -249,7 +249,7 @@ export async function notifyOrganizationRSVP(
 
     const notificationResponse = await fetch(`${API_BASE_URL}/notifications/batch`, {
       method: "POST",
-      headers: getAuthHeaders(),
+      ...defaultOptions,
       body: JSON.stringify({ notifications }),
     });
 

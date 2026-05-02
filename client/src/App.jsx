@@ -17,18 +17,12 @@ import { authApi } from "./api/authApi";
 import { initializeErrorSuppression } from "./utils/errorSuppression";
 import {
   APP_VIEWS,
-  STORAGE_KEYS,
   buildFounderProfile,
   buildTalentProfile,
-  ensureSessionMigration,
-  getAccessToken,
-  loadCurrentUser,
   resolveInitialView,
-  safeParseJson,
   upsertStoredRecord,
+  getAccessToken,
 } from "./app/session";
-
-ensureSessionMigration();
 
 // Lazy-loaded route components
 const DashboardHybrid = lazy(() => import("./components/DashboardHybrid"));
@@ -39,6 +33,9 @@ const TeamMemberOnboarding = lazy(() =>
   import("./components/TeamMemberOnboarding").then((m) => ({
     default: m.TeamMemberOnboarding,
   })),
+);
+const InvitationAcceptance = lazy(() =>
+  import("./components/InvitationAcceptance"),
 );
 const AdminDashboardRealTime = lazy(
   () => import("./components/admin/AdminDashboardRealTime"),
@@ -72,11 +69,6 @@ const AcceleratorLandingPage = lazy(() =>
     default: m.AcceleratorLandingPage,
   })),
 );
-const NotificationCronTrigger = lazy(
-  () => import("./components/NotificationCronTrigger"),
-);
-const EventReminderCron = lazy(() => import("./components/EventReminderCron"));
-
 // Admin tools (development only)
 // Deferred module references (populated after first paint)
 let refreshCurrentUser;
@@ -125,6 +117,8 @@ function AppContent() {
   const { user, setUser, login, logout } = useAuth();
   const [currentView, setCurrentView] = useState(APP_VIEWS.landing);
   const [invitationToken, setInvitationToken] = useState(null);
+  /** null = resolving, 'cohort' | 'talent' | 'error' */
+  const [invitationKind, setInvitationKind] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
 
   // Defer non-critical initialization until after first paint
@@ -142,9 +136,7 @@ function AppContent() {
       const urlView = resolveInitialView();
 
       if (urlView === APP_VIEWS.admin) {
-        const savedUser = loadCurrentUser();
-        if (savedUser) {
-          login({ user: savedUser, accessToken: getAccessToken() });
+        if (user) {
           setCurrentView(APP_VIEWS.admin);
         } else {
           setCurrentView(APP_VIEWS.landing);
@@ -169,52 +161,15 @@ function AppContent() {
         return;
       }
 
-      // Run one-time auth migration (legacy accounts)
-      if (
-        import.meta.env.VITE_ENABLE_AUTH_MIGRATION === "true" &&
-        !localStorage.getItem(STORAGE_KEYS.authMigrationCompleted)
-      ) {
-        import("./utils/backendHealthCheck").then(
-          ({ runAuthMappingMigration }) => {
-            runAuthMappingMigration(true)
-              .then((result) => {
-                if (result?.success) {
-                  localStorage.setItem(
-                    STORAGE_KEYS.authMigrationCompleted,
-                    "true",
-                  );
-                }
-              })
-              .catch(() => {});
-          },
-        );
-      }
-
-      // Restore existing session
-      const savedUser = loadCurrentUser();
-      if (savedUser) {
-        login({ user: savedUser, accessToken: getAccessToken() });
-
-        // Non-blocking backend refresh
-        if (refreshCurrentUser) {
-          refreshCurrentUser(savedUser.id)
-            .then((freshUser) => {
-              if (!freshUser) return;
-              setUser(freshUser);
-              if (freshUser.role !== savedUser.role) {
-                toast.success(
-                  `Your role has been updated to ${freshUser.role}!`,
-                );
-              }
-            })
-            .catch(() => {});
-        }
-
-        let nextView = savedUser.onboardingComplete
+      // Restore existing session from server (via cookie)
+      // AuthContext already loads user on mount via /api/auth/me
+      // Just need to determine the correct view
+      if (user) {
+        let nextView = user.onboardingComplete
           ? APP_VIEWS.dashboard
           : APP_VIEWS.profileSetup;
-        if (savedUser.role === "founder" && savedUser.onboardingComplete) {
-          const fid = String(savedUser._id ?? savedUser.id);
+        if (user.role === "founder" && user.onboardingComplete) {
+          const fid = String(user._id ?? user.id);
           if (fid) {
             const startup = await founderApi.getFounderStartupSafe(fid);
             if (!startup) nextView = APP_VIEWS.profileSetup;
@@ -227,7 +182,7 @@ function AppContent() {
     };
 
     initializeApp();
-  }, []);
+  }, [user]);
 
   // Guard: sync view with onboarding state
   useEffect(() => {
@@ -250,6 +205,54 @@ function AppContent() {
     }
   }, [user, currentView]);
 
+  useEffect(() => {
+    if (currentView !== APP_VIEWS.invitation || !invitationToken) {
+      setInvitationKind(null);
+      return;
+    }
+    setInvitationKind(null);
+    let cancelled = false;
+    (async () => {
+      try {
+        const { API_BASE_URL } = await import("./config/apiBase.js");
+        const r = await fetch(
+          `${API_BASE_URL}/invitations/token/${encodeURIComponent(invitationToken)}`,
+          { credentials: "include" },
+        );
+        const j = await r.json().catch(() => ({}));
+        if (cancelled) return;
+        if (!r.ok || !j?.success || !j?.data?.invitation) {
+          setInvitationKind("error");
+          return;
+        }
+        const kind = j.data.kind === "cohort" ? "cohort" : "talent";
+        setInvitationKind(kind);
+      } catch {
+        if (!cancelled) setInvitationKind("error");
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [currentView, invitationToken]);
+
+  const clearInvitationQuery = () => {
+    window.history.replaceState({}, document.title, window.location.pathname);
+    setInvitationToken(null);
+    setInvitationKind(null);
+  };
+
+  const handleCohortInvitationResolved = async () => {
+    clearInvitationQuery();
+    try {
+      const refreshed = await authApi.me();
+      login({ user: refreshed });
+    } catch {
+      /* session unchanged */
+    }
+    setCurrentView(APP_VIEWS.dashboard);
+  };
+
   // ---------------------------------------------------------------------------
   // Auth handlers
   // ---------------------------------------------------------------------------
@@ -265,7 +268,6 @@ function AppContent() {
       const currentUser = signupData.backendUser;
       login({
         user: currentUser,
-        accessToken: signupData.backendToken || getAccessToken(),
       });
       if (currentUser.onboardingComplete) {
         toast.success(`Welcome back, ${currentUser.name}!`);
@@ -294,10 +296,7 @@ function AppContent() {
     const completedUser = { ...userData, onboardingComplete: true };
     login({
       user: completedUser,
-      accessToken: userData?.backendToken || getAccessToken(),
     });
-    upsertStoredRecord(STORAGE_KEYS.registeredUsers, completedUser);
-    upsertStoredRecord(STORAGE_KEYS.teamMembers, completedUser);
 
     if (userData.role === "team-member" || userData.role === "team") {
       teamMemberApi
@@ -322,7 +321,6 @@ function AppContent() {
     }
 
     setUser(updatedUser);
-    upsertStoredRecord(STORAGE_KEYS.registeredUsers, updatedUser);
 
     authApi
       .updateProfile(String(updatedUser._id ?? updatedUser.id), updatedUser)
@@ -331,10 +329,6 @@ function AppContent() {
     const { role } = updatedUser;
 
     if (role === "founder") {
-      upsertStoredRecord(
-        STORAGE_KEYS.founderProfiles,
-        buildFounderProfile(updatedUser),
-      );
       if (updatedUser.startupId) {
         founderApi
           .saveFounderProfile({
@@ -351,10 +345,6 @@ function AppContent() {
         .saveTeamMemberProfile(updatedUser.id, updatedUser)
         .catch(() => {});
     } else if (role === "talent") {
-      upsertStoredRecord(
-        STORAGE_KEYS.talentProfiles,
-        buildTalentProfile(updatedUser),
-      );
       talentApi.saveTalentProfile(updatedUser.id, updatedUser).catch(() => {});
     }
   };
@@ -457,14 +447,59 @@ function AppContent() {
         </Suspense>
       )}
 
-      {currentView === APP_VIEWS.invitation && invitationToken && (
-        <Suspense fallback={<LoadingSpinner />}>
-          <TeamMemberOnboarding
-            invitationToken={invitationToken}
-            onComplete={handleInvitationAccepted}
-          />
-        </Suspense>
-      )}
+      {currentView === APP_VIEWS.invitation &&
+        invitationToken &&
+        invitationKind === null && <LoadingSpinner />}
+
+      {currentView === APP_VIEWS.invitation &&
+        invitationToken &&
+        invitationKind === "error" && (
+          <div className="min-h-screen bg-background flex items-center justify-center p-6">
+            <div className="text-center space-y-4 max-w-md">
+              <p className="text-lg font-medium">Invalid or expired invitation</p>
+              <p className="text-muted-foreground text-sm">
+                This link may have expired, already been used, or is incorrect.
+              </p>
+              <button
+                type="button"
+                className="text-primary underline"
+                onClick={() => {
+                  clearInvitationQuery();
+                  setCurrentView(APP_VIEWS.landing);
+                }}
+              >
+                Go to home
+              </button>
+            </div>
+          </div>
+        )}
+
+      {currentView === APP_VIEWS.invitation &&
+        invitationToken &&
+        invitationKind === "cohort" && (
+          <Suspense fallback={<LoadingSpinner />}>
+            <InvitationAcceptance
+              token={invitationToken}
+              onAccept={handleInvitationAccepted}
+              onCohortResolved={handleCohortInvitationResolved}
+              onCancel={() => {
+                clearInvitationQuery();
+                setCurrentView(user ? APP_VIEWS.dashboard : APP_VIEWS.landing);
+              }}
+            />
+          </Suspense>
+        )}
+
+      {currentView === APP_VIEWS.invitation &&
+        invitationToken &&
+        invitationKind === "talent" && (
+          <Suspense fallback={<LoadingSpinner />}>
+            <TeamMemberOnboarding
+              invitationToken={invitationToken}
+              onComplete={handleInvitationAccepted}
+            />
+          </Suspense>
+        )}
 
       {currentView === APP_VIEWS.invitation && !invitationToken && (
         <div className="min-h-screen bg-background flex items-center justify-center">
@@ -545,12 +580,6 @@ export default function App() {
     <ThemeProvider>
       <AuthProvider>
         <NotificationProvider>
-          <Suspense fallback={null}>
-            <NotificationCronTrigger />
-          </Suspense>
-          <Suspense fallback={null}>
-            <EventReminderCron />
-          </Suspense>
           <AppContent />
         </NotificationProvider>
       </AuthProvider>

@@ -1,16 +1,20 @@
-import { getAccessToken } from "../../app/session";
 import { API_BASE_URL } from "../../config/apiBase.js";
 
 const API_BASE = API_BASE_URL;
+
+// Default fetch options for cookie-based auth
+const defaultOptions = {
+  credentials: "include",
+  headers: {
+    "Content-Type": "application/json",
+  },
+};
 
 export async function createMeeting(meeting) {
   try {
     const response = await fetch(`${API_BASE}/meetings`, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${getAccessToken()}`,
-      },
+      ...defaultOptions,
       body: JSON.stringify(meeting),
     });
 
@@ -32,9 +36,7 @@ export async function createMeeting(meeting) {
 export async function getStartupMeetings(startupId) {
   try {
     const response = await fetch(`${API_BASE}/meetings/startup/${startupId}`, {
-      headers: {
-        Authorization: `Bearer ${getAccessToken()}`,
-      },
+      ...defaultOptions,
     });
 
     if (!response.ok) {
@@ -54,10 +56,7 @@ export async function updateMeeting(meetingId, updates) {
   try {
     const response = await fetch(`${API_BASE}/meetings/${meetingId}`, {
       method: "PUT",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${getAccessToken()}`,
-      },
+      ...defaultOptions,
       body: JSON.stringify(updates),
     });
 
@@ -79,9 +78,7 @@ export async function deleteMeeting(meetingId) {
   try {
     const response = await fetch(`${API_BASE}/meetings/${meetingId}`, {
       method: "DELETE",
-      headers: {
-        Authorization: `Bearer ${getAccessToken()}`,
-      },
+      ...defaultOptions,
     });
 
     if (!response.ok) {
@@ -99,9 +96,7 @@ export async function deleteMeeting(meetingId) {
 export async function getUserMeetings(userId) {
   try {
     const response = await fetch(`${API_BASE}/meetings/user/${userId}`, {
-      headers: {
-        Authorization: `Bearer ${getAccessToken()}`,
-      },
+      ...defaultOptions,
     });
 
     if (!response.ok) {

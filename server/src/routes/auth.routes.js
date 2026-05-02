@@ -26,4 +26,17 @@ authRouter.delete(
   asyncHandler(authController.deleteAccount)
 );
 
+// Get current authenticated user (uses cookie)
+authRouter.get(
+  "/auth/me",
+  requireAuth,
+  asyncHandler(authController.getMe)
+);
+
+// Logout - clear cookie
+authRouter.post(
+  "/auth/logout",
+  asyncHandler(authController.logout)
+);
+
 export default authRouter;

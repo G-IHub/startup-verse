@@ -32,7 +32,6 @@ const CLIENT_SEGMENT_ORPHAN_ALLOWLIST = new Set([
   "compensation-status",
   "meetings",
   "memberships",
-  "onboard-team-member",
   "performance",
   "startups",
 ]);

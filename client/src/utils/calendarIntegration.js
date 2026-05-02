@@ -3,18 +3,17 @@
  * Aggregates all date-tracked activities across the platform
  */
 
-import { getAccessToken } from "../app/session";
 import { API_BASE_URL } from "../config/apiBase.js";
 
 const API_BASE = API_BASE_URL;
 
-function authHeaders() {
-  const token = getAccessToken();
-  return {
-    Authorization: token ? `Bearer ${token}` : "",
+// Default fetch options for cookie-based auth
+const defaultOptions = {
+  credentials: "include",
+  headers: {
     "Content-Type": "application/json",
-  };
-}
+  },
+};
 
 function unwrapData(json) {
   if (!json || typeof json !== "object") return json;
@@ -86,7 +85,7 @@ export async function getFounderCalendarEvents(founderId) {
     // 1. Get cohort events
     const eventsResponse = await fetch(
       `${API_BASE}/founder/${founderId}/events`,
-      { headers: authHeaders() },
+      { ...defaultOptions },
     );
 
     if (eventsResponse.ok) {
@@ -102,7 +101,7 @@ export async function getFounderCalendarEvents(founderId) {
     // 2. Get deliverables
     const deliverablesResponse = await fetch(
       `${API_BASE}/deliverables/founder/${founderId}`,
-      { headers: authHeaders() },
+      { ...defaultOptions },
     );
 
     if (deliverablesResponse.ok) {
@@ -131,7 +130,7 @@ export async function getFounderCalendarEvents(founderId) {
     // 3. Program milestones (canonical cohort ids from membership)
     const cohortsResponse = await fetch(
       `${API_BASE}/cohorts/founder/${founderId}`,
-      { headers: authHeaders() },
+      { ...defaultOptions },
     );
 
     if (cohortsResponse.ok) {
@@ -142,7 +141,7 @@ export async function getFounderCalendarEvents(founderId) {
       for (const cohortId of cohortIds) {
         const milestonesResponse = await fetch(
           `${API_BASE}/cohorts/${cohortId}/program-milestones`,
-          { headers: authHeaders() },
+          { ...defaultOptions },
         );
 
         if (milestonesResponse.ok) {
@@ -171,30 +170,31 @@ export async function getFounderCalendarEvents(founderId) {
       }
     }
 
-    // 4. Get weekly outcomes (from execution loop)
-    const weeklyOutcomes = JSON.parse(
-      localStorage.getItem("weeklyOutcomes") || "{}",
+    // 4. Weekly outcomes (server — no localStorage)
+    const woResponse = await fetch(
+      `${API_BASE}/founders/${founderId}/weekly-outcomes`,
+      { ...defaultOptions },
     );
-    const founderOutcomes = weeklyOutcomes[founderId] || [];
-
-    const outcomeEvents = founderOutcomes
-      .filter((outcome) => outcome.date)
-      .map((outcome) => ({
-        id: `outcome-${outcome.weekNumber}`,
-        title: `📊 Week ${outcome.weekNumber} Outcome`,
-        description: outcome.outcomeDescription,
-        startDate: outcome.date,
-        type: "outcome",
-        status: outcome.approved ? "approved" : "pending",
-        source: "personal",
-        metadata: {
-          weekNumber: outcome.weekNumber,
-          category: outcome.category,
-          approved: outcome.approved,
-        },
-      }));
-    allEvents.push(...outcomeEvents);
-    console.log(`📅 [Calendar] Found ${outcomeEvents.length} weekly outcomes`);
+    if (woResponse.ok) {
+      const payload = await woResponse.json();
+      const outcomes = listFromApi(payload);
+      const outcomeEvents = outcomes
+        .filter((o) => o.weekOf)
+        .map((outcome, idx) => ({
+          id: String(outcome._id || outcome.id || `outcome-${idx}`),
+          title: `📊 Weekly outcome`,
+          description: outcome.goal || outcome.summary || "",
+          startDate: outcome.weekOf,
+          type: "outcome",
+          status: outcome.status || "active",
+          source: "personal",
+          metadata: {
+            weekOf: outcome.weekOf,
+          },
+        }));
+      allEvents.push(...outcomeEvents);
+      console.log(`📅 [Calendar] Found ${outcomeEvents.length} weekly outcomes`);
+    }
 
     // Sort by date
     allEvents.sort(
@@ -274,7 +274,7 @@ export async function getOrganizationCalendarEvents(organizationId) {
 
     const cohortsResponse = await fetch(
       `${API_BASE}/cohorts/organization/${organizationId}`,
-      { headers: authHeaders() },
+      { ...defaultOptions },
     );
 
     if (!cohortsResponse.ok) {
@@ -293,7 +293,7 @@ export async function getOrganizationCalendarEvents(organizationId) {
       const cohortName = cohort.name;
 
       const eventsResponse = await fetch(`${API_BASE}/cohorts/${cohortId}/events`, {
-        headers: authHeaders(),
+        ...defaultOptions,
       });
 
       if (eventsResponse.ok) {
@@ -310,7 +310,7 @@ export async function getOrganizationCalendarEvents(organizationId) {
 
       const deliverablesResponse = await fetch(
         `${API_BASE}/cohorts/${cohortId}/deliverables`,
-        { headers: authHeaders() },
+        { ...defaultOptions },
       );
 
       if (deliverablesResponse.ok) {
@@ -335,7 +335,7 @@ export async function getOrganizationCalendarEvents(organizationId) {
 
       const milestonesResponse = await fetch(
         `${API_BASE}/cohorts/${cohortId}/program-milestones`,
-        { headers: authHeaders() },
+        { ...defaultOptions },
       );
 
       if (milestonesResponse.ok) {

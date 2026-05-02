@@ -6,6 +6,13 @@ import * as usersController from "../controllers/users.controller.js";
 
 const usersRouter = Router();
 
+// Blueprint §14: POST /api/v1/users/ — admin-only create user
+usersRouter.post(
+  "/users",
+  requireAuth,
+  asyncHandler(usersController.createUser)
+);
+
 usersRouter.get(
   "/users/:userId",
   requireAuth,

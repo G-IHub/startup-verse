@@ -24,10 +24,17 @@ import {
   Loader2,
   CalendarDays,
 } from "lucide-react";
-import { getAccessToken } from "../../app/session";
 import { unwrapData } from "../../utils/apiEnvelope";
 
 const API_BASE = API_BASE_URL;
+
+// Default fetch options for cookie-based auth
+const defaultOptions = {
+  credentials: "include",
+  headers: {
+    "Content-Type": "application/json",
+  },
+};
 
 export default function OrganizationAgenda({
   organizationId,
@@ -45,14 +52,11 @@ export default function OrganizationAgenda({
       setLoading(true);
 
       // Load events from all cohorts
-      const token = getAccessToken();
       const eventPromises = cohorts.map(async (cohort) => {
         try {
           const cohortId = cohort.id || cohort._id;
           const response = await fetch(`${API_BASE}/cohorts/${cohortId}/events`, {
-            headers: {
-              ...(token ? { Authorization: `Bearer ${token}` } : {}),
-            },
+            ...defaultOptions,
           });
           if (!response.ok) return [];
           const inner = unwrapData(await response.json());

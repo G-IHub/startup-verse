@@ -14,9 +14,15 @@ import { Button } from "../ui/button";
 import { Badge } from "../ui/badge";
 import { Calendar, Target, Clock, AlertCircle, Sparkles } from "lucide-react";
 import StructuredMilestoneCreator from "./StructuredMilestoneCreator";
-import { getAccessToken } from "../../app/session";
 
 const API_BASE = API_BASE_URL;
+
+// Default fetch options for cookie-based auth
+
+const defaultOptions = {
+  credentials: "include",
+  headers: { "Content-Type": "application/json" },
+};
 
 export default function ProgramMilestones({
   cohortId,
@@ -33,13 +39,10 @@ export default function ProgramMilestones({
   const loadMilestones = async () => {
     try {
       setLoading(true);
-      const token = getAccessToken();
       const response = await fetch(
         `${API_BASE}/cohorts/${cohortId}/program-milestones`,
         {
-          headers: {
-            ...(token ? { Authorization: `Bearer ${token}` } : {}),
-          },
+          ...defaultOptions,
         },
       );
       if (!response.ok) throw new Error("Failed to fetch milestones");
@@ -53,16 +56,11 @@ export default function ProgramMilestones({
     }
   };
   const handleCreateStructuredMilestone = async (data) => {
-    try {
-      const token = getAccessToken();
-      const response = await fetch(
+    try {      const response = await fetch(
         `${API_BASE}/cohorts/${cohortId}/program-milestones`,
         {
+          ...defaultOptions,
           method: "POST",
-          headers: {
-            ...(token ? { Authorization: `Bearer ${token}` } : {}),
-            "Content-Type": "application/json",
-          },
           body: JSON.stringify({
             organizationId,
             title: data.title,

@@ -25,6 +25,8 @@
   --shadow-soft: 0 2px 12px rgba(0, 0, 0, 0.06);
   --shadow-focus: 0 0 0 3px rgba(58, 90, 254, 0.1);
   --shadow-card: 0 4px 24px rgba(58, 90, 254, 0.08);
+  --shadow-modal: 0 8px 40px rgba(58, 90, 254, 0.14);
+  --modal-overlay: rgba(10, 10, 30, 0.5);
   --radius-input: 10px;
   --radius-card: 14px;
 
@@ -428,6 +430,35 @@
   }
 }
 
+/* Modal / dialog shells (custom overlays + shared tokens) */
+@layer utilities {
+  .sv-modal-backdrop {
+    background-color: var(--modal-overlay);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    transition: opacity 0.2s ease;
+  }
+
+  .sv-modal-panel {
+    border-radius: 16px;
+    border: none;
+    background-color: #ffffff;
+    box-shadow: var(--shadow-modal);
+    animation: sv-modal-panel-in 0.2s ease forwards;
+  }
+}
+
+@keyframes sv-modal-panel-in {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 /* Material Design Utilities */
 @layer utilities {
   /* Readability guardrail: prevent ultra-micro text in dashboards */
@@ -464,8 +495,8 @@
   .office-card {
     background: var(--card);
     border: 1px solid color-mix(in srgb, var(--border) 88%, transparent);
-    border-radius: 12px;
-    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+    border-radius: var(--radius-card);
+    box-shadow: var(--shadow-soft);
   }
 
   .office-panel-shell {
@@ -572,7 +603,7 @@
     }
 
     .office-calendar-split {
-      grid-template-columns: 168px minmax(0, 1fr);
+      grid-template-columns: minmax(268px, 0.42fr) minmax(0, 1fr);
     }
 
     .office-calendar-split__month {
@@ -586,7 +617,7 @@
 
   @media (max-width: 1279px) {
     .office-card {
-      border-radius: 11px;
+      border-radius: var(--radius-card);
     }
   }
 
@@ -981,26 +1012,24 @@
 }
 
 /* High z-index for all Dialogs to appear above Calendar sidebar (z-100) and other panels */
-[data-slot="dialog-overlay"] {
+[data-slot="dialog-overlay"],
+[data-slot="alert-dialog-overlay"] {
   z-index: 150 !important;
 }
 
 [data-slot="dialog-content"] {
   z-index: 150 !important;
-  /* Opaque panel: semantic bg-* utilities may not apply on Radix portals (Tailwind v4 + layered CSS); match ProfileCompletionModal --popover pattern */
-  background-color: var(--card);
-  color: var(--card-foreground);
 }
 
 [data-slot="alert-dialog-content"] {
-  background-color: var(--card);
-  color: var(--card-foreground);
+  z-index: 150 !important;
 }
 
+[data-slot="sheet-overlay"],
 [data-slot="sheet-content"],
+[data-slot="drawer-overlay"],
 [data-slot="drawer-content"] {
-  background-color: var(--card);
-  color: var(--card-foreground);
+  z-index: 150 !important;
 }
 
 [data-slot="popover-content"],
@@ -1016,6 +1045,441 @@
 [data-slot="navigation-menu-content"] {
   background-color: var(--popover);
   color: var(--popover-foreground);
+}
+
+/* ========================================
+   Modal / dialog scoped design system
+   ======================================== */
+:is(
+    [data-slot="dialog-content"],
+    [data-slot="alert-dialog-content"],
+    [data-slot="sheet-content"],
+    [data-slot="drawer-content"],
+    .sv-modal-panel
+  )
+  .text-muted-foreground {
+  color: #a0a0b0 !important;
+}
+
+:is(
+    [data-slot="dialog-content"],
+    [data-slot="alert-dialog-content"],
+    [data-slot="sheet-content"],
+    [data-slot="drawer-content"],
+    .sv-modal-panel
+  )
+  [data-slot="label"] {
+  font-family: var(--font-body);
+  font-weight: 500;
+  color: #0d0d0d;
+}
+
+:is(
+    [data-slot="dialog-content"],
+    [data-slot="alert-dialog-content"],
+    [data-slot="sheet-content"],
+    [data-slot="drawer-content"],
+    .sv-modal-panel
+  )
+  :is(
+    [data-slot="input"]:not([type="checkbox"]):not([type="radio"]),
+    [data-slot="textarea"],
+    [data-slot="select-trigger"]
+  ) {
+  border-width: 1.5px !important;
+  border-color: #e2e4f0 !important;
+  border-radius: 10px !important;
+  background-color: #ffffff !important;
+  font-family: var(--font-body);
+  font-weight: 400;
+  color: #0d0d0d !important;
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease !important;
+}
+
+:is(
+    [data-slot="dialog-content"],
+    [data-slot="alert-dialog-content"],
+    [data-slot="sheet-content"],
+    [data-slot="drawer-content"],
+    .sv-modal-panel
+  )
+  :is(
+    [data-slot="input"]:not([type="checkbox"]):not([type="radio"]),
+    [data-slot="textarea"],
+    [data-slot="select-trigger"]
+  )::placeholder {
+  color: #a0a0b0 !important;
+}
+
+:is(
+    [data-slot="dialog-content"],
+    [data-slot="alert-dialog-content"],
+    [data-slot="sheet-content"],
+    [data-slot="drawer-content"],
+    .sv-modal-panel
+  )
+  :is(
+    [data-slot="input"]:not([type="checkbox"]):not([type="radio"]):focus-visible,
+    [data-slot="textarea"]:focus-visible,
+    [data-slot="select-trigger"]:focus-visible
+  ) {
+  border-color: #3a5afe !important;
+  box-shadow: 0 0 0 3px rgba(58, 90, 254, 0.1) !important;
+}
+
+/* Footer buttons (dialog / alert / sheet / drawer) */
+:is(
+    [data-slot="dialog-footer"],
+    [data-slot="alert-dialog-footer"],
+    [data-slot="sheet-footer"],
+    [data-slot="drawer-footer"]
+  )
+  [data-slot="button"].bg-primary {
+  border-radius: 10px !important;
+  font-family: var(--font-body);
+  font-weight: 600 !important;
+  background-color: #3a5afe !important;
+  color: #ffffff !important;
+  box-shadow: none !important;
+  transition:
+    background-color 0.2s ease,
+    box-shadow 0.2s ease !important;
+}
+
+:is(
+    [data-slot="dialog-footer"],
+    [data-slot="alert-dialog-footer"],
+    [data-slot="sheet-footer"],
+    [data-slot="drawer-footer"]
+  )
+  [data-slot="button"].bg-primary:hover {
+  background-color: #304ffe !important;
+  box-shadow: 0 4px 16px rgba(58, 90, 254, 0.2) !important;
+}
+
+:is(
+    [data-slot="dialog-footer"],
+    [data-slot="alert-dialog-footer"],
+    [data-slot="sheet-footer"],
+    [data-slot="drawer-footer"]
+  )
+  [data-slot="button"].border.bg-card {
+  border-radius: 10px !important;
+  font-family: var(--font-body);
+  font-weight: 600 !important;
+  background-color: #ffffff !important;
+  border: 1px solid #e2e4f0 !important;
+  color: #4a4a5a !important;
+  box-shadow: none !important;
+  transition:
+    border-color 0.2s ease,
+    background-color 0.2s ease !important;
+}
+
+:is(
+    [data-slot="dialog-footer"],
+    [data-slot="alert-dialog-footer"],
+    [data-slot="sheet-footer"],
+    [data-slot="drawer-footer"]
+  )
+  [data-slot="button"].border.bg-card:hover {
+  border-color: #e2e4f0 !important;
+  background-color: #f4f5ff !important;
+}
+
+:is(
+    [data-slot="dialog-footer"],
+    [data-slot="alert-dialog-footer"],
+    [data-slot="sheet-footer"],
+    [data-slot="drawer-footer"]
+  )
+  [data-slot="button"].border.bg-background {
+  border-radius: 10px !important;
+  font-family: var(--font-body);
+  font-weight: 600 !important;
+  background-color: #ffffff !important;
+  border: 1px solid #e2e4f0 !important;
+  color: #4a4a5a !important;
+  box-shadow: none !important;
+  transition:
+    border-color 0.2s ease,
+    background-color 0.2s ease !important;
+}
+
+:is(
+    [data-slot="dialog-footer"],
+    [data-slot="alert-dialog-footer"],
+    [data-slot="sheet-footer"],
+    [data-slot="drawer-footer"]
+  )
+  [data-slot="button"].border.bg-background:hover {
+  border-color: #e2e4f0 !important;
+  background-color: #f4f5ff !important;
+}
+
+:is(
+    [data-slot="dialog-footer"],
+    [data-slot="alert-dialog-footer"],
+    [data-slot="sheet-footer"],
+    [data-slot="drawer-footer"]
+  )
+  [data-slot="button"].bg-secondary {
+  border-radius: 10px !important;
+  font-family: var(--font-body);
+  font-weight: 600 !important;
+  background-color: #ffffff !important;
+  border: 1px solid #e2e4f0 !important;
+  color: #4a4a5a !important;
+  box-shadow: none !important;
+  transition:
+    border-color 0.2s ease,
+    background-color 0.2s ease !important;
+}
+
+:is(
+    [data-slot="dialog-footer"],
+    [data-slot="alert-dialog-footer"],
+    [data-slot="sheet-footer"],
+    [data-slot="drawer-footer"]
+  )
+  [data-slot="button"].bg-secondary:hover {
+  border-color: #e2e4f0 !important;
+  background-color: #f4f5ff !important;
+}
+
+:is(
+    [data-slot="dialog-footer"],
+    [data-slot="alert-dialog-footer"],
+    [data-slot="sheet-footer"],
+    [data-slot="drawer-footer"]
+  )
+  [data-slot="button"].bg-destructive {
+  border-radius: 10px !important;
+  font-family: var(--font-body);
+  font-weight: 600 !important;
+  background-color: #fff1f2 !important;
+  color: #ff4f6b !important;
+  border: 1px solid #fecdd3 !important;
+  box-shadow: none !important;
+  transition:
+    background-color 0.2s ease,
+    color 0.2s ease !important;
+}
+
+:is(
+    [data-slot="dialog-footer"],
+    [data-slot="alert-dialog-footer"],
+    [data-slot="sheet-footer"],
+    [data-slot="drawer-footer"]
+  )
+  [data-slot="button"].bg-destructive:hover {
+  background-color: #ff4f6b !important;
+  color: #ffffff !important;
+}
+
+/* Command palette items inside dialogs */
+[data-slot="dialog-content"] [data-slot="command-item"] {
+  border-radius: 12px !important;
+  border: none !important;
+  transition: background-color 0.2s ease !important;
+}
+
+[data-slot="dialog-content"] [data-slot="command-item"]:hover {
+  background-color: #f4f5ff !important;
+}
+
+[data-slot="dialog-content"]
+  [data-slot="command-item"][data-selected="true"] {
+  background-color: #e8ebff !important;
+  color: #0d0d0d !important;
+  border-left: 3px solid #3a5afe !important;
+  padding-left: calc(0.5rem - 3px) !important;
+}
+
+[data-slot="dialog-content"]
+  [data-slot="command-item"][data-disabled="true"] {
+  opacity: 0.6 !important;
+  background-color: #f4f5ff !important;
+}
+
+/* Badges → modal chip styling */
+:is(
+    [data-slot="dialog-content"],
+    [data-slot="alert-dialog-content"],
+    [data-slot="sheet-content"],
+    [data-slot="drawer-content"],
+    .sv-modal-panel
+  )
+  [data-slot="badge"].border-transparent.bg-primary {
+  background-color: #e8ebff !important;
+  color: #3a5afe !important;
+  border: none !important;
+  font-family: var(--font-body);
+  font-weight: 600 !important;
+  font-size: 12px !important;
+  border-radius: 999px !important;
+  padding: 2px 10px !important;
+}
+
+:is(
+    [data-slot="dialog-content"],
+    [data-slot="alert-dialog-content"],
+    [data-slot="sheet-content"],
+    [data-slot="drawer-content"],
+    .sv-modal-panel
+  )
+  [data-slot="badge"].border-transparent.bg-secondary {
+  background-color: #d1fae5 !important;
+  color: #00c896 !important;
+  border: none !important;
+  font-family: var(--font-body);
+  font-weight: 600 !important;
+  font-size: 12px !important;
+  border-radius: 999px !important;
+  padding: 2px 10px !important;
+}
+
+:is(
+    [data-slot="dialog-content"],
+    [data-slot="alert-dialog-content"],
+    [data-slot="sheet-content"],
+    [data-slot="drawer-content"],
+    .sv-modal-panel
+  )
+  [data-slot="badge"].border-transparent.bg-destructive {
+  background-color: #fff1f2 !important;
+  color: #ff4f6b !important;
+  border: 1px solid #fecdd3 !important;
+  font-family: var(--font-body);
+  font-weight: 600 !important;
+  font-size: 12px !important;
+  border-radius: 999px !important;
+  padding: 2px 10px !important;
+}
+
+:is(
+    [data-slot="dialog-content"],
+    [data-slot="alert-dialog-content"],
+    [data-slot="sheet-content"],
+    [data-slot="drawer-content"],
+    .sv-modal-panel
+  )
+  [data-slot="badge"].outline {
+  font-family: var(--font-body);
+  font-weight: 600 !important;
+  font-size: 12px !important;
+  border-radius: 999px !important;
+  padding: 2px 10px !important;
+  border-color: #e2e4f0 !important;
+}
+
+:is(
+    [data-slot="dialog-content"],
+    [data-slot="alert-dialog-content"],
+    [data-slot="sheet-content"],
+    [data-slot="drawer-content"],
+    .sv-modal-panel
+  )
+  .border-dashed {
+  border-style: solid !important;
+}
+
+:is(
+    [data-slot="dialog-content"],
+    [data-slot="alert-dialog-content"],
+    [data-slot="sheet-content"],
+    [data-slot="drawer-content"],
+    .sv-modal-panel
+  )
+  :is(.shadow-2xl, .shadow-xl) {
+  box-shadow: none !important;
+}
+
+/* Modal scrollbars (overflow regions) */
+:is(
+    [data-slot="dialog-content"],
+    [data-slot="alert-dialog-content"],
+    [data-slot="sheet-content"],
+    [data-slot="drawer-content"],
+    .sv-modal-panel
+  )
+  :is(
+    .overflow-y-auto,
+    .overflow-x-auto,
+    .overflow-auto,
+    [data-slot="command-list"]
+  ) {
+  scrollbar-width: thin;
+  scrollbar-color: #e2e4f0 #f4f5ff;
+}
+
+:is(
+    [data-slot="dialog-content"],
+    [data-slot="alert-dialog-content"],
+    [data-slot="sheet-content"],
+    [data-slot="drawer-content"],
+    .sv-modal-panel
+  )
+  :is(
+    .overflow-y-auto,
+    .overflow-x-auto,
+    .overflow-auto,
+    [data-slot="command-list"]
+  )::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+
+:is(
+    [data-slot="dialog-content"],
+    [data-slot="alert-dialog-content"],
+    [data-slot="sheet-content"],
+    [data-slot="drawer-content"],
+    .sv-modal-panel
+  )
+  :is(
+    .overflow-y-auto,
+    .overflow-x-auto,
+    .overflow-auto,
+    [data-slot="command-list"]
+  )::-webkit-scrollbar-track {
+  background: #f4f5ff;
+  border-radius: 999px;
+}
+
+:is(
+    [data-slot="dialog-content"],
+    [data-slot="alert-dialog-content"],
+    [data-slot="sheet-content"],
+    [data-slot="drawer-content"],
+    .sv-modal-panel
+  )
+  :is(
+    .overflow-y-auto,
+    .overflow-x-auto,
+    .overflow-auto,
+    [data-slot="command-list"]
+  )::-webkit-scrollbar-thumb {
+  background: #e2e4f0;
+  border-radius: 999px;
+}
+
+:is(
+    [data-slot="dialog-content"],
+    [data-slot="alert-dialog-content"],
+    [data-slot="sheet-content"],
+    [data-slot="drawer-content"],
+    .sv-modal-panel
+  )
+  :is(
+    .overflow-y-auto,
+    .overflow-x-auto,
+    .overflow-auto,
+    [data-slot="command-list"]
+  )::-webkit-scrollbar-thumb:hover {
+  background: #3a5afe;
 }
 
 /* Hide native number input spinners (replaced by custom +/- buttons) */

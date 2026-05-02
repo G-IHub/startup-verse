@@ -19,7 +19,7 @@ export default function AdaptiveVirtualOffice({
   onWinOpened,
 }) {
   return (
-    <div className="h-full flex flex-col bg-background">
+    <div className="flex h-full flex-col bg-background font-body">
       <div className="flex-1 overflow-auto">
         {view === "workspace" && (
           <VirtualStartupOfficeV2

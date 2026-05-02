@@ -6,9 +6,16 @@
 import { offlineStorage } from "../offlineStorage";
 import { API_BASE_URL } from "../../config/apiBase.js";
 import { executeWithOfflineSupport } from "../syncManager";
-import { getAccessToken } from "../../app/session";
 
 const API_BASE = API_BASE_URL;
+
+// Default fetch options for cookie-based auth
+const defaultOptions = {
+  credentials: "include",
+  headers: {
+    "Content-Type": "application/json",
+  },
+};
 
 /**
  * Get tasks for team member (with offline support)
@@ -20,11 +27,8 @@ export async function getTeamMemberTasks(teamMemberId, isOnline) {
       const response = await fetch(
         `${API_BASE}/team-members/${teamMemberId}/tasks`,
         {
+          ...defaultOptions,
           method: "GET",
-          headers: {
-            Authorization: `Bearer ${getAccessToken()}`,
-            "Content-Type": "application/json",
-          },
         },
       );
 

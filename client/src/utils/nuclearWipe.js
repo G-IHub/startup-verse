@@ -3,25 +3,29 @@
  * Completely wipes ALL data from frontend and backend
  */
 
-import { getAccessToken } from "../app/session";
 import { API_BASE_URL } from "../config/apiBase.js";
+
+// Default fetch options for cookie-based auth
+const defaultOptions = {
+  credentials: "include",
+  headers: {
+    "Content-Type": "application/json",
+  },
+};
 
 export async function executeNuclearWipe() {
   console.log("🔥🔥🔥 STARTING MEGA NUCLEAR WIPE 🔥🔥🔥");
 
   let success = true;
 
-  // Step 1: Clear ALL backend database data
-  console.log("🔥 Step 1: Clearing ALL database records...");
+  // Step 1: Clear ALL backend database data and auth cookie
+  console.log("🔥 Step 1: Clearing ALL database records and auth cookie...");
   try {
     const response = await fetch(
       `${API_BASE_URL}/admin/clear-all-data`,
       {
+        ...defaultOptions,
         method: "DELETE",
-        headers: {
-          Authorization: `Bearer ${getAccessToken()}`,
-          "Content-Type": "application/json",
-        },
       },
     );
 

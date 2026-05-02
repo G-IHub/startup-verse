@@ -282,8 +282,8 @@ export default function OnboardingModal({ onClose, onLoadSampleData }) {
   const isLastStep = currentStep === steps.length - 1;
   const isFirstStep = currentStep === 0;
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <Card className="w-full max-w-3xl max-h-[90vh] overflow-hidden">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sv-modal-backdrop">
+      <Card className="sv-modal-panel max-h-[90vh] w-full max-w-3xl overflow-hidden rounded-[16px] border-0 shadow-modal">
         <CardHeader className="border-b relative">
           <div className="flex items-center justify-between">
             <div>

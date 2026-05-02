@@ -29,7 +29,13 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "./ui/tooltip";
-import { getAccessToken } from "../app/session";
+
+// Default fetch options for cookie-based auth
+
+const defaultOptions = {
+  credentials: "include",
+  headers: { "Content-Type": "application/json" },
+};
 
 export default function ExecutionScore({
   userId,
@@ -50,9 +56,7 @@ export default function ExecutionScore({
       const response = await fetch(
         `${API_BASE_URL}/execution-score/${userId}`,
         {
-          headers: {
-            Authorization: `Bearer ${getAccessToken()}`,
-          },
+          ...defaultOptions,
         },
       );
       if (!response.ok) {

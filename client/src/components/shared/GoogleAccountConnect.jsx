@@ -14,13 +14,23 @@ import {
 import { Button } from "../ui/button";
 import { Check, X, Loader2 } from "lucide-react";
 import { toast } from "sonner";
-import { getAccessToken } from "../../app/session";
+import { unwrapData } from "../../utils/apiEnvelope";
+
+// Default fetch options for cookie-based auth
+const defaultOptions = {
+  credentials: "include",
+  headers: {
+    "Content-Type": "application/json",
+  },
+};
 
 export default function GoogleAccountConnect({ userId, userType }) {
   const [connected, setConnected] = useState(false);
   const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(true);
   const [connecting, setConnecting] = useState(false);
+  const [integrationOff, setIntegrationOff] = useState(false);
+  const [statusMessage, setStatusMessage] = useState("");
   useEffect(() => {
     checkConnectionStatus();
   }, [userId]);
@@ -29,15 +39,15 @@ export default function GoogleAccountConnect({ userId, userType }) {
       setLoading(true);
       const response = await fetch(
         `${API_BASE_URL}/google/status/${userId}`,
-        {
-          headers: {
-            Authorization: `Bearer ${getAccessToken()}`,
-          },
-        },
+        defaultOptions,
       );
       if (!response.ok) throw new Error("Failed to check status");
-      const data = await response.json();
-      setConnected(data.connected);
+      const payload = await response.json();
+      const data = unwrapData(payload) || {};
+      const enabled = data.enabled === true;
+      setIntegrationOff(!enabled);
+      setStatusMessage(data.message || "");
+      setConnected(Boolean(data.connected) && enabled);
       setEmail(data.email || "");
     } catch (error) {
       console.error("Error checking Google connection status:", error);
@@ -52,11 +62,7 @@ export default function GoogleAccountConnect({ userId, userType }) {
       // Get authorization URL
       const response = await fetch(
         `${API_BASE_URL}/google/oauth/authorize?userId=${userId}&userType=${userType}`,
-        {
-          headers: {
-            Authorization: `Bearer ${getAccessToken()}`,
-          },
-        },
+        defaultOptions,
       );
       if (!response.ok) {
         const errorText = await response.text();
@@ -65,10 +71,17 @@ export default function GoogleAccountConnect({ userId, userType }) {
           `Failed to initiate OAuth: ${response.status} - ${errorText}`,
         );
       }
-      const data = await response.json();
-      if (!data.authUrl) {
-        console.error("No authUrl in response:", data);
-        throw new Error("No authorization URL received from server");
+      const payload = await response.json();
+      const data = unwrapData(payload) || {};
+      const authUrl =
+        data.authUrl || data.authorizationUrl || data.url || null;
+      if (!authUrl) {
+        console.error("No auth URL in response:", payload);
+        throw new Error(
+          payload?.message ||
+            data?.message ||
+            "Google OAuth is not available on this server",
+        );
       }
 
       // Open OAuth popup
@@ -77,7 +90,7 @@ export default function GoogleAccountConnect({ userId, userType }) {
       const left = window.screen.width / 2 - width / 2;
       const top = window.screen.height / 2 - height / 2;
       const popup = window.open(
-        data.authUrl,
+        authUrl,
         "Google OAuth",
         `width=${width},height=${height},left=${left},top=${top}`,
       );
@@ -122,10 +135,8 @@ export default function GoogleAccountConnect({ userId, userType }) {
       const response = await fetch(
         `${API_BASE_URL}/google/disconnect/${userId}`,
         {
+          ...defaultOptions,
           method: "DELETE",
-          headers: {
-            Authorization: `Bearer ${getAccessToken()}`,
-          },
         },
       );
       if (!response.ok) throw new Error("Failed to disconnect");
@@ -179,7 +190,12 @@ export default function GoogleAccountConnect({ userId, userType }) {
         </CardDescription>
       </CardHeader>
       <CardContent>
-        {connected ? (
+        {integrationOff ? (
+          <p className="text-sm text-muted-foreground">
+            {statusMessage ||
+              "Google Calendar integration is disabled. Administrators can enable it when OAuth is configured."}
+          </p>
+        ) : connected ? (
           <div className="space-y-4">
             <div className="flex items-center gap-3 p-3 bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-800 rounded-lg">
               <div className="w-8 h-8 rounded-full bg-green-500 flex items-center justify-center flex-shrink-0">

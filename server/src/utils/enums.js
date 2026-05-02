@@ -36,3 +36,23 @@ export const STARTUP_POST_COMPENSATION_PHILOSOPHIES = [
 ];
 
 export const STARTUP_POST_VISIBILITIES = ["public", "team", "private"];
+
+/** Organization-assigned cohort deliverable template kinds */
+export const DELIVERABLE_TYPES = [
+  "general",
+  "milestone",
+  "document",
+  "report",
+  "checkpoint",
+  "other",
+];
+
+/** Startup submission lifecycle for a deliverable */
+export const DELIVERABLE_SUBMISSION_STATUSES = [
+  "draft",
+  "submitted",
+  "reviewed",
+  "approved",
+  "rejected",
+  "revision_requested",
+];

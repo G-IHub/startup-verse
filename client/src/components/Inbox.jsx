@@ -35,10 +35,16 @@ import {
 import { toast } from "sonner";
 import { Label } from "./ui/label";
 import * as inboxApi from "../utils/api/inboxApi";
-import { convertTalentToTeamMember } from "../utils/api/compensationApi";
 import CompensationSetupWizard from "./compensation/CompensationSetupWizard";
 import { getStartupId } from "../utils/startupId";
-import { getAccessToken } from "../app/session";
+
+// Default fetch options for cookie-based auth
+const defaultOptions = {
+  credentials: "include",
+  headers: {
+    "Content-Type": "application/json",
+  },
+};
 
 // Normalize MongoDB _id to id so all item.id references work
 const normalizeItem = (item) => {
@@ -247,16 +253,12 @@ export default function Inbox({ user, onBack, initialTab = "received", onNavigat
 
         // Load organization messages for founder
         try {
-          const messagesResponse = await fetch(
+          const response = await fetch(
             `${API_BASE_URL}/messages/${userId}`,
-            {
-              headers: {
-                Authorization: `Bearer ${getAccessToken()}`,
-              },
-            },
+            defaultOptions,
           );
-          if (messagesResponse.ok) {
-            const messagesData = await messagesResponse.json();
+          if (response.ok) {
+            const messagesData = await response.json();
             setOrgMessages(messagesData.messages || []);
             console.log(
               "📨 [Inbox-Founder] Organization messages loaded:",
@@ -543,11 +545,8 @@ export default function Inbox({ user, onBack, initialTab = "received", onNavigat
       const response = await fetch(
         `${API_BASE_URL}/messages/send-from-founder`,
         {
+          ...defaultOptions,
           method: "POST",
-          headers: {
-            Authorization: `Bearer ${getAccessToken()}`,
-            "Content-Type": "application/json",
-          },
           body: JSON.stringify({
             cohortId: cohort.id,
             organizationId: cohort.organizationId,
@@ -702,8 +701,8 @@ export default function Inbox({ user, onBack, initialTab = "received", onNavigat
     if (isLoading) {
       return (
         <div className="flex flex-col items-center justify-center py-16 text-center">
-          <Loader2 className="w-12 h-12 text-primary animate-spin mb-4" />
-          <p className="text-sm text-muted-foreground">Loading inbox...</p>
+          <Loader2 className="mb-4 h-12 w-12 animate-spin text-primary" />
+          <p className="font-body text-sm text-text-muted">Loading inbox...</p>
         </div>
       );
     }
@@ -734,15 +733,19 @@ export default function Inbox({ user, onBack, initialTab = "received", onNavigat
     });
     if (allReceivedItems.length === 0) {
       return (
-        <div className="flex flex-col items-center justify-center py-16 text-center">
-          <InboxIcon className="w-16 h-16 text-muted-foreground mb-4" />
-          <h3 className="text-lg font-medium mb-2">No messages yet</h3>
-          <p className="text-sm text-muted-foreground max-w-sm">
-            {user.role === "talent"
-              ? "When founders send you invitations, they'll appear here."
-              : "When talent expresses interest in your startup or you receive organization invitations, they'll appear here."}
-          </p>
-        </div>
+        <Card className="rounded-card border-0 bg-surface-card shadow-soft">
+          <CardContent className="flex flex-col items-center justify-center px-6 py-16 text-center">
+            <InboxIcon className="mb-4 h-16 w-16 text-surface-border" />
+            <h3 className="mb-2 font-heading text-lg font-semibold text-text-heading">
+              No messages yet
+            </h3>
+            <p className="max-w-sm font-body text-sm text-text-muted">
+              {user.role === "talent"
+                ? "When founders send you invitations, they'll appear here."
+                : "When talent expresses interest in your startup or you receive organization invitations, they'll appear here."}
+            </p>
+          </CardContent>
+        </Card>
       );
     }
 
@@ -1081,22 +1084,26 @@ export default function Inbox({ user, onBack, initialTab = "received", onNavigat
     if (isLoading) {
       return (
         <div className="flex flex-col items-center justify-center py-16 text-center">
-          <Loader2 className="w-12 h-12 text-primary animate-spin mb-4" />
-          <p className="text-sm text-muted-foreground">Loading sent items...</p>
+          <Loader2 className="mb-4 h-12 w-12 animate-spin text-primary" />
+          <p className="font-body text-sm text-text-muted">Loading sent items...</p>
         </div>
       );
     }
     if (sentItems.length === 0) {
       return (
-        <div className="flex flex-col items-center justify-center py-16 text-center">
-          <Send className="w-16 h-16 text-muted-foreground mb-4" />
-          <h3 className="text-lg font-medium mb-2">No sent messages</h3>
-          <p className="text-sm text-muted-foreground max-w-sm">
-            {user?.role === "talent"
-              ? "Express interest in startups to connect with founders."
-              : "Send invitations to talent to build your team."}
-          </p>
-        </div>
+        <Card className="rounded-card border-0 bg-surface-card shadow-soft">
+          <CardContent className="flex flex-col items-center justify-center px-6 py-16 text-center">
+            <Send className="mb-4 h-16 w-16 text-surface-border" />
+            <h3 className="mb-2 font-heading text-lg font-semibold text-text-heading">
+              No sent messages
+            </h3>
+            <p className="max-w-sm font-body text-sm text-text-muted">
+              {user?.role === "talent"
+                ? "Express interest in startups to connect with founders."
+                : "Send invitations to talent to build your team."}
+            </p>
+          </CardContent>
+        </Card>
       );
     }
 
@@ -1830,7 +1837,7 @@ export default function Inbox({ user, onBack, initialTab = "received", onNavigat
     );
   };
   return (
-    <div className="min-h-screen bg-background p-2 md:p-3 lg:p-4">
+    <div className="min-h-screen bg-surface-page p-2 font-body md:p-3 lg:p-4">
       {onboardingTalent && (
         <CompensationSetupWizard
           isOpen={showOnboardingWizard}
@@ -1849,29 +1856,12 @@ export default function Inbox({ user, onBack, initialTab = "received", onNavigat
                 compensationConfig,
               );
 
-              // Convert talent to team member (includes role conversion and compensation contract)
-              const result = await convertTalentToTeamMember(
-                onboardingTalent.talentId,
-                userId,
-                getStartupId(user),
-                compensationConfig,
+              if (!onboardingTalent.interestId) {
+                throw new Error("Missing interest record for onboarding.");
+              }
+              await inboxApi.markInterestAsOnboarded(
+                onboardingTalent.interestId,
               );
-              if (!result.success) {
-                throw new Error(
-                  result.error || "Failed to onboard team member",
-                );
-              }
-
-              // Mark interest as onboarded
-              if (onboardingTalent.interestId) {
-                try {
-                  await inboxApi.markInterestAsOnboarded(
-                    onboardingTalent.interestId,
-                  );
-                } catch (error) {
-                  console.error("Error marking interest as onboarded:", error);
-                }
-              }
               toast.success(
                 `🎉 ${onboardingTalent.talentName} has been successfully onboarded to your team!`,
               );
@@ -1886,15 +1876,20 @@ export default function Inbox({ user, onBack, initialTab = "received", onNavigat
         />
       )}
       {renderConversationDialog()}
-      <div className="flex items-center gap-4 mb-3 md:mb-4">
+      <div className="mb-3 flex items-center gap-4 md:mb-4">
         {onBack && (
-          <Button variant="ghost" size="icon" onClick={onBack}>
-            <ArrowLeft className="w-5 h-5" />
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={onBack}
+            className="text-text-body transition-colors duration-200 ease-in-out hover:bg-transparent hover:text-primary [&_svg]:text-text-body [&_svg]:transition-colors [&_svg]:duration-200 [&_svg]:ease-in-out hover:[&_svg]:text-primary"
+          >
+            <ArrowLeft className="h-5 w-5" />
           </Button>
         )}
         <div>
-          <h1 className="text-2xl font-bold">Inbox</h1>
-          <p className="text-sm text-muted-foreground">
+          <h1 className="font-heading text-2xl font-bold text-text-heading">Inbox</h1>
+          <p className="font-body text-sm text-text-body">
             Manage your invitations and interests
           </p>
         </div>
@@ -2016,22 +2011,28 @@ export default function Inbox({ user, onBack, initialTab = "received", onNavigat
         </DialogContent>
       </Dialog>
       <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v)}>
-        <TabsList className="grid w-full grid-cols-2 mb-3 md:mb-4">
-          <TabsTrigger value="received" className="relative">
-            <InboxIcon className="w-4 h-4 mr-2" />
+        <TabsList className="mb-3 grid h-auto min-h-10 w-full grid-cols-2 gap-0 rounded-none border-0 border-b border-surface-border bg-transparent p-0 md:mb-4">
+          <TabsTrigger
+            value="received"
+            className="relative rounded-none border-0 border-b-2 border-transparent bg-transparent font-body font-medium text-text-body shadow-none transition-colors duration-200 ease-in-out hover:text-primary data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:font-semibold data-[state=active]:text-primary data-[state=active]:shadow-none [&_svg]:text-text-muted data-[state=active]:[&_svg]:text-primary hover:[&_svg]:text-primary"
+          >
+            <InboxIcon className="mr-2 h-4 w-4" />
             Received
             {!isLoading &&
               receivedItems.filter((i) => i.status === "pending").length +
                 orgInvitations.filter((i) => i.status === "pending").length >
                 0 && (
-                <Badge className="ml-2 h-5 w-5 p-0 flex items-center justify-center">
+                <Badge className="ml-2 flex h-5 min-w-5 items-center justify-center rounded-pill bg-primary p-0 text-[10px] font-semibold text-primary-foreground">
                   {receivedItems.filter((i) => i.status === "pending").length +
                     orgInvitations.filter((i) => i.status === "pending").length}
                 </Badge>
               )}
           </TabsTrigger>
-          <TabsTrigger value="sent">
-            <Send className="w-4 h-4 mr-2" />
+          <TabsTrigger
+            value="sent"
+            className="rounded-none border-0 border-b-2 border-transparent bg-transparent font-body font-medium text-text-body shadow-none transition-colors duration-200 ease-in-out hover:text-primary data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:font-semibold data-[state=active]:text-primary data-[state=active]:shadow-none [&_svg]:text-text-muted data-[state=active]:[&_svg]:text-primary hover:[&_svg]:text-primary"
+          >
+            <Send className="mr-2 h-4 w-4" />
             Sent
           </TabsTrigger>
         </TabsList>

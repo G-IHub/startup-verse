@@ -28,10 +28,17 @@ import {
   MailOpen,
   Reply,
 } from "lucide-react";
-import { getAccessToken } from "../../app/session";
 import { unwrapData } from "../../utils/apiEnvelope";
 
 const API_BASE = API_BASE_URL;
+
+// Default fetch options for cookie-based auth
+const defaultOptions = {
+  credentials: "include",
+  headers: {
+    "Content-Type": "application/json",
+  },
+};
 
 export default function CommunicationCenter({
   cohortId,
@@ -65,11 +72,8 @@ export default function CommunicationCenter({
   const loadAnnouncements = async () => {
     try {
       setLoading(true);
-      const token = getAccessToken();
       const response = await fetch(`${API_BASE}/cohorts/${cohortId}/announcements`, {
-        headers: {
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
+        ...defaultOptions,
       });
       if (!response.ok) throw new Error("Failed to fetch announcements");
       const inner = unwrapData(await response.json());
@@ -82,14 +86,9 @@ export default function CommunicationCenter({
   };
   const loadMessages = async () => {
     try {
-      const token = getAccessToken();
       const response = await fetch(
         `${API_BASE}/messages/organization/${organizationId}`,
-        {
-          headers: {
-            ...(token ? { Authorization: `Bearer ${token}` } : {}),
-          },
-        },
+        defaultOptions,
       );
       if (!response.ok) throw new Error("Failed to fetch messages");
       const raw = unwrapData(await response.json());
@@ -103,13 +102,9 @@ export default function CommunicationCenter({
   const handleCreateAnnouncement = async (e) => {
     e.preventDefault();
     try {
-      const token = getAccessToken();
       const response = await fetch(`${API_BASE}/cohorts/${cohortId}/announcements`, {
+        ...defaultOptions,
         method: "POST",
-        headers: {
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-          "Content-Type": "application/json",
-        },
         body: JSON.stringify({
           organizationId,
           title: announcementData.title,
@@ -168,13 +163,9 @@ export default function CommunicationCenter({
               sentBy: userId,
               sentByName: userName,
             };
-      const token = getAccessToken();
       const response = await fetch(`${API_BASE}/${endpoint}`, {
+        ...defaultOptions,
         method: "POST",
-        headers: {
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-          "Content-Type": "application/json",
-        },
         body: JSON.stringify(body),
       });
       if (!response.ok) throw new Error("Failed to send message");

@@ -18,7 +18,13 @@ import {
   DialogTitle,
 } from "./ui/dialog";
 import { toast } from "sonner";
-import { getAccessToken } from "../app/session";
+
+// Default fetch options for cookie-based auth
+
+const defaultOptions = {
+  credentials: "include",
+  headers: { "Content-Type": "application/json" },
+};
 
 export function AdminDatabaseClear() {
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
@@ -31,11 +37,8 @@ export function AdminDatabaseClear() {
       const response = await fetch(
         `${API_BASE_URL}/admin/stats`,
         {
+          ...defaultOptions,
           method: "GET",
-          headers: {
-            Authorization: `Bearer ${getAccessToken()}`,
-            "Content-Type": "application/json",
-          },
         },
       );
       const data = await response.json();
@@ -61,11 +64,8 @@ export function AdminDatabaseClear() {
       const response = await fetch(
         `${API_BASE_URL}/admin/clear-all-data`,
         {
+          ...defaultOptions,
           method: "DELETE",
-          headers: {
-            Authorization: `Bearer ${getAccessToken()}`,
-            "Content-Type": "application/json",
-          },
         },
       );
       const data = await response.json();
@@ -98,94 +98,101 @@ export function AdminDatabaseClear() {
   };
   return (
     <>
-      <Card className="border-red-200 dark:border-red-900">
+      <Card className="border-0 bg-surface-card shadow-soft rounded-card">
         <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-red-600 dark:text-red-400">
-            <AlertTriangle className="w-5 h-5" />
+          <CardTitle className="flex items-center gap-2 font-heading text-base font-semibold text-status-error">
+            <AlertTriangle className="h-5 w-5 shrink-0" />
             🔥 Admin: MEGA NUCLEAR WIPE
           </CardTitle>
-          <CardDescription>
+          <CardDescription className="font-body text-text-body">
             ⚠️ Development Only - Completely wipe database + logout current
             session
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent className="space-y-4 font-body">
           <div className="space-y-2">
             <div className="flex items-center justify-between">
-              <h4 className="font-medium text-sm">Database Statistics</h4>
+              <h4 className="text-sm font-medium text-text-heading">
+                Database Statistics
+              </h4>
               <Button
                 variant="outline"
                 size="sm"
+                className="rounded-input border border-surface-border bg-surface-card font-body font-semibold text-text-body shadow-none transition-colors duration-200 ease-in-out hover:border-primary hover:text-primary"
                 onClick={fetchStats}
                 disabled={isLoadingStats}
               >
-                <BarChart3 className="w-4 h-4 mr-2" />
+                <BarChart3 className="mr-2 h-4 w-4" />
                 {isLoadingStats ? "Loading..." : "Refresh Stats"}
               </Button>
             </div>
             {stats && (
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-2 text-sm">
-                <div className="p-2 bg-gray-50 dark:bg-gray-800 rounded">
-                  <div className="text-gray-500 dark:text-gray-400">Users</div>
-                  <div className="font-bold text-lg">{stats.users}</div>
-                </div>
-                <div className="p-2 bg-gray-50 dark:bg-gray-800 rounded">
-                  <div className="text-gray-500 dark:text-gray-400">
-                    Startups
+              <div className="grid grid-cols-2 gap-2 text-sm md:grid-cols-3">
+                <div className="rounded-input bg-surface-page p-2">
+                  <div className="text-text-muted">Users</div>
+                  <div className="font-heading text-lg font-bold text-text-heading">
+                    {stats.users}
                   </div>
-                  <div className="font-bold text-lg">{stats.startups}</div>
                 </div>
-                <div className="p-2 bg-gray-50 dark:bg-gray-800 rounded">
-                  <div className="text-gray-500 dark:text-gray-400">
-                    Talents
+                <div className="rounded-input bg-surface-page p-2">
+                  <div className="text-text-muted">Startups</div>
+                  <div className="font-heading text-lg font-bold text-text-heading">
+                    {stats.startups}
                   </div>
-                  <div className="font-bold text-lg">{stats.talents}</div>
                 </div>
-                <div className="p-2 bg-gray-50 dark:bg-gray-800 rounded">
-                  <div className="text-gray-500 dark:text-gray-400">
-                    Invites
+                <div className="rounded-input bg-surface-page p-2">
+                  <div className="text-text-muted">Talents</div>
+                  <div className="font-heading text-lg font-bold text-text-heading">
+                    {stats.talents}
                   </div>
-                  <div className="font-bold text-lg">{stats.invites}</div>
                 </div>
-                <div className="p-2 bg-gray-50 dark:bg-gray-800 rounded">
-                  <div className="text-gray-500 dark:text-gray-400">Tasks</div>
-                  <div className="font-bold text-lg">{stats.tasks}</div>
-                </div>
-                <div className="p-2 bg-gray-50 dark:bg-gray-800 rounded">
-                  <div className="text-gray-500 dark:text-gray-400">
-                    Messages
+                <div className="rounded-input bg-surface-page p-2">
+                  <div className="text-text-muted">Invites</div>
+                  <div className="font-heading text-lg font-bold text-text-heading">
+                    {stats.invites}
                   </div>
-                  <div className="font-bold text-lg">{stats.messages}</div>
                 </div>
-                <div className="p-2 bg-gray-50 dark:bg-gray-800 rounded">
-                  <div className="text-gray-500 dark:text-gray-400">
-                    Activities
+                <div className="rounded-input bg-surface-page p-2">
+                  <div className="text-text-muted">Tasks</div>
+                  <div className="font-heading text-lg font-bold text-text-heading">
+                    {stats.tasks}
                   </div>
-                  <div className="font-bold text-lg">{stats.activities}</div>
                 </div>
-                <div className="p-2 bg-gray-50 dark:bg-gray-800 rounded">
-                  <div className="text-gray-500 dark:text-gray-400">
-                    Notifications
+                <div className="rounded-input bg-surface-page p-2">
+                  <div className="text-text-muted">Messages</div>
+                  <div className="font-heading text-lg font-bold text-text-heading">
+                    {stats.messages}
                   </div>
-                  <div className="font-bold text-lg">{stats.notifications}</div>
                 </div>
-                <div className="p-2 bg-gray-50 dark:bg-gray-800 rounded">
-                  <div className="text-gray-500 dark:text-gray-400">
-                    Organizations
+                <div className="rounded-input bg-surface-page p-2">
+                  <div className="text-text-muted">Activities</div>
+                  <div className="font-heading text-lg font-bold text-text-heading">
+                    {stats.activities}
                   </div>
-                  <div className="font-bold text-lg">{stats.organizations}</div>
+                </div>
+                <div className="rounded-input bg-surface-page p-2">
+                  <div className="text-text-muted">Notifications</div>
+                  <div className="font-heading text-lg font-bold text-text-heading">
+                    {stats.notifications}
+                  </div>
+                </div>
+                <div className="rounded-input bg-surface-page p-2">
+                  <div className="text-text-muted">Organizations</div>
+                  <div className="font-heading text-lg font-bold text-text-heading">
+                    {stats.organizations}
+                  </div>
                 </div>
               </div>
             )}
           </div>
-          <div className="bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-900 rounded-lg p-4">
+          <div className="rounded-input bg-status-error/5 p-4">
             <div className="flex items-start gap-3">
-              <AlertTriangle className="w-5 h-5 text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5" />
-              <div className="text-sm space-y-1">
-                <p className="font-semibold text-red-900 dark:text-red-100">
+              <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-status-error" />
+              <div className="space-y-1 text-sm">
+                <p className="font-semibold text-text-heading">
                   This will permanently delete:
                 </p>
-                <ul className="list-disc list-inside text-red-700 dark:text-red-300 space-y-0.5">
+                <ul className="list-inside list-disc space-y-0.5 text-text-body">
                   <li>🔥 YOUR CURRENT ACCOUNT (you will be logged out)</li>
                   <li>All user accounts (founders, team members, talent)</li>
                   <li>All startup profiles and team data</li>
@@ -195,7 +202,7 @@ export function AdminDatabaseClear() {
                   <li>All organizations and cohorts</li>
                   <li>🔥 ALL localStorage data (complete reset)</li>
                 </ul>
-                <p className="font-semibold text-red-900 dark:text-red-100 mt-2">
+                <p className="mt-2 font-semibold text-status-error">
                   ⚠️ MEGA NUCLEAR WIPE - This cannot be undone!
                 </p>
               </div>
@@ -215,18 +222,18 @@ export function AdminDatabaseClear() {
       <Dialog open={showConfirmDialog} onOpenChange={setShowConfirmDialog}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-red-600 dark:text-red-400">
-              <AlertTriangle className="w-5 h-5" />
+            <DialogTitle className="flex items-center gap-2 font-heading font-semibold text-status-error">
+              <AlertTriangle className="h-5 w-5 shrink-0" />
               Confirm Database Clear
             </DialogTitle>
-            <DialogDescription>
+            <DialogDescription className="font-body text-text-body">
               Are you absolutely sure you want to delete all user data from the
               database? This action cannot be undone and will permanently delete
               all records.
             </DialogDescription>
           </DialogHeader>
-          <div className="bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-900 rounded-lg p-4 my-4">
-            <p className="text-sm text-red-900 dark:text-red-100 font-semibold">
+          <div className="my-4 rounded-input bg-status-error/5 p-4">
+            <p className="font-body text-sm font-semibold text-text-heading">
               🔥 MEGA NUCLEAR WIPE - This will delete EVERYTHING including your
               current account and log you out completely!
             </p>
@@ -234,6 +241,7 @@ export function AdminDatabaseClear() {
           <DialogFooter>
             <Button
               variant="outline"
+              className="rounded-input border border-surface-border bg-surface-card font-body font-semibold text-text-body transition-colors duration-200 ease-in-out hover:border-status-error hover:text-status-error"
               onClick={() => setShowConfirmDialog(false)}
               disabled={isClearing}
             >

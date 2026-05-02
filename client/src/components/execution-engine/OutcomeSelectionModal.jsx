@@ -60,8 +60,8 @@ export default function OutcomeSelectionModal({
     setStep("custom");
   };
   return (
-    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
-      <Card className="max-w-2xl w-full max-h-[85vh] overflow-y-auto">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sv-modal-backdrop">
+      <Card className="sv-modal-panel max-h-[85vh] w-full max-w-2xl overflow-y-auto rounded-[16px] border-0 shadow-modal">
         <CardHeader className="pb-2 pt-2 border-b">
           <div className="flex items-start justify-between">
             <div className="flex-1">

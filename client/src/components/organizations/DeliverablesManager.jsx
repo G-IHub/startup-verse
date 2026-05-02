@@ -24,10 +24,17 @@ import {
   MessageSquare,
   Users,
 } from "lucide-react";
-import { getAccessToken } from "../../app/session";
 import { unwrapData } from "../../utils/apiEnvelope";
 
 const API_BASE = API_BASE_URL;
+
+// Default fetch options for cookie-based auth
+const defaultOptions = {
+  credentials: "include",
+  headers: {
+    "Content-Type": "application/json",
+  },
+};
 
 function asDeliverableList(inner) {
   if (Array.isArray(inner)) return inner;
@@ -68,11 +75,8 @@ export default function DeliverablesManager({
   const loadDeliverables = async () => {
     try {
       setLoading(true);
-      const token = getAccessToken();
       const response = await fetch(`${API_BASE}/cohorts/${cohortId}/deliverables`, {
-        headers: {
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
+        ...defaultOptions,
       });
       if (!response.ok) throw new Error("Failed to fetch deliverables");
       const list = asDeliverableList(unwrapData(await response.json()));
@@ -94,18 +98,20 @@ export default function DeliverablesManager({
   };
   const loadSubmissions = async (deliverableId) => {
     try {
-      const token = getAccessToken();
       const response = await fetch(
         `${API_BASE}/deliverables/${deliverableId}/submissions`,
-        {
-          headers: {
-            ...(token ? { Authorization: `Bearer ${token}` } : {}),
-          },
-        },
+        defaultOptions,
       );
       if (!response.ok) throw new Error("Failed to fetch submissions");
       const raw = unwrapData(await response.json());
-      setSubmissions(Array.isArray(raw) ? raw : raw.submissions || []);
+      const list = Array.isArray(raw) ? raw : raw.submissions || [];
+      setSubmissions(
+        list.map((s) => ({
+          ...s,
+          id: s._id || s.id,
+          feedback: s.feedback || s.review?.feedback || "",
+        })),
+      );
     } catch (error) {
       console.error("Error loading submissions:", error);
     }
@@ -117,13 +123,9 @@ export default function DeliverablesManager({
         .split("\n")
         .filter((r) => r.trim())
         .map((r) => r.trim());
-      const token = getAccessToken();
       const response = await fetch(`${API_BASE}/cohorts/${cohortId}/deliverables`, {
+        ...defaultOptions,
         method: "POST",
-        headers: {
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-          "Content-Type": "application/json",
-        },
         body: JSON.stringify({
           organizationId,
           title: formData.title,
@@ -151,15 +153,11 @@ export default function DeliverablesManager({
   };
   const handleReviewSubmission = async (submissionId) => {
     try {
-      const token = getAccessToken();
       const response = await fetch(
         `${API_BASE}/deliverables/submissions/${submissionId}/review`,
         {
+          ...defaultOptions,
           method: "POST",
-          headers: {
-            ...(token ? { Authorization: `Bearer ${token}` } : {}),
-            "Content-Type": "application/json",
-          },
           body: JSON.stringify({
             status: reviewData.status,
             feedback: reviewData.feedback,
@@ -188,8 +186,11 @@ export default function DeliverablesManager({
     switch (status) {
       case "approved":
         return "bg-green-500/10 text-green-700 dark:text-green-400 border-green-500/20";
+      case "revision_requested":
       case "needs-revision":
         return "bg-yellow-500/10 text-yellow-700 dark:text-yellow-400 border-yellow-500/20";
+      case "rejected":
+        return "bg-red-500/10 text-red-700 dark:text-red-400 border-red-500/20";
       case "reviewed":
         return "bg-blue-500/10 text-blue-700 dark:text-blue-400 border-blue-500/20";
       case "submitted":
@@ -495,8 +496,11 @@ export default function DeliverablesManager({
                                           <option value="approved">
                                             Approved
                                           </option>
-                                          <option value="needs-revision">
-                                            Needs Revision
+                                          <option value="revision_requested">
+                                            Needs revision
+                                          </option>
+                                          <option value="rejected">
+                                            Rejected
                                           </option>
                                           <option value="reviewed">
                                             Reviewed

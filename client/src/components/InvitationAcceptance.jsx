@@ -24,12 +24,150 @@ import {
   UserPlus,
 } from "lucide-react";
 import { toast } from "sonner";
-import { getAccessToken } from "../app/session";
+import { useAuth } from "../contexts/AuthContext";
+import { clearAuthSession } from "../app/session";
 
-export default function InvitationAcceptance({ token, onAccept, onCancel }) {
+// Default fetch options for cookie-based auth
+
+const defaultOptions = {
+  credentials: "include",
+  headers: { "Content-Type": "application/json" },
+};
+
+function CohortInvitationPanel({ invitation, onCancel, onCohortResolved }) {
+  const { user } = useAuth();
+  const [busy, setBusy] = useState(false);
+  const orgName = invitation.displayOrganizationName || "Program";
+  const cohortName = invitation.displayCohortName || "Cohort";
+  const founderId = invitation.founderId ? String(invitation.founderId) : "";
+  const userId = user ? String(user._id ?? user.id ?? "") : "";
+  const founderMatch = Boolean(user && founderId && userId === founderId);
+
+  const respond = async (accept) => {
+    if (!user) {
+      toast.error("Log in with your founder account to respond.");
+      return;
+    }
+    if (!founderMatch) {
+      toast.error(
+        "Sign in as the invited founder (this invitation is tied to another account).",
+      );
+      return;
+    }
+    const id = invitation._id ? String(invitation._id) : "";
+    if (!id) {
+      toast.error("Invalid invitation.");
+      return;
+    }
+    setBusy(true);
+    try {
+      const res = await fetch(`${API_BASE_URL}/invitations/${id}/respond`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: accept ? "accepted" : "declined" }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(json.message || "Could not update invitation");
+      }
+      toast.success(
+        accept ? "You're in the cohort." : "Invitation declined.",
+      );
+      onCohortResolved?.();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Something went wrong");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-primary/5 via-background to-accent/5">
+      <Card className="w-full max-w-lg border-primary/20">
+        <CardHeader className="text-center">
+          <div className="w-16 h-16 bg-primary rounded-full flex items-center justify-center mx-auto mb-4">
+            <Building className="w-8 h-8 text-primary-foreground" />
+          </div>
+          <CardTitle>Cohort invitation</CardTitle>
+          <CardDescription>
+            {orgName}
+            {" invites your startup to join "}
+            <span className="font-medium text-foreground">{cohortName}</span>
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {invitation.message ? (
+            <div className="p-4 bg-muted/50 rounded-lg border text-sm">
+              <p className="text-xs text-muted-foreground mb-1">Message</p>
+              <p className="italic">"{invitation.message}"</p>
+            </div>
+          ) : null}
+          <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground">
+            <Calendar className="w-3 h-3" />
+            <span>
+              Expires{" "}
+              {invitation.expiresAt
+                ? new Date(invitation.expiresAt).toLocaleDateString()
+                : "—"}
+            </span>
+          </div>
+          {!user ? (
+            <p className="text-sm text-center text-muted-foreground">
+              Log in with the founder account that received this link, then
+              accept or decline.
+            </p>
+          ) : null}
+          {user && !founderMatch ? (
+            <p className="text-sm text-center text-amber-600 dark:text-amber-400">
+              You’re signed in as a different user. Switch to the invited founder
+              account to respond.
+            </p>
+          ) : null}
+          <div className="flex flex-col sm:flex-row gap-3 pt-2">
+            <Button
+              type="button"
+              variant="outline"
+              className="flex-1"
+              disabled={busy}
+              onClick={() => onCancel?.()}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              variant="secondary"
+              className="flex-1"
+              disabled={busy || !founderMatch}
+              onClick={() => respond(false)}
+            >
+              Decline
+            </Button>
+            <Button
+              type="button"
+              className="flex-1"
+              disabled={busy || !founderMatch}
+              onClick={() => respond(true)}
+            >
+              Accept
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+export default function InvitationAcceptance({
+  token,
+  onAccept,
+  onCancel,
+  onCohortResolved,
+}) {
   const [invitation, setInvitation] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [submitting, setSubmitting] = useState(false);
   const [formData, setFormData] = useState({
     name: "",
     password: "",
@@ -47,9 +185,7 @@ export default function InvitationAcceptance({ token, onAccept, onCancel }) {
         const API_URL =
           API_BASE_URL;
         const response = await fetch(`${API_URL}/invitations/token/${token}`, {
-          headers: {
-            Authorization: `Bearer ${getAccessToken()}`,
-          },
+          ...defaultOptions,
         });
         if (!response.ok) {
           console.error("❌ [InvitationAcceptance] Failed to fetch invitation");
@@ -57,27 +193,47 @@ export default function InvitationAcceptance({ token, onAccept, onCancel }) {
           setLoading(false);
           return;
         }
-        const data = await response.json();
-        if (!data.success || !data.invitation) {
+        const payload = await response.json();
+        const data = payload?.data;
+        if (!payload?.success || !data?.invitation) {
           console.error("❌ [InvitationAcceptance] Invitation not found");
           setError("Invalid or expired invitation");
           setLoading(false);
           return;
         }
-        console.log(
-          "✅ [InvitationAcceptance] Invitation loaded:",
-          data.invitation,
-        );
+        console.log("✅ [InvitationAcceptance] Invitation loaded:", data);
         const foundInvitation = data.invitation;
+        const meta =
+          foundInvitation.metadata &&
+          typeof foundInvitation.metadata === "object"
+            ? foundInvitation.metadata
+            : {};
+
+        const kind = data.kind === "cohort" ? "cohort" : "talent";
 
         // Parse dates from stored strings
         const parsedInvitation = {
           ...foundInvitation,
+          kind,
           createdAt: new Date(foundInvitation.createdAt),
           expiresAt: foundInvitation.expiresAt
             ? new Date(foundInvitation.expiresAt)
             : new Date(Date.now() + 14 * 24 * 60 * 60 * 1000),
         };
+
+        if (kind === "cohort") {
+          parsedInvitation.displayCohortName =
+            data.cohortName || data.cohort?.name || "";
+          parsedInvitation.displayOrganizationName =
+            data.organizationName || data.organization?.name || "";
+        } else {
+          parsedInvitation.startupName =
+            data.startupName || meta.startupName || "";
+          parsedInvitation.founderName =
+            meta.founderName || meta.invitedByName || "A founder";
+          parsedInvitation.role = meta.role || meta.position || "Team member";
+          parsedInvitation.department = meta.department || "—";
+        }
 
         // Check if invitation is expired
         if (parsedInvitation.expiresAt < new Date()) {
@@ -105,11 +261,10 @@ export default function InvitationAcceptance({ token, onAccept, onCancel }) {
     };
     fetchInvitation();
   }, [token]);
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!invitation) return;
+    if (!invitation || invitation.kind === "cohort") return;
 
-    // Validation
     if (!formData.name || !formData.password || !formData.confirmPassword) {
       toast.error("Please fill in all fields");
       return;
@@ -123,252 +278,47 @@ export default function InvitationAcceptance({ token, onAccept, onCancel }) {
       return;
     }
 
-    // Create user account
-    const newUser = {
-      id: `user_${Date.now()}`,
-      role: "team-member",
-      name: formData.name,
-      email: invitation.email,
-      onboardingComplete: true,
-      startupId: invitation.startupId,
-      founderId: invitation.founderId,
-      // ✅ ADD: Link team member to founder for task assignment
-      companyId: invitation.startupId,
-      // ✅ ADD: Also set companyId for compatibility
-      profile: {
-        role: invitation.role,
-        department: invitation.department,
-        startupName: invitation.startupName,
-        joinedViaInvitation: true,
-        invitedBy: invitation.founderName,
-      },
-    };
-
-    // Update invitation status
-    const invitations = JSON.parse(
-      localStorage.getItem("startupverse_invitations") || "[]",
-    );
-    const updatedInvitations = invitations.map((inv) =>
-      inv.token === token
-        ? {
-            ...inv,
-            status: "accepted",
-          }
-        : inv,
-    );
-    localStorage.setItem(
-      "startupverse_invitations",
-      JSON.stringify(updatedInvitations),
-    );
-
-    // **AUTO-UPDATE TEAM BUILDING & EQUITY TRACKING**
-    // Add team member to Team Building section
-    const teamMembers = JSON.parse(
-      localStorage.getItem("team_members") || "[]",
-    );
-    const newTeamMember = {
-      id: `member_${Date.now()}`,
-      name: formData.name,
-      email: invitation.email,
-      role: invitation.role,
-      department: invitation.department,
-      joinDate: new Date().toISOString(),
-      equity: invitation.equityPercentage || 0,
-      status: "Active",
-    };
-    teamMembers.push(newTeamMember);
-    localStorage.setItem("team_members", JSON.stringify(teamMembers));
-
-    // Add/Update equity offer in Team Building section
-    if (invitation.equityPercentage) {
-      const equityOffers = JSON.parse(
-        localStorage.getItem("team_equity_offers") || "[]",
+    setSubmitting(true);
+    try {
+      clearAuthSession();
+      const response = await fetch(
+        `${API_BASE_URL}/invitations/token/${encodeURIComponent(token)}/accept`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            name: formData.name,
+            email: invitation.email,
+            password: formData.password,
+          }),
+        },
       );
-      const newEquityOffer = {
-        id: `offer_${Date.now()}`,
-        recipientName: formData.name,
-        recipientEmail: invitation.email,
-        role: invitation.role,
-        equityPercentage: invitation.equityPercentage,
-        vestingYears: invitation.vestingYears || 4,
-        cliffMonths: invitation.cliffMonths || 12,
-        salary: invitation.salary || "",
-        benefits: invitation.benefits || "",
-        startDate: invitation.startDate || new Date().toISOString(),
-        status: "Accepted",
-        sentDate: new Date().toISOString(),
-      };
-      equityOffers.push(newEquityOffer);
-      localStorage.setItem("team_equity_offers", JSON.stringify(equityOffers));
-    }
-
-    // **AUTO-UPDATE ROLE DEFINITIONS**
-    // Check if role already exists in role definitions, if not create it, if yes mark as filled
-    const roles = JSON.parse(localStorage.getItem("team_roles") || "[]");
-    const existingRoleIndex = roles.findIndex(
-      (r) =>
-        r.title.toLowerCase() === invitation.role.toLowerCase() &&
-        r.department.toLowerCase() === invitation.department.toLowerCase(),
-    );
-    if (existingRoleIndex >= 0) {
-      // Role exists - mark as filled
-      roles[existingRoleIndex].isFilled = true;
-      roles[existingRoleIndex].filledBy = formData.name;
-      roles[existingRoleIndex].filledDate = new Date().toISOString();
-    } else {
-      // Role doesn't exist - create new role definition
-      const newRole = {
-        id: `role_${Date.now()}`,
-        title: invitation.role,
-        department: invitation.department,
-        level: "Mid",
-        // Default level, can be updated later
-        responsibilities: `Key responsibilities for ${invitation.role} position`,
-        requiredSkills: "To be defined",
-        reportingTo: "Founder/CEO",
-        teamSize: "0",
-        isFilled: true,
-        filledBy: formData.name,
-        filledDate: new Date().toISOString(),
-      };
-      roles.push(newRole);
-    }
-    localStorage.setItem("team_roles", JSON.stringify(roles));
-
-    // **AUTO-UPDATE CAP TABLE IN COMPANY FORMATION**
-    // Add team member to Company Formation cap table if they have equity
-    if (invitation.equityPercentage) {
-      const companyFounders = JSON.parse(
-        localStorage.getItem("company_founders") || "[]",
-      );
-      const newFounderEntry = {
-        id: `founder_${Date.now()}`,
-        name: formData.name,
-        email: invitation.email,
-        role: invitation.role,
-        equity: invitation.equityPercentage,
-        vestingYears: invitation.vestingYears || 4,
-        cliffMonths: invitation.cliffMonths || 12,
-        isTeamMember: true,
-        // Flag to distinguish from original founders
-        joinDate: new Date().toISOString(),
-      };
-      companyFounders.push(newFounderEntry);
-      localStorage.setItem("company_founders", JSON.stringify(companyFounders));
-    }
-
-    // **AUTO-UPDATE FOUNDER JOURNEY PROGRESS**
-    // Mark Team Building stage as in-progress or increase progress
-    const journeyProgress = JSON.parse(
-      localStorage.getItem("founder_journey_progress") || "{}",
-    );
-    if (!journeyProgress.teamBuilding) {
-      journeyProgress.teamBuilding = {
-        status: "in-progress",
-        progress: 20,
-        startedAt: new Date().toISOString(),
-      };
-    } else {
-      // Increment progress (each team member adds progress)
-      journeyProgress.teamBuilding.progress = Math.min(
-        (journeyProgress.teamBuilding.progress || 0) + 15,
-        100,
-      );
-      // Mark as completed if progress reaches 80%+
-      if (journeyProgress.teamBuilding.progress >= 80) {
-        journeyProgress.teamBuilding.status = "completed";
-        journeyProgress.teamBuilding.completedAt = new Date().toISOString();
-      } else {
-        journeyProgress.teamBuilding.status = "in-progress";
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(payload?.message || "Failed to complete signup");
       }
+      if (!payload?.success) {
+        throw new Error(payload?.message || "Failed to complete signup");
+      }
+      const authData = payload.data || {};
+      const resultUser = authData.user;
+      if (!resultUser) {
+        throw new Error("No user returned from server");
+      }
+      toast.success("Welcome to the team!");
+      onAccept({
+        ...resultUser,
+        startupId: invitation.startupId,
+        startupName: invitation.startupName,
+        department: invitation.department,
+      });
+    } catch (err) {
+      toast.error(
+        err instanceof Error ? err.message : "Failed to complete signup",
+      );
+    } finally {
+      setSubmitting(false);
     }
-    localStorage.setItem(
-      "founder_journey_progress",
-      JSON.stringify(journeyProgress),
-    );
-
-    // **AUTO-UPDATE VIRTUAL OFFICE TEAM LIST**
-    // Add team member to virtual office with online status
-    const virtualOfficeTeam = JSON.parse(
-      localStorage.getItem("virtual_office_team") || "[]",
-    );
-    const newOfficeTeamMember = {
-      id: `office_${Date.now()}`,
-      name: formData.name,
-      email: invitation.email,
-      role: invitation.role,
-      department: invitation.department,
-      status: "online",
-      currentActivity: "Just joined the team!",
-      location: "Remote",
-      avatar: null,
-      joinedAt: new Date().toISOString(),
-    };
-    virtualOfficeTeam.push(newOfficeTeamMember);
-    localStorage.setItem(
-      "virtual_office_team",
-      JSON.stringify(virtualOfficeTeam),
-    );
-
-    // **AUTO-CREATE NOTIFICATION FOR FOUNDER**
-    // Notify the founder that someone accepted their invitation
-    const notifications = JSON.parse(
-      localStorage.getItem("founder_notifications") || "[]",
-    );
-    const newNotification = {
-      id: `notif_${Date.now()}`,
-      type: "team_member_joined",
-      title: "New Team Member Joined! 🎉",
-      message: `${formData.name} has accepted your invitation and joined as ${invitation.role}`,
-      timestamp: new Date().toISOString(),
-      read: false,
-      priority: "high",
-      actionUrl: "team:members",
-      metadata: {
-        memberName: formData.name,
-        role: invitation.role,
-        equity: invitation.equityPercentage,
-      },
-    };
-    notifications.unshift(newNotification); // Add to beginning
-    localStorage.setItem(
-      "founder_notifications",
-      JSON.stringify(notifications),
-    );
-
-    // **AUTO-UPDATE COMPANY STATS**
-    // Track company growth metrics
-    const companyStats = JSON.parse(
-      localStorage.getItem("company_stats") || "{}",
-    );
-    if (!companyStats.teamGrowth) {
-      companyStats.teamGrowth = [];
-    }
-    companyStats.teamGrowth.push({
-      date: new Date().toISOString(),
-      teamSize: teamMembers.length + 1,
-      // +1 for the new member
-      event: "member_joined",
-      memberName: formData.name,
-      role: invitation.role,
-    });
-    companyStats.currentTeamSize = teamMembers.length + 1;
-    companyStats.lastUpdated = new Date().toISOString();
-    localStorage.setItem("company_stats", JSON.stringify(companyStats));
-
-    // Remove from talent pool if they were a talent user
-    const talentProfiles = JSON.parse(
-      localStorage.getItem("startupverse_talent_profiles") || "[]",
-    );
-    const updatedTalentProfiles = talentProfiles.filter(
-      (profile) => profile.email !== invitation.email,
-    );
-    localStorage.setItem(
-      "startupverse_talent_profiles",
-      JSON.stringify(updatedTalentProfiles),
-    );
-    toast.success("Welcome to the team!");
-    onAccept(newUser);
   };
   if (loading) {
     return (
@@ -400,6 +350,17 @@ export default function InvitationAcceptance({ token, onAccept, onCancel }) {
       </div>
     );
   }
+
+  if (invitation.kind === "cohort") {
+    return (
+      <CohortInvitationPanel
+        invitation={invitation}
+        onCancel={onCancel}
+        onCohortResolved={onCohortResolved}
+      />
+    );
+  }
+
   return (
     <div className="min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-primary/5 via-background to-accent/5">
       <div className="w-full max-w-2xl space-y-6">
@@ -410,7 +371,7 @@ export default function InvitationAcceptance({ token, onAccept, onCancel }) {
             </div>
             <CardTitle>You're Invited!</CardTitle>
             <CardDescription>
-              {invitation.founderName}
+              {invitation.founderName || "A founder"}
               {" has invited you to join their startup team"}
             </CardDescription>
           </CardHeader>
@@ -423,7 +384,9 @@ export default function InvitationAcceptance({ token, onAccept, onCancel }) {
                   </div>
                   <div>
                     <p className="text-xs text-muted-foreground">Startup</p>
-                    <p className="text-sm">{invitation.startupName}</p>
+                    <p className="text-sm">
+                      {invitation.startupName || "Startup"}
+                    </p>
                   </div>
                 </div>
                 <div className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg">
@@ -432,7 +395,7 @@ export default function InvitationAcceptance({ token, onAccept, onCancel }) {
                   </div>
                   <div>
                     <p className="text-xs text-muted-foreground">Role</p>
-                    <p className="text-sm">{invitation.role}</p>
+                    <p className="text-sm">{invitation.role || "—"}</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg">
@@ -441,7 +404,7 @@ export default function InvitationAcceptance({ token, onAccept, onCancel }) {
                   </div>
                   <div>
                     <p className="text-xs text-muted-foreground">Department</p>
-                    <p className="text-sm">{invitation.department}</p>
+                    <p className="text-sm">{invitation.department || "—"}</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg">
@@ -613,9 +576,11 @@ export default function InvitationAcceptance({ token, onAccept, onCancel }) {
                 >
                   Decline
                 </Button>
-                <Button type="submit" className="flex-1">
-                  Accept & Join Team
-                  <ArrowRight className="w-4 h-4 ml-2" />
+                <Button type="submit" className="flex-1" disabled={submitting}>
+                  {submitting ? "Submitting…" : "Accept & Join Team"}
+                  {!submitting ? (
+                    <ArrowRight className="w-4 h-4 ml-2" />
+                  ) : null}
                 </Button>
               </div>
             </form>

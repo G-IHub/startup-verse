@@ -219,15 +219,12 @@ function ActivityDateFilter({ activities, children }) {
               key={p.key}
               type="button"
               onClick={() => handlePreset(p.key)}
-              className="text-[12px] font-medium transition-all duration-150"
-              style={{
-                borderRadius: 6,
-                padding: '4px 10px',
-                background: preset === p.key ? '#1C4ED8' : '#F0EEE8',
-                color: preset === p.key ? '#FFFFFF' : '#1a1a1a',
-                border: 'none',
-                cursor: 'pointer',
-              }}
+              className={cn(
+                "cursor-pointer rounded-pill px-2.5 py-1 text-[12px] font-medium transition-all duration-200 ease-in-out",
+                preset === p.key
+                  ? "bg-primary text-white"
+                  : "bg-surface-page text-text-body hover:text-primary",
+              )}
             >
               {p.label}
             </button>
@@ -239,15 +236,10 @@ function ActivityDateFilter({ activities, children }) {
           <button
             type="button"
             onClick={() => { setShowCustom((v) => !v); setPreset(null); }}
-            className="flex items-center gap-1 text-[12px] font-medium transition-all duration-150"
-            style={{
-              borderRadius: 6,
-              padding: '4px 10px',
-              border: showCustom ? '1px solid #1C4ED8' : '1px solid rgba(0,0,0,0.07)',
-              background: '#FFFFFF',
-              color: showCustom ? '#1C4ED8' : '#6B6860',
-              cursor: 'pointer',
-            }}
+            className={cn(
+              "flex cursor-pointer items-center gap-1 rounded-input border bg-surface-card px-2.5 py-1 text-[12px] font-medium text-text-body transition-all duration-200 ease-in-out hover:border-primary hover:text-primary",
+              showCustom ? "border-primary text-primary" : "border-surface-border",
+            )}
           >
             <Filter className="h-2.5 w-2.5" />
             Custom
@@ -257,7 +249,7 @@ function ActivityDateFilter({ activities, children }) {
             <button
               type="button"
               onClick={() => { setPreset(null); setFromStr(""); setToStr(""); setCustomError(""); setShowCustom(false); }}
-              className="flex items-center gap-0.5 rounded-md px-1.5 py-[3px] text-[10px] font-medium text-muted-foreground hover:text-destructive transition-colors"
+              className="flex items-center gap-0.5 rounded-md px-1.5 py-[3px] text-[10px] font-medium text-text-muted transition-colors duration-200 ease-in-out hover:text-destructive"
             >
               <X className="h-2.5 w-2.5" />
               Reset
@@ -268,31 +260,31 @@ function ActivityDateFilter({ activities, children }) {
 
       {/* Custom date range panel */}
       {showCustom && (
-        <div className="rounded-xl border border-border/70 bg-muted/30 px-3 pt-2.5 pb-3 space-y-2">
-          <div className="flex items-center gap-1.5 mb-1">
-            <Calendar className="h-3 w-3 text-muted-foreground" />
-            <span className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">Custom range</span>
+        <div className="space-y-2 rounded-card border border-surface-border bg-primary-tint/40 px-3 pb-3 pt-2.5">
+          <div className="mb-1 flex items-center gap-1.5">
+            <Calendar className="h-3 w-3 text-text-muted" />
+            <span className="text-[10px] font-semibold uppercase tracking-widest text-text-muted">Custom range</span>
           </div>
           <div className="grid grid-cols-2 gap-2">
             <div className="flex flex-col gap-1">
-              <label className="text-[10px] font-medium text-muted-foreground">From</label>
+              <label className="text-[10px] font-medium text-text-muted">From</label>
               <input
                 type="date"
                 value={fromStr}
                 max={todayStr}
                 onChange={(e) => handleFromChange(e.target.value)}
-                className="h-7 w-full rounded-lg border border-border bg-background px-2 text-[11px] text-foreground focus:outline-none focus:ring-2 focus:ring-primary/25 focus:border-primary transition-all"
+                className="h-7 w-full rounded-input border border-surface-border bg-surface-card px-2 text-[11px] text-text-heading transition-all duration-200 ease-in-out focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/25"
               />
             </div>
             <div className="flex flex-col gap-1">
-              <label className="text-[10px] font-medium text-muted-foreground">To</label>
+              <label className="text-[10px] font-medium text-text-muted">To</label>
               <input
                 type="date"
                 value={toStr}
                 max={todayStr}
                 min={fromStr || undefined}
                 onChange={(e) => handleToChange(e.target.value)}
-                className="h-7 w-full rounded-lg border border-border bg-background px-2 text-[11px] text-foreground focus:outline-none focus:ring-2 focus:ring-primary/25 focus:border-primary transition-all"
+                className="h-7 w-full rounded-input border border-surface-border bg-surface-card px-2 text-[11px] text-text-heading transition-all duration-200 ease-in-out focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/25"
               />
             </div>
           </div>
@@ -314,12 +306,15 @@ function ActivityDateFilter({ activities, children }) {
 
 function OfficePanelCard({ title, action, children, className = "" }) {
   return (
-    <Card className={cn("office-card office-animate-in shadow-none rounded-[10px] transition-shadow duration-150 hover:shadow-[0_1px_8px_rgba(0,0,0,0.06)]", className)}
-      style={{background: '#FFFFFF', border: '1px solid rgba(0,0,0,0.07)', boxShadow: 'none'}}
+    <Card
+      className={cn(
+        "office-animate-in rounded-card border border-surface-border bg-surface-card shadow-soft transition-shadow duration-200 ease-in-out hover:shadow-[0_2px_12px_rgba(0,0,0,0.06)]",
+        className,
+      )}
     >
-      <CardHeader className="pb-2 pt-4 px-5 office-panel-header">
+      <CardHeader className="border-0 bg-surface-card px-5 pb-2 pt-4">
         <div className="flex items-center justify-between gap-3">
-          <CardTitle className="text-[14px] font-semibold text-gray-900" style={{fontFamily: '"Bricolage Grotesque", "Segoe UI", sans-serif'}}>
+          <CardTitle className="font-heading text-base font-semibold text-text-heading">
             {title}
           </CardTitle>
           {action}
@@ -408,41 +403,39 @@ export default function VirtualStartupOfficeWorkspaceV2({
     : panels.isOpen("calendar");
 
   return (
-    <div className="office-panel" style={{background: '#F7F6F3', fontFamily: '"Instrument Sans", "Segoe UI", sans-serif', padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: 20}}>
-      <section
-        className="rounded-[10px] bg-white px-5 py-4 flex flex-wrap items-center justify-between gap-3"
-        style={{border: '1px solid rgba(0,0,0,0.07)', boxShadow: 'none', background: '#FFFFFF'}}
-      >
+    <div
+      className="office-panel flex flex-col gap-5 bg-surface-page px-6 py-5 font-body"
+    >
+      <section className="flex flex-wrap items-center justify-between gap-3 rounded-card border border-surface-border bg-surface-card px-5 py-4">
         <div className="min-w-0 space-y-1.5">
           <div className="flex flex-wrap items-center gap-2.5">
-            <p className="truncate text-[18px] font-semibold text-gray-900" style={{fontFamily: '"Bricolage Grotesque", "Segoe UI", sans-serif'}}>
+            <p className="truncate font-heading text-lg font-bold text-text-heading">
               {getDayGreeting()}, {user?.name || "New User"}!
             </p>
-            <span className="inline-flex items-center rounded-full px-[10px] py-[3px] text-[11px] font-medium" style={{background: '#EEF2FF', color: '#1C4ED8'}}>
+            <span className="inline-flex items-center rounded-pill bg-primary-tint px-3 py-[3px] font-body text-xs font-semibold text-primary">
               {office.teamEnergy.onlineCount} teammates online
             </span>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <span className="inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px]" style={{background: '#F0EEE8', color: '#6B6860'}}>
-              <Sparkles className="h-3 w-3" />
+            <span className="inline-flex items-center gap-1 rounded-pill border border-surface-border bg-surface-page px-2.5 py-0.5 font-body text-[11px] font-medium text-text-body">
+              <Sparkles className="h-3 w-3 shrink-0 text-text-body" />
               Live startup workspace
             </span>
-            <span className="text-[11px]" style={{color: '#6B6860'}}>Keep up the great work!</span>
+            <span className="font-body text-[11px] text-text-body">Keep up the great work!</span>
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <span className="text-[11px]" style={{color: '#6B6860'}}>Status</span>
+          <span className="font-body text-[11px] font-medium text-text-muted">Status</span>
           <button
             type="button"
-            className="rounded-full px-3 py-0.5 text-[10px] font-semibold uppercase tracking-wide transition-colors duration-150"
-            style={{background: '#DCFCE7', color: '#166534', border: 'none'}}
+            className="rounded-pill bg-status-success px-3 py-[3px] font-body text-[11px] font-semibold uppercase tracking-[0.06em] text-white transition-colors duration-200 ease-in-out"
           >
-            available
+            AVAILABLE
           </button>
         </div>
       </section>
 
-      <div className="bg-white flex flex-wrap items-center gap-0 px-3" style={{background: '#FFFFFF', borderBottom: '1px solid rgba(0,0,0,0.07)', borderTop: 'none', borderLeft: 'none', borderRight: 'none'}}>
+      <div className="flex flex-wrap items-center gap-0 border-b border-surface-border bg-surface-card px-3">
         {actionButtons.map((item) => {
           const Icon = item.icon;
           const active = panels.isOpen(item.panel);
@@ -451,19 +444,14 @@ export default function VirtualStartupOfficeWorkspaceV2({
               key={item.key}
               type="button"
               onClick={() => panels.openPanel(item.panel)}
-              className="inline-flex items-center gap-1.5 px-3 h-10 text-[13px] font-medium transition-colors duration-150"
-              style={{
-                color: active ? '#1a1a1a' : '#6B6860',
-                borderBottom: active ? '2px solid #1C4ED8' : '2px solid transparent',
-                background: 'transparent',
-                border: 'none',
-                borderBottomWidth: 2,
-                borderBottomStyle: 'solid',
-                borderBottomColor: active ? '#1C4ED8' : 'transparent',
-                cursor: 'pointer',
-              }}
+              className={cn(
+                "inline-flex h-10 cursor-pointer items-center gap-1.5 border-0 border-b-2 bg-transparent px-3 text-[13px] transition-colors duration-200 ease-in-out",
+                active
+                  ? "border-primary font-semibold text-primary"
+                  : "border-transparent font-medium text-text-body hover:text-primary",
+              )}
             >
-              <Icon className="h-4 w-4" />
+              <Icon className="h-4 w-4 shrink-0" />
               {item.label}
             </button>
           );
@@ -471,11 +459,10 @@ export default function VirtualStartupOfficeWorkspaceV2({
         <div className="ml-auto flex items-center gap-1.5 pl-2">
           <button
             type="button"
-            className="inline-flex items-center gap-1 px-2 h-10 text-[12px] transition-colors duration-150"
-            style={{color: '#6B6860', background: 'transparent', border: 'none', cursor: 'pointer'}}
+            className="inline-flex h-10 cursor-pointer items-center gap-1 border-0 bg-transparent px-2 font-body text-[12px] font-medium text-text-body transition-colors duration-200 ease-in-out hover:text-primary"
             onClick={() => panels.openPanel("calendar")}
           >
-            <Command className="h-3.5 w-3.5" />
+            <Command className="h-3.5 w-3.5 shrink-0" />
             Shortcuts
           </button>
         </div>
@@ -495,28 +482,28 @@ export default function VirtualStartupOfficeWorkspaceV2({
           title="Live Activity"
           action={
             <span className="flex items-center gap-1.5">
-              <span className="inline-block h-1.5 w-1.5 animate-pulse rounded-full" style={{background: '#22C55E'}} />
-              <span className="text-[11px]" style={{color: '#6B6860'}}>Real-time</span>
+              <span className="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-status-success" />
+              <span className="font-body text-[11px] font-medium text-text-body">Real-time</span>
             </span>
           }
           className="office-workspace-grid-top__activity"
         >
           {office.loading && recentActivities.length === 0 ? (
-            <div className="flex min-h-[145px] items-center justify-center text-[11px] text-muted-foreground">
+            <div className="flex min-h-[145px] items-center justify-center font-body text-[11px] text-text-muted">
               Loading activity...
             </div>
           ) : recentActivities.length === 0 ? (
-            <div className="flex min-h-[145px] flex-col items-center justify-center gap-1.5 text-center text-[11px] text-muted-foreground">
-              <CircleDot className="h-4 w-4 text-muted-foreground/70" />
-              <p>No activity yet</p>
-              <p>Team activity will appear here</p>
+            <div className="flex min-h-[145px] flex-col items-center justify-center gap-1.5 text-center">
+              <CircleDot className="h-4 w-4 text-surface-border" />
+              <p className="font-heading text-[11px] font-semibold text-text-heading">No activity yet</p>
+              <p className="font-body text-[11px] text-text-muted">Team activity will appear here</p>
             </div>
           ) : (
             <ActivityDateFilter activities={recentActivities}>
               {(filtered, hasActiveFilter) => (
                 <>
                   <div className="mb-1 flex items-center justify-between">
-                    <span className="text-[11px]" style={{color: '#6B6860'}}>
+                    <span className="font-body text-[11px] text-text-body">
                       {hasActiveFilter
                         ? `${filtered.length} of ${recentActivities.length} activities`
                         : `${recentActivities.length} activities`}
@@ -524,25 +511,25 @@ export default function VirtualStartupOfficeWorkspaceV2({
                   </div>
                   {filtered.length === 0 ? (
                     <div className="flex min-h-[80px] flex-col items-center justify-center gap-1 text-center">
-                      <CircleDot className="h-4 w-4 text-muted-foreground/50" />
-                      <p className="text-[11px] text-muted-foreground">No activity in this period</p>
+                      <CircleDot className="h-4 w-4 text-surface-border/80" />
+                      <p className="font-body text-[11px] text-text-muted">No activity in this period</p>
                     </div>
                   ) : (
                     <div className="overflow-y-auto" style={{ maxHeight: 280 }}>
                       {filtered.map((activity, idx) => (
                         <div
                           key={activity.id}
-                          className="py-2.5"
-                          style={{
-                            borderBottom: idx < filtered.length - 1 ? '1px solid rgba(0,0,0,0.05)' : 'none',
-                          }}
+                          className={cn(
+                            "py-2.5",
+                            idx < filtered.length - 1 && "border-b border-surface-border/80",
+                          )}
                         >
-                          <p className="line-clamp-2 text-[13px]" style={{color: '#1a1a1a'}}>
+                          <p className="line-clamp-2 font-body text-[13px] text-text-heading">
                             <span className="font-medium">{activity.userName}</span>
                             {" "}
                             {activity.message}
                           </p>
-                          <p className="mt-0.5 text-[11px]" style={{color: '#9C9A93'}}>
+                          <p className="mt-0.5 font-body text-[11px] text-text-muted">
                             {formatRelativeTime(activity.timestamp)}
                           </p>
                         </div>
@@ -562,8 +549,7 @@ export default function VirtualStartupOfficeWorkspaceV2({
           action={
             <button
               type="button"
-              className="inline-flex items-center h-7 rounded-[6px] px-2.5 text-[12px] font-medium transition-colors duration-150"
-              style={{border: '1px solid rgba(0,0,0,0.07)', background: '#FFFFFF', color: '#6B6860', cursor: 'pointer'}}
+              className="inline-flex h-7 cursor-pointer items-center rounded-input border border-surface-border bg-surface-page px-2.5 font-body text-[12px] font-semibold text-primary transition-colors duration-200 ease-in-out hover:border-primary hover:bg-primary-tint"
               onClick={() => panels.openPanel("chat")}
             >
               + Invite Team
@@ -572,31 +558,34 @@ export default function VirtualStartupOfficeWorkspaceV2({
           className="min-h-[232px] office-workspace-grid-top__team"
         >
           {roster.length === 0 ? (
-            <div className="flex min-h-[145px] items-center justify-center text-[11px] text-muted-foreground">
+            <div className="flex min-h-[145px] items-center justify-center font-body text-[11px] text-text-muted">
               No team members yet.
             </div>
           ) : (
             <div className="grid h-[164px] grid-cols-1">
               {roster.slice(0, 1).map((member) => (
-                <div key={member.id} className="h-fit rounded-[8px]" style={{background: '#F7F6F3', border: '1px solid rgba(0,0,0,0.06)', padding: '14px 16px'}}>
+                <div
+                  key={member.id}
+                  className="h-fit rounded-[12px] border border-surface-border bg-surface-page p-4"
+                >
                   <div className="mb-2 flex items-center gap-2.5">
-                    <div className="relative flex-shrink-0 flex items-center justify-center rounded-full text-[13px] font-medium" style={{width: 38, height: 38, background: '#EEF2FF', color: '#1C4ED8', fontFamily: '"Instrument Sans", "Segoe UI", sans-serif'}}>
+                    <div className="relative flex h-[38px] w-[38px] flex-shrink-0 items-center justify-center rounded-[10px] bg-primary font-heading text-[13px] font-bold text-white">
                       {getInitials(member.name)}
                       {member.isOnline && (
-                        <span className="absolute -right-0.5 -bottom-0.5 h-2.5 w-2.5 rounded-full border-2 border-white bg-emerald-500" />
+                        <span className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border-2 border-surface-card bg-status-success" />
                       )}
                     </div>
                     <div className="min-w-0">
-                      <p className="truncate text-[14px] font-medium text-gray-900">{member.name}</p>
-                      <p className="truncate text-[12px]" style={{color: '#6B6860'}}>
+                      <p className="truncate font-heading text-sm font-semibold text-text-heading">{member.name}</p>
+                      <p className="truncate font-body text-xs text-text-body">
                         {member.title || member.role}
                       </p>
                     </div>
                   </div>
                   <div className="flex items-center gap-1.5">
-                    <span className="inline-block h-1.5 w-1.5 rounded-full bg-emerald-500" />
-                    <p className="truncate text-[11px]" style={{color: '#6B6860'}}>
-                      {member.statusText || "available"}
+                    <span className="inline-block h-1.5 w-1.5 rounded-full bg-status-success" />
+                    <p className="truncate font-body text-[11px] font-medium text-text-body">
+                      {member.statusText || "In workspace"}
                     </p>
                   </div>
                 </div>
@@ -611,47 +600,67 @@ export default function VirtualStartupOfficeWorkspaceV2({
           title="Team Energy & Pulse"
           className="min-h-[232px] office-workspace-grid-top__energy"
         >
-          <div style={{display: 'flex', flexDirection: 'column', gap: 12}}>
-            <div style={{textAlign: 'center', padding: '16px 0'}}>
-              <p style={{fontFamily: '"Bricolage Grotesque", "Segoe UI", sans-serif', fontSize: 22, fontWeight: 600, color: '#1a1a1a', lineHeight: 1}}>
+          <div className="flex flex-col gap-3">
+            <div className="py-4 text-center">
+              <p className="font-heading text-[22px] font-extrabold leading-none text-primary">
                 {office.teamEnergy.percentage >= 70
                   ? "HIGH"
                   : office.teamEnergy.percentage >= 40
                     ? "MODERATE"
                     : "LOW"}
               </p>
-              <p style={{fontSize: 12, color: '#9C9A93', marginTop: 4}}>Team is winding down</p>
+              <p className="mt-1 font-body text-xs text-text-body">Team is winding down</p>
             </div>
-            <div style={{borderTop: '1px solid rgba(0,0,0,0.06)', paddingTop: 12}}>
-              <p style={{fontSize: 11, fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.06em', color: '#9C9A93', marginBottom: 8}}>Live Stats</p>
-              <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8}}>
-                <div style={{background: '#F7F6F3', borderRadius: 8, border: '1px solid rgba(0,0,0,0.06)', padding: 12, textAlign: 'center'}}>
-                  <p style={{fontSize: 18, fontWeight: 600, color: '#1a1a1a'}}>{office.teamEnergy.totalCount}</p>
-                  <p style={{fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#9C9A93', marginTop: 2}}>People</p>
+            <div className="border-t border-surface-border pt-3">
+              <p className="mb-2 font-body text-[11px] font-semibold uppercase tracking-[0.08em] text-text-muted">
+                Live Stats
+              </p>
+              <div className="grid grid-cols-2 gap-2">
+                <div className="rounded-[12px] border border-surface-border bg-surface-page p-3 text-center">
+                  <p className="font-heading text-lg font-extrabold text-primary">{office.teamEnergy.totalCount}</p>
+                  <p className="mt-0.5 font-body text-[10px] font-medium uppercase tracking-[0.06em] text-text-muted">
+                    People
+                  </p>
                 </div>
-                <div style={{background: '#F7F6F3', borderRadius: 8, border: '1px solid rgba(0,0,0,0.06)', padding: 12, textAlign: 'center'}}>
-                  <p style={{fontSize: 18, fontWeight: 600, color: '#1a1a1a'}}>{office.teamEnergy.workingCount}</p>
-                  <p style={{fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#9C9A93', marginTop: 2}}>Working</p>
+                <div className="rounded-[12px] border border-surface-border bg-surface-page p-3 text-center">
+                  <p className="font-heading text-lg font-extrabold text-primary">{office.teamEnergy.workingCount}</p>
+                  <p className="mt-0.5 font-body text-[10px] font-medium uppercase tracking-[0.06em] text-text-muted">
+                    Working
+                  </p>
                 </div>
-                <div style={{background: '#F7F6F3', borderRadius: 8, border: '1px solid rgba(0,0,0,0.06)', padding: 12, textAlign: 'center'}}>
-                  <p style={{fontSize: 18, fontWeight: 600, color: '#1a1a1a'}}>{office.teamEnergy.inCallCount}</p>
-                  <p style={{fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#9C9A93', marginTop: 2}}>In Calls</p>
+                <div className="rounded-[12px] border border-surface-border bg-surface-page p-3 text-center">
+                  <p className="font-heading text-lg font-extrabold text-primary">{office.teamEnergy.inCallCount}</p>
+                  <p className="mt-0.5 font-body text-[10px] font-medium uppercase tracking-[0.06em] text-text-muted">
+                    In Calls
+                  </p>
                 </div>
-                <div style={{background: '#F7F6F3', borderRadius: 8, border: '1px solid rgba(0,0,0,0.06)', padding: 12, textAlign: 'center'}}>
-                  <p style={{fontSize: 18, fontWeight: 600, color: '#1a1a1a'}}>{office.realtimeOnline ? "On" : "Off"}</p>
-                  <p style={{fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#9C9A93', marginTop: 2}}>Live</p>
+                <div className="rounded-[12px] border border-surface-border bg-surface-page p-3 text-center">
+                  <p
+                    className={cn(
+                      "font-heading text-lg font-extrabold",
+                      office.realtimeOnline ? "text-status-success" : "text-text-muted",
+                    )}
+                  >
+                    {office.realtimeOnline ? "On" : "Off"}
+                  </p>
+                  <p className="mt-0.5 font-body text-[10px] font-medium uppercase tracking-[0.06em] text-text-muted">
+                    Live
+                  </p>
                 </div>
               </div>
             </div>
-            <div style={{borderTop: '1px solid rgba(0,0,0,0.06)', paddingTop: 12, display: 'flex', flexDirection: 'column', gap: 6}}>
-              <div style={{display: 'flex', alignItems: 'center', justifyContent: 'space-between'}}>
-                <span style={{fontSize: 12, color: '#6B6860'}}>Energy level</span>
-                <span style={{fontSize: 12, fontWeight: 500, color: '#1C4ED8'}}>{office.teamEnergy.percentage}%</span>
+            <div className="flex flex-col gap-1.5 border-t border-surface-border pt-3">
+              <div className="flex items-center justify-between">
+                <span className="font-body text-xs font-medium text-text-body">Energy level</span>
+                <span className="font-body text-xs font-semibold text-primary">{office.teamEnergy.percentage}%</span>
               </div>
-              <div style={{height: 4, background: '#EAE8E2', borderRadius: 999}}>
-                <div style={{height: 4, width: `${office.teamEnergy.percentage}%`, background: '#1C4ED8', borderRadius: 999}} />
+              <div className="h-1.5 rounded-pill bg-surface-border">
+                <div
+                  className="h-1.5 rounded-pill bg-gradient-to-r from-primary to-accent transition-[width] duration-200 ease-out"
+                  style={{ width: `${office.teamEnergy.percentage}%` }}
+                />
               </div>
-              <div style={{display: 'flex', justifyContent: 'space-between', fontSize: 12, color: '#6B6860'}}>
+              <div className="flex justify-between font-body text-xs text-text-muted">
                 <span>{office.teamEnergy.onlineCount} online</span>
                 <span>{Math.max(0, office.teamEnergy.totalCount - office.teamEnergy.onlineCount)} away</span>
               </div>
@@ -667,25 +676,27 @@ export default function VirtualStartupOfficeWorkspaceV2({
           action={
             <button
               type="button"
-              className="inline-flex items-center gap-1 h-7 rounded-[6px] px-2.5 text-[12px] font-medium transition-colors duration-150"
-              style={{border: '1px solid rgba(0,0,0,0.07)', background: '#FFFFFF', color: '#1C4ED8', cursor: 'pointer'}}
+              className="inline-flex h-7 cursor-pointer items-center gap-1 rounded-input border border-surface-border bg-surface-page px-2.5 font-body text-[12px] font-semibold text-primary transition-colors duration-200 ease-in-out hover:border-primary hover:bg-primary-tint"
               onClick={() => panels.openPanel("calendar")}
             >
-              <Plus className="h-3.5 w-3.5" />
+              <Plus className="h-3.5 w-3.5 shrink-0" />
               Schedule
             </button>
           }
-          className="min-h-[208px] office-workspace-grid-bottom__calendar"
+          className="min-h-[248px] office-workspace-grid-bottom__calendar sm:min-h-[268px]"
         >
-          <div className="office-calendar-split grid gap-2.5">
-            <div className="rounded-[6px] p-2.5 office-calendar-split__month" style={{border: '1px solid rgba(0,0,0,0.07)'}}>
-              <div className="mb-2 flex items-center justify-between">
-                <p className="text-[14px] font-medium text-gray-900">{monthLabel}</p>
-                <ChevronDown className="h-4 w-4" style={{color: '#6B6860'}} />
+          <div className="office-calendar-split grid gap-4 md:gap-5">
+            <div className="office-calendar-split__month rounded-card border border-surface-border bg-surface-card p-4 md:p-5">
+              <div className="mb-4 flex items-center justify-between gap-2">
+                <p className="font-heading text-base font-semibold tracking-tight text-text-heading">{monthLabel}</p>
+                <ChevronDown className="h-[18px] w-[18px] shrink-0 text-text-body" />
               </div>
-              <div className="grid grid-cols-7 gap-0.5 text-center">
+              <div className="grid grid-cols-7 gap-x-1 gap-y-2 text-center sm:gap-x-1.5 sm:gap-y-2.5">
                 {["S", "M", "T", "W", "T", "F", "S"].map((day, index) => (
-                  <span key={`${day}-${index}`} className="text-[12px]" style={{color: '#6B6860'}}>
+                  <span
+                    key={`${day}-${index}`}
+                    className="pb-1 font-body text-[13px] font-medium text-text-muted sm:text-sm"
+                  >
                     {day}
                   </span>
                 ))}
@@ -693,35 +704,39 @@ export default function VirtualStartupOfficeWorkspaceV2({
                   <span
                     key={`${day || "blank"}-${index}`}
                     className={cn(
-                      "text-[12px] leading-6 flex items-center justify-center mx-auto",
-                      day === todayDate
-                        ? "rounded-full text-white font-medium"
-                        : "text-gray-800",
-                      day == null && "text-transparent",
+                      "mx-auto flex min-h-[34px] min-w-[34px] items-center justify-center rounded-full font-body text-sm leading-none sm:min-h-[38px] sm:min-w-[38px] sm:text-[15px]",
+                      day == null && "pointer-events-none text-transparent",
+                      day !== null &&
+                        day !== todayDate &&
+                        "cursor-default text-text-heading transition-colors duration-200 ease-in-out hover:bg-primary-tint hover:text-primary",
+                      day === todayDate &&
+                        "bg-primary font-semibold text-white shadow-sm",
                     )}
-                    style={day === todayDate ? {background: '#1C4ED8', width: 24, height: 24, borderRadius: '50%'} : {}}
                   >
                     {day || "."}
                   </span>
                 ))}
               </div>
             </div>
-            <div className="rounded-[6px] p-2.5 office-calendar-split__agenda" style={{border: '1px solid rgba(0,0,0,0.07)'}}>
-              <div className="mb-2 flex items-center justify-between">
-                <div className="flex items-center gap-1.5 text-[12px]" style={{color: '#6B6860'}}>
-                  <Calendar className="h-3.5 w-3.5" />
+            <div className="office-calendar-split__agenda rounded-card border border-surface-border bg-surface-card p-4 md:p-5">
+              <div className="mb-3 flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2 font-body text-sm font-semibold text-text-body">
+                  <Calendar className="h-4 w-4 shrink-0 text-text-body" />
                   Agenda
                 </div>
-                <button type="button" className="inline-flex items-center gap-1 text-[11px] px-1.5 py-0.5 rounded transition-colors" style={{color: '#6B6860', background: 'transparent', border: 'none', cursor: 'pointer'}}>
-                  <Filter className="h-3 w-3" />
+                <button
+                  type="button"
+                  className="group inline-flex cursor-pointer items-center gap-1 rounded-input border-0 bg-transparent px-1.5 py-0.5 font-body text-[11px] font-medium text-text-body transition-colors duration-200 ease-in-out hover:text-primary"
+                >
+                  <Filter className="h-3 w-3 shrink-0 text-text-body transition-colors duration-200 group-hover:text-primary" />
                   Filter
                 </button>
               </div>
               {upcomingAgenda.length === 0 ? (
-                <div className="flex min-h-[126px] flex-col items-center justify-center text-center">
-                  <CalendarDays className="h-4 w-4" style={{color: '#9C9A93'}} />
-                  <p className="mt-1.5 text-[11px]" style={{color: '#9C9A93'}}>No agenda items</p>
-                  <p className="text-[10px]" style={{color: '#9C9A93'}}>
+                <div className="flex min-h-[140px] flex-col items-center justify-center px-2 text-center sm:min-h-[152px]">
+                  <CalendarDays className="h-5 w-5 text-surface-border" />
+                  <p className="mt-1.5 font-heading text-[11px] font-semibold text-text-heading">No agenda items</p>
+                  <p className="font-body text-[10px] text-text-muted">
                     Nothing scheduled for this period
                   </p>
                 </div>
@@ -730,11 +745,13 @@ export default function VirtualStartupOfficeWorkspaceV2({
                   {upcomingAgenda.slice(0, 4).map((item, idx) => (
                     <div
                       key={item.id}
-                      className="py-2"
-                      style={{borderBottom: idx < Math.min(upcomingAgenda.length, 4) - 1 ? '1px solid rgba(0,0,0,0.05)' : 'none'}}
+                      className={cn(
+                        "py-2",
+                        idx < Math.min(upcomingAgenda.length, 4) - 1 && "border-b border-surface-border/80",
+                      )}
                     >
-                      <p className="truncate text-[13px] font-medium text-gray-900">{item.title}</p>
-                      <p className="text-[11px]" style={{color: '#6B6860'}}>
+                      <p className="truncate font-body text-[13px] font-medium text-text-heading">{item.title}</p>
+                      <p className="font-body text-[11px] text-text-body">
                         {item.date.toLocaleDateString()}
                         {" "}
                         {item.date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
@@ -753,9 +770,9 @@ export default function VirtualStartupOfficeWorkspaceV2({
         >
           {myTasks.length === 0 ? (
             <div className="flex min-h-[126px] flex-col items-center justify-center text-center">
-              <CheckCircle2 className="h-4 w-4" style={{color: '#9C9A93'}} />
-              <p className="mt-1.5 text-[11px]" style={{color: '#9C9A93'}}>No tasks yet</p>
-              <p className="text-[10px]" style={{color: '#9C9A93'}}>
+              <CheckCircle2 className="h-4 w-4 text-surface-border" />
+              <p className="mt-1.5 font-heading text-[11px] font-semibold text-text-heading">No tasks yet</p>
+              <p className="font-body text-[10px] text-text-muted">
                 {user?.role === "founder"
                   ? "Tasks from your milestones will appear here"
                   : "No tasks assigned to you yet"}
@@ -766,21 +783,26 @@ export default function VirtualStartupOfficeWorkspaceV2({
               {myTasks.slice(0, 4).map((task, idx) => (
                 <div
                   key={task.id}
-                  className="py-3 flex items-start justify-between gap-2"
-                  style={{borderBottom: idx < Math.min(myTasks.length, 4) - 1 ? '1px solid rgba(0,0,0,0.05)' : 'none'}}
+                  className={cn(
+                    "flex items-start justify-between gap-2 py-3",
+                    idx < Math.min(myTasks.length, 4) - 1 && "border-b border-surface-border/80",
+                  )}
                 >
                   <div className="min-w-0 flex-1">
-                    <p className="truncate text-[13px] font-medium text-gray-900">{task.title}</p>
-                    <p className="mt-0.5 text-[11px]" style={{color: '#9C9A93'}}>
+                    <p className="truncate font-body text-[13px] font-medium text-text-heading">{task.title}</p>
+                    <p className="mt-0.5 font-body text-[11px] text-text-muted">
                       {task.dueDate ? `Due ${task.dueDate.toLocaleDateString()}` : "No due date"}
                     </p>
                   </div>
                   <span
-                    className="flex-shrink-0 text-[11px] font-medium rounded-full px-[10px] py-[2px]"
-                    style={{
-                      background: task.status === 'completed' ? '#DCFCE7' : task.status === 'in-progress' ? '#FEF3C7' : '#F0EEE8',
-                      color: task.status === 'completed' ? '#166534' : task.status === 'in-progress' ? '#92400E' : '#6B6860',
-                    }}
+                    className={cn(
+                      "flex-shrink-0 rounded-pill px-2.5 py-0.5 font-body text-[11px] font-medium",
+                      task.status === "completed" && "bg-status-success/15 text-status-success",
+                      task.status === "in-progress" && "bg-status-warning/15 text-text-heading",
+                      task.status !== "completed" &&
+                        task.status !== "in-progress" &&
+                        "bg-primary-tint text-text-body",
+                    )}
                   >
                     {task.status}
                   </span>
@@ -790,11 +812,10 @@ export default function VirtualStartupOfficeWorkspaceV2({
           )}
           <button
             type="button"
-            className="w-full h-9 rounded-[8px] text-[13px] font-medium flex items-center justify-center gap-1.5 transition-colors duration-150"
-            style={{border: '1px solid rgba(0,0,0,0.07)', background: '#FFFFFF', color: '#6B6860', cursor: 'pointer'}}
+            className="group mt-1 flex h-9 w-full cursor-pointer items-center justify-center gap-1.5 rounded-input border-0 bg-transparent font-body text-[13px] font-semibold text-primary transition-colors duration-200 ease-in-out hover:text-accent"
             onClick={() => panels.openPanel("tasks")}
           >
-            <Target className="h-3.5 w-3.5" />
+            <Target className="h-3.5 w-3.5 shrink-0 text-primary transition-colors duration-200 group-hover:text-accent" />
             View All Tasks
           </button>
         </OfficePanelCard>
@@ -802,11 +823,10 @@ export default function VirtualStartupOfficeWorkspaceV2({
 
       <button
         type="button"
-        className="fixed bottom-4 right-4 z-40 flex h-11 w-11 items-center justify-center rounded-full text-white shadow-md transition-colors duration-150 md:bottom-5 md:right-5"
-        style={{background: '#1C4ED8'}}
+        className="fixed bottom-4 right-4 z-40 flex h-11 w-11 items-center justify-center rounded-full bg-primary text-white shadow-[0_4px_16px_rgba(58,90,254,0.30)] transition-colors duration-200 ease-in-out hover:bg-primary-hover md:bottom-5 md:right-5"
         aria-label="Open office help"
       >
-        <HelpCircle className="h-4.5 w-4.5" />
+        <HelpCircle className="h-5 w-5" />
       </button>
 
       {!panels.isMobile && panels.isOpen("chat") && (
@@ -873,9 +893,13 @@ export default function VirtualStartupOfficeWorkspaceV2({
           }}
         >
           <DrawerContent className="max-w-[calc(100%-1rem)] office-panel office-sheet-content">
-            <DrawerHeader className="office-panel-header">
-              <DrawerTitle>{getPanelTitle(panels.mobileSheet)}</DrawerTitle>
-              <DrawerDescription>{getPanelDescription(panels.mobileSheet)}</DrawerDescription>
+            <DrawerHeader className="office-panel-header border-surface-border bg-surface-card">
+              <DrawerTitle className="font-heading text-text-heading">
+                {getPanelTitle(panels.mobileSheet)}
+              </DrawerTitle>
+              <DrawerDescription className="font-body text-text-body">
+                {getPanelDescription(panels.mobileSheet)}
+              </DrawerDescription>
             </DrawerHeader>
 
             <div className="px-4 pb-4 office-panel-body">

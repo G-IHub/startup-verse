@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import { DELIVERABLE_TYPES } from "../utils/enums.js";
 
 const deliverableSchema = new mongoose.Schema(
   {
@@ -16,6 +17,15 @@ const deliverableSchema = new mongoose.Schema(
       default: "",
       maxlength: [5000, "Description cannot exceed 5000 characters"]
     },
+    type: {
+      type: String,
+      enum: {
+        values: DELIVERABLE_TYPES,
+        message: "{VALUE} is not a valid deliverable type",
+      },
+      default: "general",
+    },
+    requirements: { type: [String], default: [] },
     dueDate: { type: Date },
     createdBy: { type: mongoose.Schema.Types.ObjectId, ref: "User", index: true },
   },

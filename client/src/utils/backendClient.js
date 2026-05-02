@@ -1,15 +1,19 @@
-import { getAccessToken } from "../app/session";
 import { API_BASE_URL } from "../config/apiBase.js";
 
 /**
  * Canonical backend client for Phase 1 contract lock.
+ * Uses cookie-based authentication (HttpOnly cookies).
  */
 
 export { API_BASE_URL };
 
-function getAuthToken() {
-  return getAccessToken();
-}
+// Default fetch options for cookie-based auth
+const defaultOptions = {
+  credentials: "include",
+  headers: {
+    "Content-Type": "application/json",
+  },
+};
 
 function buildUrl(endpoint) {
   return `${API_BASE_URL}${endpoint}`;
@@ -47,10 +51,10 @@ async function parseEnvelope(response, endpoint) {
  */
 export async function fetchEnvelope(path, init = {}) {
   const response = await fetch(buildUrl(path), {
+    ...defaultOptions,
     ...init,
     headers: {
-      Authorization: `Bearer ${getAuthToken()}`,
-      "Content-Type": "application/json",
+      ...defaultOptions.headers,
       ...init.headers,
     },
   });
@@ -68,10 +72,10 @@ export async function tryRequest(endpoint, options = {}) {
 
 export async function request(endpoint, options = {}) {
   const response = await fetch(buildUrl(endpoint), {
+    ...defaultOptions,
     ...options,
     headers: {
-      Authorization: `Bearer ${getAuthToken()}`,
-      "Content-Type": "application/json",
+      ...defaultOptions.headers,
       ...options.headers,
     },
   });

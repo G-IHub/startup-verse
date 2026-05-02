@@ -40,7 +40,7 @@ const ALLOWED_TASK_TRANSITIONS = Object.freeze({
   pending: new Set(["pending", "in-progress", "blocked"]),
   "in-progress": new Set(["in-progress", "pending", "blocked", "completed"]),
   blocked: new Set(["blocked", "pending", "in-progress"]),
-  completed: new Set(["completed", "pending"]),
+  completed: new Set(["completed"]),
 });
 
 export function validateTaskStatusTransition(fromStatus, toStatus) {

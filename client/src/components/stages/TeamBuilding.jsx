@@ -724,9 +724,9 @@ export default function TeamBuilding({ user, onBack }) {
         />
       )}
       {showCompensationManager && (
-        <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4">
-          <div className="w-full max-w-6xl h-[90vh] bg-background rounded-lg shadow-xl overflow-hidden flex flex-col">
-            <div className="flex items-center justify-between p-4 border-b">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sv-modal-backdrop">
+          <div className="sv-modal-panel flex h-[90vh] w-full max-w-6xl flex-col overflow-hidden rounded-[16px] border-0 bg-white shadow-modal">
+            <div className="flex items-center justify-between border-b border-[#e2e4f0] p-4">
               <h2 className="text-xl font-bold flex items-center gap-2">
                 <DollarSign className="w-6 h-6 text-primary" />
                 Compensation Management System

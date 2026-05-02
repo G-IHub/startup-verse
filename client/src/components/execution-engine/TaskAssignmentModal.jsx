@@ -65,8 +65,8 @@ export default function TaskAssignmentModal({
     onClose();
   };
   return (
-    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[70] p-4">
-      <Card className="max-w-md w-full max-h-[80vh] overflow-hidden flex flex-col">
+    <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 sv-modal-backdrop">
+      <Card className="sv-modal-panel flex max-h-[80vh] w-full max-w-md flex-col overflow-hidden rounded-[16px] border-0 shadow-modal">
         <CardHeader className="border-b">
           <div className="flex items-start justify-between">
             <div className="flex-1 min-w-0">

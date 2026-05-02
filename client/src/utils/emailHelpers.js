@@ -3,10 +3,17 @@
  * Helper functions for sending emails via backend
  */
 
-import { getAccessToken } from "../app/session";
 import { API_BASE_URL } from "../config/apiBase.js";
 
 const API_URL = API_BASE_URL;
+
+// Default fetch options for cookie-based auth
+const defaultOptions = {
+  credentials: "include",
+  headers: {
+    "Content-Type": "application/json",
+  },
+};
 
 /**
  * Check if email service is configured
@@ -14,9 +21,7 @@ const API_URL = API_BASE_URL;
 export async function checkEmailConfiguration() {
   try {
     const response = await fetch(`${API_URL}/emails/test`, {
-      headers: {
-        Authorization: `Bearer ${getAccessToken()}`,
-      },
+      ...defaultOptions,
     });
     const data = await response.json();
     return data.configured === true;
@@ -34,11 +39,8 @@ export async function sendTeamInvitationEmail(params) {
     console.log("📧 Sending team invitation email to:", params.toEmail);
 
     const response = await fetch(`${API_URL}/emails/send-invitation`, {
+      ...defaultOptions,
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${getAccessToken()}`,
-      },
       body: JSON.stringify(params),
     });
 
@@ -68,11 +70,8 @@ export async function sendNotificationEmail(params) {
     console.log("📧 Sending notification email to:", params.toEmail);
 
     const response = await fetch(`${API_URL}/emails/send-notification`, {
+      ...defaultOptions,
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${getAccessToken()}`,
-      },
       body: JSON.stringify(params),
     });
 
@@ -102,11 +101,8 @@ export async function sendWelcomeEmail(params) {
     console.log("📧 Sending welcome email to:", params.toEmail);
 
     const response = await fetch(`${API_URL}/emails/send-welcome`, {
+      ...defaultOptions,
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${getAccessToken()}`,
-      },
       body: JSON.stringify(params),
     });
 

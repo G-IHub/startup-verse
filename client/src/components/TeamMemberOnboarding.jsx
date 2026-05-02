@@ -63,6 +63,11 @@ export function TeamMemberOnboarding({ invitationToken, onComplete }) {
       if (!payload?.success || !data?.invitation) {
         throw new Error(payload?.message || "Invitation not found");
       }
+      if (data.kind === "cohort") {
+        throw new Error(
+          "This link is a cohort invitation. Open it while signed in as the invited founder, or use the correct team invite link.",
+        );
+      }
       const invitationData = {
         ...data.invitation,
         startupName: data.startupName || "",

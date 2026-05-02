@@ -23,10 +23,17 @@ import {
   Clock,
 } from "lucide-react";
 import { toast } from "sonner";
-import { getAccessToken } from "../../app/session";
 import { unwrapData } from "../../utils/apiEnvelope";
 
 const API_BASE = API_BASE_URL;
+
+// Default fetch options for cookie-based auth
+const defaultOptions = {
+  credentials: "include",
+  headers: {
+    "Content-Type": "application/json",
+  },
+};
 
 export default function MentorManager({ organizationId, cohorts, isAdmin }) {
   const [mentors, setMentors] = useState([]);
@@ -45,14 +52,9 @@ export default function MentorManager({ organizationId, cohorts, isAdmin }) {
   const loadMentors = async () => {
     try {
       setLoading(true);
-      const token = getAccessToken();
       const response = await fetch(
         `${API_BASE}/organizations/${organizationId}/mentors`,
-        {
-          headers: {
-            ...(token ? { Authorization: `Bearer ${token}` } : {}),
-          },
-        },
+        defaultOptions,
       );
       if (!response.ok) throw new Error("Failed to fetch mentors");
       const inner = unwrapData(await response.json());
@@ -66,21 +68,17 @@ export default function MentorManager({ organizationId, cohorts, isAdmin }) {
   };
   const handleInviteMentor = async (e) => {
     e.preventDefault();
-    if (!formData.name || !formData.email) {
-      toast.error("Name and email are required");
+    if (!formData.email?.trim()) {
+      toast.error("Email is required");
       return;
     }
     try {
       setInviting(true);
-      const token = getAccessToken();
       const response = await fetch(
         `${API_BASE}/organizations/${organizationId}/mentors`,
         {
+          ...defaultOptions,
           method: "POST",
-          headers: {
-            ...(token ? { Authorization: `Bearer ${token}` } : {}),
-            "Content-Type": "application/json",
-          },
           body: JSON.stringify({
             email: formData.email,
             expertise: formData.expertise,
@@ -90,7 +88,7 @@ export default function MentorManager({ organizationId, cohorts, isAdmin }) {
       if (!response.ok) throw new Error("Failed to invite mentor");
       unwrapData(await response.json());
       toast.success(
-        "Mentor invited successfully! Magic link sent to their email.",
+        "Mentor linked to your organization. They must use a registered StartupVerse email.",
       );
 
       // Reset form
@@ -114,12 +112,9 @@ export default function MentorManager({ organizationId, cohorts, isAdmin }) {
   const handleDeleteMentor = async (mentorId) => {
     if (!confirm("Are you sure you want to remove this mentor?")) return;
     try {
-      const token = getAccessToken();
       const response = await fetch(`${API_BASE}/mentors/${mentorId}`, {
+        ...defaultOptions,
         method: "DELETE",
-        headers: {
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
       });
       if (!response.ok) throw new Error("Failed to delete mentor");
       toast.success("Mentor removed successfully");
@@ -159,7 +154,8 @@ export default function MentorManager({ organizationId, cohorts, isAdmin }) {
                 Mentors
               </CardTitle>
               <CardDescription className="text-xs mt-1">
-                Invite mentors to guide your cohort founders
+                Link mentors by the email on their StartupVerse account (they must
+                already be registered).
               </CardDescription>
             </div>
             <Button
@@ -183,7 +179,7 @@ export default function MentorManager({ organizationId, cohorts, isAdmin }) {
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="text-[9px] text-muted-foreground">
-                    Mentor Name
+                    Display name (optional)
                   </label>
                   <Input
                     value={formData.name}
@@ -193,8 +189,7 @@ export default function MentorManager({ organizationId, cohorts, isAdmin }) {
                         name: e.target.value,
                       })
                     }
-                    placeholder="e.g., Jane Smith"
-                    required={true}
+                    placeholder="For your notes only"
                     className="h-7 text-[10px]"
                   />
                 </div>

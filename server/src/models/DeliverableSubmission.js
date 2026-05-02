@@ -1,4 +1,15 @@
 import mongoose from "mongoose";
+import { DELIVERABLE_SUBMISSION_STATUSES } from "../utils/enums.js";
+
+const attachmentSchema = new mongoose.Schema(
+  {
+    url: { type: String, required: true, trim: true },
+    name: { type: String, default: "", trim: true },
+    mimeType: { type: String, default: "" },
+    uploadedAt: { type: Date, default: () => new Date() },
+  },
+  { _id: false },
+);
 
 const deliverableSubmissionSchema = new mongoose.Schema(
   {
@@ -11,10 +22,19 @@ const deliverableSubmissionSchema = new mongoose.Schema(
       maxlength: [10000, "Content cannot exceed 10000 characters"]
     },
     links: { type: [String], default: [] },
-    status: { 
-      type: String, 
+    attachments: { type: [attachmentSchema], default: [] },
+    feedback: {
+      type: String,
+      default: "",
+      maxlength: [8000, "Feedback cannot exceed 8000 characters"],
+    },
+    status: {
+      type: String,
+      enum: {
+        values: DELIVERABLE_SUBMISSION_STATUSES,
+        message: "{VALUE} is not a valid submission status",
+      },
       default: "submitted",
-      maxlength: [50, "Status cannot exceed 50 characters"]
     },
     review: { type: mongoose.Schema.Types.Mixed, default: {} },
   },

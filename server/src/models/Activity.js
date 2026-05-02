@@ -37,6 +37,17 @@ activitySchema.pre("deleteOne", rejectMutation);
 activitySchema.pre("deleteMany", rejectMutation);
 activitySchema.pre("findOneAndDelete", rejectMutation);
 
+activitySchema.pre("save", function rejectInPlaceMutation(next) {
+  if (!this.isNew) {
+    return next(
+      new Error(
+        "Activity records are immutable; cannot save changes to an existing activity.",
+      ),
+    );
+  }
+  return next();
+});
+
 const Activity =
   mongoose.models.Activity || mongoose.model("Activity", activitySchema);
 

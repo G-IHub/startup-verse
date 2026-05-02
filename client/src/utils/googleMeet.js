@@ -4,7 +4,14 @@
  */
 import { toast } from "sonner";
 import { API_BASE_URL } from "../config/apiBase.js";
-import { getAccessToken } from "../app/session";
+
+// Default fetch options for cookie-based auth
+const defaultOptions = {
+  credentials: "include",
+  headers: {
+    "Content-Type": "application/json",
+  },
+};
 
 /**
  * Check if user has connected their Google account
@@ -13,17 +20,14 @@ export async function isGoogleConnected(userId) {
   try {
     const response = await fetch(
       `${API_BASE_URL}/google/status/${userId}`,
-      {
-        headers: {
-          Authorization: `Bearer ${getAccessToken()}`,
-        },
-      },
+      defaultOptions,
     );
 
     if (!response.ok) return false;
 
-    const data = await response.json();
-    return data.connected;
+    const payload = await response.json();
+    const data = payload?.data || {};
+    return data.enabled === true && data.connected === true;
   } catch (error) {
     console.error("Error checking Google connection:", error);
     return false;
@@ -37,16 +41,13 @@ export async function getGoogleConnectionStatus(userId) {
   try {
     const response = await fetch(
       `${API_BASE_URL}/google/status/${userId}`,
-      {
-        headers: {
-          Authorization: `Bearer ${getAccessToken()}`,
-        },
-      },
+      defaultOptions,
     );
 
     if (!response.ok) return { connected: false };
 
-    return await response.json();
+    const payload = await response.json();
+    return payload?.data || { connected: false };
   } catch (error) {
     console.error("Error getting Google status:", error);
     return { connected: false };
@@ -61,11 +62,8 @@ export async function createGoogleMeet(params) {
     const response = await fetch(
       `${API_BASE_URL}/google/create-meeting`,
       {
+        ...defaultOptions,
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${getAccessToken()}`,
-        },
         body: JSON.stringify(params),
       },
     );
@@ -94,11 +92,8 @@ export async function createInstantGoogleMeet(userId, roomName) {
     const response = await fetch(
       `${API_BASE_URL}/google/instant-meeting/${userId}`,
       {
+        ...defaultOptions,
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${getAccessToken()}`,
-        },
         body: JSON.stringify({ roomName }),
       },
     );

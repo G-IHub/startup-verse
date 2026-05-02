@@ -73,7 +73,7 @@ const DialogOverlay = React.forwardRef(({ className, ...props }, ref) => (
         ref: ref,
         "data-slot": "dialog-overlay",
         className: cn(
-          "data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 fixed inset-0 z-50 bg-black/50",
+          "sv-modal-backdrop data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 fixed inset-0 z-50",
           className,
         ),
       },
@@ -96,7 +96,7 @@ const DialogContent = React.forwardRef(
             "data-slot": "dialog-content",
             "aria-describedby": props["aria-describedby"] || undefined,
             className: cn(
-              "bg-[var(--card)] text-[var(--card-foreground)] data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 fixed top-[50%] left-[50%] z-50 grid w-full max-w-[calc(100%-3rem)] translate-x-[-50%] translate-y-[-50%] gap-4 rounded-xl border p-6 shadow-xl duration-200 sm:max-w-lg",
+              "bg-surface-card font-body text-text-body data-[state=open]:animate-sv-modal-centered-in data-[state=closed]:animate-sv-modal-centered-out fixed top-[50%] left-[50%] z-50 grid w-full max-w-[calc(100%-3rem)] translate-x-[-50%] translate-y-[-50%] gap-4 rounded-[16px] border-0 p-6 shadow-modal duration-200 ease-in-out sm:max-w-lg",
               className,
             ),
           },
@@ -106,7 +106,7 @@ const DialogContent = React.forwardRef(
         {children}
         <DialogPrimitive.Close
           className={cn(
-            "ring-offset-background focus:ring-ring data-[state=open]:bg-accent data-[state=open]:text-muted-foreground absolute top-4 right-4 rounded-xs opacity-70 transition-opacity hover:opacity-100 focus:ring-2 focus:ring-offset-2 focus:outline-hidden disabled:pointer-events-none [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
+            "absolute top-4 right-4 rounded-lg bg-transparent p-1.5 text-[#a0a0b0] transition-all duration-200 ease-in-out hover:bg-[#f4f5ff] hover:text-text-heading focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 disabled:pointer-events-none [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
             closeClassName,
           )}
         >
@@ -125,7 +125,7 @@ function DialogHeader({ className, ...props }) {
         {
           "data-slot": "dialog-header",
           className: cn(
-            "flex flex-col gap-2 text-center sm:text-left",
+            "flex flex-col gap-2 border-b border-[#e2e4f0] pb-4 text-center sm:text-left",
             className,
           ),
         },
@@ -156,7 +156,10 @@ const DialogTitle = React.forwardRef(({ className, ...props }, ref) => (
       {
         ref: ref,
         "data-slot": "dialog-title",
-        className: cn("text-lg leading-none font-semibold", className),
+        className: cn(
+          "font-heading text-lg leading-none font-bold text-[#0d0d0d]",
+          className,
+        ),
       },
       props,
     )}
@@ -169,7 +172,10 @@ const DialogDescription = React.forwardRef(({ className, ...props }, ref) => (
       {
         ref: ref,
         "data-slot": "dialog-description",
-        className: cn("text-muted-foreground text-sm", className),
+        className: cn(
+          "font-body text-sm font-normal text-[#4a4a5a]",
+          className,
+        ),
       },
       props,
     )}

@@ -25,6 +25,8 @@ import talentRouter from "./talent.routes.js";
 import teamMembersRouter from "./teamMembers.routes.js";
 import usersRouter from "./users.routes.js";
 import meetingsRouter from "./meetings.routes.js";
+import performanceRouter from "./performance.routes.js";
+import membershipsRouter from "./memberships.routes.js";
 
 const apiRouter = Router();
 
@@ -50,6 +52,8 @@ apiRouter.use(mentorsRouter);
 apiRouter.use(announcementsRouter);
 apiRouter.use(pollsRouter);
 apiRouter.use(meetingsRouter);
+apiRouter.use(performanceRouter);
+apiRouter.use(membershipsRouter);
 apiRouter.use(emailsRouter);
 apiRouter.use(adminRouter);
 apiRouter.use(migrationsRouter);

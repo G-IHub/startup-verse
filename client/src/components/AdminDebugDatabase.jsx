@@ -1,11 +1,19 @@
 import React, { useState } from "react";
 import { API_BASE_URL } from "../config/apiBase.js";
-import { getAccessToken } from "../app/session";
 
 /**
  * ADMIN DEBUG DATABASE COMPONENT
  * Shows exactly what's in the database to help debug deletion issues
  */
+
+// Default fetch options for cookie-based auth
+const defaultOptions = {
+  credentials: "include",
+  headers: {
+    "Content-Type": "application/json",
+  },
+};
+
 export function AdminDebugDatabase() {
   const [loading, setLoading] = useState(false);
   const [dbData, setDbData] = useState(null);
@@ -23,12 +31,7 @@ export function AdminDebugDatabase() {
       }
       const response = await fetch(
         `${API_BASE_URL}/team-members/${currentUser.id}`,
-        {
-          method: "GET",
-          headers: {
-            Authorization: `Bearer ${getAccessToken()}`,
-          },
-        },
+        defaultOptions,
       );
       const data = await response.json();
       setDbData({

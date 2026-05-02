@@ -1,9 +1,13 @@
 import crypto from "crypto";
 import mongoose from "mongoose";
 import FounderTalentInvitation from "../models/FounderTalentInvitation.js";
+import CohortInvitation from "../models/CohortInvitation.js";
+import Cohort from "../models/Cohort.js";
 import Interest from "../models/Interest.js";
 import CohortMembership from "../models/CohortMembership.js";
 import Startup from "../models/Startup.js";
+import Organization from "../models/Organization.js";
+import OrganizationAdmin from "../models/OrganizationAdmin.js";
 import User from "../models/User.js";
 import TeamMemberProfile from "../models/TeamMemberProfile.js";
 import Presence from "../models/Presence.js";
@@ -12,6 +16,7 @@ import Message from "../models/Message.js";
 import { error as apiError, success as apiSuccess } from "../utils/apiResponse.js";
 import { sendTokenResponse } from "../utils/sendToken.js";
 import { emitRealtime } from "../services/realtime.service.js";
+import { createNotification, broadcastNotification } from "../services/notificationService.js";
 import { SOCKET_EVENTS } from "../realtime/events.js";
 import { startupRoom, userRoom } from "../realtime/rooms.js";
 import { mapActivityToDto } from "../utils/activityDto.js";
@@ -27,34 +32,114 @@ const canAccessInterest = (req, interest) =>
   req.user?.id === String(interest?.founderId || "") ||
   req.user?.id === String(interest?.talentId || "");
 
+async function isOrgAdminFor(userId, organizationId) {
+  if (!organizationId) return false;
+  const exists = await OrganizationAdmin.exists({
+    organizationId,
+    userId,
+  });
+  return Boolean(exists);
+}
+
+// Blueprint §6.10 — org → founder cohort invitation create.
 export const createInvitation = async (req, res) => {
-  const requestedFounderId = req.body?.founderId || req.user.id;
-  if (!isSelfOrAdmin(req, requestedFounderId)) {
-    return apiError(res, "Forbidden.", 403);
+  const cohortId = req.body?.cohortId;
+  if (!cohortId) {
+    return apiError(res, "cohortId is required.", 400);
   }
-  const invitation = await FounderTalentInvitation.create({
-    founderId: requestedFounderId,
-    talentId: req.body?.talentId || null,
-    startupId: req.body?.startupId || null,
+  const cohort = await Cohort.findById(cohortId).lean();
+  if (!cohort) {
+    return apiError(res, "Cohort not found.", 404);
+  }
+
+  // Caller must be an admin of the organisation that owns the cohort.
+  if (!isAdmin(req)) {
+    const allowed = await isOrgAdminFor(req.user.id, cohort.organizationId);
+    if (!allowed) {
+      return apiError(
+        res,
+        "Forbidden. Only organisation admins can invite founders to a cohort.",
+        403,
+      );
+    }
+  }
+
+  const invitation = await CohortInvitation.create({
+    cohortId,
+    organizationId: cohort.organizationId,
+    founderId: req.body?.founderId || null,
     email: req.body?.email || "",
     message: req.body?.message || "",
     token: crypto.randomUUID(),
     status: "pending",
-    kind: "org-founder",
+    invitedBy: req.user.id,
     metadata: req.body?.metadata || {},
   });
+
+  // If the invitee is an existing user, drop a notification immediately.
+  if (invitation.founderId) {
+    await createNotification({
+      userId: invitation.founderId,
+      type: "cohort-invitation",
+      title: "You've been invited to a cohort",
+      message: `Join "${cohort.name || "a cohort"}" via the invitation link.`,
+      actionUrl: `/?invitation=${invitation.token}`,
+      metadata: {
+        invitationId: String(invitation._id),
+        cohortId: String(cohortId),
+        organizationId: String(cohort.organizationId || ""),
+      },
+    }).catch(() => null);
+  }
   return apiSuccess(res, invitation, 201);
 };
 
+// Blueprint §14: GET /invitations/founder/:founderId — cohort invitations for a founder.
 export const getFounderInvitations = async (req, res) => {
   if (!isSelfOrAdmin(req, req.params.founderId)) {
     return apiError(res, "Forbidden.", 403);
   }
-  const invitations = await FounderTalentInvitation.find({ founderId: req.params.founderId }).sort({ createdAt: -1 });
-  return apiSuccess(res, invitations);
+  // New canonical store + legacy back-compat for rows already in FounderTalentInvitation.
+  const [cohortInvites, legacyOrgInvites] = await Promise.all([
+    CohortInvitation.find({ founderId: req.params.founderId })
+      .sort({ createdAt: -1 })
+      .lean(),
+    FounderTalentInvitation.find({
+      founderId: req.params.founderId,
+      kind: "org-founder",
+    })
+      .sort({ createdAt: -1 })
+      .lean(),
+  ]);
+  return apiSuccess(res, [...cohortInvites, ...legacyOrgInvites]);
 };
 
+// Blueprint §14: GET /invitations/token/:token
+// Looks up cohort invitations first (canonical), falls back to founder-talent
+// invitations for legacy / talent token flows. Response includes a `kind`
+// discriminator so clients can route to the correct UI.
 export const getInvitationByToken = async (req, res) => {
+  const cohortInvite = await CohortInvitation.findOne({ token: req.params.token });
+  if (cohortInvite) {
+    const cohort = cohortInvite.cohortId
+      ? await Cohort.findById(cohortInvite.cohortId).lean()
+      : null;
+    const organization = cohortInvite.organizationId
+      ? await Organization.findById(cohortInvite.organizationId, {
+          name: 1,
+          logo: 1,
+        }).lean()
+      : null;
+    return apiSuccess(res, {
+      kind: "cohort",
+      invitation: cohortInvite,
+      cohort,
+      organization,
+      organizationName: organization?.name || "",
+      cohortName: cohort?.name || "",
+    });
+  }
+
   const invitation = await FounderTalentInvitation.findOne({ token: req.params.token });
   if (!invitation) {
     return apiError(res, "Invitation not found.", 404);
@@ -63,6 +148,7 @@ export const getInvitationByToken = async (req, res) => {
     ? await Startup.findById(invitation.startupId, { name: 1 })
     : null;
   return apiSuccess(res, {
+    kind: invitation.kind === "org-founder" ? "cohort" : "talent",
     invitation,
     startupName: startup?.name || "",
   });
@@ -126,17 +212,92 @@ export const acceptInvitationByToken = async (req, res) => {
   return sendTokenResponse(user, 201, res, "Invitation accepted.");
 };
 
+// Blueprint §6.10 — founder accepts/declines a cohort invitation.
+// Dual-path: prefer CohortInvitation (canonical) and fall back to legacy
+// FounderTalentInvitation rows with kind="org-founder".
 export const respondToInvitation = async (req, res) => {
-  const invitation = await FounderTalentInvitation.findById(req.params.invitationId);
+  const invitationId = req.params.invitationId;
+  const requestedStatus = String(req.body?.status || "accepted").toLowerCase();
+  if (!["accepted", "declined"].includes(requestedStatus)) {
+    return apiError(res, "status must be 'accepted' or 'declined'.", 400);
+  }
+
+  const cohortInvite = mongoose.Types.ObjectId.isValid(String(invitationId))
+    ? await CohortInvitation.findById(invitationId)
+    : null;
+
+  if (cohortInvite) {
+    if (!canAccessInvitation(req, cohortInvite)) {
+      return apiError(res, "Forbidden.", 403);
+    }
+    if (cohortInvite.status !== "pending") {
+      return apiError(res, "Invitation is no longer pending.", 409);
+    }
+    if (cohortInvite.expiresAt && cohortInvite.expiresAt < new Date()) {
+      cohortInvite.status = "expired";
+      await cohortInvite.save();
+      return apiError(res, "Invitation has expired.", 410);
+    }
+    cohortInvite.status = requestedStatus;
+    cohortInvite.respondedAt = new Date();
+    await cohortInvite.save();
+
+    if (requestedStatus === "accepted" && cohortInvite.founderId && cohortInvite.cohortId) {
+      const startup = await Startup.findOne({ founderId: cohortInvite.founderId });
+      if (startup) {
+        await CohortMembership.findOneAndUpdate(
+          { cohortId: cohortInvite.cohortId, startupId: startup._id },
+          {
+            cohortId: cohortInvite.cohortId,
+            startupId: startup._id,
+            founderId: cohortInvite.founderId,
+            status: "active",
+            joinedAt: new Date(),
+          },
+          { upsert: true, new: true },
+        );
+      }
+    }
+
+    // Notify org admins of the response.
+    if (cohortInvite.organizationId) {
+      const admins = await OrganizationAdmin.find(
+        { organizationId: cohortInvite.organizationId },
+        { userId: 1 },
+      ).lean();
+      const recipients = admins.map((a) => a.userId).filter(Boolean);
+      if (recipients.length) {
+        await broadcastNotification(recipients, {
+          type: "cohort-invitation-response",
+          title: `Invitation ${requestedStatus}`,
+          message: `A founder has ${requestedStatus} the cohort invitation.`,
+          actionUrl: `/?view=organizations&tab=cohorts`,
+          metadata: {
+            invitationId: String(cohortInvite._id),
+            cohortId: String(cohortInvite.cohortId || ""),
+            status: requestedStatus,
+          },
+        });
+      }
+    }
+
+    return apiSuccess(res, cohortInvite);
+  }
+
+  // Legacy fallback (org-founder rows that pre-date the CohortInvitation split).
+  const invitation = await FounderTalentInvitation.findById(invitationId);
   if (!invitation) return apiError(res, "Invitation not found.", 404);
   if (!canAccessInvitation(req, invitation)) {
     return apiError(res, "Forbidden.", 403);
   }
-  invitation.status = req.body?.status || "accepted";
+  invitation.status = requestedStatus;
   await invitation.save();
 
-
-  if (invitation.status === "accepted" && invitation.startupId && invitation.founderId) {
+  if (
+    requestedStatus === "accepted" &&
+    invitation.startupId &&
+    invitation.founderId
+  ) {
     await CohortMembership.findOneAndUpdate(
       { startupId: invitation.startupId },
       {
@@ -144,6 +305,7 @@ export const respondToInvitation = async (req, res) => {
         founderId: invitation.founderId,
         cohortId: req.body?.cohortId || null,
         status: "active",
+        joinedAt: new Date(),
       },
       { upsert: true, new: true },
     );
@@ -167,6 +329,23 @@ export const sendFounderTalentInvitation = async (req, res) => {
     status: "pending",
     kind: "founder-talent",
   });
+
+  if (invitation.talentId) {
+    await createNotification({
+      userId: invitation.talentId,
+      type: "talent-invitation-received",
+      title: "New invitation from a founder",
+      message: req.body?.message
+        ? String(req.body.message).slice(0, 200)
+        : "You have a new invitation from a founder.",
+      actionUrl: `/?view=virtual-office&tab=invitations&invitationId=${invitation._id}`,
+      metadata: {
+        invitationId: String(invitation._id),
+        founderId: String(founderId),
+      },
+    }).catch(() => null);
+  }
+
   return apiSuccess(res, invitation, 201);
 };
 
@@ -230,6 +409,7 @@ export const createInterest = async (req, res) => {
     talentId,
     founderId: body.founderId,
     startupId: body.startupId || null,
+    postId: body.postId || null,
     message: body.message || "",
     status: "pending",
     messages: [],
@@ -266,6 +446,22 @@ export const createInterest = async (req, res) => {
   } catch (dmErr) {
     console.error("[createInterest] Failed to send interest DM:", dmErr.message);
   }
+
+  // Notify founder of the new interest.
+  await createNotification({
+    userId: body.founderId,
+    type: "interest-received",
+    title: "New interest in your startup",
+    message: body.message
+      ? `New interest: ${String(body.message).slice(0, 200)}`
+      : "A talent expressed interest in your startup.",
+    actionUrl: `/?view=virtual-office&tab=inbox&interestId=${interest._id}`,
+    metadata: {
+      interestId: String(interest._id),
+      talentId: String(talentId),
+      startupId: String(body.startupId || ""),
+    },
+  }).catch(() => null);
 
   return apiSuccess(res, interest, 201);
 };
@@ -402,6 +598,37 @@ export const onboardInterest = async (req, res) => {
     if (activityEvent?.startupId) {
       emitRealtime(SOCKET_EVENTS.ACTIVITY_CREATED, activityEvent, [startupRoom(activityEvent.startupId)]);
     }
+
+    // Notify both sides of the new team-member onboarding.
+    try {
+      const onboardedInterest = responsePayload?.interest;
+      if (onboardedInterest) {
+        await Promise.all([
+          createNotification({
+            userId: onboardedInterest.founderId,
+            type: "team-member-joined",
+            title: "Team member joined",
+            message: "A new team member has joined your startup.",
+            actionUrl: `/?view=virtual-office&tab=team`,
+            metadata: {
+              interestId: String(onboardedInterest._id),
+              talentId: String(onboardedInterest.talentId || ""),
+            },
+          }).catch(() => null),
+          createNotification({
+            userId: onboardedInterest.talentId,
+            type: "team-member-onboarded",
+            title: "Welcome to the team",
+            message: "You've been onboarded. Open the Virtual Office to begin.",
+            actionUrl: `/?view=virtual-office`,
+            metadata: { interestId: String(onboardedInterest._id) },
+          }).catch(() => null),
+        ]);
+      }
+    } catch (err) {
+      console.error("[onboardInterest] notify failed:", err.message);
+    }
+
     return apiSuccess(res, responsePayload);
   } catch (error) {
     if (error.message === "Interest not found.") {

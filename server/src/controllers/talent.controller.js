@@ -5,6 +5,7 @@ import Startup from "../models/Startup.js";
 import StartupPost from "../models/StartupPost.js";
 import FounderTalentInvitation from "../models/FounderTalentInvitation.js";
 import { error as apiError, success as apiSuccess } from "../utils/apiResponse.js";
+import { attachMatchScores } from "../utils/talentMatching.js";
 
 export const createOrUpdateProfile = async (req, res) => {
   const requestedUserId = String(req.body?.userId || "").trim();
@@ -92,23 +93,30 @@ export const getStartupPostsFeed = async (req, res) => {
       post.founderName ||
       post.founderId?.name ||
       "";
+    const lookingFor = Array.isArray(post.lookingFor) ? post.lookingFor : [];
     return {
       ...post,
       founderId: post.founderId?._id ?? post.founderId,
       founderName: resolvedName,
       founder: resolvedName,
+      role: lookingFor[0] || "",
+      requirements: lookingFor,
+      type: post.stage || "startup",
     };
   });
   return apiSuccess(res, { posts, total, page, pageSize });
 };
 
 export const applyForPosition = async (req, res) => {
+  const letter = String(req.body?.coverLetter || req.body?.coverNote || "").slice(0, 2000);
   const application = await TalentApplication.create({
     talentId: req.params.talentId,
     startupId: req.body?.startupId || null,
     founderId: req.body?.founderId || null,
+    postId: req.body?.postId || null,
     position: req.body?.position || "",
-    coverNote: req.body?.coverNote || "",
+    coverNote: letter,
+    coverLetter: letter,
     status: req.body?.status || "submitted",
   });
   return apiSuccess(res, application, 201);
@@ -152,6 +160,20 @@ export const unsaveItem = async (req, res) => {
 };
 
 export const getMatches = async (req, res) => {
-  const invitations = await FounderTalentInvitation.find({ talentId: req.params.talentId }).sort({ createdAt: -1 });
-  return apiSuccess(res, invitations);
+  const talentId = req.params.talentId;
+  const [invitations, profile, posts] = await Promise.all([
+    FounderTalentInvitation.find({ talentId }).sort({ createdAt: -1 }).lean(),
+    TalentProfile.findOne({ userId: talentId }).lean(),
+    StartupPost.find({ visibility: "public" }).sort({ createdAt: -1 }).limit(150).lean(),
+  ]);
+
+  const scored = attachMatchScores(profile, posts).sort(
+    (a, b) => (b.matchScore || 0) - (a.matchScore || 0),
+  );
+
+  return apiSuccess(res, {
+    invitations,
+    matches: scored,
+    opportunities: scored,
+  });
 };

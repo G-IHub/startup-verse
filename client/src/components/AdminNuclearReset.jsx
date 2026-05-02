@@ -1,12 +1,20 @@
 import React, { useState } from "react";
 import { API_BASE_URL } from "../config/apiBase.js";
-import { getAccessToken } from "../app/session";
 
 /**
  * ADMIN NUCLEAR RESET COMPONENT
  * ⚠️ DANGER: This will delete ALL users except founders
  * Use this to clean up testing data and start fresh
  */
+
+// Default fetch options for cookie-based auth
+const defaultOptions = {
+  credentials: "include",
+  headers: {
+    "Content-Type": "application/json",
+  },
+};
+
 export function AdminNuclearReset() {
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null);
@@ -27,11 +35,8 @@ export function AdminNuclearReset() {
       const response = await fetch(
         `${API_BASE_URL}/admin/nuclear-reset`,
         {
+          ...defaultOptions,
           method: "POST",
-          headers: {
-            Authorization: `Bearer ${getAccessToken()}`,
-            "Content-Type": "application/json",
-          },
         },
       );
       console.log("🔥 [NUCLEAR RESET] Response status:", response.status);

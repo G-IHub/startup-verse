@@ -1,5 +1,12 @@
-import { getAccessToken } from "../app/session";
 import { API_BASE_URL } from "../config/apiBase.js";
+
+// Default fetch options for cookie-based auth
+const defaultOptions = {
+  credentials: "include",
+  headers: {
+    "Content-Type": "application/json",
+  },
+};
 
 export const authApi = {
   /**
@@ -17,11 +24,8 @@ export const authApi = {
     });
 
     const response = await fetch(`${API_BASE_URL}/auth/signup`, {
+      ...defaultOptions,
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${getAccessToken()}`,
-      },
       body: JSON.stringify(payloadData),
     });
 
@@ -34,7 +38,8 @@ export const authApi = {
     }
 
     console.log("✅ [AuthAPI] Signup successful:", result.user?.email);
-    return { user: result.user, token: result.token || "" };
+    // Token is now in HttpOnly cookie - no longer returned in response
+    return { user: result.user };
   },
 
   /**
@@ -44,11 +49,8 @@ export const authApi = {
     console.log("🔐 [AuthAPI] Signing in:", data.email);
 
     const response = await fetch(`${API_BASE_URL}/auth/signin`, {
+      ...defaultOptions,
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${getAccessToken()}`,
-      },
       body: JSON.stringify(data),
     });
 
@@ -61,7 +63,8 @@ export const authApi = {
     }
 
     console.log("✅ [AuthAPI] Signin successful:", result.user?.email);
-    return { user: result.user, token: result.token || "" };
+    // Token is now in HttpOnly cookie - no longer returned in response
+    return { user: result.user };
   },
 
   /**
@@ -71,11 +74,8 @@ export const authApi = {
     console.log("🔄 [AuthAPI] Updating profile:", userId);
 
     const response = await fetch(`${API_BASE_URL}/auth/profile/${userId}`, {
+      ...defaultOptions,
       method: "PUT",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${getAccessToken()}`,
-      },
       body: JSON.stringify(updates),
     });
 
@@ -89,5 +89,50 @@ export const authApi = {
 
     console.log("✅ [AuthAPI] Profile updated:", result?.email);
     return result;
+  },
+
+  /**
+   * Get current authenticated user (uses cookie)
+   */
+  me: async () => {
+    console.log("👤 [AuthAPI] Getting current user");
+
+    const response = await fetch(`${API_BASE_URL}/auth/me`, {
+      ...defaultOptions,
+      method: "GET",
+    });
+
+    const payload = await response.json();
+    const result = payload?.data || {};
+
+    if (!response.ok) {
+      console.error("❌ [AuthAPI] Get me failed:", payload?.message);
+      throw new Error(payload?.message || "Failed to get current user");
+    }
+
+    console.log("✅ [AuthAPI] Got current user:", result?.email);
+    return result;
+  },
+
+  /**
+   * Logout - clears HttpOnly cookie
+   */
+  logout: async () => {
+    console.log("👋 [AuthAPI] Logging out");
+
+    const response = await fetch(`${API_BASE_URL}/auth/logout`, {
+      ...defaultOptions,
+      method: "POST",
+    });
+
+    const payload = await response.json();
+
+    if (!response.ok) {
+      console.error("❌ [AuthAPI] Logout failed:", payload?.message);
+      throw new Error(payload?.message || "Logout failed");
+    }
+
+    console.log("✅ [AuthAPI] Logout successful");
+    return payload?.data || { loggedOut: true };
   },
 };

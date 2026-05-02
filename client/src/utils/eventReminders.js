@@ -3,15 +3,15 @@
  * Sends notifications to founders 1 hour before events start.
  */
 
-import { getAccessToken } from "../app/session";
 import { API_BASE_URL } from "../config/apiBase.js";
 
-function getAuthHeaders() {
-  return {
-    Authorization: `Bearer ${getAccessToken()}`,
+// Default fetch options for cookie-based auth
+const defaultOptions = {
+  credentials: "include",
+  headers: {
     "Content-Type": "application/json",
-  };
-}
+  },
+};
 
 /**
  * Check if an event needs a reminder and send it.
@@ -23,7 +23,7 @@ export async function checkAndSendEventReminders(founderId) {
     }
 
     const response = await fetch(`${API_BASE_URL}/founder/${founderId}/events`, {
-      headers: getAuthHeaders(),
+      ...defaultOptions,
     });
     if (!response.ok) return;
 
@@ -88,8 +88,8 @@ async function sendEventReminder(founderId, event) {
     };
 
     const response = await fetch(`${API_BASE_URL}/notifications`, {
+      ...defaultOptions,
       method: "POST",
-      headers: getAuthHeaders(),
       body: JSON.stringify(notification),
     });
 
@@ -107,7 +107,7 @@ async function sendEventReminder(founderId, event) {
 export async function getUpcomingEvents(founderId) {
   try {
     const response = await fetch(`${API_BASE_URL}/founder/${founderId}/events`, {
-      headers: getAuthHeaders(),
+      ...defaultOptions,
     });
     if (!response.ok) return [];
 

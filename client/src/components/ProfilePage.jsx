@@ -60,6 +60,38 @@ import {
   ExternalLink,
   Trash2,
 } from "lucide-react";
+import { cn } from "./ui/utils";
+import { Checkbox } from "./ui/checkbox";
+
+const SP_LABEL =
+  "font-body text-[13px] font-medium uppercase tracking-[0.06em] text-text-muted";
+const SP_SUBLABEL =
+  "font-body text-[13px] font-medium normal-case tracking-normal text-text-body";
+const SP_INPUT =
+  "rounded-input border-[1.5px] border-surface-border bg-surface-card font-body text-sm text-text-heading placeholder:text-text-muted transition-all duration-200 ease-in-out focus-visible:border-primary focus-visible:outline-none focus-visible:shadow-focus";
+const SP_TEXTAREA =
+  "min-h-16 resize-none rounded-input border-[1.5px] border-surface-border bg-surface-card font-body text-sm text-text-heading placeholder:text-text-muted transition-all duration-200 ease-in-out focus-visible:border-primary focus-visible:outline-none focus-visible:shadow-focus";
+const SP_SELECT_TRIGGER =
+  "w-full rounded-input border-[1.5px] border-surface-border bg-surface-card font-body text-sm text-text-heading transition-all duration-200 ease-in-out focus-visible:border-primary focus-visible:outline-none focus-visible:shadow-focus [&_svg]:text-text-body";
+const SP_VALUE = "font-body text-sm font-normal text-text-heading";
+const SP_EMPTY = "font-body text-sm italic text-text-muted";
+const SP_CARD = "border-0 bg-surface-card shadow-soft rounded-card";
+const SP_CARD_TITLE =
+  "flex items-center gap-2 font-heading text-base font-semibold text-text-heading [&_svg]:text-primary";
+const SP_PRIMARY_BTN =
+  "rounded-input bg-primary font-body font-semibold text-white shadow-[0_4px_16px_rgba(58,90,254,0.20)] transition-colors duration-200 ease-in-out hover:bg-primary-hover [&_svg]:text-white";
+const SP_CANCEL_BTN =
+  "rounded-input border border-surface-border bg-surface-card font-body font-semibold text-text-body transition-colors duration-200 ease-in-out hover:border-status-error hover:text-status-error";
+const SP_PREVIEW_BTN =
+  "rounded-input border border-surface-border bg-surface-card font-body font-semibold text-text-body shadow-none transition-colors duration-200 ease-in-out hover:border-primary hover:text-primary [&_svg]:text-text-body hover:[&_svg]:text-primary";
+const SP_CHECK_WRAP =
+  "flex flex-wrap gap-2 rounded-input border-0 bg-surface-page p-3";
+const SP_CHECK_BOX =
+  "border-[1.5px] border-surface-border bg-surface-card data-[state=checked]:border-primary data-[state=checked]:bg-primary data-[state=checked]:text-white";
+const SP_CHECK_LABEL_BASE =
+  "flex cursor-pointer items-center gap-2 font-body text-sm text-text-heading";
+const SP_CHECK_LABEL_ON = "font-medium text-primary";
+
 export default function ProfilePage({ user, onUpdateUser, initialEditing = false }) {
   const [isEditing, setIsEditing] = useState(initialEditing);
   const [showPreview, setShowPreview] = useState(false);
@@ -383,11 +415,13 @@ export default function ProfilePage({ user, onUpdateUser, initialEditing = false
   // Render Talent Profile
   if (user.role === "talent") {
     return (
-      <div className="min-h-screen bg-background p-2 md:p-3 lg:p-4 space-y-3 md:space-y-4">
-        <div className="flex items-center justify-between flex-wrap gap-4">
+      <div className="min-h-full space-y-3 bg-transparent p-2 font-body md:space-y-4 md:p-3 lg:p-4">
+        <div className="flex flex-wrap items-center justify-between gap-4">
           <div>
-            <h1 className="text-3xl mb-2">Professional Profile</h1>
-            <p className="text-muted-foreground">
+            <h1 className="mb-2 font-heading text-3xl font-bold text-text-heading">
+              Professional Profile
+            </h1>
+            <p className="font-body text-text-body">
               This is what founders see when browsing talent
             </p>
           </div>
@@ -395,24 +429,29 @@ export default function ProfilePage({ user, onUpdateUser, initialEditing = false
             {!isEditing && (
               <Button
                 variant="outline"
+                className={SP_PREVIEW_BTN}
                 onClick={() => setShowPreview(!showPreview)}
               >
-                <Eye className="w-4 h-4 mr-2" />
+                <Eye className="mr-2 h-4 w-4" />
                 {showPreview ? "Edit View" : "Preview"}
               </Button>
             )}
             {!isEditing ? (
-              <Button onClick={() => setIsEditing(true)}>
-                <Edit className="w-4 h-4 mr-2" />
+              <Button className={SP_PRIMARY_BTN} onClick={() => setIsEditing(true)}>
+                <Edit className="mr-2 h-4 w-4" />
                 Edit Profile
               </Button>
             ) : (
               <>
-                <Button variant="outline" onClick={() => setIsEditing(false)}>
+                <Button
+                  variant="outline"
+                  className={SP_CANCEL_BTN}
+                  onClick={() => setIsEditing(false)}
+                >
                   Cancel
                 </Button>
-                <Button onClick={handleSave}>
-                  <Save className="w-4 h-4 mr-2" />
+                <Button className={SP_PRIMARY_BTN} onClick={handleSave}>
+                  <Save className="mr-2 h-4 w-4" />
                   Save Changes
                 </Button>
               </>
@@ -420,7 +459,7 @@ export default function ProfilePage({ user, onUpdateUser, initialEditing = false
           </div>
         </div>
         {!showPreview && profileCompletion < 100 && (
-          <Card className="border-2 border-primary/20">
+          <Card className={cn(SP_CARD, "ring-1 ring-primary/25")}>
             <CardContent className="pt-6 space-y-4">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
@@ -436,15 +475,15 @@ export default function ProfilePage({ user, onUpdateUser, initialEditing = false
                 </span>
               </div>
               <Progress value={profileCompletion} className="h-3" />
-              <p className="text-sm text-muted-foreground">
+              <p className="font-body text-sm text-text-muted">
                 {getCompletionMessage(profileCompletion)}
               </p>
             </CardContent>
           </Card>
         )}
-        <Card>
+        <Card className={SP_CARD}>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
+            <CardTitle className={SP_CARD_TITLE}>
               <UserCircle className="w-5 h-5" />
               Professional Profile
             </CardTitle>
@@ -452,9 +491,9 @@ export default function ProfilePage({ user, onUpdateUser, initialEditing = false
           <CardContent className="space-y-4">
             <div className="grid md:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="name">Full Name *</Label>
+                <Label className={SP_LABEL} htmlFor="name">Full Name *</Label>
                 {isEditing ? (
-                  <Input
+                  <Input className={cn(SP_INPUT)}
                     id="name"
                     value={editedProfile.name}
                     onChange={(e) =>
@@ -465,13 +504,13 @@ export default function ProfilePage({ user, onUpdateUser, initialEditing = false
                     }
                   />
                 ) : (
-                  <p className="text-sm p-2 bg-muted rounded-md">{user.name}</p>
+                  <p className={SP_VALUE}>{user.name}</p>
                 )}
               </div>
               <div className="space-y-2">
-                <Label htmlFor="professionalTitle">Professional Title *</Label>
+                <Label className={SP_LABEL} htmlFor="professionalTitle">Professional Title *</Label>
                 {isEditing ? (
-                  <Input
+                  <Input className={cn(SP_INPUT)}
                     id="professionalTitle"
                     value={editedProfile.professionalTitle}
                     onChange={(e) =>
@@ -483,15 +522,15 @@ export default function ProfilePage({ user, onUpdateUser, initialEditing = false
                     placeholder="e.g., Senior Full-Stack Developer"
                   />
                 ) : (
-                  <p className="text-sm p-2 bg-muted rounded-md">
+                  <p className={SP_VALUE}>
                     {user.professionalTitle || "Not specified"}
                   </p>
                 )}
               </div>
               <div className="space-y-2">
-                <Label htmlFor="location">Location *</Label>
+                <Label className={SP_LABEL} htmlFor="location">Location *</Label>
                 {isEditing ? (
-                  <Input
+                  <Input className={cn(SP_INPUT)}
                     id="location"
                     value={editedProfile.location}
                     onChange={(e) =>
@@ -503,16 +542,16 @@ export default function ProfilePage({ user, onUpdateUser, initialEditing = false
                     placeholder="e.g., San Francisco, CA"
                   />
                 ) : (
-                  <p className="text-sm p-2 bg-muted rounded-md flex items-center gap-2">
-                    <MapPin className="w-4 h-4" />
+                  <p className={cn(SP_VALUE, "flex items-center gap-2")}>
+                    <MapPin className="h-4 w-4 shrink-0 text-text-muted" />
                     {user.location || "Not specified"}
                   </p>
                 )}
               </div>
               <div className="space-y-2">
-                <Label htmlFor="yearsOfExperience">Years of Experience *</Label>
+                <Label className={SP_LABEL} htmlFor="yearsOfExperience">Years of Experience *</Label>
                 {isEditing ? (
-                  <Input
+                  <Input className={cn(SP_INPUT)}
                     id="yearsOfExperience"
                     value={editedProfile.yearsOfExperience}
                     onChange={(e) =>
@@ -524,16 +563,16 @@ export default function ProfilePage({ user, onUpdateUser, initialEditing = false
                     placeholder="e.g., 5"
                   />
                 ) : (
-                  <p className="text-sm p-2 bg-muted rounded-md">
+                  <p className={SP_VALUE}>
                     {user.yearsOfExperience || "Not specified"}
                   </p>
                 )}
               </div>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="bio">Professional Bio *</Label>
+              <Label className={SP_LABEL} htmlFor="bio">Professional Bio *</Label>
               {isEditing ? (
-                <Textarea
+                <Textarea className={cn(SP_TEXTAREA)}
                   id="bio"
                   value={editedProfile.bio}
                   onChange={(e) =>
@@ -546,7 +585,13 @@ export default function ProfilePage({ user, onUpdateUser, initialEditing = false
                   rows={5}
                 />
               ) : (
-                <p className="text-sm p-4 bg-muted rounded-md whitespace-pre-wrap">
+                <p
+                  className={cn(
+                    SP_VALUE,
+                    "whitespace-pre-wrap",
+                    !user.bio && SP_EMPTY,
+                  )}
+                >
                   {user.bio || "No bio added yet"}
                 </p>
               )}
@@ -558,13 +603,13 @@ export default function ProfilePage({ user, onUpdateUser, initialEditing = false
             </div>
           </CardContent>
         </Card>
-        <Card>
+        <Card className={SP_CARD}>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
+            <CardTitle className={SP_CARD_TITLE}>
               <Code className="w-5 h-5" />
               Skills & Expertise *
             </CardTitle>
-            <CardDescription>
+            <CardDescription className="font-body text-text-body">
               Add your key skills so founders can find you
             </CardDescription>
           </CardHeader>
@@ -595,7 +640,7 @@ export default function ProfilePage({ user, onUpdateUser, initialEditing = false
             </div>
             {isEditing && (
               <div className="flex gap-2">
-                <Input
+                <Input className={cn(SP_INPUT)}
                   value={newSkill}
                   onChange={(e) => setNewSkill(e.target.value)}
                   onKeyPress={(e) => {
@@ -613,22 +658,22 @@ export default function ProfilePage({ user, onUpdateUser, initialEditing = false
             )}
           </CardContent>
         </Card>
-        <Card>
+        <Card className={SP_CARD}>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
+            <CardTitle className={SP_CARD_TITLE}>
               <Globe className="w-5 h-5" />
               Professional Links
             </CardTitle>
-            <CardDescription>
+            <CardDescription className="font-body text-text-body">
               These links help validate your professional background
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="grid md:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="linkedin">LinkedIn *</Label>
+                <Label className={SP_LABEL} htmlFor="linkedin">LinkedIn *</Label>
                 {isEditing ? (
-                  <Input
+                  <Input className={cn(SP_INPUT)}
                     id="linkedin"
                     value={editedProfile.linkedin}
                     onChange={(e) =>
@@ -640,8 +685,8 @@ export default function ProfilePage({ user, onUpdateUser, initialEditing = false
                     placeholder="https://linkedin.com/in/yourprofile"
                   />
                 ) : (
-                  <p className="text-sm p-2 bg-muted rounded-md flex items-center gap-2">
-                    <Linkedin className="w-4 h-4" />
+                  <p className={cn(SP_VALUE, "flex items-center gap-2")}>
+                    <Linkedin className="h-4 w-4 shrink-0 text-text-muted" />
                     {user.linkedin ? (
                       <a
                         href={user.linkedin}
@@ -659,9 +704,9 @@ export default function ProfilePage({ user, onUpdateUser, initialEditing = false
                 )}
               </div>
               <div className="space-y-2">
-                <Label htmlFor="github">GitHub</Label>
+                <Label className={SP_LABEL} htmlFor="github">GitHub</Label>
                 {isEditing ? (
-                  <Input
+                  <Input className={cn(SP_INPUT)}
                     id="github"
                     value={editedProfile.github}
                     onChange={(e) =>
@@ -673,8 +718,8 @@ export default function ProfilePage({ user, onUpdateUser, initialEditing = false
                     placeholder="https://github.com/yourusername"
                   />
                 ) : (
-                  <p className="text-sm p-2 bg-muted rounded-md flex items-center gap-2">
-                    <Github className="w-4 h-4" />
+                  <p className={cn(SP_VALUE, "flex items-center gap-2")}>
+                    <Github className="h-4 w-4 shrink-0 text-text-muted" />
                     {user.github ? (
                       <a
                         href={user.github}
@@ -692,9 +737,9 @@ export default function ProfilePage({ user, onUpdateUser, initialEditing = false
                 )}
               </div>
               <div className="space-y-2 md:col-span-2">
-                <Label htmlFor="website">Portfolio Website</Label>
+                <Label className={SP_LABEL} htmlFor="website">Portfolio Website</Label>
                 {isEditing ? (
-                  <Input
+                  <Input className={cn(SP_INPUT)}
                     id="website"
                     value={editedProfile.website}
                     onChange={(e) =>
@@ -706,8 +751,8 @@ export default function ProfilePage({ user, onUpdateUser, initialEditing = false
                     placeholder="https://yourportfolio.com"
                   />
                 ) : (
-                  <p className="text-sm p-2 bg-muted rounded-md flex items-center gap-2">
-                    <Globe className="w-4 h-4" />
+                  <p className={cn(SP_VALUE, "flex items-center gap-2")}>
+                    <Globe className="h-4 w-4 shrink-0 text-text-muted" />
                     {user.website ? (
                       <a
                         href={user.website}
@@ -727,15 +772,15 @@ export default function ProfilePage({ user, onUpdateUser, initialEditing = false
             </div>
           </CardContent>
         </Card>
-        <Card>
+        <Card className={SP_CARD}>
           <CardHeader>
             <div className="flex items-center justify-between">
               <div>
-                <CardTitle className="flex items-center gap-2">
+                <CardTitle className={SP_CARD_TITLE}>
                   <Briefcase className="w-5 h-5" />
                   Work Experience *
                 </CardTitle>
-                <CardDescription>
+                <CardDescription className="font-body text-text-body">
                   Add your professional work history to validate your experience
                 </CardDescription>
               </div>
@@ -749,7 +794,7 @@ export default function ProfilePage({ user, onUpdateUser, initialEditing = false
           </CardHeader>
           <CardContent className="space-y-4">
             {editedProfile.workExperience.length === 0 ? (
-              <div className="text-center py-8 bg-muted/50 rounded-lg">
+              <div className="rounded-input bg-surface-page py-8 text-center">
                 <Briefcase className="w-12 h-12 mx-auto text-muted-foreground mb-3" />
                 <p className="text-sm text-muted-foreground mb-2">
                   No work experience added yet
@@ -763,7 +808,7 @@ export default function ProfilePage({ user, onUpdateUser, initialEditing = false
               </div>
             ) : (
               editedProfile.workExperience.map((exp, index) => (
-                <div key={exp.id} className="p-4 border rounded-lg space-y-3">
+                <div key={exp.id} className="space-y-3 rounded-input border-0 bg-surface-page p-4">
                   {isEditing ? (
                     <>
                       <div className="flex justify-between items-start">
@@ -780,7 +825,7 @@ export default function ProfilePage({ user, onUpdateUser, initialEditing = false
                         </Button>
                       </div>
                       <div className="grid md:grid-cols-2 gap-3">
-                        <Input
+                        <Input className={cn(SP_INPUT)}
                           placeholder="Company"
                           value={exp.company}
                           onChange={(e) =>
@@ -791,7 +836,7 @@ export default function ProfilePage({ user, onUpdateUser, initialEditing = false
                             )
                           }
                         />
-                        <Input
+                        <Input className={cn(SP_INPUT)}
                           placeholder="Position"
                           value={exp.position}
                           onChange={(e) =>
@@ -802,7 +847,7 @@ export default function ProfilePage({ user, onUpdateUser, initialEditing = false
                             )
                           }
                         />
-                        <Input
+                        <Input className={cn(SP_INPUT)}
                           placeholder="Start Date"
                           value={exp.startDate}
                           onChange={(e) =>
@@ -813,7 +858,7 @@ export default function ProfilePage({ user, onUpdateUser, initialEditing = false
                             )
                           }
                         />
-                        <Input
+                        <Input className={cn(SP_INPUT)}
                           placeholder="End Date"
                           value={exp.endDate}
                           onChange={(e) =>
@@ -839,12 +884,15 @@ export default function ProfilePage({ user, onUpdateUser, initialEditing = false
                             }
                             className="w-4 h-4"
                           />
-                          <Label htmlFor={`current-${exp.id}`}>
+                          <Label
+                            className={cn(SP_LABEL, "normal-case tracking-normal")}
+                            htmlFor={`current-${exp.id}`}
+                          >
                             Currently working here
                           </Label>
                         </div>
                         <div className="md:col-span-2">
-                          <Textarea
+                          <Textarea className={cn(SP_TEXTAREA)}
                             placeholder="Description"
                             value={exp.description}
                             onChange={(e) =>
@@ -887,11 +935,11 @@ export default function ProfilePage({ user, onUpdateUser, initialEditing = false
             )}
           </CardContent>
         </Card>
-        <Card>
+        <Card className={SP_CARD}>
           <CardHeader>
             <div className="flex items-center justify-between">
               <div>
-                <CardTitle className="flex items-center gap-2">
+                <CardTitle className={SP_CARD_TITLE}>
                   <GraduationCap className="w-5 h-5" />
                   Education
                 </CardTitle>
@@ -906,14 +954,14 @@ export default function ProfilePage({ user, onUpdateUser, initialEditing = false
           </CardHeader>
           <CardContent className="space-y-4">
             {editedProfile.education.length === 0 ? (
-              <div className="text-center py-6 bg-muted/50 rounded-lg">
+              <div className="rounded-input bg-surface-page py-6 text-center">
                 <p className="text-sm text-muted-foreground">
                   No education added yet
                 </p>
               </div>
             ) : (
               editedProfile.education.map((edu, index) => (
-                <div key={edu.id} className="p-4 border rounded-lg space-y-3">
+                <div key={edu.id} className="space-y-3 rounded-input border-0 bg-surface-page p-4">
                   {isEditing ? (
                     <>
                       <div className="flex justify-between items-start">
@@ -930,7 +978,7 @@ export default function ProfilePage({ user, onUpdateUser, initialEditing = false
                         </Button>
                       </div>
                       <div className="grid md:grid-cols-2 gap-3">
-                        <Input
+                        <Input className={cn(SP_INPUT)}
                           placeholder="Institution"
                           value={edu.institution}
                           onChange={(e) =>
@@ -941,21 +989,21 @@ export default function ProfilePage({ user, onUpdateUser, initialEditing = false
                             )
                           }
                         />
-                        <Input
+                        <Input className={cn(SP_INPUT)}
                           placeholder="Degree"
                           value={edu.degree}
                           onChange={(e) =>
                             updateEducation(edu.id, "degree", e.target.value)
                           }
                         />
-                        <Input
+                        <Input className={cn(SP_INPUT)}
                           placeholder="Field of Study"
                           value={edu.field}
                           onChange={(e) =>
                             updateEducation(edu.id, "field", e.target.value)
                           }
                         />
-                        <Input
+                        <Input className={cn(SP_INPUT)}
                           placeholder="Graduation Year"
                           value={edu.graduationYear}
                           onChange={(e) =>
@@ -991,15 +1039,15 @@ export default function ProfilePage({ user, onUpdateUser, initialEditing = false
             )}
           </CardContent>
         </Card>
-        <Card>
+        <Card className={SP_CARD}>
           <CardHeader>
             <div className="flex items-center justify-between">
               <div>
-                <CardTitle className="flex items-center gap-2">
+                <CardTitle className={SP_CARD_TITLE}>
                   <Award className="w-5 h-5" />
                   Certifications & Credentials
                 </CardTitle>
-                <CardDescription>
+                <CardDescription className="font-body text-text-body">
                   Professional certifications help validate your expertise
                 </CardDescription>
               </div>
@@ -1013,14 +1061,14 @@ export default function ProfilePage({ user, onUpdateUser, initialEditing = false
           </CardHeader>
           <CardContent className="space-y-4">
             {editedProfile.certifications.length === 0 ? (
-              <div className="text-center py-6 bg-muted/50 rounded-lg">
+              <div className="rounded-input bg-surface-page py-6 text-center">
                 <p className="text-sm text-muted-foreground">
                   No certifications added yet
                 </p>
               </div>
             ) : (
               editedProfile.certifications.map((cert, index) => (
-                <div key={cert.id} className="p-4 border rounded-lg space-y-3">
+                <div key={cert.id} className="space-y-3 rounded-input border-0 bg-surface-page p-4">
                   {isEditing ? (
                     <>
                       <div className="flex justify-between items-start">
@@ -1037,14 +1085,14 @@ export default function ProfilePage({ user, onUpdateUser, initialEditing = false
                         </Button>
                       </div>
                       <div className="grid md:grid-cols-2 gap-3">
-                        <Input
+                        <Input className={cn(SP_INPUT)}
                           placeholder="Certification Name"
                           value={cert.name}
                           onChange={(e) =>
                             updateCertification(cert.id, "name", e.target.value)
                           }
                         />
-                        <Input
+                        <Input className={cn(SP_INPUT)}
                           placeholder="Issuing Organization"
                           value={cert.issuer}
                           onChange={(e) =>
@@ -1055,7 +1103,7 @@ export default function ProfilePage({ user, onUpdateUser, initialEditing = false
                             )
                           }
                         />
-                        <Input
+                        <Input className={cn(SP_INPUT)}
                           placeholder="Issue Year"
                           value={cert.issueYear}
                           onChange={(e) =>
@@ -1066,7 +1114,7 @@ export default function ProfilePage({ user, onUpdateUser, initialEditing = false
                             )
                           }
                         />
-                        <Input
+                        <Input className={cn(SP_INPUT)}
                           placeholder="Credential ID (Optional)"
                           value={cert.credentialId || ""}
                           onChange={(e) =>
@@ -1078,7 +1126,7 @@ export default function ProfilePage({ user, onUpdateUser, initialEditing = false
                           }
                         />
                         <div className="md:col-span-2">
-                          <Input
+                          <Input className={cn(SP_INPUT)}
                             placeholder="Credential URL (Optional)"
                             value={cert.credentialUrl || ""}
                             onChange={(e) =>
@@ -1091,8 +1139,8 @@ export default function ProfilePage({ user, onUpdateUser, initialEditing = false
                           />
                         </div>
                         <div className="md:col-span-2 space-y-2">
-                          <Label>Certificate Image</Label>
-                          <Input
+                          <Label className={SP_LABEL}>Certificate Image</Label>
+                          <Input className={cn(SP_INPUT)}
                             type="file"
                             accept="image/*"
                             onChange={(e) =>
@@ -1156,15 +1204,15 @@ export default function ProfilePage({ user, onUpdateUser, initialEditing = false
             )}
           </CardContent>
         </Card>
-        <Card>
+        <Card className={SP_CARD}>
           <CardHeader>
             <div className="flex items-center justify-between">
               <div>
-                <CardTitle className="flex items-center gap-2">
+                <CardTitle className={SP_CARD_TITLE}>
                   <FileText className="w-5 h-5" />
                   Portfolio & Projects
                 </CardTitle>
-                <CardDescription>
+                <CardDescription className="font-body text-text-body">
                   Showcase your best work to stand out to founders
                 </CardDescription>
               </div>
@@ -1178,14 +1226,14 @@ export default function ProfilePage({ user, onUpdateUser, initialEditing = false
           </CardHeader>
           <CardContent className="space-y-4">
             {editedProfile.portfolioItems.length === 0 ? (
-              <div className="text-center py-6 bg-muted/50 rounded-lg">
+              <div className="rounded-input bg-surface-page py-6 text-center">
                 <p className="text-sm text-muted-foreground">
                   No portfolio items added yet
                 </p>
               </div>
             ) : (
               editedProfile.portfolioItems.map((item, index) => (
-                <div key={item.id} className="p-4 border rounded-lg space-y-3">
+                <div key={item.id} className="space-y-3 rounded-input border-0 bg-surface-page p-4">
                   {isEditing ? (
                     <>
                       <div className="flex justify-between items-start">
@@ -1202,7 +1250,7 @@ export default function ProfilePage({ user, onUpdateUser, initialEditing = false
                         </Button>
                       </div>
                       <div className="space-y-3">
-                        <Input
+                        <Input className={cn(SP_INPUT)}
                           placeholder="Project Title"
                           value={item.title}
                           onChange={(e) =>
@@ -1213,14 +1261,14 @@ export default function ProfilePage({ user, onUpdateUser, initialEditing = false
                             )
                           }
                         />
-                        <Input
+                        <Input className={cn(SP_INPUT)}
                           placeholder="Project Type (e.g., Web App, Mobile App)"
                           value={item.type}
                           onChange={(e) =>
                             updatePortfolioItem(item.id, "type", e.target.value)
                           }
                         />
-                        <Textarea
+                        <Textarea className={cn(SP_TEXTAREA)}
                           placeholder="Description"
                           value={item.description}
                           onChange={(e) =>
@@ -1232,7 +1280,7 @@ export default function ProfilePage({ user, onUpdateUser, initialEditing = false
                           }
                           rows={3}
                         />
-                        <Input
+                        <Input className={cn(SP_INPUT)}
                           placeholder="Project URL"
                           value={item.url}
                           onChange={(e) =>
@@ -1270,9 +1318,9 @@ export default function ProfilePage({ user, onUpdateUser, initialEditing = false
             )}
           </CardContent>
         </Card>
-        <Card>
+        <Card className={SP_CARD}>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
+            <CardTitle className={SP_CARD_TITLE}>
               <Calendar className="w-5 h-5" />
               Availability & Preferences
             </CardTitle>
@@ -1280,7 +1328,7 @@ export default function ProfilePage({ user, onUpdateUser, initialEditing = false
           <CardContent className="space-y-4">
             <div className="grid md:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="experience">
+                <Label className={SP_LABEL} htmlFor="experience">
                   Years of Experience (For Display) *
                 </Label>
                 {isEditing ? (
@@ -1303,7 +1351,7 @@ export default function ProfilePage({ user, onUpdateUser, initialEditing = false
                     <option value="10+ years">10+ years</option>
                   </select>
                 ) : (
-                  <p className="text-sm p-2 bg-muted rounded-md">
+                  <p className={SP_VALUE}>
                     {user.experience || "Not specified"}
                   </p>
                 )}
@@ -1312,7 +1360,7 @@ export default function ProfilePage({ user, onUpdateUser, initialEditing = false
                 </p>
               </div>
               <div className="space-y-2">
-                <Label htmlFor="availability">When Can You Start? *</Label>
+                <Label className={SP_LABEL} htmlFor="availability">When Can You Start? *</Label>
                 {isEditing ? (
                   <select
                     id="availability"
@@ -1333,7 +1381,7 @@ export default function ProfilePage({ user, onUpdateUser, initialEditing = false
                     <option value="Flexible">Flexible</option>
                   </select>
                 ) : (
-                  <p className="text-sm p-2 bg-muted rounded-md">
+                  <p className={SP_VALUE}>
                     {user.availability || "Not specified"}
                   </p>
                 )}
@@ -1344,7 +1392,7 @@ export default function ProfilePage({ user, onUpdateUser, initialEditing = false
             </div>
             <div className="grid md:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="availabilityStatus">Current Status *</Label>
+                <Label className={SP_LABEL} htmlFor="availabilityStatus">Current Status *</Label>
                 {isEditing ? (
                   <select
                     id="availabilityStatus"
@@ -1366,13 +1414,13 @@ export default function ProfilePage({ user, onUpdateUser, initialEditing = false
                     </option>
                   </select>
                 ) : (
-                  <p className="text-sm p-2 bg-muted rounded-md">
+                  <p className={SP_VALUE}>
                     {user.availabilityStatus || "Not specified"}
                   </p>
                 )}
               </div>
               <div className="space-y-2">
-                <Label htmlFor="preferredCommitment">
+                <Label className={SP_LABEL} htmlFor="preferredCommitment">
                   Preferred Commitment *
                 </Label>
                 {isEditing ? (
@@ -1394,7 +1442,7 @@ export default function ProfilePage({ user, onUpdateUser, initialEditing = false
                     <option value="flexible">Flexible</option>
                   </select>
                 ) : (
-                  <p className="text-sm p-2 bg-muted rounded-md">
+                  <p className={SP_VALUE}>
                     {user.preferredCommitment || "Not specified"}
                   </p>
                 )}
@@ -1402,18 +1450,18 @@ export default function ProfilePage({ user, onUpdateUser, initialEditing = false
             </div>
           </CardContent>
         </Card>
-        <Card>
+        <Card className={SP_CARD}>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
+            <CardTitle className={SP_CARD_TITLE}>
               <Target className="w-5 h-5" />
               Career Goals & Industry Preferences
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="professionalGoals">Professional Goals</Label>
+              <Label className={SP_LABEL} htmlFor="professionalGoals">Professional Goals</Label>
               {isEditing ? (
-                <Textarea
+                <Textarea className={cn(SP_TEXTAREA)}
                   id="professionalGoals"
                   value={editedProfile.professionalGoals}
                   onChange={(e) =>
@@ -1426,18 +1474,24 @@ export default function ProfilePage({ user, onUpdateUser, initialEditing = false
                   rows={3}
                 />
               ) : (
-                <p className="text-sm p-4 bg-muted rounded-md whitespace-pre-wrap">
+                <p
+                  className={cn(
+                    SP_VALUE,
+                    "whitespace-pre-wrap",
+                    !user.professionalGoals && SP_EMPTY,
+                  )}
+                >
                   {user.professionalGoals || "Not specified"}
                 </p>
               )}
             </div>
             <div className="space-y-2">
-              <Label htmlFor="interests">
+              <Label className={SP_LABEL} htmlFor="interests">
                 Industry Interests (Displayed on Profile Card) *
               </Label>
               {isEditing ? (
                 <>
-                  <Input
+                  <Input className={cn(SP_INPUT)}
                     id="interests"
                     value={
                       Array.isArray(editedProfile.interests)
@@ -1461,7 +1515,7 @@ export default function ProfilePage({ user, onUpdateUser, initialEditing = false
                   </p>
                 </>
               ) : (
-                <p className="text-sm p-2 bg-muted rounded-md">
+                <p className={SP_VALUE}>
                   {Array.isArray(user.interests) && user.interests.length > 0
                     ? user.interests.join(", ")
                     : "Not specified"}
@@ -1469,12 +1523,12 @@ export default function ProfilePage({ user, onUpdateUser, initialEditing = false
               )}
             </div>
             <div className="space-y-2">
-              <Label htmlFor="industryPreferences">
+              <Label className={SP_LABEL} htmlFor="industryPreferences">
                 Other Industry Preferences (Optional)
               </Label>
               {isEditing ? (
                 <>
-                  <Input
+                  <Input className={cn(SP_INPUT)}
                     id="industryPreferences"
                     value={
                       Array.isArray(editedProfile.industryPreferences)
@@ -1498,7 +1552,7 @@ export default function ProfilePage({ user, onUpdateUser, initialEditing = false
                   </p>
                 </>
               ) : (
-                <p className="text-sm p-2 bg-muted rounded-md">
+                <p className={SP_VALUE}>
                   {Array.isArray(user.industryPreferences) &&
                   user.industryPreferences.length > 0
                     ? user.industryPreferences.join(", ")
@@ -1514,34 +1568,40 @@ export default function ProfilePage({ user, onUpdateUser, initialEditing = false
 
   // Render Founder/Team Member Profile
   return (
-    <div className="min-h-screen bg-background p-2 md:p-3 lg:p-4 space-y-3 md:space-y-4">
+    <div className="min-h-full space-y-3 bg-transparent p-2 font-body md:space-y-4 md:p-3 lg:p-4">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl mb-2">Founder Profile</h1>
-          <p className="text-muted-foreground">
+          <h1 className="mb-2 font-heading text-3xl font-bold text-text-heading">
+            Founder Profile
+          </h1>
+          <p className="font-body text-text-body">
             Manage your personal and startup information
           </p>
         </div>
         {!isEditing ? (
-          <Button onClick={() => setIsEditing(true)}>
-            <Edit className="w-4 h-4 mr-2" />
+          <Button className={SP_PRIMARY_BTN} onClick={() => setIsEditing(true)}>
+            <Edit className="mr-2 h-4 w-4" />
             Edit Profile
           </Button>
         ) : (
           <div className="flex gap-2">
-            <Button variant="outline" onClick={() => setIsEditing(false)}>
+            <Button
+              variant="outline"
+              className={SP_CANCEL_BTN}
+              onClick={() => setIsEditing(false)}
+            >
               Cancel
             </Button>
-            <Button onClick={handleSave}>
-              <Save className="w-4 h-4 mr-2" />
+            <Button className={SP_PRIMARY_BTN} onClick={handleSave}>
+              <Save className="mr-2 h-4 w-4" />
               Save Changes
             </Button>
           </div>
         )}
       </div>
-      <Card>
+      <Card className={SP_CARD}>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
+          <CardTitle className={SP_CARD_TITLE}>
             <UserCircle className="w-5 h-5" />
             Personal Information
           </CardTitle>
@@ -1549,9 +1609,9 @@ export default function ProfilePage({ user, onUpdateUser, initialEditing = false
         <CardContent className="space-y-4">
           <div className="grid md:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="name">Full Name</Label>
+              <Label className={SP_LABEL} htmlFor="name">Full Name</Label>
               {isEditing ? (
-                <Input
+                <Input className={cn(SP_INPUT)}
                   id="name"
                   value={editedProfile.name}
                   onChange={(e) =>
@@ -1562,13 +1622,13 @@ export default function ProfilePage({ user, onUpdateUser, initialEditing = false
                   }
                 />
               ) : (
-                <p className="text-sm p-2 bg-muted rounded-md">{user.name}</p>
+                <p className={SP_VALUE}>{user.name}</p>
               )}
             </div>
             <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
+              <Label className={SP_LABEL} htmlFor="email">Email</Label>
               {isEditing ? (
-                <Input
+                <Input className={cn(SP_INPUT)}
                   id="email"
                   type="email"
                   value={editedProfile.email}
@@ -1580,17 +1640,17 @@ export default function ProfilePage({ user, onUpdateUser, initialEditing = false
                   }
                 />
               ) : (
-                <p className="text-sm p-2 bg-muted rounded-md flex items-center gap-2">
-                  <Mail className="w-4 h-4" />
+                <p className={cn(SP_VALUE, "flex items-center gap-2")}>
+                  <Mail className="h-4 w-4 shrink-0 text-text-muted" />
                   {user.email}
                 </p>
               )}
             </div>
           </div>
           <div className="space-y-2">
-            <Label htmlFor="bio">Bio</Label>
+            <Label className={SP_LABEL} htmlFor="bio">Bio</Label>
             {isEditing ? (
-              <Textarea
+              <Textarea className={cn(SP_TEXTAREA)}
                 id="bio"
                 value={editedProfile.bio}
                 onChange={(e) =>
@@ -1603,7 +1663,13 @@ export default function ProfilePage({ user, onUpdateUser, initialEditing = false
                 rows={4}
               />
             ) : (
-              <p className="text-sm p-4 bg-muted rounded-md">
+              <p
+                className={cn(
+                  SP_VALUE,
+                  "whitespace-pre-wrap",
+                  !user.bio && SP_EMPTY,
+                )}
+              >
                 {user.bio || "No bio added yet"}
               </p>
             )}
@@ -1611,9 +1677,9 @@ export default function ProfilePage({ user, onUpdateUser, initialEditing = false
         </CardContent>
       </Card>
       {user.role === "founder" && (
-        <Card>
+        <Card className={SP_CARD}>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
+            <CardTitle className={SP_CARD_TITLE}>
               <Building className="w-5 h-5" />
               Startup Information
             </CardTitle>
@@ -1621,9 +1687,9 @@ export default function ProfilePage({ user, onUpdateUser, initialEditing = false
           <CardContent className="space-y-4">
             <div className="grid md:grid-cols-2 gap-4">
               <div className="space-y-2 md:col-span-2">
-                <Label htmlFor="startupName">Startup name</Label>
+                <Label className={SP_LABEL} htmlFor="startupName">Startup name</Label>
                 {isEditing ? (
-                  <Input
+                  <Input className={cn(SP_INPUT)}
                     id="startupName"
                     value={editedProfile.startupName}
                     onChange={(e) =>
@@ -1635,7 +1701,7 @@ export default function ProfilePage({ user, onUpdateUser, initialEditing = false
                     placeholder="Your startup name"
                   />
                 ) : (
-                  <p className="text-sm p-2 bg-muted rounded-md">
+                  <p className={SP_VALUE}>
                     {user.startupName ||
                       user.profile?.startupName ||
                       "Not specified"}
@@ -1643,9 +1709,9 @@ export default function ProfilePage({ user, onUpdateUser, initialEditing = false
                 )}
               </div>
               <div className="space-y-2 md:col-span-2">
-                <Label htmlFor="startupDescription">Startup description</Label>
+                <Label className={SP_LABEL} htmlFor="startupDescription">Startup description</Label>
                 {isEditing ? (
-                  <Textarea
+                  <Textarea className={cn(SP_TEXTAREA)}
                     id="startupDescription"
                     value={editedProfile.startupDescription || ""}
                     onChange={(e) =>
@@ -1658,7 +1724,7 @@ export default function ProfilePage({ user, onUpdateUser, initialEditing = false
                     placeholder="What you do and the problem you solve"
                   />
                 ) : (
-                  <p className="text-sm p-2 bg-muted rounded-md whitespace-pre-wrap">
+                  <p className={cn(SP_VALUE, "whitespace-pre-wrap")}>
                     {user.profile?.startupDescription ||
                       user.startupDescription ||
                       "Not specified"}
@@ -1666,7 +1732,7 @@ export default function ProfilePage({ user, onUpdateUser, initialEditing = false
                 )}
               </div>
               <div className="space-y-2 md:col-span-2">
-                <Label>Startup type (industry)</Label>
+                <Label className={SP_LABEL}>Startup type (industry)</Label>
                 {isEditing ? (
                   <>
                     <Select
@@ -1678,7 +1744,7 @@ export default function ProfilePage({ user, onUpdateUser, initialEditing = false
                         })
                       }
                     >
-                      <SelectTrigger className="w-full">
+                      <SelectTrigger className={cn(SP_SELECT_TRIGGER)}>
                         <SelectValue placeholder="Select industry" />
                       </SelectTrigger>
                       <SelectContent>
@@ -1691,7 +1757,7 @@ export default function ProfilePage({ user, onUpdateUser, initialEditing = false
                     </Select>
                     {editedProfile.industryFocus === "Others" && (
                       <Input
-                        className="mt-2"
+                        className={cn(SP_INPUT, "mt-2")}
                         value={editedProfile.otherIndustry || ""}
                         onChange={(e) =>
                           setEditedProfile({
@@ -1704,7 +1770,7 @@ export default function ProfilePage({ user, onUpdateUser, initialEditing = false
                     )}
                   </>
                 ) : (
-                  <p className="text-sm p-2 bg-muted rounded-md">
+                  <p className={SP_VALUE}>
                     {user.industry ||
                       user.profile?.industry ||
                       user.profile?.industryFocus ||
@@ -1713,35 +1779,40 @@ export default function ProfilePage({ user, onUpdateUser, initialEditing = false
                 )}
               </div>
               <div className="space-y-2 md:col-span-2">
-                <Label>Target audience</Label>
+                <Label className={SP_LABEL}>Target audience</Label>
                 {isEditing ? (
-                  <div className="flex flex-wrap gap-2 border border-border rounded-md p-3">
-                    {FOUNDER_TARGET_AUDIENCE_OPTIONS.map((opt) => (
-                      <label
-                        key={opt}
-                        className="flex items-center gap-2 text-sm cursor-pointer"
-                      >
-                        <input
-                          type="checkbox"
-                          checked={editedProfile.targetAudience?.includes?.(
-                            opt,
+                  <div className={SP_CHECK_WRAP}>
+                    {FOUNDER_TARGET_AUDIENCE_OPTIONS.map((opt) => {
+                      const checked =
+                        editedProfile.targetAudience?.includes?.(opt);
+                      return (
+                        <label
+                          key={opt}
+                          className={cn(
+                            SP_CHECK_LABEL_BASE,
+                            checked && SP_CHECK_LABEL_ON,
                           )}
-                          onChange={() => {
-                            const cur = editedProfile.targetAudience || [];
-                            setEditedProfile({
-                              ...editedProfile,
-                              targetAudience: cur.includes(opt)
-                                ? cur.filter((x) => x !== opt)
-                                : [...cur, opt],
-                            });
-                          }}
-                        />
-                        {opt}
-                      </label>
-                    ))}
+                        >
+                          <Checkbox
+                            className={SP_CHECK_BOX}
+                            checked={checked}
+                            onCheckedChange={() => {
+                              const cur = editedProfile.targetAudience || [];
+                              setEditedProfile({
+                                ...editedProfile,
+                                targetAudience: cur.includes(opt)
+                                  ? cur.filter((x) => x !== opt)
+                                  : [...cur, opt],
+                              });
+                            }}
+                          />
+                          {opt}
+                        </label>
+                      );
+                    })}
                   </div>
                 ) : (
-                  <p className="text-sm p-2 bg-muted rounded-md">
+                  <p className={SP_VALUE}>
                     {Array.isArray(user.profile?.targetAudience)
                       ? user.profile.targetAudience.join(", ")
                       : Array.isArray(user.targetAudience)
@@ -1751,33 +1822,40 @@ export default function ProfilePage({ user, onUpdateUser, initialEditing = false
                 )}
               </div>
               <div className="space-y-2 md:col-span-2">
-                <Label>Roles needed</Label>
+                <Label className={SP_LABEL}>Roles needed</Label>
                 {isEditing ? (
-                  <div className="flex flex-wrap gap-2 border border-border rounded-md p-3 max-h-48 overflow-y-auto">
-                    {FOUNDER_ROLES_NEEDED_OPTIONS.map((opt) => (
-                      <label
-                        key={opt}
-                        className="flex items-center gap-2 text-xs cursor-pointer"
-                      >
-                        <input
-                          type="checkbox"
-                          checked={editedProfile.rolesNeeded?.includes?.(opt)}
-                          onChange={() => {
-                            const cur = editedProfile.rolesNeeded || [];
-                            setEditedProfile({
-                              ...editedProfile,
-                              rolesNeeded: cur.includes(opt)
-                                ? cur.filter((x) => x !== opt)
-                                : [...cur, opt],
-                            });
-                          }}
-                        />
-                        {opt}
-                      </label>
-                    ))}
+                  <div className={cn(SP_CHECK_WRAP, "max-h-48 overflow-y-auto")}>
+                    {FOUNDER_ROLES_NEEDED_OPTIONS.map((opt) => {
+                      const checked = editedProfile.rolesNeeded?.includes?.(opt);
+                      return (
+                        <label
+                          key={opt}
+                          className={cn(
+                            SP_CHECK_LABEL_BASE,
+                            "text-xs",
+                            checked && SP_CHECK_LABEL_ON,
+                          )}
+                        >
+                          <Checkbox
+                            className={SP_CHECK_BOX}
+                            checked={checked}
+                            onCheckedChange={() => {
+                              const cur = editedProfile.rolesNeeded || [];
+                              setEditedProfile({
+                                ...editedProfile,
+                                rolesNeeded: cur.includes(opt)
+                                  ? cur.filter((x) => x !== opt)
+                                  : [...cur, opt],
+                              });
+                            }}
+                          />
+                          {opt}
+                        </label>
+                      );
+                    })}
                     {editedProfile.rolesNeeded?.includes?.("Others") && (
                       <Input
-                        className="w-full mt-2"
+                        className={cn(SP_INPUT, "mt-2 w-full")}
                         placeholder="Specify role"
                         value={editedProfile.otherRole || ""}
                         onChange={(e) =>
@@ -1790,7 +1868,7 @@ export default function ProfilePage({ user, onUpdateUser, initialEditing = false
                     )}
                   </div>
                 ) : (
-                  <p className="text-sm p-2 bg-muted rounded-md">
+                  <p className={SP_VALUE}>
                     {Array.isArray(user.profile?.rolesNeeded)
                       ? user.profile.rolesNeeded.join(", ")
                       : Array.isArray(user.rolesNeeded)
@@ -1800,7 +1878,7 @@ export default function ProfilePage({ user, onUpdateUser, initialEditing = false
                 )}
               </div>
               <div className="space-y-2">
-                <Label>Team size</Label>
+                <Label className={SP_LABEL}>Team size</Label>
                 {isEditing ? (
                   <Select
                     value={editedProfile.teamSize || ""}
@@ -1808,7 +1886,7 @@ export default function ProfilePage({ user, onUpdateUser, initialEditing = false
                       setEditedProfile({ ...editedProfile, teamSize: v })
                     }
                   >
-                    <SelectTrigger className="w-full">
+                    <SelectTrigger className={cn(SP_SELECT_TRIGGER)}>
                       <SelectValue placeholder="Team size" />
                     </SelectTrigger>
                     <SelectContent>
@@ -1820,14 +1898,20 @@ export default function ProfilePage({ user, onUpdateUser, initialEditing = false
                     </SelectContent>
                   </Select>
                 ) : (
-                  <p className="text-sm p-2 bg-muted rounded-md flex items-center gap-2">
-                    <Users className="w-4 h-4" />
+                  <p
+                    className={cn(
+                      SP_VALUE,
+                      "flex items-center gap-2",
+                      !(user.profile?.teamSize || user.teamSize) && SP_EMPTY,
+                    )}
+                  >
+                    <Users className="h-4 w-4 shrink-0 text-text-muted" />
                     {user.profile?.teamSize || user.teamSize || "Not specified"}
                   </p>
                 )}
               </div>
               <div className="space-y-2">
-                <Label>Execution stage</Label>
+                <Label className={SP_LABEL}>Execution stage</Label>
                 {isEditing ? (
                   <Select
                     value={editedProfile.startupStage || ""}
@@ -1835,7 +1919,7 @@ export default function ProfilePage({ user, onUpdateUser, initialEditing = false
                       setEditedProfile({ ...editedProfile, startupStage: v })
                     }
                   >
-                    <SelectTrigger className="w-full">
+                    <SelectTrigger className={cn(SP_SELECT_TRIGGER)}>
                       <SelectValue placeholder="Stage" />
                     </SelectTrigger>
                     <SelectContent>
@@ -1847,8 +1931,15 @@ export default function ProfilePage({ user, onUpdateUser, initialEditing = false
                     </SelectContent>
                   </Select>
                 ) : (
-                  <p className="text-sm p-2 bg-muted rounded-md flex items-center gap-2">
-                    <Target className="w-4 h-4" />
+                  <p
+                    className={cn(
+                      SP_VALUE,
+                      "flex items-center gap-2",
+                      !(user.startupStage || user.profile?.startupStage) &&
+                        SP_EMPTY,
+                    )}
+                  >
+                    <Target className="h-4 w-4 shrink-0 text-text-muted" />
                     {user.startupStage ||
                       user.profile?.startupStage ||
                       "Not specified"}
@@ -1856,12 +1947,16 @@ export default function ProfilePage({ user, onUpdateUser, initialEditing = false
                 )}
               </div>
             </div>
-            <div className="grid md:grid-cols-1 gap-4 border-t pt-4">
-              <p className="text-sm font-medium text-muted-foreground">
+            <div
+              className={cn(
+                "grid gap-4 border-t border-surface-border pt-4 md:grid-cols-1",
+              )}
+            >
+              <p className="font-body text-sm font-semibold text-text-heading">
                 Where you are today
               </p>
               <div className="space-y-2">
-                <Label>Validated problem / idea</Label>
+                <Label className={SP_SUBLABEL}>Validated problem / idea</Label>
                 {isEditing ? (
                   <Select
                     value={editedProfile.hasValidatedIdea || ""}
@@ -1872,7 +1967,7 @@ export default function ProfilePage({ user, onUpdateUser, initialEditing = false
                       })
                     }
                   >
-                    <SelectTrigger>
+                    <SelectTrigger className={cn(SP_SELECT_TRIGGER)}>
                       <SelectValue placeholder="Select" />
                     </SelectTrigger>
                     <SelectContent>
@@ -1884,7 +1979,7 @@ export default function ProfilePage({ user, onUpdateUser, initialEditing = false
                     </SelectContent>
                   </Select>
                 ) : (
-                  <p className="text-sm p-2 bg-muted rounded-md">
+                  <p className={SP_VALUE}>
                     {user.profile?.hasValidatedIdea ||
                       user.hasValidatedIdea ||
                       "Not specified"}
@@ -1892,7 +1987,7 @@ export default function ProfilePage({ user, onUpdateUser, initialEditing = false
                 )}
               </div>
               <div className="space-y-2">
-                <Label>MVP or prototype</Label>
+                <Label className={SP_SUBLABEL}>MVP or prototype</Label>
                 {isEditing ? (
                   <Select
                     value={editedProfile.hasMVP || ""}
@@ -1900,7 +1995,7 @@ export default function ProfilePage({ user, onUpdateUser, initialEditing = false
                       setEditedProfile({ ...editedProfile, hasMVP: v })
                     }
                   >
-                    <SelectTrigger>
+                    <SelectTrigger className={cn(SP_SELECT_TRIGGER)}>
                       <SelectValue placeholder="Select" />
                     </SelectTrigger>
                     <SelectContent>
@@ -1912,13 +2007,13 @@ export default function ProfilePage({ user, onUpdateUser, initialEditing = false
                     </SelectContent>
                   </Select>
                 ) : (
-                  <p className="text-sm p-2 bg-muted rounded-md">
+                  <p className={SP_VALUE}>
                     {user.profile?.hasMVP || user.hasMVP || "Not specified"}
                   </p>
                 )}
               </div>
               <div className="space-y-2">
-                <Label>Customers or users</Label>
+                <Label className={SP_SUBLABEL}>Customers or users</Label>
                 {isEditing ? (
                   <Select
                     value={editedProfile.hasCustomers || ""}
@@ -1929,7 +2024,7 @@ export default function ProfilePage({ user, onUpdateUser, initialEditing = false
                       })
                     }
                   >
-                    <SelectTrigger>
+                    <SelectTrigger className={cn(SP_SELECT_TRIGGER)}>
                       <SelectValue placeholder="Select" />
                     </SelectTrigger>
                     <SelectContent>
@@ -1941,7 +2036,7 @@ export default function ProfilePage({ user, onUpdateUser, initialEditing = false
                     </SelectContent>
                   </Select>
                 ) : (
-                  <p className="text-sm p-2 bg-muted rounded-md">
+                  <p className={SP_VALUE}>
                     {user.profile?.hasCustomers ||
                       user.hasCustomers ||
                       "Not specified"}
@@ -1952,9 +2047,9 @@ export default function ProfilePage({ user, onUpdateUser, initialEditing = false
           </CardContent>
         </Card>
       )}
-      <Card>
+      <Card className={SP_CARD}>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
+          <CardTitle className={SP_CARD_TITLE}>
             <Globe className="w-5 h-5" />
             Contact & Links
           </CardTitle>
@@ -1962,9 +2057,9 @@ export default function ProfilePage({ user, onUpdateUser, initialEditing = false
         <CardContent className="space-y-4">
           <div className="grid md:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="website">Website</Label>
+              <Label className={SP_LABEL} htmlFor="website">Website</Label>
               {isEditing ? (
-                <Input
+                <Input className={cn(SP_INPUT)}
                   id="website"
                   value={editedProfile.website}
                   onChange={(e) =>
@@ -1976,16 +2071,22 @@ export default function ProfilePage({ user, onUpdateUser, initialEditing = false
                   placeholder="https://yourstartup.com"
                 />
               ) : (
-                <p className="text-sm p-2 bg-muted rounded-md flex items-center gap-2">
-                  <Globe className="w-4 h-4" />
+                <p
+                  className={cn(
+                    SP_VALUE,
+                    "flex items-center gap-2",
+                    !user.website && SP_EMPTY,
+                  )}
+                >
+                  <Globe className="h-4 w-4 shrink-0 text-text-muted" />
                   {user.website || "Not specified"}
                 </p>
               )}
             </div>
             <div className="space-y-2">
-              <Label htmlFor="linkedin">LinkedIn</Label>
+              <Label className={SP_LABEL} htmlFor="linkedin">LinkedIn</Label>
               {isEditing ? (
-                <Input
+                <Input className={cn(SP_INPUT)}
                   id="linkedin"
                   value={editedProfile.linkedin}
                   onChange={(e) =>
@@ -1997,8 +2098,14 @@ export default function ProfilePage({ user, onUpdateUser, initialEditing = false
                   placeholder="https://linkedin.com/in/yourname"
                 />
               ) : (
-                <p className="text-sm p-2 bg-muted rounded-md flex items-center gap-2">
-                  <Linkedin className="w-4 h-4" />
+                <p
+                  className={cn(
+                    SP_VALUE,
+                    "flex items-center gap-2",
+                    !user.linkedin && SP_EMPTY,
+                  )}
+                >
+                  <Linkedin className="h-4 w-4 shrink-0 text-text-muted" />
                   {user.linkedin || "Not specified"}
                 </p>
               )}

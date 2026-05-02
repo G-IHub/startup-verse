@@ -1,6 +1,6 @@
 # API Parity Matrix (Client Runtime -> Express API)
 
-Last updated: 2026-04-14
+Last updated: 2026-05-02
 
 Envelope standard:
 - Success: `{ "success": true, "data": ... }`
@@ -62,11 +62,13 @@ Envelope standard:
 | `/debug/startups/:startupId` | Canonical | Yes | none | startup debug summary | [`debug.routes.js`](./src/routes/debug.routes.js) |
 | `/admin/stats` | Canonical | Yes + admin | none | aggregate counts + extended stats object | [`admin.routes.js`](./src/routes/admin.routes.js) |
 | `/admin/reminder-delivery-metrics` | Canonical | Yes + admin | none | reminder job queue counts | [`admin.routes.js`](./src/routes/admin.routes.js) |
+| `/admin/analytics/snapshot` | Canonical | Yes + admin | none | Mongo-backed counts + user list for admin UI | [`admin.routes.js`](./src/routes/admin.routes.js) |
 | `/admin/clear-all-data` | Canonical | Yes + admin | none | deterministic 501 with `COMPAT_NOT_IMPLEMENTED` | Implemented |
 | `/admin/nuclear-reset` | Canonical | Yes + admin | none | deterministic 501 with `COMPAT_NOT_IMPLEMENTED` | Implemented |
 | `/admin/mega-nuclear-reset` | Canonical | Yes + admin | none | deterministic 501 with `COMPAT_NOT_IMPLEMENTED` | Implemented |
+| `/google/*` (status, oauth, meet, disconnect) | Canonical | Yes (mixed) | OAuth / Meet payloads | **Off by default** (`GOOGLE_INTEGRATION_ENABLED`); `503`/`501` when disabled or not wired | [`google.routes.js`](./src/routes/google.routes.js) |
 | `/emails/*` | Canonical | Yes | email payloads | placeholder send ack | [`emails.routes.js`](./src/routes/emails.routes.js) |
-| `/migrate/*` + `/migrations/*` | Canonical | Yes + admin | migration payloads | deterministic 501 with `COMPAT_NOT_IMPLEMENTED` | [`migrations.routes.js`](./src/routes/migrations.routes.js) |
+| `/migrate/*` + `/migrations/*` | Canonical | Yes + admin | migration payloads | Idempotent admin migrations (org-invitation split, etc.); destructive admin nukes remain `501` elsewhere | [`migrations.routes.js`](./src/routes/migrations.routes.js) |
 
 ## Compatibility router removal (2026-04-11)
 

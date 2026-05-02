@@ -14,6 +14,7 @@ import {
 } from "../domain/weeklyLoopRules.js";
 import { error as apiError, success as apiSuccess } from "../utils/apiResponse.js";
 import { mapActivityToDto } from "../utils/activityDto.js";
+import { createNotification } from "../services/notificationService.js";
 
 export const createOrUpdateProfile = async (req, res) => {
   const requestedUserId = String(req.body?.userId || "").trim();
@@ -97,6 +98,27 @@ export const updateTask = async (req, res) => {
 
   if (task.startupId) {
     emitRealtime(SOCKET_EVENTS.TASK_UPDATED, task, [startupRoom(task.startupId)]);
+  }
+
+  // Notify founder when team member transitions a task into blocked.
+  if (
+    updates.status === "blocked" &&
+    existingTask.status !== "blocked" &&
+    task.founderId
+  ) {
+    await createNotification({
+      userId: task.founderId,
+      type: "task-blocked",
+      title: "Task blocked by team member",
+      message: `${task.assignedToName || "A team member"} blocked: ${task.title}`,
+      actionUrl: `/?view=virtual-office&tab=tasks&taskId=${task._id}`,
+      metadata: {
+        taskId: String(task._id),
+        teamMemberId: String(req.params.teamMemberId),
+        blockerReason: task.blockerReason || "",
+        blockerNote: task.blockerNote || "",
+      },
+    });
   }
 
   return apiSuccess(res, task);

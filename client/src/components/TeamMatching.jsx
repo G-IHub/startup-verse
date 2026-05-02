@@ -10,8 +10,15 @@
 
 import React, { useState } from "react";
 import { API_BASE_URL } from "../config/apiBase.js";
-import { getAccessToken } from "../app/session";
 import { Button } from "./ui/button";
+
+// Default fetch options for cookie-based auth
+const defaultOptions = {
+  credentials: "include",
+  headers: {
+    "Content-Type": "application/json",
+  },
+};
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
 import { Badge } from "./ui/badge";
@@ -277,11 +284,7 @@ export default function TeamMatching({ user, onNavigate }) {
     console.log("🌐 [TeamMatching] Fetching talent profiles from backend...");
     fetch(
       `${API_BASE_URL}/talent/profiles`,
-      {
-        headers: {
-          Authorization: `Bearer ${getAccessToken()}`,
-        },
-      },
+      defaultOptions,
     )
       .then((res) => res.json())
       .then((data) => {
@@ -860,15 +863,15 @@ export default function TeamMatching({ user, onNavigate }) {
     user.role,
   );
   return (
-    <div className="p-2 md:p-3 lg:p-4 space-y-3 md:space-y-4">
+    <div className="min-h-full bg-surface-page p-2 font-body md:p-3 lg:p-4 space-y-3 md:space-y-4">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 mb-4 md:mb-6">
         <div>
-          <h2 className="text-xl md:text-2xl text-gray-900 dark:text-white mb-1">
+          <h2 className="mb-1 font-heading text-xl font-bold text-text-heading md:text-2xl">
             {user.role === "founder"
               ? "Browse Talent"
               : "Browse Startups"}
           </h2>
-          <p className="text-xs md:text-sm text-gray-600 dark:text-gray-400">
+          <p className="font-body text-xs text-text-body md:text-sm">
             {user.role === "founder"
               ? "Discover talent that can grow into your team"
               : user.role === "team-member"
@@ -897,7 +900,7 @@ export default function TeamMatching({ user, onNavigate }) {
                       setIsPostIdeaOpen(true);
                     }
                   }}
-                  className="bg-blue-600 hover:bg-blue-700 text-sm"
+                  className="rounded-input bg-primary font-body text-sm font-semibold text-white shadow-[0_4px_16px_rgba(58,90,254,0.20)] transition-colors duration-200 ease-in-out hover:bg-primary-hover"
                 >
                   {hasExistingPost ? (
                     <>
@@ -914,7 +917,7 @@ export default function TeamMatching({ user, onNavigate }) {
                 <Button
                   onClick={() => setShowCompensationManager(true)}
                   variant="outline"
-                  className="text-sm"
+                  className="rounded-input border border-surface-border bg-surface-card font-body text-sm font-semibold text-text-body transition-colors duration-200 ease-in-out hover:border-primary hover:bg-surface-card hover:text-primary"
                 >
                   <DollarSign className="w-4 h-4 mr-1.5" />
                   Onboarding & Comp
@@ -924,7 +927,7 @@ export default function TeamMatching({ user, onNavigate }) {
           })()}
       </div>
       {user.role === "team-member" && (
-        <Card className="border-2 border-yellow-200 bg-yellow-50 dark:bg-yellow-900/10">
+        <Card className="rounded-card border border-surface-border bg-yellow-50/90 shadow-soft dark:bg-yellow-900/10">
           <CardContent className="p-4 md:p-6">
             <div className="flex items-start gap-3">
               <div className="w-10 h-10 rounded-full bg-yellow-200 dark:bg-yellow-800 flex items-center justify-center flex-shrink-0">
@@ -954,7 +957,7 @@ export default function TeamMatching({ user, onNavigate }) {
         <>
           <div className="flex flex-col sm:flex-row gap-2 mb-4">
             <div className="flex-1 relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-muted" />
               <Input
                 placeholder={
                   user.role === "founder"
@@ -963,11 +966,11 @@ export default function TeamMatching({ user, onNavigate }) {
                 }
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-9 text-sm"
+                className="rounded-input border border-surface-border bg-surface-card pl-9 font-body text-sm text-text-heading placeholder:text-text-muted transition-shadow duration-200 ease-in-out focus-visible:border-primary focus-visible:shadow-[0_0_0_3px_rgba(58,90,254,0.10)] focus-visible:ring-0"
               />
             </div>
             <Select value={sortBy} onValueChange={setSortBy}>
-              <SelectTrigger className="w-full sm:w-40 text-sm">
+              <SelectTrigger className="w-full rounded-input border border-surface-border bg-surface-card font-body text-sm font-medium text-text-heading transition-colors duration-200 ease-in-out hover:border-primary sm:w-40 [&_svg]:text-text-body">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -980,7 +983,7 @@ export default function TeamMatching({ user, onNavigate }) {
             <>
               {pendingOnboarding.length > 0 && (
                 <div className="mb-6">
-                  <Card className="border-2 border-green-500/30 bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-950/20 dark:to-emerald-950/20">
+                  <Card className="rounded-card border border-surface-border bg-gradient-to-br from-green-50 to-emerald-50 shadow-soft dark:from-green-950/20 dark:to-emerald-950/20">
                     <CardHeader className="pb-3">
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
@@ -1007,7 +1010,7 @@ export default function TeamMatching({ user, onNavigate }) {
                         {pendingOnboarding.map((talent) => (
                           <Card
                             key={talent.id}
-                            className="border border-green-200 dark:border-green-800"
+                            className="rounded-card border border-surface-border bg-surface-card shadow-soft dark:border-surface-border"
                           >
                             <CardContent className="p-4">
                               <div className="flex items-start justify-between mb-3">
@@ -1055,7 +1058,7 @@ export default function TeamMatching({ user, onNavigate }) {
               {teamRecommendations.length > 0 &&
                 recommendedTalent.length > 0 && (
                   <div className="mb-6">
-                    <Card className="border-2 border-primary/20 bg-gradient-to-br from-primary/5 to-primary/10">
+                    <Card className="rounded-card border border-surface-border bg-gradient-to-br from-primary/5 to-primary/10 shadow-soft">
                       <CardHeader className="pb-3">
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-2">
@@ -1086,7 +1089,7 @@ export default function TeamMatching({ user, onNavigate }) {
                             {teamRecommendations.slice(0, 3).map((rec) => (
                               <div
                                 key={rec.id}
-                                className="p-3 rounded-lg border bg-background/50"
+                                className="rounded-input bg-surface-page p-3 shadow-soft"
                               >
                                 <div className="flex items-start justify-between mb-1">
                                   <p className="font-medium text-sm">
@@ -1133,7 +1136,7 @@ export default function TeamMatching({ user, onNavigate }) {
                             {recommendedTalent.map((member) => (
                               <Card
                                 key={member.id}
-                                className="relative hover:shadow-md transition-shadow"
+                                className="relative rounded-card border border-surface-border bg-surface-card shadow-soft transition-shadow duration-200 ease-in-out hover:shadow-[0_4px_16px_rgba(0,0,0,0.08)]"
                               >
                                 <CardContent className="p-3">
                                   {member.matchScore && (
@@ -1219,7 +1222,7 @@ export default function TeamMatching({ user, onNavigate }) {
                   </div>
                 )}
               {(!user.onboardingComplete || !user.profile) && (
-                <Card className="border-2 border-orange-200 bg-orange-50/50 dark:bg-orange-950/20 mb-4">
+                <Card className="mb-4 rounded-card border border-surface-border bg-orange-50/50 shadow-soft dark:bg-orange-950/20">
                   <CardContent className="p-4">
                     <div className="flex items-start gap-3">
                       <AlertCircle className="w-5 h-5 text-orange-600 flex-shrink-0 mt-0.5" />
@@ -1236,19 +1239,19 @@ export default function TeamMatching({ user, onNavigate }) {
                   </CardContent>
                 </Card>
               )}
-              <div className="border-t pt-4">
-                <h3 className="text-base font-semibold mb-3 flex items-center gap-2">
-                  <Search className="w-4 h-4" />
+              <div className="pt-6">
+                <h3 className="mb-3 flex items-center gap-2 font-heading text-base font-semibold text-text-heading">
+                  <Search className="h-4 w-4 text-primary" />
                   Browse Talent
                 </h3>
                 {filteredTalent.length === 0 ? (
-                  <Card className="border-2 border-dashed">
+                  <Card className="rounded-card border-0 bg-surface-card shadow-soft">
                     <CardContent className="flex flex-col items-center justify-center py-12">
-                      <Users className="w-16 h-16 text-gray-300 mb-4" />
-                      <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
+                      <Users className="mb-4 h-16 w-16 text-surface-border" />
+                      <h3 className="mb-2 font-heading text-lg font-semibold text-text-heading">
                         No talent profiles yet
                       </h3>
-                      <p className="text-sm text-gray-500 dark:text-gray-400 text-center max-w-md">
+                      <p className="max-w-md text-center font-body text-sm text-text-muted">
                         Check back soon! Talented people are joining
                         StartupVerse every day.
                       </p>
@@ -1257,7 +1260,7 @@ export default function TeamMatching({ user, onNavigate }) {
                 ) : (
                   <div className="grid gap-4 md:grid-cols-3">
                     {filteredTalent.map((member) => (
-                      <Card key={member.id} className="relative">
+                      <Card key={member.id} className="relative rounded-card border border-surface-border bg-surface-card shadow-soft transition-shadow duration-200 ease-in-out hover:shadow-[0_4px_16px_rgba(0,0,0,0.08)]">
                         <CardContent className="p-4">
                           {member.matchScore && member.matchScore >= 40 && (
                             <Badge
@@ -1396,7 +1399,7 @@ export default function TeamMatching({ user, onNavigate }) {
           {user.role === "talent" && (
             <div className="space-y-3">
               {filteredIdeas.length === 0 ? (
-                <Card className="bg-purple-50 dark:bg-purple-950/20 border-purple-200 dark:border-purple-900">
+                <Card className="rounded-card border border-surface-border bg-purple-50 shadow-soft dark:bg-purple-950/20">
                   <CardContent className="p-4 text-center">
                     <Rocket className="w-8 h-8 mx-auto mb-2 text-purple-600 dark:text-purple-400" />
                     <p className="text-sm mb-1">No startup ideas found</p>
@@ -1409,7 +1412,7 @@ export default function TeamMatching({ user, onNavigate }) {
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   {filteredIdeas.map((idea) => (
-                    <Card key={idea.id} className="flex flex-col">
+                    <Card key={idea.id} className="flex flex-col rounded-card border border-surface-border bg-surface-card shadow-soft transition-shadow duration-200 ease-in-out hover:shadow-[0_4px_16px_rgba(0,0,0,0.08)]">
                       <CardContent className="p-4 flex flex-col flex-1">
                         <div className="flex items-start gap-3 mb-3">
                           <Avatar className="w-10 h-10">
@@ -2196,7 +2199,7 @@ export default function TeamMatching({ user, onNavigate }) {
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-4 mt-6">
-              <Card className="hover:shadow-lg transition-shadow border-2 border-primary/20">
+              <Card className="rounded-card border border-surface-border bg-surface-card shadow-soft transition-shadow duration-200 ease-in-out hover:shadow-[0_4px_16px_rgba(0,0,0,0.08)]">
                 <CardHeader className="pb-3">
                   <div className="flex items-start justify-between mb-2">
                     <div className="flex items-start gap-3 flex-1">
@@ -2581,9 +2584,9 @@ export default function TeamMatching({ user, onNavigate }) {
         onInvite={handleSendInvitation}
       />
       {showCompensationManager && (
-        <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4">
-          <div className="w-full max-w-6xl h-[90vh] bg-background rounded-lg shadow-xl overflow-hidden flex flex-col">
-            <div className="flex items-center justify-between p-4 border-b">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sv-modal-backdrop">
+          <div className="sv-modal-panel flex h-[90vh] w-full max-w-6xl flex-col overflow-hidden rounded-[16px] border-0 bg-white shadow-modal">
+            <div className="flex items-center justify-between border-b border-[#e2e4f0] p-4">
               <h2 className="text-xl font-bold flex items-center gap-2">
                 <DollarSign className="w-6 h-6 text-primary" />
                 Team Onboarding & Compensation

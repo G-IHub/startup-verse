@@ -23,6 +23,8 @@ organizationsRouter.post(
 organizationsRouter.get("/organizations/:orgId", requireAuth, asyncHandler(organizationsController.getOrganizationById));
 organizationsRouter.put("/organizations/:orgId/update", requireAuth, requireOrgAdmin, asyncHandler(organizationsController.updateOrganization));
 organizationsRouter.put("/organizations/:orgId/logo", requireAuth, requireOrgAdmin, asyncHandler(organizationsController.updateOrganizationLogo));
+// Blueprint §14 verb alias: POST /organizations/:orgId/logo
+organizationsRouter.post("/organizations/:orgId/logo", requireAuth, requireOrgAdmin, asyncHandler(organizationsController.updateOrganizationLogo));
 
 organizationsRouter.get("/organizations/:orgId/admins", requireAuth, asyncHandler(organizationsController.getOrganizationAdmins));
 organizationsRouter.post("/organizations/:orgId/admins", requireAuth, requireOrgAdmin, asyncHandler(organizationsController.addOrganizationAdmin));

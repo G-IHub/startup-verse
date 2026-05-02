@@ -128,6 +128,12 @@ export default function NotificationCenter({ onNavigate }) {
       // Parse the actionUrl to determine the page and extract IDs
       const url = notification.actionUrl;
 
+      if (url.startsWith("/?")) {
+        window.location.href = url;
+        setOpen(false);
+        return;
+      }
+
       // 🔥 NEW: Handle Virtual Office room URLs (event reminders with meeting links)
       // Check if URL is a Virtual Office room URL (contains /room/ or /office/room/)
       if (url.includes("/room/") || url.includes("/office/room/")) {

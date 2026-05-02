@@ -3,10 +3,17 @@
  * Run this from browser console to verify backend deployment
  */
 
-import { getAccessToken } from "../app/session";
 import { API_BASE_URL } from "../config/apiBase.js";
 
 const BASE_URL = API_BASE_URL;
+
+// Default fetch options for cookie-based auth
+const defaultOptions = {
+  credentials: "include",
+  headers: {
+    "Content-Type": "application/json",
+  },
+};
 
 export async function testBackendConnection() {
   console.log("🧪 Testing StartupVerse Backend Connection...\n");
@@ -55,11 +62,8 @@ export async function testBackendConnection() {
     };
 
     const response = await fetch(`${BASE_URL}/presence/update`, {
+      ...defaultOptions,
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${getAccessToken()}`,
-      },
       body: JSON.stringify(testData),
     });
 
@@ -86,10 +90,8 @@ export async function testBackendConnection() {
   console.log("Test 3: Get Activities (GET)");
   try {
     const response = await fetch(`${BASE_URL}/presence/test-startup`, {
+      ...defaultOptions,
       method: "GET",
-      headers: {
-        Authorization: `Bearer ${getAccessToken()}`,
-      },
     });
 
     const data = await response.json();

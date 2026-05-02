@@ -428,8 +428,8 @@ export default function MilestoneDetailView({
   const milestoneCount = draftMilestones.length;
 
   return (
-    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-3">
-      <Card className="w-full sm:max-w-lg max-h-[85vh] overflow-y-auto">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sv-modal-backdrop">
+      <Card className="sv-modal-panel max-h-[85vh] w-full overflow-y-auto rounded-[16px] border-0 shadow-modal sm:max-w-lg">
         <CardHeader className="pb-2 pt-3 border-b flex-shrink-0">
           <div className="flex items-start justify-between">
             <div className="flex-1">
@@ -1024,8 +1024,8 @@ export default function MilestoneDetailView({
         </div>
       </Card>
       {blockingTaskId && (
-        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-[60] p-4">
-          <Card className="w-full sm:max-w-lg">
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 sv-modal-backdrop">
+          <Card className="sv-modal-panel w-full rounded-[16px] border-0 shadow-modal sm:max-w-lg">
             <CardHeader className="pb-2 pt-3">
               <CardTitle className="flex items-center gap-2 text-base">
                 <AlertCircle className="w-5 h-5 text-orange-500" />
@@ -1119,7 +1119,7 @@ export default function MilestoneDetailView({
       )}
       {deleteConfirm && (
         <div
-          className="fixed inset-0 bg-black/70 flex items-center justify-center z-[70] p-4"
+          className="fixed inset-0 z-[70] flex items-center justify-center p-4 sv-modal-backdrop"
           role="presentation"
           onClick={() => !committing && setDeleteConfirm(null)}
         >
@@ -1127,7 +1127,7 @@ export default function MilestoneDetailView({
             role="dialog"
             aria-modal="true"
             aria-labelledby="delete-confirm-title"
-            className="w-full max-w-md shadow-lg"
+            className="sv-modal-panel w-full max-w-md rounded-[16px] border-0 shadow-modal"
             onClick={(e) => e.stopPropagation()}
           >
             <CardHeader className="pb-2 pt-4 px-4 border-b">

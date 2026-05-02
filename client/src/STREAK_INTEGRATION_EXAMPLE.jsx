@@ -91,7 +91,7 @@ function ExampleFounderDashboard({ user }) {
       )}
       <div className="grid md:grid-cols-2 gap-3" />
       {showLeaderboard && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sv-modal-backdrop">
           <div className="max-w-2xl w-full">
             <StreakLeaderboard
               currentUser={user}

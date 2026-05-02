@@ -3,9 +3,17 @@
  * Handles authentication and account management
  */
 
-const API_BASE = API_BASE_URL;
-import { getAccessToken } from "../../app/session";
 import { API_BASE_URL } from "../../config/apiBase.js";
+
+const API_BASE = API_BASE_URL;
+
+// Default fetch options for cookie-based auth
+const defaultOptions = {
+  credentials: "include",
+  headers: {
+    "Content-Type": "application/json",
+  },
+};
 
 /**
  * Delete user account
@@ -14,11 +22,8 @@ import { API_BASE_URL } from "../../config/apiBase.js";
 export async function deleteAccount(userId) {
   try {
     const response = await fetch(`${API_BASE}/auth/account/${userId}`, {
+      ...defaultOptions,
       method: "DELETE",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${getAccessToken()}`,
-      },
     });
 
     const data = await response.json();

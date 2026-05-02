@@ -2,6 +2,7 @@ import User from "../models/User.js";
 import Notification from "../models/Notification.js";
 import { error as apiError, success as apiSuccess } from "../utils/apiResponse.js";
 import { sanitizeUser } from "../utils/sanitize.js";
+import { USER_ROLES } from "../utils/enums.js";
 
 // - Get user by ID
 export const getUserById = async (req, res) => {
@@ -10,6 +11,34 @@ export const getUserById = async (req, res) => {
     return apiError(res, "User not found.", 404);
   }
   return apiSuccess(res, sanitizeUser(user));
+};
+
+// Blueprint §14: POST /api/v1/users/ — admin-only create user
+export const createUser = async (req, res) => {
+  if (req.user?.isAdmin !== true) {
+    return apiError(res, "Forbidden. Admin only.", 403);
+  }
+  const { name, email, password, role } = req.body || {};
+  if (!name || !email || !password) {
+    return apiError(res, "name, email, and password are required.", 400);
+  }
+  const normalizedEmail = String(email).toLowerCase().trim();
+  const existing = await User.findOne({ email: normalizedEmail });
+  if (existing) {
+    return apiError(res, "Account already exists.", 409);
+  }
+  const requestedRole = String(role || "founder").toLowerCase();
+  const finalRole = USER_ROLES.includes(requestedRole)
+    ? requestedRole
+    : "founder";
+  const user = await User.create({
+    name: String(name).trim(),
+    email: normalizedEmail,
+    password: String(password),
+    role: finalRole,
+    isAdmin: false,
+  });
+  return apiSuccess(res, sanitizeUser(user), 201);
 };
 
 // - Search user by email

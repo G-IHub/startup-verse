@@ -44,7 +44,9 @@ Use this after automated smoke scripts pass. Check each box when verified in a s
 
 ## Regression scripts (local)
 
-**One-shot (recommended):** from `server/` run `node scripts/alignment-gate-smoke.mjs` or `npm run test:alignment-gate` (Phase 1 contract + all-controller envelopes + client path inventory + client/server route prefixes + HTTP envelope sample, then Phase 2–3 smokes).
+**One-shot automated verify (recommended before manual QA):** from `server/` run `npm run verify:release` — full **alignment gate** plus **`client` production build**. Optional: `VERIFY_HTTP_FLOWS=1 npm run verify:release` also runs Phase 1.3 HTTP contract flows (requires Mongo + full `.env`).
+
+**Alignment gate only:** `node scripts/alignment-gate-smoke.mjs` or `npm run test:alignment-gate` (Phase 1 contract + all-controller envelopes + client path inventory + client/server route prefixes + HTTP envelope sample, then Phase 2–9 smokes).
 
 Or individually:
 

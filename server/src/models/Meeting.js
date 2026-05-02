@@ -2,7 +2,7 @@ import mongoose from "mongoose";
 
 const meetingSchema = new mongoose.Schema(
   {
-    startupId: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true, index: true },
+    startupId: { type: mongoose.Schema.Types.ObjectId, ref: "Startup", required: true, index: true },
     organizerId: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true, index: true },
     title: { type: String, required: true },
     description: { type: String, default: "" },

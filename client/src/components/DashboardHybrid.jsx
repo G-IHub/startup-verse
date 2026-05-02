@@ -56,6 +56,11 @@ const PageLoadingFallback = () => (
     </div>
   </div>
 );
+
+const showCompensationDemo =
+  import.meta.env.DEV ||
+  import.meta.env.VITE_INCLUDE_COMPENSATION_DEMO === "true";
+
 export default function DashboardHybrid({ user, onLogout, onUpdateUser }) {
   // For founders and talent, default to 'dashboard' (homepage)
   // For team members, also default to 'dashboard' (team member home)
@@ -355,8 +360,15 @@ export default function DashboardHybrid({ user, onLogout, onUpdateUser }) {
           </Suspense>
         );
 
-      // Compensation Demo (for testing)
       case "compensation-demo":
+        if (!showCompensationDemo) {
+          return (
+            <div className="flex min-h-[320px] items-center justify-center p-6 text-center text-sm text-muted-foreground">
+              Compensation demo is disabled. Set VITE_INCLUDE_COMPENSATION_DEMO=true
+              for staging, or use a development build.
+            </div>
+          );
+        }
         return (
           <Suspense fallback={<PageLoadingFallback />}>
             <CompensationDemoPage user={user} />

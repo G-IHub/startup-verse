@@ -1,8 +1,15 @@
 // Team Messaging Utilities - Real Backend Integration
 
-import { getAccessToken } from "../app/session";
 import { API_BASE_URL } from "../config/apiBase.js";
 import { request } from "./backendClient";
+
+// Default fetch options for cookie-based auth
+const defaultOptions = {
+  credentials: "include",
+  headers: {
+    "Content-Type": "application/json",
+  },
+};
 
 const API_BASE = API_BASE_URL;
 
@@ -321,9 +328,7 @@ export async function uploadMessageFile(file, startupId, senderId, options = {})
 
     const response = await fetch(`${API_BASE}/messages/upload-file`, {
       method: "POST",
-      headers: {
-        Authorization: `Bearer ${getAccessToken()}`,
-      },
+      credentials: "include",
       body: formData,
     });
 

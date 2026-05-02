@@ -43,6 +43,29 @@ export default {
         soft: "0 2px 12px rgba(0, 0, 0, 0.06)",
         focus: "0 0 0 3px rgba(58, 90, 254, 0.10)",
         card: "0 4px 24px rgba(58, 90, 254, 0.08)",
+        modal: "0 8px 40px rgba(58, 90, 254, 0.14)",
+      },
+      keyframes: {
+        /* Opacity only — do not animate `transform` here: Tailwind v4 centers
+           dialogs via the `translate` property (-50%/-50%), and keyframe
+           `transform` composes with it and breaks centering (modal jumps top-left). */
+        svModalCenteredIn: {
+          from: { opacity: "0" },
+          to: { opacity: "1" },
+        },
+        svModalCenteredOut: {
+          from: { opacity: "1" },
+          to: { opacity: "0" },
+        },
+        svModalPanelIn: {
+          from: { opacity: "0", transform: "translateY(12px)" },
+          to: { opacity: "1", transform: "translateY(0)" },
+        },
+      },
+      animation: {
+        "sv-modal-centered-in": "svModalCenteredIn 0.2s ease forwards",
+        "sv-modal-centered-out": "svModalCenteredOut 0.2s ease forwards",
+        "sv-modal-panel-in": "svModalPanelIn 0.2s ease forwards",
       },
     },
   },

@@ -3,17 +3,21 @@
  * These functions call the backend to create notifications for various platform events
  */
 
-import { getAccessToken } from "../app/session";
 import { API_BASE_URL } from "../config/apiBase.js";
+
+// Default fetch options for cookie-based auth
+const defaultOptions = {
+  credentials: "include",
+  headers: {
+    "Content-Type": "application/json",
+  },
+};
 
 async function createNotification(payload) {
   try {
     const response = await fetch(`${API_BASE_URL}/notifications`, {
+      ...defaultOptions,
       method: "POST",
-      headers: {
-        Authorization: `Bearer ${getAccessToken()}`,
-        "Content-Type": "application/json",
-      },
       body: JSON.stringify(payload),
     });
 
@@ -28,9 +32,35 @@ async function createNotification(payload) {
 /**
  * Trigger when a team member is invited
  */
-export async function notifyTeamMemberInvited(params) {
-  // Note: This would require email-based notification or waiting until the user signs up
-  console.log("Team member invited:", params);
+export async function notifyTeamMemberInvited(params = {}) {
+  const {
+    founderId,
+    teamMemberUserId,
+    talentUserId,
+    invitationToken,
+    startupName = "",
+    message = "",
+  } = params;
+  const inviteeId = teamMemberUserId || talentUserId;
+  if (inviteeId) {
+    await createNotification({
+      userId: inviteeId,
+      type: "team-invitation",
+      title: "Team invitation",
+      message:
+        message ||
+        (startupName
+          ? `You've been invited to join ${startupName}.`
+          : "You've been invited to join a team on StartupVerse."),
+      actionUrl: invitationToken
+        ? `/?invitation=${encodeURIComponent(invitationToken)}`
+        : "/?view=virtual-office",
+      metadata: {
+        founderId: founderId ? String(founderId) : "",
+        invitationToken: invitationToken || "",
+      },
+    });
+  }
 }
 
 /**

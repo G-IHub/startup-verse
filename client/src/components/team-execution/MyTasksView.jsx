@@ -436,8 +436,8 @@ export default function MyTasksView({ userId, userName, founderId }) {
         );
       })}
       {blockingTaskId && (
-        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
-          <Card className="max-w-md w-full">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sv-modal-backdrop">
+          <Card className="sv-modal-panel w-full max-w-md rounded-[16px] border-0 shadow-modal">
             <CardHeader>
               <div className="flex items-start justify-between">
                 <div>

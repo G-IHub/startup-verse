@@ -4,10 +4,17 @@
  * Handles all API calls for Talent users to the backend.
  * Follows the same pattern as founderApi and teamMemberApi.
  */
-import { getAccessToken } from "../../app/session";
 import { API_BASE_URL } from "../../config/apiBase.js";
 
 const API_BASE = API_BASE_URL;
+
+// Default fetch options for cookie-based auth
+const defaultOptions = {
+  credentials: "include",
+  headers: {
+    "Content-Type": "application/json",
+  },
+};
 
 // Pagination types
 
@@ -16,10 +23,10 @@ async function apiCall(endpoint, options = {}) {
   const url = `${API_BASE}${endpoint}`;
 
   const response = await fetch(url, {
+    ...defaultOptions,
     ...options,
     headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${getAccessToken()}`,
+      ...defaultOptions.headers,
       ...options.headers,
     },
   });

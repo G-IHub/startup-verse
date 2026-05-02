@@ -1,10 +1,108 @@
 /**
  * Admin Analytics Utilities - FIXED VERSION
  *
- * Collects real-time platform data from ALL localStorage sources
+ * Prefers server snapshot (MongoDB) when the admin is authenticated; falls
+ * back to legacy localStorage aggregation.
  */
 
 import { STORAGE_KEYS } from "../app/session";
+import { API_BASE_URL } from "../config/apiBase.js";
+
+let serverSnapshotPromise = null;
+
+async function fetchServerSnapshot() {
+  try {
+    const r = await fetch(`${API_BASE_URL}/admin/analytics/snapshot`, {
+      credentials: "include",
+    });
+    if (!r.ok) return null;
+    const p = await r.json();
+    return p.success && p.data ? p.data : null;
+  } catch {
+    return null;
+  }
+}
+
+function getServerSnapshot() {
+  if (!serverSnapshotPromise) {
+    serverSnapshotPromise = fetchServerSnapshot();
+  }
+  return serverSnapshotPromise;
+}
+
+function mapSnapshotToPlatformAnalytics(snap) {
+  const { stats, startups } = snap;
+  const oneWeekAgo = new Date(Date.now() - 7 * 86400000);
+  const oneMonthAgo = new Date(Date.now() - 30 * 86400000);
+  const users = snap.users || [];
+  const newThisWeek = users.filter(
+    (u) => u.createdAt && new Date(u.createdAt) > oneWeekAgo,
+  ).length;
+  const newThisMonth = users.filter(
+    (u) => u.createdAt && new Date(u.createdAt) > oneMonthAgo,
+  ).length;
+  const activeThisWeek = users.filter(
+    (u) => u.lastActive && new Date(u.lastActive) > oneWeekAgo,
+  ).length;
+
+  const byRegion = {};
+  users.forEach((u) => {
+    const region = u.location || "Unknown";
+    byRegion[region] = (byRegion[region] || 0) + 1;
+  });
+
+  return {
+    users: {
+      total: stats.usersTotal,
+      founders: stats.foundersCount,
+      teamMembers: stats.teamCount,
+      talent: stats.talentCount,
+      newThisWeek,
+      newThisMonth,
+      activeThisWeek,
+      byRegion,
+    },
+    startups: {
+      total: stats.startupsTotal,
+      byStage: startups?.byStage || {},
+      byIndustry: startups?.byIndustry || {},
+      averageTeamSize:
+        stats.startupsTotal > 0 && stats.teamCount > 0
+          ? Math.round((stats.teamCount / stats.startupsTotal) * 10) / 10
+          : 0,
+    },
+    outcomes: {
+      total: stats.outcomesTotal,
+      completed: stats.outcomesCompleted,
+      inProgress: Math.max(0, stats.outcomesTotal - stats.outcomesCompleted),
+      completionRate:
+        stats.outcomesTotal === 0
+          ? 0
+          : Math.round((stats.outcomesCompleted / stats.outcomesTotal) * 100),
+      thisWeek: 0,
+    },
+    tasks: {
+      total: stats.tasksTotal,
+      completed: stats.tasksCompleted,
+      inProgress: Math.max(0, stats.tasksTotal - stats.tasksCompleted),
+      completionRate:
+        stats.tasksTotal === 0
+          ? 0
+          : Math.round((stats.tasksCompleted / stats.tasksTotal) * 100),
+    },
+    engagement: {
+      dailyActiveUsers: activeThisWeek,
+      weeklyActiveUsers: activeThisWeek,
+      monthlyActiveUsers: newThisMonth,
+      averageSessionsPerUser:
+        stats.usersTotal > 0
+          ? Math.round(
+              ((stats.tasksTotal + stats.outcomesTotal) / stats.usersTotal) * 10,
+            ) / 10
+          : 0,
+    },
+  };
+}
 
 /**
  * Helper: Check if role is team member (handles variations)
@@ -29,6 +127,14 @@ function normalizeRole(role) {
  * Get all users from ALL localStorage sources
  */
 export async function getAllUsers() {
+  const snap = await getServerSnapshot();
+  if (snap?.users?.length) {
+    return snap.users.map((u) => ({
+      ...u,
+      role: normalizeRole(u.role),
+    }));
+  }
+
   console.log("🔍 [Analytics] Starting comprehensive user fetch...");
 
   const userMap = new Map();
@@ -297,6 +403,11 @@ export async function getAllUsers() {
  * Get comprehensive platform analytics
  */
 export async function getPlatformAnalytics() {
+  const snap = await getServerSnapshot();
+  if (snap) {
+    return mapSnapshotToPlatformAnalytics(snap);
+  }
+
   console.log("📊 [Analytics] Starting comprehensive analytics calculation...");
 
   const users = await getAllUsers();
@@ -497,6 +608,11 @@ export async function getPlatformAnalytics() {
  * Get user growth data for charts (last 30 days)
  */
 export async function getUserGrowthData() {
+  const snap = await getServerSnapshot();
+  if (snap?.growthData?.length) {
+    return snap.growthData;
+  }
+
   const users = await getAllUsers();
   const now = new Date();
   const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
@@ -546,6 +662,11 @@ export async function getUserGrowthData() {
  * Get outcome completion rate over time (last 8 weeks)
  */
 export async function getOutcomeCompletionTrend() {
+  const snap = await getServerSnapshot();
+  if (snap?.outcomeTrend?.length) {
+    return snap.outcomeTrend;
+  }
+
   const users = await getAllUsers();
   const now = new Date();
 
@@ -602,6 +723,11 @@ export async function getOutcomeCompletionTrend() {
  * Get top performing users (by outcomes completed)
  */
 export async function getTopPerformers(limit = 10) {
+  const snap = await getServerSnapshot();
+  if (snap?.topPerformers?.length) {
+    return snap.topPerformers.slice(0, limit);
+  }
+
   const users = await getAllUsers();
 
   return users

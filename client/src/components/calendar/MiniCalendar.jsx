@@ -289,11 +289,11 @@ export default function MiniCalendar({
       </Card>
       {selectedDate && selectedDateEvents.length > 0 && (
         <div
-          className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 sv-modal-backdrop"
           onClick={() => setSelectedDate(null)}
         >
           <Card
-            className="w-full max-w-lg max-h-[80vh] overflow-auto"
+            className="sv-modal-panel max-h-[80vh] w-full max-w-lg overflow-auto rounded-[16px] border-0 shadow-modal"
             onClick={(e) => e.stopPropagation()}
           >
             <CardContent className="p-4">
@@ -376,11 +376,11 @@ export default function MiniCalendar({
       )}
       {selectedEvent && (
         <div
-          className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 sv-modal-backdrop"
           onClick={() => setSelectedEvent(null)}
         >
           <Card
-            className="w-full max-w-xl"
+            className="sv-modal-panel w-full max-w-xl rounded-[16px] border-0 shadow-modal"
             onClick={(e) => e.stopPropagation()}
           >
             <CardContent className="p-6">

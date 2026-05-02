@@ -45,8 +45,8 @@ import {
   selectUnreadCount,
 } from "../../state/useNotificationsStore";
 
-// 🔥 REMOVED: OrganizationEventsWidget and OrganizationAnnouncementsWidget
-// Events appear in Virtual Office updates/calendar, announcements in inbox
+import OrganizationAnnouncementsWidget from "../organizations/OrganizationAnnouncementsWidget";
+import OrganizationEventsWidget from "../organizations/OrganizationEventsWidget";
 import { checkAndSendEventReminders } from "../../utils/eventReminders";
 import {
   Rocket,
@@ -409,11 +409,11 @@ https://startupverse.com/12-week-challenge
       </Card>
       {showBreakdown && scoreData && (
         <div
-          className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 sv-modal-backdrop"
           onClick={() => setShowBreakdown(false)}
         >
           <Card
-            className="w-full max-w-md"
+            className="sv-modal-panel w-full max-w-md rounded-[16px] border-0 shadow-modal"
             onClick={(e) => e.stopPropagation()}
           >
             <CardHeader>
@@ -1740,8 +1740,8 @@ export default function FounderDashboard({
         />
       )}
       {showSkipWarning && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <Card className="max-w-md w-full">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sv-modal-backdrop">
+          <Card className="sv-modal-panel w-full max-w-md rounded-[16px] border-0 shadow-modal">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <AlertCircle className="w-5 h-5 text-orange-500" />
@@ -2238,7 +2238,7 @@ export default function FounderDashboard({
                                       {isSubmitted ? (
                                         <Badge
                                           variant="outline"
-                                          className={`text-[7px] ${deliverable.mySubmission.status === "approved" ? "bg-green-500/10 text-green-700 dark:text-green-400 border-green-500/20" : deliverable.mySubmission.status === "needs-revision" ? "bg-yellow-500/10 text-yellow-700 dark:text-yellow-400 border-yellow-500/20" : "bg-purple-500/10 text-purple-700 dark:text-purple-400 border-purple-500/20"}`}
+                                          className={`text-[7px] ${deliverable.mySubmission.status === "approved" ? "bg-green-500/10 text-green-700 dark:text-green-400 border-green-500/20" : deliverable.mySubmission.status === "revision_requested" || deliverable.mySubmission.status === "needs-revision" ? "bg-yellow-500/10 text-yellow-700 dark:text-yellow-400 border-yellow-500/20" : deliverable.mySubmission.status === "rejected" ? "bg-red-500/10 text-red-700 dark:text-red-400 border-red-500/20" : "bg-purple-500/10 text-purple-700 dark:text-purple-400 border-purple-500/20"}`}
                                         >
                                           {deliverable.mySubmission.status}
                                         </Badge>
@@ -2406,6 +2406,15 @@ export default function FounderDashboard({
               </Card>
             </div>
           </div>
+            {founderId ? (
+              <div className="mt-4 grid shrink-0 grid-cols-1 gap-4 lg:grid-cols-2">
+                <OrganizationAnnouncementsWidget founderId={founderId} />
+                <OrganizationEventsWidget
+                  founderId={founderId}
+                  founderName={user.name || ""}
+                />
+              </div>
+            ) : null}
             <div className="min-h-6 flex-1 basis-0 sm:min-h-8" aria-hidden />
             <div className="mb-12 flex-shrink-0 md:mb-16">
               <div className="flex flex-col gap-3 border-t border-surface-border bg-surface-page py-3 md:flex-row md:items-center md:justify-between md:gap-4 md:px-1">

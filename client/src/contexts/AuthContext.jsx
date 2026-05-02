@@ -1,51 +1,50 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
+import { authApi } from "../api/authApi";
 import { setAdminFlag } from "../utils/adminHelpers";
-import {
-  clearAuthSession,
-  ensureSessionMigration,
-  getAccessToken,
-  setAccessToken,
-  setSessionUser,
-} from "../app/session";
 const AuthContext = createContext(undefined);
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
-  const [token, setToken] = useState("");
   const [isLoading, setIsLoading] = useState(true);
 
-  // Load auth session on mount
+  // Load auth session on mount - fetch from server using cookie
   useEffect(() => {
-    try {
-      const session = ensureSessionMigration();
-      if (session?.user) {
-        // Automatically set admin flag based on email
-        const userWithAdmin = setAdminFlag(session.user);
-        setUser(userWithAdmin);
+    const loadSession = async () => {
+      try {
+        const currentUser = await authApi.me();
+        if (currentUser) {
+          // Automatically set admin flag based on email
+          const userWithAdmin = setAdminFlag(currentUser);
+          setUser(userWithAdmin);
+        }
+      } catch (error) {
+        // Not authenticated or session expired - user stays null
+        console.log("No active session found");
+      } finally {
+        setIsLoading(false);
       }
-      setToken(getAccessToken());
-    } catch (error) {
-      console.error("Error loading auth session:", error);
-    } finally {
-      setIsLoading(false);
-    }
+    };
+
+    loadSession();
   }, []);
 
   const updateUser = (nextUser) => {
     const normalized = nextUser ? setAdminFlag(nextUser) : null;
     setUser(normalized);
-    setSessionUser(normalized);
   };
 
-  const login = ({ user: nextUser, accessToken = "" }) => {
-    setAccessToken(accessToken);
-    setToken(accessToken || "");
+  const login = ({ user: nextUser }) => {
+    // Token is now stored in HttpOnly cookie by the server
+    // No need to store it in localStorage
     updateUser(nextUser);
   };
 
-  const logout = () => {
-    clearAuthSession();
+  const logout = async () => {
+    try {
+      await authApi.logout();
+    } catch (error) {
+      console.error("Logout API call failed:", error);
+    }
     setUser(null);
-    setToken("");
   };
 
   return (
@@ -53,7 +52,6 @@ export function AuthProvider({ children }) {
       value={{
         user,
         setUser: updateUser,
-        token,
         login,
         logout,
         isLoading,

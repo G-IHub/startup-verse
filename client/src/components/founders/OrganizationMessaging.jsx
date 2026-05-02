@@ -15,7 +15,13 @@ import { Input } from "../ui/input";
 import { Textarea } from "../ui/textarea";
 import { Badge } from "../ui/badge";
 import { Plus, MessageSquare, Send, Mail, MailOpen } from "lucide-react";
-import { getAccessToken } from "../../app/session";
+
+// Default fetch options for cookie-based auth
+
+const defaultOptions = {
+  credentials: "include",
+  headers: { "Content-Type": "application/json" },
+};
 
 export default function OrganizationMessaging({
   founderId,
@@ -40,9 +46,7 @@ export default function OrganizationMessaging({
       const response = await fetch(
         `${API_BASE_URL}/messages/${founderId}`,
         {
-          headers: {
-            Authorization: `Bearer ${getAccessToken()}`,
-          },
+          ...defaultOptions,
         },
       );
       if (!response.ok) throw new Error("Failed to fetch messages");
@@ -70,11 +74,8 @@ export default function OrganizationMessaging({
       const response = await fetch(
         `${API_BASE_URL}/messages/send-from-founder`,
         {
+          ...defaultOptions,
           method: "POST",
-          headers: {
-            Authorization: `Bearer ${getAccessToken()}`,
-            "Content-Type": "application/json",
-          },
           body: JSON.stringify({
             cohortId: cohort.id,
             organizationId: cohort.organizationId,

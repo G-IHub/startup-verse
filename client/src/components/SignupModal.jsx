@@ -104,14 +104,14 @@ export default function SignupModal({ role, onClose, onSignup }) {
   const roleContent = getRoleContent();
   return (
     <div
-      className="fixed inset-0 bg-black/60 backdrop-blur-md flex items-center justify-center p-2 z-50 animate-in fade-in duration-200"
+      className="fixed inset-0 z-50 flex animate-in fade-in items-center justify-center p-2 duration-200 sv-modal-backdrop"
       onClick={handleBackdropClick}
     >
-      <Card className="w-full max-w-xs relative shadow-2xl animate-in zoom-in-95 duration-300 border-2">
+      <Card className="sv-modal-panel relative w-full max-w-xs rounded-[16px] border-0 shadow-modal">
         <Button
           variant="ghost"
           size="icon"
-          className="absolute right-1 top-1 z-10 hover:bg-muted h-6 w-6"
+          className="absolute right-1 top-1 z-10 h-6 w-6 rounded-lg bg-transparent text-[#a0a0b0] transition-all duration-200 hover:bg-[#f4f5ff] hover:text-[#0d0d0d]"
           onClick={onClose}
         >
           <X className="w-3 h-3" />

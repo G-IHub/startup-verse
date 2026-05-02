@@ -621,11 +621,13 @@ export default function ProfileCompletionModal({
       }}
       className="fixed inset-0 z-50 flex items-start justify-center p-4 sm:pt-8"
     >
-      <div className="absolute inset-0 bg-background/55" />
-      <div className="relative bg-background border border-border rounded-xl w-full max-w-xl max-h-[90vh] flex flex-col overflow-hidden">
-        <div className="shrink-0 bg-background border-b border-border p-4 sm:p-5 flex items-start justify-between">
+      <div className="absolute inset-0 sv-modal-backdrop" />
+      <div className="sv-modal-panel relative flex max-h-[90vh] w-full max-w-xl flex-col overflow-hidden rounded-[16px] border-0 shadow-modal">
+        <div className="flex shrink-0 items-start justify-between border-b border-[#e2e4f0] bg-white p-4 sm:p-5">
           <div className="flex-1">
-            <h2 className="text-lg font-bold mb-0.5">Complete Your Profile</h2>
+            <h2 className="font-heading mb-0.5 text-lg font-bold text-[#0d0d0d]">
+              Complete Your Profile
+            </h2>
             <p className="text-xs text-muted-foreground">
               {role === "founder"
                 ? "Tell us about your startup to get personalized guidance"

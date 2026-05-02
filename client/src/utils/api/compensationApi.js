@@ -1,7 +1,14 @@
-import { getAccessToken } from "../../app/session";
 import { API_BASE_URL } from "../../config/apiBase.js";
 
 const BASE_URL = API_BASE_URL;
+
+// Default fetch options for cookie-based auth
+const defaultOptions = {
+  credentials: "include",
+  headers: {
+    "Content-Type": "application/json",
+  },
+};
 
 // Create compensation contract
 export async function createCompensationContract(
@@ -13,10 +20,7 @@ export async function createCompensationContract(
   try {
     const response = await fetch(`${BASE_URL}/compensation-contracts`, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${getAccessToken()}`,
-      },
+      ...defaultOptions,
       body: JSON.stringify({
         founderId,
         teamMemberId,
@@ -55,10 +59,7 @@ export async function getCompensationContract(teamMemberId) {
       `${BASE_URL}/compensation-contracts/member/${teamMemberId}`,
       {
         method: "GET",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${getAccessToken()}`,
-        },
+        ...defaultOptions,
       },
     );
 
@@ -112,10 +113,7 @@ export async function getCompensationStatus(teamMemberId) {
       `${BASE_URL}/compensation-status/${teamMemberId}`,
       {
         method: "GET",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${getAccessToken()}`,
-        },
+        ...defaultOptions,
       },
     );
 
@@ -166,10 +164,7 @@ export async function getStartupCompensationContracts(startupId) {
       `${BASE_URL}/compensation-contracts/startup/${startupId}`,
       {
         method: "GET",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${getAccessToken()}`,
-        },
+        ...defaultOptions,
       },
     );
 
@@ -215,32 +210,42 @@ export async function getStartupCompensationContracts(startupId) {
   }
 }
 
-// Convert talent to team member (called during onboarding)
+/**
+ * Unified onboarding: persists via `POST /interests/:interestId/onboard` only.
+ * `compensationConfig` is accepted for UI compatibility; compensation contracts
+ * are handled separately when those routes exist.
+ */
 export async function convertTalentToTeamMember(
   talentId,
   founderId,
   startupId,
   compensationConfig,
+  interestId,
 ) {
+  if (!interestId) {
+    throw new Error(
+      "interestId is required — use the canonical interest onboarding endpoint.",
+    );
+  }
   try {
-    const response = await fetch(`${BASE_URL}/onboard-team-member`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${getAccessToken()}`,
+    const response = await fetch(
+      `${BASE_URL}/interests/${encodeURIComponent(interestId)}/onboard`,
+      {
+        method: "POST",
+        ...defaultOptions,
+        body: JSON.stringify({
+          talentId,
+          founderId,
+          startupId,
+          compensationConfig,
+        }),
       },
-      body: JSON.stringify({
-        talentId,
-        founderId,
-        startupId,
-        compensationConfig,
-      }),
-    });
+    );
 
     const data = await response.json();
 
     if (!response.ok) {
-      throw new Error(data.error || "Failed to convert talent to team member");
+      throw new Error(data.message || data.error || "Failed to onboard team member");
     }
 
     return data;
@@ -257,10 +262,7 @@ export async function getPendingTeamMembers(startupId) {
       `${BASE_URL}/compensation/pending-members/${startupId}`,
       {
         method: "GET",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${getAccessToken()}`,
-        },
+        ...defaultOptions,
       },
     );
 

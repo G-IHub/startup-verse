@@ -62,7 +62,7 @@ const AlertDialogOverlay = React.forwardRef(({ className, ...props }, ref) => {
           ref: ref,
           "data-slot": "alert-dialog-overlay",
           className: cn(
-            "data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 fixed inset-0 z-50 bg-black/50",
+            "sv-modal-backdrop data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 fixed inset-0 z-50",
             className,
           ),
         },
@@ -72,16 +72,17 @@ const AlertDialogOverlay = React.forwardRef(({ className, ...props }, ref) => {
   );
 });
 AlertDialogOverlay.displayName = AlertDialogPrimitive.Overlay.displayName;
-function AlertDialogContent({ className, ...props }) {
-  return (
+const AlertDialogContent = React.forwardRef(
+  ({ className, overlayClassName, ...props }, ref) => (
     <AlertDialogPortal>
-      <AlertDialogOverlay />
+      <AlertDialogOverlay className={overlayClassName} />
       <AlertDialogPrimitive.Content
         {..._extends(
           {
+            ref,
             "data-slot": "alert-dialog-content",
             className: cn(
-              "bg-[var(--card)] text-[var(--card-foreground)] data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 fixed top-[50%] left-[50%] z-50 grid w-full max-w-[calc(100%-3rem)] translate-x-[-50%] translate-y-[-50%] gap-4 rounded-lg border p-6 shadow-lg duration-200 sm:max-w-lg",
+              "bg-surface-card font-body text-text-body data-[state=open]:animate-sv-modal-centered-in data-[state=closed]:animate-sv-modal-centered-out fixed top-[50%] left-[50%] z-50 grid w-full max-w-[calc(100%-3rem)] translate-x-[-50%] translate-y-[-50%] gap-4 rounded-[16px] border-0 p-6 shadow-modal duration-200 ease-in-out sm:max-w-lg",
               className,
             ),
           },
@@ -89,8 +90,9 @@ function AlertDialogContent({ className, ...props }) {
         )}
       />
     </AlertDialogPortal>
-  );
-}
+  ),
+);
+AlertDialogContent.displayName = AlertDialogPrimitive.Content.displayName;
 function AlertDialogHeader({ className, ...props }) {
   return (
     <div
@@ -98,7 +100,7 @@ function AlertDialogHeader({ className, ...props }) {
         {
           "data-slot": "alert-dialog-header",
           className: cn(
-            "flex flex-col gap-2 text-center sm:text-left",
+            "flex flex-col gap-2 border-b border-[#e2e4f0] pb-4 text-center sm:text-left",
             className,
           ),
         },
@@ -129,7 +131,10 @@ function AlertDialogTitle({ className, ...props }) {
       {..._extends(
         {
           "data-slot": "alert-dialog-title",
-          className: cn("text-lg font-semibold", className),
+          className: cn(
+            "font-heading text-lg font-bold text-[#0d0d0d]",
+            className,
+          ),
         },
         props,
       )}
@@ -142,7 +147,10 @@ function AlertDialogDescription({ className, ...props }) {
       {..._extends(
         {
           "data-slot": "alert-dialog-description",
-          className: cn("text-muted-foreground text-sm", className),
+          className: cn(
+            "font-body text-sm font-normal text-[#4a4a5a]",
+            className,
+          ),
         },
         props,
       )}
@@ -154,6 +162,7 @@ function AlertDialogAction({ className, ...props }) {
     <AlertDialogPrimitive.Action
       {..._extends(
         {
+          "data-slot": "button",
           className: cn(buttonVariants(), className),
         },
         props,
@@ -166,6 +175,7 @@ function AlertDialogCancel({ className, ...props }) {
     <AlertDialogPrimitive.Cancel
       {..._extends(
         {
+          "data-slot": "button",
           className: cn(
             buttonVariants({
               variant: "outline",

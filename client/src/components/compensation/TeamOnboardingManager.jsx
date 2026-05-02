@@ -10,7 +10,6 @@ import { Button } from "../ui/button";
 import { Badge } from "../ui/badge";
 import { Avatar, AvatarFallback } from "../ui/avatar";
 import CompensationSetupWizard from "./CompensationSetupWizard";
-import { convertTalentToTeamMember } from "../../utils/api/compensationApi";
 import * as inboxApi from "../../utils/api/inboxApi";
 import { getStartupTeamMembers } from "../../utils/api/teamMemberApi";
 import { toast } from "sonner";
@@ -166,42 +165,25 @@ export default function TeamOnboardingManager({ user }) {
       user.startupId || user.companyId || "demo-startup-id",
     );
     try {
-      // Convert talent to team member (includes compensation contract creation)
-      console.log("🚀 Calling convertTalentToTeamMember API...");
-      const result = await convertTalentToTeamMember(
-        selectedTalent.talentId,
-        user.id,
-        user.startupId || user.companyId || "demo-startup-id",
-        compensationConfig,
-      );
-      console.log("📊 API Result:", result);
-      if (result.success) {
-        toast.success(
-          `🎉 ${selectedTalent.talentName} has been successfully onboarded to your team!`,
+      if (!selectedTalent.interestId) {
+        toast.error(
+          "Cannot onboard without an interest record. Complete onboarding from the Inbox.",
         );
-
-        // Mark as onboarded
-        setOnboardedIds([...onboardedIds, selectedTalent.id]);
-
-        // If this came from an interest, mark it as onboarded in the backend
-        if (selectedTalent.interestId) {
-          try {
-            await inboxApi.markInterestAsOnboarded(selectedTalent.interestId);
-          } catch (error) {
-            console.error("Error marking interest as onboarded:", error);
-          }
-        }
-        setShowWizard(false);
-        setSelectedTalent(null);
-
-        // Reload accepted talent to reflect any changes
-        await loadAcceptedTalent();
-      } else {
-        toast.error(result.error || "Failed to onboard team member");
+        return;
       }
+      await inboxApi.markInterestAsOnboarded(selectedTalent.interestId);
+      toast.success(
+        `🎉 ${selectedTalent.talentName} has been successfully onboarded to your team!`,
+      );
+
+      setOnboardedIds([...onboardedIds, selectedTalent.id]);
+      setShowWizard(false);
+      setSelectedTalent(null);
+
+      await loadAcceptedTalent();
     } catch (error) {
-      console.error("❌ Error onboarding team member:", error);
-      toast.error("Failed to onboard team member");
+      console.error("❌ Onboarding failed:", error);
+      toast.error(error.message || "Failed to onboard team member");
     }
   };
   const formatDate = (dateString) => {

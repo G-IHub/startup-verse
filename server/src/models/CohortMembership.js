@@ -10,6 +10,7 @@ const cohortMembershipSchema = new mongoose.Schema(
       default: "active",
       maxlength: [50, "Status cannot exceed 50 characters"]
     },
+    joinedAt: { type: Date, default: () => new Date(), index: true },
   },
   { timestamps: true },
 );

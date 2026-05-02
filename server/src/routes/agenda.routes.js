@@ -1,7 +1,9 @@
 import { Router } from "express";
 import asyncHandler from "../utils/asyncHandler.js";
 import requireAuth from "../middleware/requireAuth.js";
+import requireRole from "../middleware/requireRole.js";
 import { success as apiSuccess, error as apiError } from "../utils/apiResponse.js";
+import { runDailyDigestJobs } from "../services/schedulerJobs.js";
 import Event from "../models/Event.js";
 import Deliverable from "../models/Deliverable.js";
 import ProgramMilestone from "../models/ProgramMilestone.js";
@@ -314,11 +316,16 @@ agendaRouter.get(
 agendaRouter.post(
   "/agenda/notifications/daily",
   requireAuth,
+  requireRole("admin"),
   asyncHandler(async (req, res) => {
+    const counts = await runDailyDigestJobs();
     return apiSuccess(res, {
       triggered: true,
       ranAt: new Date().toISOString(),
       startupId: req.body?.startupId || null,
+      ...counts,
+      eventCount: counts.eventReminders,
+      deliverableCount: counts.deliverableDueSoon,
     });
   }),
 );

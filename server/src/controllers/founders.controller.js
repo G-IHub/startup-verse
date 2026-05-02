@@ -1,4 +1,5 @@
 import crypto from "crypto";
+import User from "../models/User.js";
 import FounderProfile from "../models/FounderProfile.js";
 import Startup from "../models/Startup.js";
 import Milestone from "../models/Milestone.js";
@@ -31,6 +32,7 @@ import {
   success as apiSuccess,
 } from "../utils/apiResponse.js";
 import { emitRealtime } from "../services/realtime.service.js";
+import { createNotification, broadcastNotification } from "../services/notificationService.js";
 import { SOCKET_EVENTS } from "../realtime/events.js";
 import { startupRoom } from "../realtime/rooms.js";
 
@@ -447,6 +449,22 @@ export const createTask = async (req, res) => {
     ]);
   }
 
+  // Notify assignee when a task is created already assigned to them.
+  if (task.assignedTo && String(task.assignedTo) !== String(founderId)) {
+    await createNotification({
+      userId: task.assignedTo,
+      type: "task-assigned",
+      title: "New task assigned",
+      message: `You have a new task: ${task.title}`,
+      actionUrl: `/?view=virtual-office&tab=tasks&taskId=${task._id}`,
+      metadata: {
+        taskId: String(task._id),
+        startupId: String(task.startupId || ""),
+        founderId: String(founderId),
+      },
+    });
+  }
+
   return apiSuccess(res, task, 201);
 };
 
@@ -502,6 +520,48 @@ export const updateTask = async (req, res) => {
     ]);
   }
 
+  // Notify on assignment change to a new assignee.
+  const prevAssignee = String(existingTask.assignedTo || "");
+  const nextAssignee = String(updatedTask?.assignedTo || "");
+  if (
+    nextAssignee &&
+    nextAssignee !== prevAssignee &&
+    nextAssignee !== String(founderId)
+  ) {
+    await createNotification({
+      userId: nextAssignee,
+      type: "task-assigned",
+      title: "Task reassigned to you",
+      message: `You have been assigned: ${updatedTask.title}`,
+      actionUrl: `/?view=virtual-office&tab=tasks&taskId=${updatedTask._id}`,
+      metadata: {
+        taskId: String(updatedTask._id),
+        startupId: String(updatedTask.startupId || ""),
+        founderId: String(founderId),
+      },
+    });
+  }
+
+  // Notify founder when a task transitions into blocked state.
+  if (
+    updatedTask &&
+    updatedTask.status === "blocked" &&
+    existingTask.status !== "blocked"
+  ) {
+    await createNotification({
+      userId: founderId,
+      type: "task-blocked",
+      title: "Task blocked",
+      message: `Task is blocked: ${updatedTask.title}`,
+      actionUrl: `/?view=virtual-office&tab=tasks&taskId=${updatedTask._id}`,
+      metadata: {
+        taskId: String(updatedTask._id),
+        blockerReason: updatedTask.blockerReason || "",
+        blockerNote: updatedTask.blockerNote || "",
+      },
+    });
+  }
+
   return apiSuccess(res, updatedTask);
 };
 
@@ -536,10 +596,7 @@ export const updateTaskStatus = async (req, res) => {
     updates.blockerReason = "";
     updates.blockerNote = "";
   }
-  const existingTask = await Task.findOne({
-    _id: req.params.taskId,
-    founderId,
-  });
+  const existingTask = await Task.findOne({ _id: req.params.taskId, founderId });
   if (!existingTask) {
     return apiError(res, "Task not found.", 404);
   }
@@ -573,6 +630,21 @@ export const updateTaskStatus = async (req, res) => {
     ]);
   }
 
+  if (status === "blocked" && existingTask.status !== "blocked") {
+    await createNotification({
+      userId: founderId,
+      type: "task-blocked",
+      title: "Task blocked",
+      message: `Task is blocked: ${updatedTask.title}`,
+      actionUrl: `/?view=virtual-office&tab=tasks&taskId=${updatedTask._id}`,
+      metadata: {
+        taskId: String(updatedTask._id),
+        blockerReason: updatedTask.blockerReason || "",
+        blockerNote: updatedTask.blockerNote || "",
+      },
+    });
+  }
+
   return apiSuccess(res, updatedTask);
 };
 
@@ -604,6 +676,11 @@ export const assignTask = async (req, res) => {
     assignedToName: nextAssigned ? name : "",
     assignedToAvatar: nextAssigned ? avatar : "",
   };
+  const previous = await Task.findOne(
+    { _id: req.params.taskId, founderId },
+    { assignedTo: 1 },
+  );
+  const previousAssignee = String(previous?.assignedTo || "");
   const task = await Task.findOneAndUpdate(
     { _id: req.params.taskId, founderId },
     assignUpdate,
@@ -624,6 +701,26 @@ export const assignTask = async (req, res) => {
     emitRealtime(SOCKET_EVENTS.TASK_UPDATED, task, [
       startupRoom(task.startupId),
     ]);
+  }
+
+  const nextAssigneeId = String(task.assignedTo || "");
+  if (
+    nextAssigneeId &&
+    nextAssigneeId !== previousAssignee &&
+    nextAssigneeId !== String(founderId)
+  ) {
+    await createNotification({
+      userId: task.assignedTo,
+      type: "task-assigned",
+      title: "Task assigned to you",
+      message: `You have been assigned: ${task.title}`,
+      actionUrl: `/?view=virtual-office&tab=tasks&taskId=${task._id}`,
+      metadata: {
+        taskId: String(task._id),
+        startupId: String(task.startupId || ""),
+        founderId: String(founderId),
+      },
+    });
   }
 
   return apiSuccess(res, task);
@@ -766,6 +863,38 @@ export const createWeeklyOutcome = async (req, res) => {
         : `Weekly outcome submitted: ${requestedStatus}.`,
     metadata: { outcomeId: outcome._id, status: requestedStatus },
   });
+
+  // Notify team members when an outcome is submitted (final status).
+  if (
+    requestedStatus !== "active" &&
+    outcome.startupId &&
+    (!existing || existing.status === "active")
+  ) {
+    try {
+      const teamMembers = await TeamMemberProfile.find(
+        { founderId },
+        { userId: 1 },
+      ).lean();
+      const recipients = teamMembers.map((m) => m.userId).filter(Boolean);
+      if (recipients.length) {
+        await broadcastNotification(recipients, {
+          type: "outcome-submitted",
+          title: "Weekly outcome submitted",
+          message: `This week's outcome was marked ${requestedStatus}.`,
+          actionUrl: `/?view=virtual-office&tab=weekly`,
+          metadata: {
+            outcomeId: String(outcome._id),
+            status: requestedStatus,
+            startupId: String(outcome.startupId),
+            founderId: String(founderId),
+          },
+        });
+      }
+    } catch (err) {
+      // Notification fan-out must not block the persistence response.
+      console.error("[createWeeklyOutcome] notify team failed:", err.message);
+    }
+  }
 
   return apiSuccess(res, outcome, existing ? 200 : 201);
 };
@@ -1622,5 +1751,103 @@ export const getFounderAnalyticsDashboard = async (req, res) => {
       activeMembers: totalMembers,
       topPerformers: [],
     },
+  });
+};
+
+// Public-safe DTO for founder list
+function publicFounderDto(user, startup) {
+  if (!user) return null;
+  return {
+    id: String(user._id),
+    name: user.name,
+    role: user.role,
+    avatarUrl: user.avatarUrl || "",
+    onboardingComplete: !!user.onboardingComplete,
+    startup: startup
+      ? {
+          id: String(startup._id),
+          name: startup.name,
+          description: startup.description || "",
+          industry: startup.industry || "",
+          stage: startup.stage || "",
+          logo: startup.logo || "",
+          website: startup.website || "",
+        }
+      : null,
+  };
+}
+
+// Blueprint §14: GET /api/v1/founders/
+export const listFounders = async (req, res) => {
+  const limit = Math.min(Math.max(parseInt(req.query?.limit, 10) || 50, 1), 100);
+  const skip = Math.max(parseInt(req.query?.skip, 10) || 0, 0);
+  const founders = await User.find({ role: "founder" })
+    .sort({ createdAt: -1 })
+    .skip(skip)
+    .limit(limit)
+    .lean();
+  const founderIds = founders.map((f) => f._id);
+  const startups = await Startup.find({ founderId: { $in: founderIds } }).lean();
+  const startupByFounder = new Map(
+    startups.map((s) => [String(s.founderId), s]),
+  );
+  const items = founders
+    .map((u) => publicFounderDto(u, startupByFounder.get(String(u._id))))
+    .filter(Boolean);
+  return apiSuccess(res, { founders: items, limit, skip, count: items.length });
+};
+
+// Blueprint §14: GET /api/v1/founders/:founderId/execution-data
+// Aggregate of milestones + tasks + outcomes used by client surfaces
+export const getExecutionData = async (req, res) => {
+  const founderId = req.params.founderId;
+  if (!founderGuard(req, founderId)) {
+    return apiError(res, "Forbidden.", 403);
+  }
+  const [milestones, tasks, outcomes] = await Promise.all([
+    Milestone.find({ founderId }).sort({ sequence: 1 }).lean(),
+    Task.find({ founderId }).sort({ createdAt: -1 }).lean(),
+    WeeklyOutcome.find({ founderId }).sort({ weekOf: -1 }).lean(),
+  ]);
+  const metrics = computeExecutionScoreMetrics({ tasks, outcomes });
+  return apiSuccess(res, {
+    milestones,
+    tasks,
+    outcomes,
+    metrics,
+  });
+};
+
+// Blueprint §14: GET /api/v1/startups/:founderId/snapshot
+export const getStartupSnapshot = async (req, res) => {
+  const founderId = req.params.founderId;
+  if (!founderGuard(req, founderId)) {
+    return apiError(res, "Forbidden.", 403);
+  }
+  const startup = await Startup.findOne({ founderId }).lean();
+  if (!startup) {
+    return apiError(res, "Startup not found.", 404);
+  }
+  const now = new Date();
+  const weekStart = new Date(now);
+  weekStart.setHours(0, 0, 0, 0);
+  weekStart.setDate(weekStart.getDate() - weekStart.getDay());
+  const [activeOutcome, recentActivities, tasks, outcomes] = await Promise.all([
+    WeeklyOutcome.findOne({ founderId, status: "active" })
+      .sort({ weekOf: -1 })
+      .lean(),
+    Activity.find({ startupId: startup._id })
+      .sort({ createdAt: -1 })
+      .limit(10)
+      .lean(),
+    Task.find({ founderId }, { status: 1, milestoneId: 1 }).lean(),
+    WeeklyOutcome.find({ founderId }, { status: 1, weekOf: 1 }).lean(),
+  ]);
+  const metrics = computeExecutionScoreMetrics({ tasks, outcomes });
+  return apiSuccess(res, {
+    startup,
+    activeWeeklyOutcome: activeOutcome || null,
+    recentActivities: recentActivities.map(mapActivityToDto),
+    executionScore: metrics,
   });
 };

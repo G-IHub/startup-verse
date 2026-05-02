@@ -6,6 +6,9 @@ import * as teamMembersController from "../controllers/teamMembers.controller.js
 
 const foundersRouter = Router();
 
+// Blueprint §14: GET /api/v1/founders/ — list founders
+foundersRouter.get("/founders", requireAuth, asyncHandler(foundersController.listFounders));
+
 foundersRouter.post("/founders/profile", requireAuth, asyncHandler(foundersController.createOrUpdateProfile));
 foundersRouter.get("/founders/profile/:userId", requireAuth, asyncHandler(foundersController.getProfileByUserId));
 
@@ -29,6 +32,12 @@ foundersRouter.delete("/founders/:founderId/tasks/:taskId", requireAuth, asyncHa
 
 foundersRouter.get("/founders/:founderId/weekly-outcomes", requireAuth, asyncHandler(foundersController.getWeeklyOutcomes));
 foundersRouter.post("/founders/:founderId/weekly-outcomes", requireAuth, asyncHandler(foundersController.createWeeklyOutcome));
+
+// Blueprint §14: GET /api/v1/founders/:founderId/execution-data
+foundersRouter.get("/founders/:founderId/execution-data", requireAuth, asyncHandler(foundersController.getExecutionData));
+
+// Blueprint §14: GET /api/v1/startups/:founderId/snapshot
+foundersRouter.get("/startups/:founderId/snapshot", requireAuth, asyncHandler(foundersController.getStartupSnapshot));
 foundersRouter.post("/founders/:founderId/weekly-plan", requireAuth, asyncHandler(foundersController.createWeeklyPlan));
 foundersRouter.post("/founders/:founderId/intent-parse", requireAuth, asyncHandler(foundersController.parseFounderIntent));
 

@@ -147,8 +147,8 @@ export default function StructuredMilestoneCreator({
     0,
   );
   return (
-    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
-      <Card className="max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sv-modal-backdrop">
+      <Card className="sv-modal-panel max-h-[90vh] w-full max-w-4xl overflow-y-auto rounded-[16px] border-0 shadow-modal">
         <CardHeader className="border-b pb-3">
           <div className="flex items-start justify-between">
             <div className="flex-1">

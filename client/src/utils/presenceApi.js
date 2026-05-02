@@ -1,7 +1,14 @@
-import { getAccessToken } from "../app/session";
 import { API_BASE_URL } from "../config/apiBase.js";
 
 const API_URL = API_BASE_URL;
+
+// Default fetch options for cookie-based auth
+const defaultOptions = {
+  credentials: "include",
+  headers: {
+    "Content-Type": "application/json",
+  },
+};
 
 function toClientPresence(raw) {
   if (!raw || typeof raw !== "object") return null;
@@ -43,11 +50,8 @@ export async function updatePresence({
     const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
 
     const response = await fetch(`${API_URL}/presence/update`, {
+      ...defaultOptions,
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${getAccessToken()}`,
-      },
       body: JSON.stringify({
         userId,
         startupId,
@@ -95,10 +99,8 @@ export async function getActiveUsers(startupId) {
     const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
 
     const response = await fetch(`${API_URL}/presence/${startupId}`, {
+      ...defaultOptions,
       method: "GET",
-      headers: {
-        Authorization: `Bearer ${getAccessToken()}`,
-      },
       signal: controller.signal,
     });
 
@@ -141,10 +143,8 @@ export async function removePresence(userId, startupId) {
     const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
 
     const response = await fetch(`${API_URL}/presence/${startupId}/${userId}`, {
+      ...defaultOptions,
       method: "DELETE",
-      headers: {
-        Authorization: `Bearer ${getAccessToken()}`,
-      },
       signal: controller.signal,
     });
 

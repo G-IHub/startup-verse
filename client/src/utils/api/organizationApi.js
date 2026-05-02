@@ -2,18 +2,25 @@
  * Organization API client
  * All organization-related API calls
  */
-import { getAccessToken } from "../../app/session";
 import { API_BASE_URL } from "../../config/apiBase.js";
+
+// Default fetch options for cookie-based auth
+const defaultOptions = {
+  credentials: "include",
+  headers: {
+    "Content-Type": "application/json",
+  },
+};
 
 async function apiCall(endpoint, options = {}, silent404 = false) {
   const url = `${API_BASE_URL}${endpoint}`;
 
   try {
     const response = await fetch(url, {
+      ...defaultOptions,
       ...options,
       headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${getAccessToken()}`,
+        ...defaultOptions.headers,
         ...options.headers,
       },
     });

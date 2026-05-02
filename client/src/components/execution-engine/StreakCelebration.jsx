@@ -115,7 +115,7 @@ export function StreakCelebration({
             exit={{
               opacity: 0,
             }}
-            className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100]"
+            className="fixed inset-0 z-[100] sv-modal-backdrop"
             onClick={onClose}
           />
           {showConfetti && (
@@ -174,7 +174,7 @@ export function StreakCelebration({
             className="fixed inset-0 flex items-center justify-center z-[102] p-4"
             onClick={(e) => e.stopPropagation()}
           >
-            <Card className="w-full max-w-lg overflow-hidden border-2 border-primary shadow-2xl">
+            <Card className="w-full max-w-lg overflow-hidden rounded-[16px] border-0 shadow-modal">
               <div
                 className={`relative p-8 bg-gradient-to-br ${celebration.color} text-white overflow-hidden`}
               >
