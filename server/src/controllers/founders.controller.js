@@ -5,6 +5,7 @@ import Startup from "../models/Startup.js";
 import Milestone from "../models/Milestone.js";
 import Task from "../models/Task.js";
 import WeeklyOutcome from "../models/WeeklyOutcome.js";
+import { validateWeeklyPlanMilestonesInput } from "../domain/weeklyPlanMilestoneValidation.js";
 import StartupPost from "../models/StartupPost.js";
 import FounderTalentInvitation from "../models/FounderTalentInvitation.js";
 import Announcement from "../models/Announcement.js";
@@ -1115,6 +1116,10 @@ export const createWeeklyPlan = async (req, res) => {
   }
 
   const milestonesInput = Array.isArray(plan.milestones) ? plan.milestones : [];
+  const milestoneValidation = validateWeeklyPlanMilestonesInput(milestonesInput);
+  if (!milestoneValidation.ok) {
+    return apiError(res, milestoneValidation.message, 400);
+  }
   const createdMilestones = [];
 
   const planStatusLower = String(plan.status || "active").toLowerCase();

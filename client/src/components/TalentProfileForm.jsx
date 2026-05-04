@@ -1,6 +1,7 @@
 import React, {
   forwardRef,
   useImperativeHandle,
+  useMemo,
   useRef,
   useState,
 } from "react";
@@ -20,9 +21,16 @@ import {
   Globe,
   Github,
   Linkedin,
+  X,
 } from "lucide-react";
 import { Badge } from "./ui/badge";
+import { Checkbox } from "./ui/checkbox";
 import { toast } from "sonner";
+import { getTalentProfileFormCompletionPercent } from "../utils/talentProfileCompletion";
+import {
+  TALENT_SKILL_OPTIONS,
+  TALENT_SKILL_OPTION_SET,
+} from "../domains/talent/talentSkillOptions";
 
 const STEP_TITLES = [
   "Professional profile",
@@ -31,43 +39,128 @@ const STEP_TITLES = [
 ];
 
 const TalentProfileForm = forwardRef(function TalentProfileForm(
-  { loading, onSubmit, initialData },
+  { loading, onSubmit, initialData, onSkip },
   ref,
 ) {
   const formRef = useRef(null);
   const [step, setStep] = useState(1);
 
-  const [fullName, setFullName] = useState(initialData?.name || "");
-  const [professionalTitle, setProfessionalTitle] = useState("");
-  const [location, setLocation] = useState("");
-  const [bio, setBio] = useState("");
+  const d = initialData || {};
 
-  const [skillsInput, setSkillsInput] = useState("");
+  const [fullName, setFullName] = useState(
+    () => d.fullName ?? d.name ?? "",
+  );
+  const [professionalTitle, setProfessionalTitle] = useState(
+    () => d.professionalTitle ?? "",
+  );
+  const [location, setLocation] = useState(() => d.location ?? "");
+  const [bio, setBio] = useState(() => d.bio ?? "");
 
-  const [linkedinUrl, setLinkedinUrl] = useState("");
-  const [githubUrl, setGithubUrl] = useState("");
-  const [portfolioWebsite, setPortfolioWebsite] = useState("");
+  const [skills, setSkills] = useState(() => {
+    if (Array.isArray(d.skills)) return [...d.skills];
+    if (typeof d.skillsInput === "string" && d.skillsInput.trim()) {
+      return d.skillsInput
+        .split(",")
+        .map((x) => x.trim())
+        .filter(Boolean);
+    }
+    return [];
+  });
+  const [customSkillDraft, setCustomSkillDraft] = useState("");
 
-  const [workExperiences, setWorkExperiences] = useState([]);
+  const [linkedinUrl, setLinkedinUrl] = useState(() => d.linkedinUrl ?? "");
+  const [githubUrl, setGithubUrl] = useState(() => d.githubUrl ?? "");
+  const [portfolioWebsite, setPortfolioWebsite] = useState(
+    () => d.portfolioWebsite ?? "",
+  );
 
-  const [educationList, setEducationList] = useState([]);
+  const [workExperiences, setWorkExperiences] = useState(
+    () => d.workExperiences ?? [],
+  );
 
-  const [certifications, setCertifications] = useState([]);
+  const [educationList, setEducationList] = useState(
+    () => d.educationList ?? [],
+  );
 
-  const [portfolioItems, setPortfolioItems] = useState([]);
+  const [certifications, setCertifications] = useState(
+    () => d.certifications ?? [],
+  );
 
-  const [availabilityStatus, setAvailabilityStatus] = useState("");
-  const [preferredCommitment, setPreferredCommitment] = useState("");
-  const [yearsOfExperience, setYearsOfExperience] = useState("");
+  const [portfolioItems, setPortfolioItems] = useState(
+    () => d.portfolioItems ?? [],
+  );
 
-  const [experience, setExperience] = useState("");
-  const [availability, setAvailability] = useState("");
-  const [interests, setInterests] = useState([]);
+  const [availabilityStatus, setAvailabilityStatus] = useState(
+    () => d.availabilityStatus ?? "",
+  );
+  const [preferredCommitment, setPreferredCommitment] = useState(
+    () => d.preferredCommitment ?? "",
+  );
+  const [yearsOfExperience, setYearsOfExperience] = useState(
+    () => d.yearsOfExperience ?? "",
+  );
 
-  const [professionalGoals, setProfessionalGoals] = useState("");
-  const [industryPreferences, setIndustryPreferences] = useState([]);
+  const [experience, setExperience] = useState(() => d.experience ?? "");
+  const [availability, setAvailability] = useState(() => d.availability ?? "");
+  const [interests, setInterests] = useState(() => d.interests ?? []);
 
-  const wizardPercent = Math.round((step / 3) * 100);
+  const [professionalGoals, setProfessionalGoals] = useState(
+    () => d.professionalGoals ?? "",
+  );
+  const [industryPreferences, setIndustryPreferences] = useState(
+    () => d.industryPreferences ?? [],
+  );
+
+  /** Same algorithm as dashboard / profile completion — field-based, not step-based */
+  const wizardPercent = useMemo(
+    () =>
+      getTalentProfileFormCompletionPercent({
+        fullName,
+        email: initialData?.email || "",
+        professionalTitle,
+        location,
+        bio,
+        yearsOfExperience,
+        skills,
+        linkedinUrl,
+        githubUrl,
+        portfolioWebsite,
+        workExperiences,
+        educationList,
+        certifications,
+        portfolioItems,
+        availabilityStatus,
+        preferredCommitment,
+        experience,
+        availability,
+        interests,
+        professionalGoals,
+        industryPreferences,
+      }),
+    [
+      fullName,
+      initialData?.email,
+      professionalTitle,
+      location,
+      bio,
+      yearsOfExperience,
+      skills,
+      linkedinUrl,
+      githubUrl,
+      portfolioWebsite,
+      workExperiences,
+      educationList,
+      certifications,
+      portfolioItems,
+      availabilityStatus,
+      preferredCommitment,
+      experience,
+      availability,
+      interests,
+      professionalGoals,
+      industryPreferences,
+    ],
+  );
 
   const validateStep1 = () => {
     if (!fullName.trim()) {
@@ -94,10 +187,7 @@ const TalentProfileForm = forwardRef(function TalentProfileForm(
     professionalTitle,
     location,
     bio,
-    skills: skillsInput
-      .split(",")
-      .map((s) => s.trim())
-      .filter(Boolean),
+    skills: [...new Set(skills.map((s) => String(s).trim()).filter(Boolean))],
     linkedinUrl,
     githubUrl,
     portfolioWebsite,
@@ -240,6 +330,19 @@ const TalentProfileForm = forwardRef(function TalentProfileForm(
   const removePortfolioItem = (id) => {
     setPortfolioItems(portfolioItems.filter((item) => item.id !== id));
   };
+
+  const addCustomSkill = () => {
+    const s = customSkillDraft.trim();
+    if (!s) return;
+    setSkills((prev) => (prev.includes(s) ? prev : [...prev, s]));
+    setCustomSkillDraft("");
+  };
+
+  const removeSkill = (skill) => {
+    setSkills((prev) => prev.filter((x) => x !== skill));
+  };
+
+  const extraSkills = skills.filter((s) => !TALENT_SKILL_OPTION_SET.has(s));
   const updatePortfolioItem = (id, field, value) => {
     setPortfolioItems(
       portfolioItems.map((item) =>
@@ -266,8 +369,11 @@ const TalentProfileForm = forwardRef(function TalentProfileForm(
           <p className="text-sm font-medium">
             Step {step} of 3 — {STEP_TITLES[step - 1]}
           </p>
-          <span className="text-xs text-muted-foreground tabular-nums">
-            {wizardPercent}%
+          <span
+            className="text-xs text-muted-foreground tabular-nums"
+            title="Based on all sections — matches your profile completion on the dashboard"
+          >
+            {wizardPercent}% complete
           </span>
         </div>
         <Progress value={wizardPercent} className="h-2" />
@@ -351,19 +457,88 @@ const TalentProfileForm = forwardRef(function TalentProfileForm(
               <Award className="w-5 h-5 text-primary" />
               <h3>Skills & Expertise</h3>
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="skills">Technical & Professional Skills</Label>
-              <Textarea
-                id="skills"
-                placeholder="e.g., React, Node.js, TypeScript, Product Strategy, Agile, Team Leadership"
-                value={skillsInput}
-                onChange={(e) => setSkillsInput(e.target.value)}
-                disabled={loading}
-                rows={3}
-              />
-              <p className="text-xs text-muted-foreground">
-                Separate skills with commas. Be specific!
+            <div className="space-y-3">
+              <Label>Technical & Professional Skills</Label>
+              <p className="text-xs text-muted-foreground -mt-1">
+                Select all that apply — same style as elsewhere in the app. Add
+                custom skills below if needed.
               </p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-x-3 gap-y-2 max-h-[min(320px,50vh)] overflow-y-auto rounded-md border border-border/60 bg-muted/10 p-3">
+                {TALENT_SKILL_OPTIONS.map((skill, idx) => {
+                  const id = `talent-skill-${idx}`;
+                  return (
+                    <div key={skill} className="flex items-center gap-2">
+                      <Checkbox
+                        id={id}
+                        checked={skills.includes(skill)}
+                        onCheckedChange={(checked) => {
+                          setSkills((prev) => {
+                            if (checked === true) {
+                              return prev.includes(skill) ? prev : [...prev, skill];
+                            }
+                            return prev.filter((x) => x !== skill);
+                          });
+                        }}
+                        disabled={loading}
+                      />
+                      <label
+                        htmlFor={id}
+                        className="text-sm leading-snug cursor-pointer select-none"
+                      >
+                        {skill}
+                      </label>
+                    </div>
+                  );
+                })}
+              </div>
+              {extraSkills.length > 0 ? (
+                <div className="flex flex-wrap gap-2">
+                  {extraSkills.map((skill) => (
+                    <Badge
+                      key={skill}
+                      variant="secondary"
+                      className="flex items-center gap-1 pr-1"
+                    >
+                      {skill}
+                      <button
+                        type="button"
+                        className="rounded-sm p-0.5 hover:bg-muted hover:text-destructive"
+                        onClick={() => removeSkill(skill)}
+                        disabled={loading}
+                        aria-label={`Remove ${skill}`}
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    </Badge>
+                  ))}
+                </div>
+              ) : null}
+              <div className="flex gap-2">
+                <Input
+                  value={customSkillDraft}
+                  onChange={(e) => setCustomSkillDraft(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      addCustomSkill();
+                    }
+                  }}
+                  placeholder="Add another skill…"
+                  disabled={loading}
+                  className="text-sm"
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  className="shrink-0"
+                  onClick={addCustomSkill}
+                  disabled={loading || !customSkillDraft.trim()}
+                  aria-label="Add skill"
+                >
+                  <Plus className="w-4 h-4" />
+                </Button>
+              </div>
             </div>
           </div>
           <div className="space-y-4 pt-4 border-t">
@@ -1018,28 +1193,47 @@ const TalentProfileForm = forwardRef(function TalentProfileForm(
               <p className="text-xs text-muted-foreground mt-2">
                 PDF, DOC, or DOCX (max 5MB)
               </p>
+              <p className="text-xs text-amber-700 dark:text-amber-500/90 mt-3">
+                Resume upload is not saved to your profile yet — only the fields
+                above are stored.
+              </p>
             </div>
           </div>
         </>
       )}
 
-      <div className="flex flex-col-reverse gap-3 border-t border-border/70 pt-4 sm:flex-row sm:justify-between sm:items-center">
-        {step > 1 ? (
-          <Button
-            type="button"
-            variant="outline"
-            disabled={loading}
-            onClick={() => setStep((s) => Math.max(1, s - 1))}
-          >
-            Back
-          </Button>
-        ) : (
-          <span className="hidden sm:block sm:w-24" aria-hidden />
-        )}
+      <div className="flex flex-col-reverse gap-2 pt-2 sm:flex-row sm:justify-between sm:items-center">
+        <div className="flex flex-wrap items-center gap-2">
+          {typeof onSkip === "function" ? (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={loading}
+              onClick={onSkip}
+            >
+              Skip
+            </Button>
+          ) : null}
+          {step > 1 ? (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={loading}
+              onClick={() => setStep((s) => Math.max(1, s - 1))}
+            >
+              Back
+            </Button>
+          ) : typeof onSkip !== "function" ? (
+            <span className="hidden sm:block sm:w-24" aria-hidden />
+          ) : null}
+        </div>
         <div className="flex flex-col gap-2 sm:flex-row sm:ml-auto">
           {step === 1 && (
             <Button
               type="button"
+              size="sm"
               disabled={loading}
               onClick={() => {
                 if (validateStep1()) setStep(2);
@@ -1049,13 +1243,18 @@ const TalentProfileForm = forwardRef(function TalentProfileForm(
             </Button>
           )}
           {step === 2 && (
-            <Button type="button" disabled={loading} onClick={() => setStep(3)}>
+            <Button
+              type="button"
+              size="sm"
+              disabled={loading}
+              onClick={() => setStep(3)}
+            >
               Next
             </Button>
           )}
           {step === 3 && (
-            <Button type="submit" disabled={loading}>
-              {loading ? "Saving..." : "Complete profile"}
+            <Button type="submit" size="sm" disabled={loading}>
+              {loading ? "Saving..." : "Next"}
             </Button>
           )}
         </div>

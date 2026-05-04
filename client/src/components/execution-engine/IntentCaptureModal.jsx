@@ -8,6 +8,8 @@ import {
 } from "../ui/card";
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
+import { Input } from "../ui/input";
+import { Label } from "../ui/label";
 import { Textarea } from "../ui/textarea";
 import {
   Sparkles,
@@ -24,6 +26,7 @@ import {
   parseFounderIntent,
   suggestRefinements,
 } from "../../utils/intentParser";
+import MilestoneTaskFieldList from "./MilestoneTaskFieldList.jsx";
 const EXAMPLE_INTENTS = [
   "Validate our pricing with 10 potential customers",
   "Build MVP of our mobile app with core features",
@@ -46,6 +49,7 @@ export default function IntentCaptureModal({
   const [customTitle, setCustomTitle] = useState("");
   const [customDescription, setCustomDescription] = useState("");
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [milestoneDrafts, setMilestoneDrafts] = useState([]);
   useEffect(() => {
     if (!isOpen) {
       // Reset state when modal closes
@@ -55,8 +59,27 @@ export default function IntentCaptureModal({
       setIsEditing(false);
       setCustomTitle("");
       setCustomDescription("");
+      setMilestoneDrafts([]);
     }
   }, [isOpen]);
+  useEffect(() => {
+    if (!parsedIntent?.suggestedMilestones?.length) {
+      setMilestoneDrafts([]);
+      return;
+    }
+    setMilestoneDrafts(
+      parsedIntent.suggestedMilestones.map((m) => {
+        const rowTasks = (Array.isArray(m.tasks) ? m.tasks : [])
+          .map((t) => (typeof t === "string" ? t : String(t?.title || "")))
+          .map((s) => s.trim())
+          .filter(Boolean);
+        return {
+          title: String(m.title || ""),
+          tasks: rowTasks.length > 0 ? rowTasks : [""],
+        };
+      }),
+    );
+  }, [parsedIntent]);
   if (!isOpen) return null;
   const handleAnalyzeIntent = async () => {
     if (!userInput.trim()) return;
@@ -82,9 +105,25 @@ export default function IntentCaptureModal({
   };
   const handleConfirm = async () => {
     if (!parsedIntent) return;
+    const suggestedMilestones = milestoneDrafts.map((draft, i) => {
+      const orig = parsedIntent.suggestedMilestones[i];
+      const lines = (Array.isArray(draft.tasks) ? draft.tasks : [])
+        .map((s) => String(s || "").trim())
+        .filter(Boolean);
+      const origTasks = (Array.isArray(orig?.tasks) ? orig.tasks : [])
+        .map((t) => (typeof t === "string" ? t : String(t?.title || "")))
+        .filter(Boolean);
+      return {
+        title:
+          draft.title.trim() ||
+          String(orig?.title || "").trim() ||
+          `Milestone ${i + 1}`,
+        tasks: lines.length > 0 ? lines : origTasks,
+      };
+    });
     try {
       await onConfirmIntent(
-        parsedIntent,
+        { ...parsedIntent, suggestedMilestones },
         isEditing ? customTitle : undefined,
         isEditing ? customDescription : undefined,
       );
@@ -161,18 +200,21 @@ export default function IntentCaptureModal({
                   {EXAMPLE_INTENTS.map((example, index) => (
                     <button
                       key={index}
+                      type="button"
                       onClick={() => handleUseExample(example)}
-                      className="w-full text-left p-3 rounded-lg border-2 border-border hover:border-primary/50 hover:bg-primary/5 transition-all group"
+                      className="group w-full rounded-xl border border-primary/20 bg-card p-3 text-left shadow-sm transition-all hover:border-primary/35 hover:bg-primary/[0.03] hover:shadow dark:border-primary/25 dark:hover:border-primary/45 dark:hover:bg-primary/[0.06]"
                     >
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm">{example}</span>
-                        <ChevronRight className="w-4 h-4 text-muted-foreground group-hover:text-primary" />
+                      <div className="flex items-center justify-between gap-3">
+                        <span className="text-sm text-card-foreground">
+                          {example}
+                        </span>
+                        <ChevronRight className="h-4 w-4 shrink-0 text-text-muted transition-colors group-hover:text-primary" />
                       </div>
                     </button>
                   ))}
                 </div>
               </div>
-              <div className="flex gap-3 pt-4 border-t">
+              <div className="flex gap-3 border-t border-primary/12 pt-4 dark:border-primary/20">
                 <Button variant="outline" onClick={onClose} className="flex-1">
                   Cancel
                 </Button>
@@ -287,29 +329,51 @@ export default function IntentCaptureModal({
                 </div>
               )}
               <div>
-                <h4 className="font-semibold mb-3 flex items-center gap-2">
+                <h4 className="font-semibold mb-1 flex items-center gap-2">
                   <Sparkles className="w-4 h-4 text-primary" />
-                  Generated Milestones (
-                  {parsedIntent.suggestedMilestones.length})
+                  Generated Milestones ({milestoneDrafts.length})
                 </h4>
-                <div className="space-y-2">
-                  {parsedIntent.suggestedMilestones.map((milestone, index) => (
+                <p className="text-xs text-text-body mb-3 leading-relaxed">
+                  Adjust milestone titles and tasks before saving.
+                </p>
+                <div className="space-y-3">
+                  {milestoneDrafts.map((draft, index) => (
                     <div
                       key={index}
-                      className="p-3 bg-muted/50 rounded-lg border"
+                      className="rounded-xl border border-primary/15 bg-card p-3 shadow-sm dark:border-primary/22"
                     >
                       <div className="flex items-start gap-3">
-                        <div className="w-6 h-6 rounded-full bg-primary/10 text-primary flex items-center justify-center text-sm font-semibold flex-shrink-0">
+                        <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary/10 text-sm font-semibold text-primary">
                           {index + 1}
                         </div>
-                        <div className="flex-1">
-                          <p className="font-medium mb-1">{milestone.title}</p>
-                          <div className="text-xs text-muted-foreground">
-                            {milestone.tasks.length}
-                            {" tasks • "}
-                            {milestone.tasks.slice(0, 2).join(" • ")}
-                            {milestone.tasks.length > 2 && "..."}
+                        <div className="min-w-0 flex-1 space-y-2">
+                          <div>
+                            <Label className="text-xs text-text-muted">
+                              Milestone title
+                            </Label>
+                            <Input
+                              value={draft.title}
+                              onChange={(e) => {
+                                const v = e.target.value;
+                                setMilestoneDrafts((prev) =>
+                                  prev.map((d, i) =>
+                                    i === index ? { ...d, title: v } : d,
+                                  ),
+                                );
+                              }}
+                              className="mt-1"
+                            />
                           </div>
+                          <MilestoneTaskFieldList
+                            tasks={draft.tasks}
+                            onChange={(next) =>
+                              setMilestoneDrafts((prev) =>
+                                prev.map((d, i) =>
+                                  i === index ? { ...d, tasks: next } : d,
+                                ),
+                              )
+                            }
+                          />
                         </div>
                       </div>
                     </div>
@@ -349,7 +413,7 @@ export default function IntentCaptureModal({
                 </p>
                 <p className="text-sm italic">"{parsedIntent.originalInput}"</p>
               </div>
-              <div className="flex gap-3 pt-4 border-t">
+              <div className="flex gap-3 border-t border-primary/12 pt-4 dark:border-primary/20">
                 <Button
                   variant="outline"
                   onClick={() => {

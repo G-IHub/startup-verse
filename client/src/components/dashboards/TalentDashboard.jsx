@@ -399,33 +399,33 @@ export default function TalentDashboard({
           {/* Welcome Header */}
           <div className="flex items-start justify-between">
             <div>
-              <h1 className="text-2xl font-bold text-foreground">
+              <h1 className="font-heading text-2xl font-extrabold text-text-heading">
                 {"Welcome back, "}
                 {getFirstName(user?.name) || "New User"}
               </h1>
-              <p className="text-sm text-muted-foreground mt-0.5">
+              <p className="font-body text-sm text-text-muted mt-0.5">
                 {dateLabel}
               </p>
             </div>
             <div className="flex items-center gap-6">
-              <div className="flex items-center gap-2">
-                <Star className="h-4 w-4 text-muted-foreground" />
+              <div className="flex items-center gap-2 bg-surface-card rounded-input shadow-soft px-3 py-2 transition-shadow duration-200 ease-in-out hover:shadow-[0_4px_16px_rgba(58,90,254,0.10)]">
+                <Star className="h-4 w-4 text-status-warning" />
                 <div className="flex items-center gap-1">
-                  <span className="text-base font-bold text-foreground">
+                  <span className="font-heading text-base font-bold text-primary">
                     {viewModel.summary.sentInterestCount}
                   </span>
-                  <p className="text-[11px] text-muted-foreground leading-none">
+                  <p className="font-body text-[11px] font-medium text-text-body leading-none">
                     New Matches
                   </p>
                 </div>
               </div>
-              <div className="flex items-center gap-2">
-                <Bookmark className="h-4 w-4 text-muted-foreground" />
+              <div className="flex items-center gap-2 bg-surface-card rounded-input shadow-soft px-3 py-2 transition-shadow duration-200 ease-in-out hover:shadow-[0_4px_16px_rgba(58,90,254,0.10)]">
+                <Bookmark className="h-4 w-4 text-accent" />
                 <div className="flex items-center gap-1"> 
-                  <span className="text-base font-bold text-foreground">
+                  <span className="font-heading text-base font-bold text-primary">
                     {viewModel.summary.savedCount}
                   </span>
-                  <p className="text-[11px] text-muted-foreground leading-none">
+                  <p className="font-body text-[11px] font-medium text-text-body leading-none">
                     Saved
                   </p>
                 </div>
@@ -434,20 +434,26 @@ export default function TalentDashboard({
           </div>
 
           {/* Hero Banner */}
-          <div className="rounded-xl bg-blue-600 px-6 py-4 text-white">
+          <div
+            className="rounded-card px-6 py-4 text-white shadow-[0_4px_24px_rgba(58,90,254,0.18)] transition-shadow duration-200 ease-in-out"
+            style={{
+              background:
+                "linear-gradient(135deg, #3a5afe 0%, #7c4dff 100%)",
+            }}
+          >
             <div className="flex items-center justify-between gap-4">
               <div>
-                <h2 className="text-base font-bold">
+                <h2 className="font-heading text-base font-bold text-white">
                   Find Your Perfect Startup
                 </h2>
-                <p className="text-sm text-blue-200 mt-1 max-w-xl">
+                <p className="font-body text-sm text-white/85 mt-1 max-w-xl">
                   Discover startups that match your skills, interests, and
                   career goals. Connect with founders and join exciting teams.
                 </p>
               </div>
               <Button
                 onClick={() => onNavigate?.("team-matching")}
-                className="shrink-0 bg-white text-blue-700 hover:bg-blue-50 font-semibold gap-2 rounded-lg px-4"
+                className="shrink-0 bg-white/15 hover:bg-white/25 text-white font-body font-semibold gap-2 rounded-input px-4 backdrop-blur-[4px] border-[1.5px] border-white/40 transition-colors duration-200 ease-in-out"
                 size="sm"
               >
                 <Search className="h-4 w-4" />
@@ -460,12 +466,12 @@ export default function TalentDashboard({
           {/* Top Matches Section */}
           <div>
             <div className="flex items-center gap-2 mb-0.5">
-              <Star className="h-4 w-4 text-muted-foreground" />
-              <h2 className="text-base font-semibold text-foreground">
+              <Star className="h-4 w-4 text-status-warning" />
+              <h2 className="font-heading text-base font-bold text-text-heading">
                 Top Matches for You
               </h2>
             </div>
-            <p className="text-sm text-muted-foreground mb-5">
+            <p className="font-body text-sm text-text-body mb-5">
               Startups looking for your skills
             </p>
 
@@ -496,18 +502,18 @@ export default function TalentDashboard({
             )}
 
             {!isLoading && topMatches.length === 0 && (
-              <div className="rounded-xl border border-border bg-card px-6 py-12 text-center">
-                <Sparkles className="h-8 w-8 text-muted-foreground mx-auto mb-3" />
-                <p className="text-sm font-medium text-foreground">
+              <div className="rounded-card bg-surface-card shadow-soft px-6 py-12 text-center transition-shadow duration-200 ease-in-out">
+                <Sparkles className="h-8 w-8 text-accent mx-auto mb-3" />
+                <p className="font-heading text-sm font-semibold text-text-heading">
                   No matches yet
                 </p>
-                <p className="text-xs text-muted-foreground mt-1">
+                <p className="font-body text-xs text-text-muted mt-1">
                   Complete your profile to unlock personalized startup matches.
                 </p>
                 <Button
                   size="sm"
                   variant="outline"
-                  className="mt-4"
+                  className="mt-4 rounded-input border-[1.5px] border-primary bg-surface-card text-primary font-body font-semibold hover:bg-primary hover:text-white transition-colors duration-200 ease-in-out"
                   onClick={handleCompleteProfileClick}
                 >
                   Complete Profile
@@ -665,22 +671,30 @@ export default function TalentDashboard({
         {/* Complete Your Profile floating badge */}
         {talentCompletion < 100 && (
           <div
-            className="fixed bottom-6 right-6 flex items-center gap-3 rounded-2xl bg-card border border-border shadow-xl px-4 py-3 cursor-pointer hover:shadow-2xl transition-shadow max-w-[230px] z-50"
+            className="fixed bottom-6 right-6 flex items-center gap-3 rounded-card bg-surface-card px-4 py-3 cursor-pointer shadow-[0_8px_32px_rgba(58,90,254,0.14)] hover:shadow-[0_12px_40px_rgba(58,90,254,0.18)] transition-shadow duration-200 ease-in-out max-w-[230px] z-50"
             onClick={handleCompleteProfileClick}
           >
-            <div className="h-9 w-9 rounded-full bg-amber-100 flex items-center justify-center shrink-0">
-              <Sparkles className="h-4 w-4 text-amber-500" />
+            <div
+              className="h-9 w-9 rounded-input flex items-center justify-center shrink-0"
+              style={{
+                background: "linear-gradient(135deg, #ffb300, #ff6b00)",
+              }}
+            >
+              <Sparkles className="h-4 w-4 text-white" />
             </div>
             <div className="flex-1 min-w-0">
               <div className="flex items-center justify-between mb-1">
-                <p className="text-[12px] font-semibold text-foreground leading-tight">
+                <p className="font-heading text-[12px] font-semibold text-text-heading leading-tight">
                   Complete Your Profile
                 </p>
-                <ArrowRight className="h-3 w-3 text-muted-foreground shrink-0" />
+                <ArrowRight className="h-3 w-3 text-primary shrink-0" />
               </div>
               <div className="flex items-center gap-1.5">
-                <Progress value={talentCompletion} className="h-1.5 flex-1" />
-                <span className="text-[11px] font-bold text-amber-600 shrink-0">
+                <Progress
+                  value={talentCompletion}
+                  className="h-1.5 flex-1 bg-surface-border rounded-pill border-0 [&>[data-slot=progress-indicator]]:!bg-[linear-gradient(90deg,#3a5afe,#7c4dff)]"
+                />
+                <span className="font-body text-[11px] font-bold text-primary shrink-0">
                   {talentCompletion}%
                 </span>
               </div>

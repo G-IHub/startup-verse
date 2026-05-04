@@ -148,7 +148,7 @@ export default function VerticalSidebar({
           "group relative mx-1 flex w-[calc(100%-0.5rem)] flex-col items-center justify-center gap-0.5 rounded-lg px-1 py-1 text-center transition-colors duration-200 ease-in-out",
           "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary/45",
           active
-            ? "bg-[rgba(58,90,254,0.12)] text-white before:absolute before:left-0 before:top-1/2 before:h-6 before:w-0.5 before:-translate-y-1/2 before:rounded-full before:bg-primary before:content-['']"
+            ? "bg-[rgba(58,90,254,0.15)] text-primary before:absolute before:left-0 before:top-1/2 before:h-6 before:w-0.5 before:-translate-y-1/2 before:rounded-full before:bg-primary before:content-['']"
             : "text-[rgba(255,255,255,0.45)] hover:bg-[rgba(255,255,255,0.06)] hover:text-[rgba(255,255,255,0.85)]",
         )}
         onClick={() => handleNavClick(item)}
@@ -157,7 +157,7 @@ export default function VerticalSidebar({
           className={cn(
             "relative inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md transition-colors duration-200 ease-in-out",
             active
-              ? "bg-transparent text-white"
+              ? "bg-transparent text-primary"
               : "bg-transparent text-[rgba(255,255,255,0.45)] group-hover:bg-white/[0.06] group-hover:text-[rgba(255,255,255,0.85)]",
           )}
         >
@@ -177,7 +177,7 @@ export default function VerticalSidebar({
           className={cn(
             "max-w-[4.25rem] truncate text-[10px] font-medium leading-tight tracking-wide transition-colors duration-200 ease-in-out",
             active
-              ? "text-white"
+              ? "text-primary"
               : "text-[rgba(255,255,255,0.45)] group-hover:text-[rgba(255,255,255,0.85)]",
           )}
         >
@@ -202,7 +202,7 @@ export default function VerticalSidebar({
         <div className="relative flex items-center justify-center px-2 py-2">
           <button
             type="button"
-            className="relative inline-flex h-10 w-10 items-center justify-center rounded-[10px] bg-primary text-primary-foreground shadow-none transition-opacity duration-200 ease-in-out hover:bg-primary-hover hover:opacity-100"
+            className="relative inline-flex h-10 w-10 items-center justify-center rounded-[12px] bg-primary text-primary-foreground shadow-none transition-opacity duration-200 ease-in-out hover:bg-primary-hover hover:opacity-100"
             aria-label="StartupVerse"
           >
             <Sparkles className="h-[18px] w-[18px]" strokeWidth={1.75} />

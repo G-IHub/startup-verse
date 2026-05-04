@@ -78,6 +78,7 @@ export const updateProfile = async (req, res) => {
     "profile",
     "onboardingComplete",
     "avatarUrl",
+    "startupId",
   ];
   const updates = {};
 

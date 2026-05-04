@@ -8,76 +8,201 @@ function nonEmptyArray(a) {
   return Array.isArray(a) && a.length > 0;
 }
 
-/** Average of per-row "filled" ratios for list objects;0 if empty list. */
-function listCompleteness(rows, keys) {
+/** Per-row fill ratio for list objects using key list (each key 0 or 1). */
+function listCompleteness(rows, keyFns) {
   if (!nonEmptyArray(rows)) return 0;
   const ratios = rows.map((row) => {
     if (!row || typeof row !== "object") return 0;
-    const filled = keys.filter((k) => str(row[k])).length;
-    return filled / keys.length;
+    const filled = keyFns.filter((fn) => fn(row)).length;
+    return filled / keyFns.length;
   });
   return ratios.reduce((a, b) => a + b, 0) / ratios.length;
 }
 
 /**
- * Talent profile completion 0–100 with weighted buckets:
- * - Core (professional): 40%
- * - Skills, links, experience, education, certs, portfolio: 35%
- * - Availability & goals: 25%
+ * Flatten persisted user + nested profile into one shape used for completion.
+ * Matches fields written by ProfileCompletionModal / ProfileCompletionForm for talent.
  */
-export function getTalentProfileCompletionPercent(user) {
-  if (!user || user.role !== "talent") return 100;
-
+export function flattenTalentUserForCompletion(user) {
+  if (!user || typeof user !== "object") {
+    return getEmptyTalentFlat();
+  }
   const p = user.profile || {};
 
-  const name = str(user.name || p.fullName);
-  const email = str(user.email || p.email);
-  const professionalTitle = str(user.professionalTitle || p.professionalTitle);
-  const yearsOfExperience = str(
-    user.yearsOfExperience ?? p.yearsOfExperience ?? "",
-  );
-  const bio = str(user.bio || p.bio);
+  const work = user.workExperience || p.workExperiences || [];
+  const education = user.education || p.educationList || [];
+  const certifications = user.certifications || p.certifications || [];
+  const portfolioItems = user.portfolioItems || p.portfolioItems || [];
 
-  const coreChecks = [name, email, professionalTitle, yearsOfExperience, bio];
-  const coreRatio =
-    coreChecks.filter((x) => x.length > 0).length / coreChecks.length;
-  let total = coreRatio * 40;
+  return {
+    name: str(user.name || p.fullName),
+    email: str(user.email || p.email),
+    professionalTitle: str(user.professionalTitle || p.professionalTitle),
+    yearsOfExperience: str(
+      user.yearsOfExperience ?? p.yearsOfExperience ?? "",
+    ),
+    bio: str(user.bio || p.bio),
+    location: str(user.location || p.location),
 
-  const skills = user.skills || p.skills;
-  const skillsRatio = nonEmptyArray(skills) ? 1 : 0;
+    skills: user.skills || p.skills || [],
 
-  const linkedin = str(user.linkedin || p.linkedinUrl);
-  const github = str(user.github || p.githubUrl);
-  const website = str(user.website || p.portfolioWebsite);
+    linkedin: str(user.linkedin || p.linkedinUrl),
+    github: str(user.github || p.githubUrl),
+    website: str(
+      user.website || p.portfolioWebsite || p.websiteUrl || "",
+    ),
+
+    workExperience: Array.isArray(work) ? work : [],
+    education: Array.isArray(education) ? education : [],
+    certifications: Array.isArray(certifications) ? certifications : [],
+    portfolioItems: Array.isArray(portfolioItems) ? portfolioItems : [],
+
+    availabilityStatus: str(user.availabilityStatus || p.availabilityStatus),
+    preferredCommitment: str(
+      user.preferredCommitment || p.preferredCommitment,
+    ),
+    experience: str(user.experience || p.experience),
+    availability: str(user.availability || p.availability),
+    professionalGoals: str(user.professionalGoals || p.professionalGoals),
+    interests: user.interests || p.interests || [],
+    industryPreferences:
+      user.industryPreferences || p.industryPreferences || [],
+  };
+}
+
+function getEmptyTalentFlat() {
+  return {
+    name: "",
+    email: "",
+    professionalTitle: "",
+    yearsOfExperience: "",
+    bio: "",
+    location: "",
+    skills: [],
+    linkedin: "",
+    github: "",
+    website: "",
+    workExperience: [],
+    education: [],
+    certifications: [],
+    portfolioItems: [],
+    availabilityStatus: "",
+    preferredCommitment: "",
+    experience: "",
+    availability: "",
+    professionalGoals: "",
+    interests: [],
+    industryPreferences: [],
+  };
+}
+
+/**
+ * Live form snapshot → same flat shape as flattenTalentUserForCompletion.
+ * `email` should be the authenticated email (not always edited on step 1).
+ */
+export function talentFormSnapshotToFlat(snapshot) {
+  const s = snapshot || {};
+  const skillsRaw = s.skills;
+  const skills = Array.isArray(skillsRaw)
+    ? skillsRaw
+    : typeof s.skillsInput === "string"
+      ? s.skillsInput
+          .split(",")
+          .map((x) => x.trim())
+          .filter(Boolean)
+      : [];
+
+  return {
+    name: str(s.fullName ?? s.name),
+    email: str(s.email),
+    professionalTitle: str(s.professionalTitle),
+    yearsOfExperience: str(s.yearsOfExperience ?? ""),
+    bio: str(s.bio),
+    location: str(s.location),
+
+    skills,
+
+    linkedin: str(s.linkedinUrl ?? s.linkedin),
+    github: str(s.githubUrl ?? s.github),
+    website: str(s.portfolioWebsite ?? s.websiteUrl ?? s.website),
+
+    workExperience: Array.isArray(s.workExperiences)
+      ? s.workExperiences
+      : Array.isArray(s.workExperience)
+        ? s.workExperience
+        : [],
+    education: Array.isArray(s.educationList)
+      ? s.educationList
+      : Array.isArray(s.education)
+        ? s.education
+        : [],
+    certifications: Array.isArray(s.certifications) ? s.certifications : [],
+    portfolioItems: Array.isArray(s.portfolioItems) ? s.portfolioItems : [],
+
+    availabilityStatus: str(s.availabilityStatus),
+    preferredCommitment: str(s.preferredCommitment),
+    experience: str(s.experience),
+    availability: str(s.availability),
+    professionalGoals: str(s.professionalGoals),
+    interests: Array.isArray(s.interests) ? s.interests : [],
+    industryPreferences: Array.isArray(s.industryPreferences)
+      ? s.industryPreferences
+      : [],
+  };
+}
+
+/**
+ * Core / step2 / step3 weights — same as stored profile buckets (TalentProfile + user flags).
+ * - Core: 40% (35% five required + 5% optional location; email from account counts)
+ * - Structured + skills + links: 35%
+ * - Availability + goals: 25%
+ */
+export function computeTalentProfileCompletionFromFlat(flat) {
+  const f = flat || getEmptyTalentFlat();
+
+  const reqCore = [
+    str(f.name),
+    str(f.email),
+    str(f.professionalTitle),
+    str(f.yearsOfExperience),
+    str(f.bio),
+  ];
+  const coreReqRatio =
+    reqCore.map((x) => (x.length > 0 ? 1 : 0)).reduce((a, b) => a + b, 0) / 5;
+  const locationPts = str(f.location).length > 0 ? 1 : 0;
+  let total = coreReqRatio * 35 + locationPts * 5;
+
+  const skillsRatio = nonEmptyArray(f.skills) ? 1 : 0;
+
+  const linkedin = str(f.linkedin);
+  const github = str(f.github);
+  const website = str(f.website);
   const linkSlots = [linkedin, github, website].map((x) => (x ? 1 : 0));
   const linksRatio = linkSlots.reduce((a, b) => a + b, 0) / 3;
 
-  const work = user.workExperience || p.workExperiences;
-  const workRatio = listCompleteness(work, [
-    "company",
-    "position",
-    "startDate",
+  const workRatio = listCompleteness(f.workExperience, [
+    (row) => str(row.company).length > 0,
+    (row) => str(row.position).length > 0,
+    (row) => str(row.startDate).length > 0,
   ]);
 
-  const education = user.education || p.educationList;
-  const educationRatio = listCompleteness(education, [
-    "institution",
-    "degree",
-    "field",
-    "graduationYear",
+  const educationRatio = listCompleteness(f.education, [
+    (row) => str(row.institution).length > 0,
+    (row) => str(row.degree).length > 0,
+    (row) => str(row.field).length > 0,
+    (row) =>
+      str(row.graduationYear || row.endYear || row.startYear).length > 0,
   ]);
 
-  const certifications = user.certifications || p.certifications;
-  const certRatio = listCompleteness(certifications, [
-    "name",
-    "issuer",
-    "issueYear",
+  const certRatio = listCompleteness(f.certifications, [
+    (row) => str(row.name).length > 0,
+    (row) => str(row.issuer).length > 0,
+    (row) => str(row.year || row.issueYear).length > 0,
   ]);
 
-  const portfolioItems = user.portfolioItems || p.portfolioItems;
-  const portfolioRatio = listCompleteness(portfolioItems, [
-    "title",
-    "description",
+  const portfolioRatio = listCompleteness(f.portfolioItems, [
+    (row) => str(row.title).length > 0,
+    (row) => str(row.description).length > 0,
   ]);
 
   const step2Parts = [
@@ -88,35 +213,84 @@ export function getTalentProfileCompletionPercent(user) {
     certRatio,
     portfolioRatio,
   ];
-  const step2Avg =
-    step2Parts.reduce((a, b) => a + b, 0) / step2Parts.length;
+  const step2Avg = step2Parts.reduce((a, b) => a + b, 0) / step2Parts.length;
   total += step2Avg * 35;
 
-  const availabilityStatus = str(
-    user.availabilityStatus || p.availabilityStatus,
-  );
-  const preferredCommitment = str(
-    user.preferredCommitment || p.preferredCommitment,
-  );
-  const experience = str(user.experience || p.experience);
-  const availability = str(user.availability || p.availability);
-  const professionalGoals = str(user.professionalGoals || p.professionalGoals);
-  const interests = user.interests || p.interests;
-  const interestsRatio = nonEmptyArray(interests) ? 1 : 0;
-  const industryPreferences = user.industryPreferences || p.industryPreferences;
-  const industryRatio = nonEmptyArray(industryPreferences) ? 1 : 0;
+  const interestsRatio = nonEmptyArray(f.interests) ? 1 : 0;
+  const industryRatio = nonEmptyArray(f.industryPreferences) ? 1 : 0;
 
   const step3Checks = [
-    availabilityStatus,
-    preferredCommitment,
-    experience,
-    availability,
-    professionalGoals,
-  ].map((x) => (str(x).length > 0 ? 1 : 0));
-  step3Checks.push(interestsRatio, industryRatio);
+    str(f.availabilityStatus).length > 0 ? 1 : 0,
+    str(f.preferredCommitment).length > 0 ? 1 : 0,
+    str(f.experience).length > 0 ? 1 : 0,
+    str(f.availability).length > 0 ? 1 : 0,
+    str(f.professionalGoals).length > 0 ? 1 : 0,
+    interestsRatio,
+    industryRatio,
+  ];
   const step3Ratio =
     step3Checks.reduce((a, b) => a + b, 0) / step3Checks.length;
   total += step3Ratio * 25;
 
   return Math.min(100, Math.round(total));
+}
+
+export function getTalentProfileCompletionPercent(user) {
+  if (!user || user.role !== "talent") return 100;
+  const flat = flattenTalentUserForCompletion(user);
+  return computeTalentProfileCompletionFromFlat(flat);
+}
+
+/** Wizard / live form: pass buildSubmissionData() spread + email */
+export function getTalentProfileFormCompletionPercent(formSnapshot) {
+  const flat = talentFormSnapshotToFlat(formSnapshot);
+  return computeTalentProfileCompletionFromFlat(flat);
+}
+
+/**
+ * Map persisted user (top-level + profile) into TalentProfileForm initialData keys.
+ */
+export function persistedTalentToFormInitialData(user) {
+  const f = flattenTalentUserForCompletion(user);
+  return {
+    fullName: f.name,
+    email: f.email,
+    professionalTitle: f.professionalTitle,
+    location: f.location,
+    bio: f.bio,
+    yearsOfExperience: f.yearsOfExperience,
+    skills: Array.isArray(f.skills) ? [...f.skills] : [],
+    linkedinUrl: f.linkedin,
+    githubUrl: f.github,
+    portfolioWebsite: f.website,
+    workExperiences: Array.isArray(f.workExperience)
+      ? f.workExperience.map((row) => ({ ...row }))
+      : [],
+    educationList: Array.isArray(f.education)
+      ? f.education.map((row) => ({
+          ...row,
+          graduationYear:
+            row.graduationYear ?? row.endYear ?? row.startYear ?? "",
+        }))
+      : [],
+    certifications: Array.isArray(f.certifications)
+      ? f.certifications.map((row) => ({
+          ...row,
+          issueYear: row.issueYear ?? row.year ?? "",
+          credentialUrl: row.credentialUrl ?? row.url ?? "",
+        }))
+      : [],
+    portfolioItems: Array.isArray(f.portfolioItems)
+      ? f.portfolioItems.map((row) => ({ ...row }))
+      : [],
+    availabilityStatus: f.availabilityStatus,
+    preferredCommitment: f.preferredCommitment,
+    experience: f.experience,
+    availability: f.availability,
+    interests: Array.isArray(f.interests) ? [...f.interests] : [],
+    professionalGoals: f.professionalGoals,
+    industryPreferences: Array.isArray(f.industryPreferences)
+      ? [...f.industryPreferences]
+      : [],
+  };
 }

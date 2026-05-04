@@ -13,6 +13,52 @@ export function weekOfStartIso(date = new Date()) {
 
 const FINAL_OUTCOME = new Set(["completed", "partial", "missed"]);
 
+/** Keep aligned with `server/src/domain/weeklyPlanMilestoneValidation.js`. */
+export const MIN_WEEKLY_MILESTONE_TITLE_LEN = 2;
+export const MIN_WEEKLY_TASK_TITLE_LEN = 2;
+
+/**
+ * Validates milestones for POST /weekly-plan and for draft commits from the milestone editor.
+ * @param {unknown} milestones
+ * @returns {{ ok: true } | { ok: false, message: string }}
+ */
+export function validateWeeklyPlanMilestones(milestones) {
+  const ms = Array.isArray(milestones) ? milestones : [];
+  if (ms.length === 0) {
+    return {
+      ok: false,
+      message:
+        "Add at least one milestone. Each milestone needs a title and at least one task.",
+    };
+  }
+  for (let i = 0; i < ms.length; i++) {
+    const m = ms[i];
+    const title = String(m?.title ?? "").trim();
+    if (title.length < MIN_WEEKLY_MILESTONE_TITLE_LEN) {
+      return {
+        ok: false,
+        message: `Milestone ${i + 1}: title must be at least ${MIN_WEEKLY_MILESTONE_TITLE_LEN} characters.`,
+      };
+    }
+    const tasks = Array.isArray(m?.tasks) ? m.tasks : [];
+    const nonempty = tasks
+      .map((t) => {
+        if (typeof t === "string") return t.trim();
+        return String(t?.title ?? "").trim();
+      })
+      .filter((s) => s.length >= MIN_WEEKLY_TASK_TITLE_LEN);
+    if (nonempty.length === 0) {
+      const short =
+        title.length > 48 ? `${title.slice(0, 48)}…` : title;
+      return {
+        ok: false,
+        message: `“${short}” needs at least one task with a title (at least ${MIN_WEEKLY_TASK_TITLE_LEN} characters).`,
+      };
+    }
+  }
+  return { ok: true };
+}
+
 /**
  * `weekOf` for POST /weekly-plan: reuse the latest outcome's week when it is still
  * **active** (update path). If the latest outcome is **final**, use the first week
@@ -76,7 +122,7 @@ export function buildWeeklyPlanFromTemplate(
   templateId,
   stageId,
   weekNumber,
-  { customTitle, customDescription } = {},
+  { customTitle, customDescription, customMilestones } = {},
   existingOutcomes = [],
 ) {
   const outcome = createOutcomeFromTemplate(templateId, stageId, weekNumber);
@@ -89,11 +135,33 @@ export function buildWeeklyPlanFromTemplate(
   const goal = String(customTitle || outcome.title || "").trim();
   const summary = String(customDescription || outcome.description || "").trim();
 
-  const milestones = template.defaultMilestones.map((m) => ({
-    title: m.title,
-    description: "",
-    tasks: m.defaultTasks.map((taskTitle) => taskPayloadFromTitle(taskTitle)),
-  }));
+  const milestones =
+    Array.isArray(customMilestones) && customMilestones.length > 0
+      ? customMilestones.map((m) => {
+          const rawTitles = (Array.isArray(m.tasks) ? m.tasks : [])
+            .map((taskTitle) =>
+              typeof taskTitle === "string"
+                ? taskTitle
+                : String(taskTitle?.title || ""),
+            )
+            .map((s) => s.trim())
+            .filter((s) => s.length >= MIN_WEEKLY_TASK_TITLE_LEN);
+
+          return {
+            title: String(m.title || "").trim().slice(0, 200),
+            description: "",
+            tasks: rawTitles.map((taskTitle) =>
+              taskPayloadFromTitle(taskTitle),
+            ),
+          };
+        })
+      : template.defaultMilestones.map((m) => ({
+          title: m.title,
+          description: "",
+          tasks: m.defaultTasks.map((taskTitle) =>
+            taskPayloadFromTitle(taskTitle),
+          ),
+        }));
 
   return {
     goal,
@@ -113,10 +181,34 @@ export function buildWeeklyPlanCustom(
   _stageId,
   _weekNumber,
   existingOutcomes = [],
+  customMilestones = null,
 ) {
   const goal = String(customTitle || "").trim();
   const summary = String(customDescription || "").trim();
   if (!goal) return null;
+
+  if (Array.isArray(customMilestones) && customMilestones.length > 0) {
+    const milestones = customMilestones.map((m) => {
+      const taskTitles = (Array.isArray(m.tasks) ? m.tasks : [])
+        .map((t) => String(t || "").trim())
+        .filter((s) => s.length >= MIN_WEEKLY_TASK_TITLE_LEN);
+      const milestoneTitle = String(m.title || "").trim().slice(0, 200);
+      return {
+        title: milestoneTitle,
+        description: "",
+        tasks: taskTitles.map((taskTitle) =>
+          taskPayloadFromTitle(taskTitle),
+        ),
+      };
+    });
+    return {
+      goal,
+      summary,
+      weekOf: nextPlanWeekOfIso(existingOutcomes),
+      status: "active",
+      milestones,
+    };
+  }
 
   const lines = summary
     .split(/\n+/)
@@ -171,17 +263,28 @@ export function buildWeeklyPlanFromIntent(
   const goal = String(customTitle || outcome.title || "").trim();
   const summary = String(customDescription || outcome.description || "").trim();
 
-  const milestones = parsedIntent.suggestedMilestones.map((m) => ({
-    title: m.title,
-    description: "",
-    tasks: (m.tasks || [])
+  const milestones = parsedIntent.suggestedMilestones.map((m) => {
+    const tasks = (m.tasks || [])
       .map((taskTitle) =>
         typeof taskTitle === "string"
-          ? { title: ensureTaskTitle(taskTitle) }
-          : { title: ensureTaskTitle(taskTitle?.title || "") },
+          ? { title: String(taskTitle).trim().slice(0, 200) }
+          : {
+              title: String(taskTitle?.title || "")
+                .trim()
+                .slice(0, 200),
+            },
       )
-      .filter((row) => row.title && String(row.title).trim()),
-  }));
+      .filter(
+        (row) =>
+          row.title &&
+          String(row.title).trim().length >= MIN_WEEKLY_TASK_TITLE_LEN,
+      );
+    return {
+      title: String(m.title || "").trim().slice(0, 200),
+      description: "",
+      tasks,
+    };
+  });
 
   return {
     goal,

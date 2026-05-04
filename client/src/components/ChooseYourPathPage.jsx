@@ -15,7 +15,8 @@ import {
 } from "lucide-react";
 import InlineSignupForm from "./InlineSignupForm";
 import InlineProfileCompletion from "./InlineProfileCompletion";
-export default function ChooseYourPathPage({ onBack, onComplete }) {
+
+export default function ChooseYourPathPage({ onBack, onComplete, onPersistUser }) {
   const [showSignupModal, setShowSignupModal] = useState(false);
   const [selectedRole, setSelectedRole] = useState(null);
   const [showProfileSetup, setShowProfileSetup] = useState(false);
@@ -24,6 +25,8 @@ export default function ChooseYourPathPage({ onBack, onComplete }) {
   const [currentSlide, setCurrentSlide] = useState(0);
   const [isExiting, setIsExiting] = useState(false);
   const isMountedRef = useRef(true);
+  /** Latest user from ProfileCompletionForm (avoids stale state when onComplete runs same tick as onUpdateUser). */
+  const latestUserRef = useRef(null);
   const [view, setView] = useState("choose-path");
 
   // Features carousel data
@@ -127,20 +130,19 @@ export default function ChooseYourPathPage({ onBack, onComplete }) {
       };
     }
     if (!isMountedRef.current) return;
+    latestUserRef.current = user;
     setNewUser(user);
     setSelectedRole(role);
     setShowProfileSetup(true);
     setView("profile-setup");
   };
-  const handleProfileComplete = (profileData) => {
+  const handleProfileComplete = () => {
     if (!isMountedRef.current) return;
 
-    // Complete the entire flow - navigate to dashboard
-    // The onUpdateUser callback should have already updated newUser with complete profile
-    if (selectedRole && newUser) {
-      // Mark onboarding as complete
+    const base = latestUserRef.current ?? newUser;
+    if (selectedRole && base) {
       const completedUser = {
-        ...newUser,
+        ...base,
         onboardingComplete: true,
       };
       onComplete(selectedRole, completedUser, pendingAccessToken);
@@ -148,8 +150,9 @@ export default function ChooseYourPathPage({ onBack, onComplete }) {
   };
   const handleProfileUpdateUser = (updatedUser) => {
     if (!isMountedRef.current) return;
-    // Update the local user state as profile is being filled out
+    latestUserRef.current = updatedUser;
     setNewUser(updatedUser);
+    onPersistUser?.(updatedUser);
   };
   const handleSignupModalClose = () => {
     if (!isMountedRef.current) return;
@@ -160,6 +163,7 @@ export default function ChooseYourPathPage({ onBack, onComplete }) {
   };
   const handleProfileSetupClose = () => {
     if (!isMountedRef.current) return;
+    latestUserRef.current = null;
     setShowProfileSetup(false);
     setNewUser(null);
     setPendingAccessToken("");

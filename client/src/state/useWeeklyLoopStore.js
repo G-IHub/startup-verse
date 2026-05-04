@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { apiGet, apiPost, apiPut, apiDelete } from "../utils/apiClient.js";
 import { mapFounderWeeklyLoop } from "../domains/founder/mappers/founderWeeklyLoopMapper.js";
+import { validateWeeklyPlanMilestones } from "../domains/founder/mappers/weeklyPlanPayload.js";
 
 /**
  * Weekly execution loop store.
@@ -138,6 +139,10 @@ export const useWeeklyLoopStore = create((set, get) => ({
     const id = founderIdOverride || get().founderId;
     if (!id || !plan) {
       throw new Error("Missing founder or plan.");
+    }
+    const milestoneCheck = validateWeeklyPlanMilestones(plan.milestones);
+    if (!milestoneCheck.ok) {
+      throw new Error(milestoneCheck.message);
     }
     const data = await apiPost(`/founders/${id}/weekly-plan`, { plan });
     set({ founderId: id });

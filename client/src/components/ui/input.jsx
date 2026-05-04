@@ -14,6 +14,11 @@ function _extends() {
 }
 import * as React from "react";
 import { cn } from "./utils";
+
+/** Shared surface styles for text inputs and password-input (thinner focus ring). */
+export const inputSurfaceClassName =
+  "file:text-foreground placeholder:text-muted-foreground placeholder:text-xs selection:bg-primary selection:text-primary-foreground dark:bg-input/30 flex h-10 w-full min-w-0 rounded-lg px-3 py-2 text-base bg-input-background border border-border transition-all outline-none file:inline-flex file:h-7 file:border-0 file:bg-transparent file:text-sm file:font-medium disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50 md:text-sm focus-visible:border-ring focus-visible:ring-ring/35 focus-visible:ring-2 hover:border-ring/50 aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive";
+
 function Input({ className, type, ...props }) {
   return (
     <input
@@ -21,12 +26,7 @@ function Input({ className, type, ...props }) {
         {
           type: type,
           "data-slot": "input",
-          className: cn(
-            "file:text-foreground placeholder:text-muted-foreground placeholder:text-xs selection:bg-primary selection:text-primary-foreground dark:bg-input/30 flex h-10 w-full min-w-0 rounded-lg px-3 py-2 text-base bg-input-background border border-border transition-all outline-none file:inline-flex file:h-7 file:border-0 file:bg-transparent file:text-sm file:font-medium disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50 md:text-sm",
-            "focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] hover:border-ring/50",
-            "aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive",
-            className,
-          ),
+          className: cn(inputSurfaceClassName, className),
         },
         props,
       )}

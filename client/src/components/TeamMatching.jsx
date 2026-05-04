@@ -866,7 +866,7 @@ export default function TeamMatching({ user, onNavigate }) {
     <div className="min-h-full bg-surface-page p-2 font-body md:p-3 lg:p-4 space-y-3 md:space-y-4">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 mb-4 md:mb-6">
         <div>
-          <h2 className="mb-1 font-heading text-xl font-bold text-text-heading md:text-2xl">
+          <h2 className="mb-1 font-heading text-xl font-extrabold text-text-heading md:text-2xl">
             {user.role === "founder"
               ? "Browse Talent"
               : "Browse Startups"}
@@ -966,11 +966,11 @@ export default function TeamMatching({ user, onNavigate }) {
                 }
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="rounded-input border border-surface-border bg-surface-card pl-9 font-body text-sm text-text-heading placeholder:text-text-muted transition-shadow duration-200 ease-in-out focus-visible:border-primary focus-visible:shadow-[0_0_0_3px_rgba(58,90,254,0.10)] focus-visible:ring-0"
+                className="rounded-input border-[1.5px] border-surface-border bg-surface-card pl-9 font-body text-sm text-text-heading placeholder:text-text-muted transition-shadow duration-200 ease-in-out focus-visible:border-primary focus-visible:shadow-[0_0_0_3px_rgba(58,90,254,0.10)] focus-visible:ring-0"
               />
             </div>
             <Select value={sortBy} onValueChange={setSortBy}>
-              <SelectTrigger className="w-full rounded-input border border-surface-border bg-surface-card font-body text-sm font-medium text-text-heading transition-colors duration-200 ease-in-out hover:border-primary sm:w-40 [&_svg]:text-text-body">
+              <SelectTrigger className="w-full rounded-input border-[1.5px] border-surface-border bg-surface-card font-body text-sm font-medium text-text-heading transition-colors duration-200 ease-in-out hover:border-primary sm:w-40 [&_svg]:text-text-body">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -1399,11 +1399,13 @@ export default function TeamMatching({ user, onNavigate }) {
           {user.role === "talent" && (
             <div className="space-y-3">
               {filteredIdeas.length === 0 ? (
-                <Card className="rounded-card border border-surface-border bg-purple-50 shadow-soft dark:bg-purple-950/20">
+                <Card className="rounded-card border-0 bg-surface-card shadow-soft transition-shadow duration-200 ease-in-out">
                   <CardContent className="p-4 text-center">
-                    <Rocket className="w-8 h-8 mx-auto mb-2 text-purple-600 dark:text-purple-400" />
-                    <p className="text-sm mb-1">No startup ideas found</p>
-                    <p className="text-xs text-muted-foreground">
+                    <Rocket className="w-8 h-8 mx-auto mb-2 text-accent" />
+                    <p className="font-heading text-sm font-semibold text-text-heading mb-1">
+                      No startup ideas found
+                    </p>
+                    <p className="font-body text-xs text-text-muted">
                       Check back soon! Founders post new opportunities every
                       day.
                     </p>

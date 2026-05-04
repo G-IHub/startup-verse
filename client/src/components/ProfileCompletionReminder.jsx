@@ -23,7 +23,10 @@ import {
   DialogHeader,
   DialogTitle,
 } from "./ui/dialog";
-import { getTalentProfileCompletionPercent } from "../utils/talentProfileCompletion";
+import {
+  flattenTalentUserForCompletion,
+  getTalentProfileCompletionPercent,
+} from "../utils/talentProfileCompletion";
 
 const COMPLETION_THRESHOLD = 80; // Profile must be 80% complete to permanently dismiss
 
@@ -45,63 +48,68 @@ export default function ProfileCompletionReminder({
     };
   };
   const getProfileSegments = () => {
+    const f = flattenTalentUserForCompletion(user);
     const segments = [
       {
         id: "professional-profile",
         label: "Professional Profile",
         icon: UserCircle,
         isComplete: !!(
-          user.name &&
-          user.professionalTitle &&
-          user.yearsOfExperience &&
-          user.bio
+          f.name &&
+          f.email &&
+          f.professionalTitle &&
+          f.yearsOfExperience &&
+          f.bio
         ),
       },
       {
         id: "skills-expertise",
         label: "Skills & Expertise",
         icon: Code,
-        isComplete: !!(user.skills && user.skills.length > 0),
+        isComplete: Array.isArray(f.skills) && f.skills.length > 0,
       },
       {
         id: "professional-links",
         label: "Professional Links",
         icon: Link2,
-        isComplete: !!(user.linkedin || user.github || user.website),
+        isComplete: !!(f.linkedin || f.github || f.website),
       },
       {
         id: "work-experience",
         label: "Work Experience",
         icon: Briefcase,
-        isComplete: !!(user.workExperience && user.workExperience.length > 0),
+        isComplete:
+          Array.isArray(f.workExperience) && f.workExperience.length > 0,
       },
       {
         id: "education",
         label: "Education",
         icon: GraduationCap,
-        isComplete: !!(user.education && user.education.length > 0),
+        isComplete: Array.isArray(f.education) && f.education.length > 0,
       },
       {
         id: "certifications",
         label: "Certifications & Credentials",
         icon: Award,
-        isComplete: !!(user.certifications && user.certifications.length > 0),
+        isComplete:
+          Array.isArray(f.certifications) && f.certifications.length > 0,
       },
       {
         id: "portfolio",
         label: "Portfolio & Projects",
         icon: FolderKanban,
-        isComplete: !!(user.portfolioItems && user.portfolioItems.length > 0),
+        isComplete:
+          Array.isArray(f.portfolioItems) && f.portfolioItems.length > 0,
       },
       {
         id: "availability",
         label: "Availability & Preferences",
         icon: Calendar,
         isComplete: !!(
-          user.availabilityStatus &&
-          user.preferredCommitment &&
-          user.experience &&
-          user.availability
+          f.availabilityStatus &&
+          f.preferredCommitment &&
+          f.experience &&
+          f.availability
         ),
       },
       {
@@ -109,9 +117,10 @@ export default function ProfileCompletionReminder({
         label: "Career Goals & Industries",
         icon: Target,
         isComplete: !!(
-          (user.professionalGoals && String(user.professionalGoals).trim()) ||
-          (user.interests && user.interests.length > 0) ||
-          (user.industryPreferences && user.industryPreferences.length > 0)
+          (f.professionalGoals && String(f.professionalGoals).trim()) ||
+          (Array.isArray(f.interests) && f.interests.length > 0) ||
+          (Array.isArray(f.industryPreferences) &&
+            f.industryPreferences.length > 0)
         ),
       },
     ];

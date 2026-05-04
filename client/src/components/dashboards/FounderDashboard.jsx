@@ -80,6 +80,7 @@ import {
   buildWeeklyPlanCustom,
   buildWeeklyPlanFromIntent,
   buildWeeklyPlanFromTemplate,
+  validateWeeklyPlanMilestones,
 } from "../../domains/founder/mappers/weeklyPlanPayload.js";
 import PendingCompensationCard from "../compensation/PendingCompensationCard";
 import * as founderApi from "../../utils/api/founderApi";
@@ -1166,6 +1167,7 @@ export default function FounderDashboard({
     templateId,
     customTitle,
     customDescription,
+    customMilestones,
   ) => {
     if (!founderId) {
       toast.error("Could not identify your account", {
@@ -1183,12 +1185,13 @@ export default function FounderDashboard({
             currentStageId,
             weekNumber,
             outcomesRaw,
+            customMilestones,
           )
         : buildWeeklyPlanFromTemplate(
             templateId,
             currentStageId,
             weekNumber,
-            { customTitle, customDescription },
+            { customTitle, customDescription, customMilestones },
             outcomesRaw,
           );
     if (!plan?.goal) {
@@ -1197,6 +1200,14 @@ export default function FounderDashboard({
           templateId === "custom"
             ? "Add a title and description for your weekly goal."
             : "Pick a template or try another stage.",
+      });
+      return;
+    }
+
+    const milestoneCheck = validateWeeklyPlanMilestones(plan.milestones);
+    if (!milestoneCheck.ok) {
+      toast.error("Complete each milestone", {
+        description: milestoneCheck.message,
       });
       return;
     }
@@ -1242,6 +1253,20 @@ export default function FounderDashboard({
     const milestoneIdMap = new Map();
 
     try {
+      const milestonesPayload = draftMilestones.map((m) => ({
+        title: m.title,
+        tasks: draft
+          .filter((t) => String(t.milestoneId ?? "") === String(m.id))
+          .map((t) => ({ title: t.title })),
+      }));
+      const milestoneCheck = validateWeeklyPlanMilestones(milestonesPayload);
+      if (!milestoneCheck.ok) {
+        toast.error("Cannot save week plan", {
+          description: milestoneCheck.message,
+        });
+        throw new Error(milestoneCheck.message);
+      }
+
       const draftTaskIdSet = new Set(draft.map((t) => taskIdStr(t)));
       const draftMilestoneIdSet = new Set(
         draftMilestones.map((m) => String(m.id)),
@@ -1270,10 +1295,7 @@ export default function FounderDashboard({
         const mid = String(dm.id);
         if (baselineMidSet.has(mid)) continue;
         const titleRaw = String(dm.title || "").trim();
-        const title =
-          titleRaw.length >= 2
-            ? titleRaw.slice(0, 200)
-            : "New milestone".slice(0, 200);
+        const title = titleRaw.slice(0, 200);
         const created = await weeklyLoop.saveMilestone(
           {
             title,
@@ -1303,10 +1325,7 @@ export default function FounderDashboard({
           await weeklyLoop.updateMilestone(
             mid,
             {
-              title:
-                nextTitle.length >= 2
-                  ? nextTitle.slice(0, 200)
-                  : String(bm.title || "Milestone").slice(0, 200),
+              title: nextTitle.slice(0, 200),
               description: String(dm.description || "").trim().slice(0, 5000),
             },
             skip,
@@ -1327,7 +1346,7 @@ export default function FounderDashboard({
           if (!mid) continue;
           await weeklyLoop.saveTask(
             {
-              title: String(d.title || "Task").trim().slice(0, 500) || "Task",
+              title: String(d.title || "").trim().slice(0, 500),
               description: String(d.description || "").trim().slice(0, 5000),
               milestoneId: mid,
               status: d.status || "pending",
@@ -1419,11 +1438,9 @@ export default function FounderDashboard({
         const bde = String(base.description || "").trim();
         const dde = String(d.description || "").trim();
         if (bt !== dt || bde !== dde) {
-          const patchTitle =
-            dt.length >= 2 ? dt.slice(0, 200) : bt.slice(0, 200) || "Task";
           await weeklyLoop.updateTaskPatch(
             id,
-            { title: patchTitle, description: dde },
+            { title: dt.slice(0, 200), description: dde },
             skip,
           );
         }
@@ -1433,7 +1450,14 @@ export default function FounderDashboard({
       toast.success("Week plan updated");
     } catch (error) {
       console.error("Error saving task changes:", error);
-      toast.error("Failed to save task changes");
+      toast.error("Failed to save task changes", {
+        description:
+          error?.message &&
+          String(error.message).length > 0 &&
+          error.message !== "Failed to save task changes"
+            ? error.message
+            : undefined,
+      });
       throw error;
     }
   };
@@ -1478,6 +1502,14 @@ export default function FounderDashboard({
     );
     if (!plan?.goal) {
       toast.error("Failed to set outcome");
+      return;
+    }
+
+    const milestoneCheck = validateWeeklyPlanMilestones(plan.milestones);
+    if (!milestoneCheck.ok) {
+      toast.error("Complete each milestone", {
+        description: milestoneCheck.message,
+      });
       return;
     }
 

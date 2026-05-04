@@ -31,6 +31,7 @@ import {
   resolveIndustryForPersistence,
   validateFounderStartupFields,
 } from "../domains/founder/founderProfileConfig";
+import { persistedTalentToFormInitialData } from "../utils/talentProfileCompletion";
 
 /** Panel width from trigger + longest option; opaque surface scrolls as one block */
 function computeMenuPanelBox(buttonRect, optionStrings, gap = 4, pad = 12) {
@@ -339,8 +340,6 @@ export default function ProfileCompletionModal({
   onUpdateUser,
 }) {
   const [loading, setLoading] = useState(false);
-  const talentFormRef = useRef(null);
-  const [talentProfileData, setTalentProfileData] = useState(null);
 
   // Founder form fields
   const [startupName, setStartupName] = useState("");
@@ -637,14 +636,11 @@ export default function ProfileCompletionModal({
         </div>
         <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain [scrollbar-gutter:stable]">
         {role === "talent" ? (
-          <div className="p-6 space-y-6">
+          <div className="px-6 pb-5 pt-4">
             <TalentProfileForm
               loading={loading}
-              ref={talentFormRef}
-              initialData={{
-                name: user?.name,
-                email: user?.email,
-              }}
+              initialData={persistedTalentToFormInitialData(user)}
+              onSkip={handleSkipForNow}
               onSubmit={(data) => {
                 console.log(
                   "📝 [ProfileCompletion] TalentProfileForm submitted with data:",
@@ -708,41 +704,6 @@ export default function ProfileCompletionModal({
                 onClose();
               }}
             />
-            <div className="flex flex-col sm:flex-row justify-end gap-3 pt-4 border-t border-border/70">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={handleSkipForNow}
-                disabled={loading}
-                className="w-full sm:w-auto px-8"
-              >
-                Skip for now
-              </Button>
-              <Button
-                type="button"
-                onClick={() => {
-                  console.log(
-                    "🔘 [ProfileCompletion] Complete Profile button clicked for talent",
-                  );
-                  console.log(
-                    "📋 [ProfileCompletion] Form ref:",
-                    talentFormRef.current,
-                  );
-                  if (talentFormRef.current) {
-                    console.log(
-                      "✅ [ProfileCompletion] Requesting form submit...",
-                    );
-                    talentFormRef.current.requestSubmit();
-                  } else {
-                    console.error("❌ [ProfileCompletion] Form ref is null!");
-                  }
-                }}
-                disabled={loading}
-                className="w-full sm:w-auto px-8"
-              >
-                {loading ? "Saving..." : "Complete Profile"}
-              </Button>
-            </div>
           </div>
         ) : (
           <form onSubmit={handleSubmit} className="p-6 space-y-6">

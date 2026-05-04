@@ -38,6 +38,7 @@ import {
   Pencil,
   Plus,
   Trash2,
+  AlertTriangle,
 } from "lucide-react";
 import TaskAssignmentModal from "./TaskAssignmentModal";
 import TaskIncentiveModal from "./TaskIncentiveModal";
@@ -54,17 +55,36 @@ function taskPriority(task) {
 }
 
 function priorityFlagClass(p) {
-  if (p === "high") return "text-red-600 dark:text-red-400";
-  if (p === "low") return "text-muted-foreground";
-  return "text-amber-600 dark:text-amber-400";
+  if (p === "high")
+    return "text-[color:var(--primary-dark)] hover:bg-primary/10 hover:text-primary";
+  if (p === "low")
+    return "text-muted-foreground hover:bg-muted/70 hover:text-foreground";
+  return "text-primary hover:bg-primary/10 hover:text-[color:var(--primary-dark)]";
 }
 
+/** Surfaces only — label color forced in CSS (see `.sv-priority-chip` in globals) so modal/theme tokens can’t turn it white */
 function priorityBadgeClass(p) {
   if (p === "high")
-    return "text-red-700 border-red-300 bg-red-50 dark:bg-red-950/30 dark:border-red-800";
+    return "border-primary/35 bg-primary/12 font-semibold dark:border-primary/45 dark:bg-primary/22";
   if (p === "low")
-    return "text-muted-foreground border-border bg-muted/40";
-  return "text-amber-800 border-amber-300 bg-amber-50 dark:bg-amber-950/30 dark:border-amber-800";
+    return "border-border/90 bg-muted/50 font-medium dark:bg-muted/40";
+  return "border-primary/35 bg-[#e8ebff] font-semibold dark:border-primary/40 dark:bg-primary/18";
+}
+
+function priorityLabelFor(p) {
+  const hit = PRIORITY_OPTIONS.find((o) => o.value === p);
+  return hit?.label ?? "Medium";
+}
+
+/** Background tint per task status — avoids heavy per-row borders inside grouped lists */
+function taskRowSurfaceClass(task) {
+  if (task.status === "completed")
+    return "bg-emerald-50/50 dark:bg-emerald-950/25";
+  if (task.status === "blocked")
+    return "bg-orange-50/35 dark:bg-orange-950/15";
+  if (task.status === "in-progress")
+    return "bg-primary/[0.06] dark:bg-primary/[0.09]";
+  return "";
 }
 
 function taskIdStr(t) {
@@ -308,10 +328,12 @@ export default function MilestoneDetailView({
 
   const getMilestoneIcon = (rowStatus) => {
     if (rowStatus === "completed")
-      return <CheckCircle2 className="w-5 h-5 text-green-500" />;
+      return <CheckCircle2 className="h-4 w-4 shrink-0 text-green-500" />;
     if (rowStatus === "in-progress")
-      return <Circle className="w-5 h-5 text-primary fill-primary/20" />;
-    return <Circle className="w-5 h-5 text-muted-foreground" />;
+      return (
+        <Circle className="h-4 w-4 shrink-0 fill-primary/20 text-primary" />
+      );
+    return <Circle className="h-4 w-4 shrink-0 text-muted-foreground" />;
   };
 
   const handleTaskCheckboxChange = (task, checked) => {
@@ -429,14 +451,14 @@ export default function MilestoneDetailView({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sv-modal-backdrop">
-      <Card className="sv-modal-panel max-h-[85vh] w-full overflow-y-auto rounded-[16px] border-0 shadow-modal sm:max-w-lg">
-        <CardHeader className="pb-2 pt-3 border-b flex-shrink-0">
-          <div className="flex items-start justify-between">
-            <div className="flex-1">
-              <CardTitle className="text-base md:text-lg flex items-center gap-2">
+      <Card className="sv-modal-panel max-h-[82vh] w-full max-w-[min(100%,26rem)] overflow-y-auto rounded-[14px] border-0 shadow-modal sm:max-w-[28rem]">
+        <CardHeader className="flex-shrink-0 border-b border-primary/12 pb-2 pt-3 dark:border-primary/18">
+          <div className="flex items-start justify-between gap-2">
+            <div className="min-w-0 flex-1">
+              <CardTitle className="flex items-center gap-2 text-sm font-semibold leading-snug md:text-[15px]">
                 {outcome.title}
               </CardTitle>
-              <CardDescription className="mt-1 text-xs">
+              <CardDescription className="mt-0.5 text-[11px] text-text-muted md:text-xs">
                 {"Week "}
                 {outcome.weekNumber}
                 {" • "}
@@ -449,28 +471,31 @@ export default function MilestoneDetailView({
             <Button
               variant="ghost"
               size="sm"
+              type="button"
               onClick={onClose}
               disabled={committing}
-              className="h-8 w-8 rounded-full !bg-gray-200 dark:!bg-gray-700 hover:!bg-gray-300 dark:hover:!bg-gray-600 p-0"
+              className="h-8 w-8 shrink-0 rounded-md text-muted-foreground hover:bg-transparent hover:text-foreground"
             >
-              <X className="w-4 h-4" />
+              <X className="h-4 w-4" />
             </Button>
           </div>
         </CardHeader>
-        <CardContent className="space-y-3 md:space-y-4 flex-1 overflow-y-auto min-h-0 py-3 md:py-4 scrollbar-thin scrollbar-thumb-gray-300 dark:scrollbar-thumb-gray-700 scrollbar-track-transparent">
-          <div className="p-4 bg-primary/5 rounded-lg">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-sm font-medium">Overall Progress</span>
-              <span className="text-sm text-muted-foreground">
+        <CardContent className="min-h-0 flex-1 space-y-2.5 overflow-y-auto px-3 py-2.5 scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-transparent dark:scrollbar-thumb-gray-700 md:space-y-3 md:px-4 md:py-3">
+          <div className="rounded-xl border border-primary/15 bg-primary/[0.04] p-2.5 dark:border-primary/20 dark:bg-primary/[0.07]">
+            <div className="mb-1.5 flex items-center justify-between gap-2">
+              <span className="text-xs font-medium text-card-foreground">
+                Overall progress
+              </span>
+              <span className="text-[11px] text-text-muted tabular-nums md:text-xs">
                 {completedTaskCount}
                 {" / "}
                 {totalTasks}
                 {" tasks"}
               </span>
             </div>
-            <Progress value={overallProgressPct} className="h-2" />
+            <Progress value={overallProgressPct} className="h-1.5" />
           </div>
-          <div className="space-y-3">
+          <div className="space-y-2 md:space-y-2.5">
             {draftMilestones.map((milestone) => {
               const milestoneTasks = getTasksForMilestone(milestone.id);
               const isExpanded = expandedMilestones.has(milestone.id);
@@ -486,27 +511,27 @@ export default function MilestoneDetailView({
               return (
                 <div
                   key={milestone.id}
-                  className="border rounded-lg overflow-x-clip overflow-y-visible"
+                  className="overflow-x-clip overflow-y-visible rounded-lg border border-primary/15 dark:border-primary/22"
                 >
                   <div
-                    className={`p-4 transition-colors ${rowStatus === "completed" ? "bg-green-50 dark:bg-green-950/20" : rowStatus === "in-progress" ? "bg-primary/5" : "bg-muted/30"}`}
+                    className={`transition-colors ${rowStatus === "completed" ? "bg-emerald-50/85 dark:bg-emerald-950/20" : rowStatus === "in-progress" ? "bg-primary/[0.04]" : "bg-card"} px-3 py-2`}
                   >
-                    <div className="flex items-start gap-2 min-w-0">
+                    <div className="flex min-w-0 items-start gap-1.5 md:gap-2">
                       <button
                         type="button"
-                        className="shrink-0 rounded p-0.5 text-muted-foreground hover:bg-background/80 mt-0.5"
+                        className="mt-0.5 shrink-0 rounded p-0.5 text-muted-foreground hover:bg-primary/10"
                         onClick={() => toggleMilestone(milestone.id)}
                         aria-expanded={isExpanded}
                       >
                         {isExpanded ? (
-                          <ChevronDown className="w-5 h-5" />
+                          <ChevronDown className="h-4 w-4" />
                         ) : (
-                          <ChevronRight className="w-5 h-5" />
+                          <ChevronRight className="h-4 w-4" />
                         )}
                       </button>
                       <button
                         type="button"
-                        className="shrink-0 text-left mt-0.5"
+                        className="mt-0.5 shrink-0 text-left"
                         onClick={() => toggleMilestone(milestone.id)}
                       >
                         {getMilestoneIcon(rowStatus)}
@@ -543,17 +568,17 @@ export default function MilestoneDetailView({
                                 if (e.key === "Enter")
                                   setEditingMilestoneId(null);
                               }}
-                              className="h-8 text-sm font-semibold"
+                              className="h-7 text-xs font-semibold md:text-sm"
                               autoFocus
                             />
                           ) : (
                             <h4
-                              className={`font-semibold text-left ${rowStatus === "completed" ? "line-through text-muted-foreground" : ""}`}
+                              className={`text-left text-sm font-semibold leading-snug md:text-[15px] ${rowStatus === "completed" ? "text-muted-foreground line-through" : "text-card-foreground"}`}
                             >
                               {milestone.title || "Untitled milestone"}
                             </h4>
                           )}
-                          <div className="flex items-center gap-4 mt-1 text-xs text-muted-foreground">
+                          <div className="mt-0.5 flex items-center gap-3 text-[11px] text-text-muted md:text-xs">
                             <span>
                               {completedTasks}/{nTasks}
                               {" tasks"}
@@ -567,12 +592,12 @@ export default function MilestoneDetailView({
                             )}
                           </div>
                         </div>
-                        <div className="flex shrink-0 items-center gap-1">
+                        <div className="flex shrink-0 items-center gap-0.5">
                           <Button
                             type="button"
                             variant="ghost"
                             size="icon"
-                            className="h-8 w-8 shrink-0"
+                            className="h-7 w-7 shrink-0 text-muted-foreground hover:bg-primary/10 hover:text-foreground"
                             disabled={committing}
                             aria-label="Edit milestone title"
                             onClick={(e) => {
@@ -580,13 +605,13 @@ export default function MilestoneDetailView({
                               setEditingMilestoneId(milestone.id);
                             }}
                           >
-                            <Pencil className="w-4 h-4" />
+                            <Pencil className="h-3.5 w-3.5" />
                           </Button>
                           <Button
                             type="button"
                             variant="ghost"
                             size="icon"
-                            className="h-8 w-8 shrink-0 text-destructive hover:text-destructive"
+                            className="h-7 w-7 shrink-0 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
                             disabled={committing}
                             aria-label="Delete milestone"
                             onClick={(e) => {
@@ -597,28 +622,32 @@ export default function MilestoneDetailView({
                               });
                             }}
                           >
-                            <Trash2 className="w-4 h-4" />
+                            <Trash2 className="h-3.5 w-3.5" />
                           </Button>
                         </div>
                       </div>
                     </div>
                   </div>
                   {isExpanded && (
-                    <div className="p-4 space-y-2 bg-background">
-                      {milestoneTasks.map((task) => {
+                    <div className="border-t border-primary/10 bg-muted/25 px-2 pb-2 pt-1.5 dark:border-primary/15 dark:bg-muted/10 md:px-2.5 md:pb-2.5 md:pt-2">
+                      <div className="overflow-hidden rounded-lg border border-primary/12 bg-card dark:border-primary/18">
+                      {milestoneTasks.length === 0 ? (
+                        <p className="px-3 py-5 text-center text-[11px] text-muted-foreground md:text-xs">
+                          No tasks in this milestone yet. Add one below.
+                        </p>
+                      ) : (
+                      milestoneTasks.map((task) => {
                         const assignees = taskAssignees(task, assigneeRoster);
                         const p = taskPriority(task);
-                        const pLabel =
-                          PRIORITY_OPTIONS.find((o) => o.value === p)?.label ||
-                          "Medium";
+                        const pLabel = priorityLabelFor(p);
                         return (
                           <div
                             key={taskIdStr(task)}
                             role="presentation"
                             onClick={(e) => e.stopPropagation()}
-                            className={`p-2 rounded-lg border-2 transition-all ${task.status === "completed" ? "bg-green-50 dark:bg-green-950/20 border-green-200 dark:border-green-900" : task.status === "blocked" ? "bg-orange-50 dark:bg-orange-950/20 border-orange-200 dark:border-orange-900" : task.status === "in-progress" ? "bg-blue-50 dark:bg-blue-950/20 border-blue-200 dark:border-blue-900" : "border-border"}`}
+                            className={`border-b border-primary/[0.09] px-2 py-1.5 transition-colors last:border-b-0 md:px-2.5 md:py-2 ${taskRowSurfaceClass(task)}`}
                           >
-                            <div className="flex items-start gap-2 min-w-0">
+                            <div className="flex min-w-0 items-start gap-2">
                               <div className="flex shrink-0 items-center pt-0.5">
                                 <Checkbox
                                   checked={task.status === "completed"}
@@ -638,12 +667,12 @@ export default function MilestoneDetailView({
                                   >
                                     {task.title}
                                   </span>
-                                  <Badge
-                                    variant="outline"
-                                    className={`text-[9px] px-1.5 py-0 h-5 ${priorityBadgeClass(p)}`}
+                                  <span
+                                    data-priority={p}
+                                    className={`sv-priority-chip inline-flex h-5 max-w-full shrink-0 items-center rounded-full border px-2 text-[10px] leading-none tracking-tight ${priorityBadgeClass(p)}`}
                                   >
                                     {pLabel}
-                                  </Badge>
+                                  </span>
                                 </div>
                                 {task.description && (
                                   <p className="text-[10px] text-muted-foreground mt-0.5">
@@ -669,7 +698,7 @@ export default function MilestoneDetailView({
                                   {task.status === "in-progress" && (
                                     <Badge
                                       variant="outline"
-                                      className="text-blue-600 border-blue-300"
+                                      className="border-primary/28 bg-primary/[0.06] text-primary-dark dark:text-primary-tint"
                                     >
                                       In Progress
                                     </Badge>
@@ -778,11 +807,11 @@ export default function MilestoneDetailView({
                                     <Button
                                       size="sm"
                                       variant="ghost"
-                                      className={priorityFlagClass(p)}
+                                      className={`h-8 w-8 shrink-0 p-0 ${priorityFlagClass(p)}`}
                                       aria-label="Set priority"
                                       disabled={committing}
                                     >
-                                      <Flag className="w-4 h-4" />
+                                      <Flag className="h-4 w-4" />
                                     </Button>
                                   </DropdownMenuTrigger>
                                   <DropdownMenuContent align="end">
@@ -920,11 +949,13 @@ export default function MilestoneDetailView({
                             </div>
                           </div>
                         );
-                      })}
+                      })
+                      )}
+                      </div>
                       <div
                         role="presentation"
                         onClick={(e) => e.stopPropagation()}
-                        className="flex flex-col sm:flex-row gap-2 pt-3 mt-1 border-t border-border/60"
+                        className="mt-2 flex flex-col gap-2 border-t border-primary/10 pt-2 sm:flex-row"
                       >
                         <Input
                           placeholder="Add a task…"
@@ -941,14 +972,14 @@ export default function MilestoneDetailView({
                               addDraftTask(milestone);
                             }
                           }}
-                          className="h-9 text-sm flex-1"
+                          className="h-8 flex-1 text-xs md:text-sm"
                           disabled={committing}
                         />
                         <Button
                           type="button"
                           size="sm"
                           variant="secondary"
-                          className="shrink-0 sm:w-auto w-full"
+                          className="h-8 shrink-0 border border-primary/15 bg-card text-xs hover:bg-primary/[0.06] dark:border-primary/22 sm:w-auto"
                           disabled={
                             committing ||
                             !String(
@@ -961,14 +992,6 @@ export default function MilestoneDetailView({
                           <span className="hidden sm:inline">Add task</span>
                         </Button>
                       </div>
-                      {milestoneTasks.length === 0 && (
-                        <div className="text-center py-2 text-muted-foreground">
-                          <p className="text-xs">
-                            No tasks yet. Add tasks above, then confirm to save
-                            them to your week.
-                          </p>
-                        </div>
-                      )}
                     </div>
                   )}
                 </div>
@@ -978,7 +1001,7 @@ export default function MilestoneDetailView({
               type="button"
               variant="outline"
               size="sm"
-              className="w-full"
+              className="h-8 w-full rounded-[10px] border-primary/22 text-xs text-primary hover:bg-primary/[0.06] md:h-9 md:text-sm"
               disabled={committing}
               onClick={() => {
                 const newId = `temp-ms-${Date.now()}`;
@@ -1003,10 +1026,11 @@ export default function MilestoneDetailView({
             </Button>
           </div>
         </CardContent>
-        <div className="border-t px-3 py-3 flex flex-wrap gap-2 justify-end bg-muted/30 shrink-0">
+        <div className="flex shrink-0 flex-wrap justify-end gap-2 border-t border-primary/12 bg-muted/20 px-3 py-2.5 dark:border-primary/18 md:py-3">
           <Button
             type="button"
             variant="outline"
+            className="h-8 rounded-[10px] border-primary/22 text-xs hover:bg-primary/[0.05] md:h-9 md:text-sm"
             onClick={onClose}
             disabled={committing}
           >
@@ -1014,6 +1038,7 @@ export default function MilestoneDetailView({
           </Button>
           <Button
             type="button"
+            className="h-8 rounded-[10px] text-xs shadow-sm md:h-9 md:text-sm"
             onClick={handleConfirm}
             disabled={
               !isDirty || committing || typeof onCommitTaskDraft !== "function"
@@ -1037,7 +1062,7 @@ export default function MilestoneDetailView({
                 {blockerReasons.map((reason) => (
                   <div
                     key={reason.value}
-                    className={`p-3 border-2 rounded-lg cursor-pointer transition-all ${blockReason === reason.value ? "border-primary bg-primary/5" : "border-border hover:border-primary/50"}`}
+                    className={`cursor-pointer rounded-lg border p-3 transition-all ${blockReason === reason.value ? "border-primary bg-primary/5" : "border-primary/20 hover:border-primary/40"}`}
                     onClick={() => setBlockReason(reason.value)}
                   >
                     <p className="font-medium text-sm">{reason.label}</p>
@@ -1119,7 +1144,7 @@ export default function MilestoneDetailView({
       )}
       {deleteConfirm && (
         <div
-          className="fixed inset-0 z-[70] flex items-center justify-center p-4 sv-modal-backdrop"
+          className="fixed inset-0 z-[70] flex items-center justify-center p-3 sv-modal-backdrop"
           role="presentation"
           onClick={() => !committing && setDeleteConfirm(null)}
         >
@@ -1127,30 +1152,47 @@ export default function MilestoneDetailView({
             role="dialog"
             aria-modal="true"
             aria-labelledby="delete-confirm-title"
-            className="sv-modal-panel w-full max-w-md rounded-[16px] border-0 shadow-modal"
+            aria-describedby="delete-confirm-desc"
+            className="sv-modal-panel w-full max-w-[min(100%,22rem)] overflow-hidden rounded-[14px] border-0 shadow-modal sm:max-w-sm"
             onClick={(e) => e.stopPropagation()}
           >
-            <CardHeader className="pb-2 pt-4 px-4 border-b">
-              <CardTitle
-                id="delete-confirm-title"
-                className="text-base font-semibold"
-              >
-                {deleteConfirm.kind === "milestone"
-                  ? "Delete milestone"
-                  : "Remove task"}
-              </CardTitle>
-              <CardDescription className="text-sm leading-relaxed pt-1">
-                {deleteConfirm.kind === "milestone"
-                  ? "Delete this milestone and all of its tasks? This cannot be undone."
-                  : "Remove this task from your draft. Nothing is saved to the server until you confirm changes on the main screen."}
-              </CardDescription>
-            </CardHeader>
-            <CardFooter className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end py-4 px-4 bg-muted/20 border-t">
+            <div className="px-4 pb-1 pt-4">
+              <div className="flex gap-3">
+                <div
+                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-destructive/10 text-destructive dark:bg-destructive/15"
+                  aria-hidden
+                >
+                  <AlertTriangle className="h-5 w-5" strokeWidth={2} />
+                </div>
+                <div className="min-w-0 flex-1 space-y-1.5">
+                  <h3
+                    id="delete-confirm-title"
+                    className="font-heading text-sm font-semibold leading-snug text-card-foreground md:text-[15px]"
+                  >
+                    {deleteConfirm.kind === "milestone"
+                      ? "Delete milestone?"
+                      : "Remove this task?"}
+                  </h3>
+                  <p
+                    id="delete-confirm-desc"
+                    className="text-[13px] leading-relaxed text-text-body md:text-sm"
+                  >
+                    {deleteConfirm.kind === "milestone"
+                      ? "This removes the milestone and every task under it. You can’t undo this after you save your week plan."
+                      : "This removes the task from your draft only. Nothing is sent to the server until you tap Confirm changes."}
+                  </p>
+                </div>
+              </div>
+            </div>
+            <div
+              data-slot="dialog-footer"
+              className="flex flex-col gap-2 border-t border-primary/12 px-4 py-3 dark:border-primary/18 sm:flex-row sm:justify-end sm:gap-2"
+            >
               <Button
                 type="button"
                 variant="outline"
                 disabled={committing}
-                className="w-full sm:w-auto"
+                className="order-2 w-full border-primary/22 bg-card font-semibold hover:bg-primary/[0.04] dark:border-primary/28 sm:order-1 sm:w-auto"
                 onClick={() => setDeleteConfirm(null)}
               >
                 Cancel
@@ -1159,14 +1201,14 @@ export default function MilestoneDetailView({
                 type="button"
                 variant="destructive"
                 disabled={committing}
-                className="w-full sm:w-auto"
+                className="order-1 w-full font-semibold sm:order-2 sm:w-auto"
                 onClick={confirmPendingDelete}
               >
                 {deleteConfirm.kind === "milestone"
                   ? "Delete milestone"
                   : "Remove task"}
               </Button>
-            </CardFooter>
+            </div>
           </Card>
         </div>
       )}

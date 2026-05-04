@@ -176,9 +176,10 @@ export default function OrganizationEventsWidget({
     return colors[eventType] || colors["other"];
   };
   const upcomingEvents = events.filter((e) => isEventUpcoming(e.startTime));
+  const cardSurface = "border-primary/18 shadow-[var(--shadow-soft)]";
   if (loading) {
     return (
-      <Card>
+      <Card className={cardSurface}>
         <CardHeader className="pb-3">
           <CardTitle className="text-sm flex items-center gap-2">
             <Calendar className="w-4 h-4" />
@@ -200,7 +201,7 @@ export default function OrganizationEventsWidget({
   }
   if (upcomingEvents.length === 0) {
     return (
-      <Card>
+      <Card className={cardSurface}>
         <CardHeader className="pb-3">
           <CardTitle className="text-sm flex items-center gap-2">
             <Calendar className="w-4 h-4" />
@@ -216,7 +217,7 @@ export default function OrganizationEventsWidget({
     );
   }
   return (
-    <Card>
+    <Card className={cardSurface}>
       <CardHeader className="pb-3">
         <CardTitle className="text-sm flex items-center gap-2">
           <Calendar className="w-4 h-4" />

@@ -70,57 +70,40 @@ weeklyOutcomeSchema.index({ founderId: 1, weekOf: -1 });
 
 const FINAL_OUTCOME_STATUSES = new Set(["completed", "partial", "missed"]);
 
-weeklyOutcomeSchema.pre("save", async function rejectFinalOutcomeMutation(next) {
-  try {
-    if (this.isNew) return next();
-    const existing = await this.constructor
-      .findById(this._id)
-      .select("status")
-      .lean();
-    if (existing && FINAL_OUTCOME_STATUSES.has(existing.status)) {
-      return next(
-        new Error(
-          "WeeklyOutcome is immutable once submitted (completed, partial, or missed).",
-        ),
-      );
-    }
-    return next();
-  } catch (err) {
-    return next(err);
+// Mongoose 9+: pre middleware does not receive next(); throw instead.
+weeklyOutcomeSchema.pre("save", async function rejectFinalOutcomeMutation() {
+  if (this.isNew) return;
+  const existing = await this.constructor
+    .findById(this._id)
+    .select("status")
+    .lean();
+  if (existing && FINAL_OUTCOME_STATUSES.has(existing.status)) {
+    throw new Error(
+      "WeeklyOutcome is immutable once submitted (completed, partial, or missed).",
+    );
   }
 });
 
-weeklyOutcomeSchema.pre("findOneAndUpdate", async function guardImmutableUpdate(next) {
-  try {
+weeklyOutcomeSchema.pre(
+  "findOneAndUpdate",
+  async function guardImmutableUpdate() {
     const filter = this.getFilter();
     const existing = await this.model.findOne(filter).lean();
     if (existing && FINAL_OUTCOME_STATUSES.has(existing.status)) {
-      return next(
-        new Error(
-          "WeeklyOutcome is immutable once submitted (completed, partial, or missed).",
-        ),
+      throw new Error(
+        "WeeklyOutcome is immutable once submitted (completed, partial, or missed).",
       );
     }
-    return next();
-  } catch (err) {
-    return next(err);
-  }
-});
+  },
+);
 
-weeklyOutcomeSchema.pre("updateOne", async function guardImmutableUpdateOne(next) {
-  try {
-    const filter = this.getFilter();
-    const existing = await this.model.findOne(filter).lean();
-    if (existing && FINAL_OUTCOME_STATUSES.has(existing.status)) {
-      return next(
-        new Error(
-          "WeeklyOutcome is immutable once submitted (completed, partial, or missed).",
-        ),
-      );
-    }
-    return next();
-  } catch (err) {
-    return next(err);
+weeklyOutcomeSchema.pre("updateOne", async function guardImmutableUpdateOne() {
+  const filter = this.getFilter();
+  const existing = await this.model.findOne(filter).lean();
+  if (existing && FINAL_OUTCOME_STATUSES.has(existing.status)) {
+    throw new Error(
+      "WeeklyOutcome is immutable once submitted (completed, partial, or missed).",
+    );
   }
 });
 

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
+import { PasswordInput } from "./ui/password-input";
 import { Textarea } from "./ui/textarea";
 import {
   Card,
@@ -315,10 +316,10 @@ export function TeamMemberOnboarding({ invitationToken, onComplete }) {
                 <Lock className="w-4 h-4" />
                 Password *
               </Label>
-              <Input
+              <PasswordInput
                 id="password"
-                type="password"
-                placeholder="At least 6 characters"
+                autoComplete="new-password"
+                placeholder="Please enter your password (min. 6 characters)"
                 value={formData.password}
                 onChange={(e) =>
                   setFormData({
@@ -339,10 +340,10 @@ export function TeamMemberOnboarding({ invitationToken, onComplete }) {
                 <Lock className="w-4 h-4" />
                 Confirm Password *
               </Label>
-              <Input
+              <PasswordInput
                 id="confirmPassword"
-                type="password"
-                placeholder="Re-enter your password"
+                autoComplete="new-password"
+                placeholder="Re-enter your password to confirm"
                 value={formData.confirmPassword}
                 onChange={(e) =>
                   setFormData({

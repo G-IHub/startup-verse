@@ -66,19 +66,21 @@ const taskSchema = new mongoose.Schema(
 
 taskSchema.index({ founderId: 1, startupId: 1, createdAt: -1 });
 
-taskSchema.pre("validate", function requireBlockerFieldsWhenBlocked(next) {
+// Mongoose 8+ / 9+: document middleware does not pass `next`; throw instead.
+taskSchema.pre("validate", function requireBlockerFieldsWhenBlocked() {
   if (this.status === "blocked") {
-    const reasonOk = typeof this.blockerReason === "string" && this.blockerReason.trim().length > 0;
-    const noteOk = typeof this.blockerNote === "string" && this.blockerNote.trim().length > 0;
+    const reasonOk =
+      typeof this.blockerReason === "string" &&
+      this.blockerReason.trim().length > 0;
+    const noteOk =
+      typeof this.blockerNote === "string" &&
+      this.blockerNote.trim().length > 0;
     if (!reasonOk || !noteOk) {
-      return next(
-        new Error(
-          "Blocked tasks require both blockerReason and blockerNote.",
-        ),
+      throw new Error(
+        "Blocked tasks require both blockerReason and blockerNote.",
       );
     }
   }
-  return next();
 });
 
 const Task = mongoose.models.Task || mongoose.model("Task", taskSchema);

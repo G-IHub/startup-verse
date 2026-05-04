@@ -134,10 +134,11 @@ export default function OrganizationAnnouncementsWidget({ founderId }) {
       day: "numeric",
     });
   };
+  const cardSurface = "border-primary/18 shadow-[var(--shadow-soft)]";
   const unreadCount = announcements.filter(isUnread).length;
   if (loading) {
     return (
-      <Card>
+      <Card className={cardSurface}>
         <CardHeader className="pb-3">
           <CardTitle className="text-sm flex items-center gap-2">
             <Bell className="w-4 h-4" />
@@ -159,7 +160,7 @@ export default function OrganizationAnnouncementsWidget({ founderId }) {
   }
   if (announcements.length === 0) {
     return (
-      <Card>
+      <Card className={cardSurface}>
         <CardHeader className="pb-3">
           <CardTitle className="text-sm flex items-center gap-2">
             <Bell className="w-4 h-4" />
@@ -175,7 +176,7 @@ export default function OrganizationAnnouncementsWidget({ founderId }) {
     );
   }
   return (
-    <Card>
+    <Card className={cardSurface}>
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between">
           <CardTitle className="text-sm flex items-center gap-2">

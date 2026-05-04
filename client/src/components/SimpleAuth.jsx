@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
+import { PasswordInput } from "./ui/password-input";
 import { Label } from "./ui/label";
 import {
   Card,
@@ -197,10 +198,10 @@ export default function SimpleAuth({ role, onComplete }) {
                     <Label htmlFor="password" className="text-xs">
                       Password
                     </Label>
-                    <Input
+                    <PasswordInput
                       id="password"
-                      type="password"
-                      placeholder="••••••••"
+                      autoComplete="current-password"
+                      placeholder="Please enter your password"
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
                       required={true}

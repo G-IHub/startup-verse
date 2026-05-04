@@ -9,6 +9,7 @@ import {
   CardTitle,
 } from "./ui/card";
 import { Input } from "./ui/input";
+import { PasswordInput } from "./ui/password-input";
 import { Label } from "./ui/label";
 import { Badge } from "./ui/badge";
 import { Separator } from "./ui/separator";
@@ -536,10 +537,10 @@ export default function InvitationAcceptance({
               </div>
               <div className="space-y-2">
                 <Label htmlFor="password">Password *</Label>
-                <Input
+                <PasswordInput
                   id="password"
-                  type="password"
-                  placeholder="Create a password (min. 6 characters)"
+                  autoComplete="new-password"
+                  placeholder="Please choose a password (min. 6 characters)"
                   value={formData.password}
                   onChange={(e) =>
                     setFormData({
@@ -552,10 +553,10 @@ export default function InvitationAcceptance({
               </div>
               <div className="space-y-2">
                 <Label htmlFor="confirmPassword">Confirm Password *</Label>
-                <Input
+                <PasswordInput
                   id="confirmPassword"
-                  type="password"
-                  placeholder="Confirm your password"
+                  autoComplete="new-password"
+                  placeholder="Re-enter your password to confirm"
                   value={formData.confirmPassword}
                   onChange={(e) =>
                     setFormData({

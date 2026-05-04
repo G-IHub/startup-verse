@@ -68,8 +68,35 @@ function buildQueryString(params) {
 /**
  * Save or update talent profile
  */
+function mapEducationForTalentProfile(rows) {
+  const list = Array.isArray(rows) ? rows : [];
+  return list.map((edu) => ({
+    institution: String(edu?.institution ?? "").slice(0, 200),
+    degree: String(edu?.degree ?? "").slice(0, 200),
+    field: String(edu?.field ?? "").slice(0, 200),
+    startYear: String(edu?.startYear ?? "").slice(0, 20),
+    endYear: String(
+      edu?.endYear ?? edu?.graduationYear ?? "",
+    ).slice(0, 20),
+    current: Boolean(edu?.current),
+  }));
+}
+
+function mapCertificationsForTalentProfile(rows) {
+  const list = Array.isArray(rows) ? rows : [];
+  return list.map((c) => ({
+    name: String(c?.name ?? "").slice(0, 200),
+    issuer: String(c?.issuer ?? "").slice(0, 200),
+    year: String(c?.year ?? c?.issueYear ?? "").slice(0, 20),
+    url: String(c?.url ?? c?.credentialUrl ?? "").slice(0, 1000),
+  }));
+}
+
 export async function saveTalentProfile(userId, profileData) {
   // Normalize field names from the user object to TalentProfile schema names
+  const rawEdu =
+    profileData?.educationList || profileData?.education || [];
+  const rawCert = profileData?.certifications || [];
   const normalized = {
     fullName: profileData?.fullName || profileData?.name || "",
     professionalTitle: profileData?.professionalTitle || "",
@@ -84,14 +111,18 @@ export async function saveTalentProfile(userId, profileData) {
     preferredCommitment: profileData?.preferredCommitment || "",
     linkedinUrl: profileData?.linkedinUrl || profileData?.linkedin || "",
     githubUrl: profileData?.githubUrl || profileData?.github || "",
-    websiteUrl: profileData?.websiteUrl || profileData?.website || "",
+    websiteUrl:
+      profileData?.websiteUrl ||
+      profileData?.website ||
+      profileData?.portfolioWebsite ||
+      "",
     portfolioLinks: profileData?.portfolioLinks || [],
     preferredRoles: profileData?.preferredRoles || [],
     industryPreferences: profileData?.industryPreferences || [],
     interests: profileData?.interests || [],
     workExperiences: profileData?.workExperiences || profileData?.workExperience || [],
-    educationList: profileData?.educationList || profileData?.education || [],
-    certifications: profileData?.certifications || [],
+    educationList: mapEducationForTalentProfile(rawEdu),
+    certifications: mapCertificationsForTalentProfile(rawCert),
     portfolioItems: profileData?.portfolioItems || [],
   };
 

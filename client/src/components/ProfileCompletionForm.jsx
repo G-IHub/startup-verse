@@ -39,6 +39,7 @@ import {
   resolveIndustryForPersistence,
   validateFounderStartupFields,
 } from "../domains/founder/founderProfileConfig";
+import { persistedTalentToFormInitialData } from "../utils/talentProfileCompletion";
 
 const industryOptions = FOUNDER_INDUSTRY_OPTIONS;
 const audienceOptions = FOUNDER_TARGET_AUDIENCE_OPTIONS;
@@ -697,10 +698,7 @@ export default function ProfileCompletionForm({
             <TalentProfileForm
               loading={loading}
               ref={talentFormRef}
-              initialData={{
-                name: user?.name,
-                email: user?.email,
-              }}
+              initialData={persistedTalentToFormInitialData(user)}
               onSubmit={(data) => {
                 console.log(
                   "📝 [ProfileCompletion] TalentProfileForm submitted with data:",

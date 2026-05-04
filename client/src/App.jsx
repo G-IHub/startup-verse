@@ -324,7 +324,12 @@ function AppContent() {
 
     authApi
       .updateProfile(String(updatedUser._id ?? updatedUser.id), updatedUser)
-      .catch(() => {});
+      .catch((err) => {
+        console.error("[handleUpdateUser] Profile sync failed:", err);
+        toast.error(
+          err?.message || "Could not save profile to the server. Please try again.",
+        );
+      });
 
     const { role } = updatedUser;
 
@@ -397,6 +402,7 @@ function AppContent() {
       {currentView === APP_VIEWS.choosePath && (
         <ChooseYourPathPage
           onBack={() => setCurrentView(APP_VIEWS.landing)}
+          onPersistUser={handleUpdateUser}
           onComplete={async (_role, completedUser, accessToken) => {
             login({
               user: completedUser,

@@ -50,12 +50,11 @@ const talentApplicationSchema = new mongoose.Schema(
 
 talentApplicationSchema.index({ talentId: 1, createdAt: -1 });
 
-talentApplicationSchema.pre("save", function syncCoverLetter(next) {
+talentApplicationSchema.pre("save", function syncCoverLetter() {
   const letter = String(this.coverLetter || "").trim();
   const note = String(this.coverNote || "").trim();
   if (letter && !note) this.coverNote = letter;
   if (note && !letter) this.coverLetter = note;
-  next();
 });
 
 const TalentApplication =

@@ -26,8 +26,10 @@ const activitySchema = new mongoose.Schema(
 
 activitySchema.index({ startupId: 1, createdAt: -1 });
 
-function rejectMutation(next) {
-  next(new Error("Activity records are immutable and cannot be modified or deleted."));
+function rejectMutation() {
+  throw new Error(
+    "Activity records are immutable and cannot be modified or deleted.",
+  );
 }
 
 activitySchema.pre("updateOne", rejectMutation);
@@ -37,15 +39,13 @@ activitySchema.pre("deleteOne", rejectMutation);
 activitySchema.pre("deleteMany", rejectMutation);
 activitySchema.pre("findOneAndDelete", rejectMutation);
 
-activitySchema.pre("save", function rejectInPlaceMutation(next) {
+// Mongoose 9+: pre middleware does not receive next(); throw instead.
+activitySchema.pre("save", function rejectInPlaceMutation() {
   if (!this.isNew) {
-    return next(
-      new Error(
-        "Activity records are immutable; cannot save changes to an existing activity.",
-      ),
+    throw new Error(
+      "Activity records are immutable; cannot save changes to an existing activity.",
     );
   }
-  return next();
 });
 
 const Activity =
