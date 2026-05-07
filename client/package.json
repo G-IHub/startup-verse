@@ -48,6 +48,7 @@
     "react-hook-form": "^7.55.0",
     "react-joyride": "*",
     "react-resizable-panels": "^2.1.7",
+    "react-router-dom": "^6.30.3",
     "react-use": "*",
     "recharts": "^2.15.2",
     "socket.io-client": "^4.8.3",

@@ -10,6 +10,7 @@ import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
 import { Textarea } from "./ui/textarea";
+import { cn } from "./ui/utils";
 import { ChevronDown } from "lucide-react";
 import TalentProfileForm from "./TalentProfileForm";
 import {
@@ -79,6 +80,7 @@ function SingleSelectDropdown({
   required = false,
   /** When set (e.g. modal shell), menus portal here so they stack above in-modal scroll layers */
   portalContainer = null,
+  onboardingSurface = false,
 }) {
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef(null);
@@ -140,14 +142,19 @@ function SingleSelectDropdown({
     createPortal(
       <div
         ref={menuRef}
-        className="fixed z-[10000] overflow-y-auto overflow-x-hidden rounded-md border border-border text-popover-foreground"
+        className={cn(
+          "fixed z-[10000] overflow-y-auto overflow-x-hidden text-popover-foreground",
+          onboardingSurface
+            ? "rounded-[10px] border border-surface-border shadow-soft"
+            : "rounded-md border border-border",
+        )}
         style={{
           top: menuBox.top,
           left: menuBox.left,
           width: menuBox.width,
           maxHeight: menuBox.maxHeight,
           backgroundColor: "var(--popover)",
-          boxShadow: "var(--elevation-3)",
+          boxShadow: onboardingSurface ? undefined : "var(--elevation-3)",
         }}
       >
         {options.map((option) => (
@@ -158,7 +165,13 @@ function SingleSelectDropdown({
               onChange(option);
               setIsOpen(false);
             }}
-            className={`flex w-full px-3 py-2.5 text-left text-xs leading-snug whitespace-normal break-words transition-colors hover:bg-muted ${value === option ? "bg-muted" : ""}`}
+            className={cn(
+              "flex w-full px-3 py-2.5 text-left text-xs leading-snug whitespace-normal break-words hover:bg-muted",
+              onboardingSurface
+                ? "transition-colors duration-200 ease-in-out"
+                : "transition-colors",
+              value === option ? "bg-muted" : "",
+            )}
           >
             {option}
           </button>
@@ -169,8 +182,26 @@ function SingleSelectDropdown({
 
   return (
     <div className="space-y-2">
-      <Label>
-        {label} {required && "*"}
+      <Label
+        className={
+          onboardingSurface
+            ? "font-body font-medium text-[13px] text-text-heading"
+            : undefined
+        }
+      >
+        {label}
+        {required &&
+          (onboardingSurface ? (
+            <>
+              {" "}
+              <span className="text-status-error">*</span>
+            </>
+          ) : (
+            <>
+              {" "}
+              *
+            </>
+          ))}
       </Label>
       <div ref={dropdownRef} className="relative">
         <button
@@ -181,15 +212,33 @@ function SingleSelectDropdown({
             setIsOpen(!isOpen);
           }}
           disabled={disabled}
-          className="flex h-10 w-full items-center justify-between rounded-md border border-border/70 bg-background px-3 text-left text-foreground disabled:opacity-50"
+          className={cn(
+            "flex h-10 w-full items-center justify-between px-3 text-left outline-none disabled:opacity-50",
+            onboardingSurface
+              ? "rounded-[10px] border-[1.5px] border-surface-border bg-white font-body text-sm transition-all duration-200 ease-in-out focus-visible:border-primary focus-visible:shadow-focus focus-visible:ring-0"
+              : "rounded-md border border-border/70 bg-background text-foreground",
+          )}
         >
           <span
-            className={`truncate ${isPlaceholder ? "text-xs text-muted-foreground" : "text-xs"}`}
+            className={cn(
+              "truncate",
+              onboardingSurface
+                ? isPlaceholder
+                  ? "text-sm text-text-muted"
+                  : "text-sm text-text-heading"
+                : isPlaceholder
+                  ? "text-xs text-muted-foreground"
+                  : "text-xs",
+            )}
           >
             {displayValue}
           </span>
           <ChevronDown
-            className={`h-4 w-4 shrink-0 transition-transform ${isOpen ? "rotate-180" : ""}`}
+            className={cn(
+              "h-4 w-4 shrink-0 transition-transform duration-200 ease-in-out",
+              onboardingSurface && "text-text-body",
+              isOpen && "rotate-180",
+            )}
           />
         </button>
       </div>
@@ -206,12 +255,19 @@ function MultiSelectDropdown({
   placeholder,
   disabled = false,
   portalContainer = null,
+  onboardingSurface = false,
 }) {
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef(null);
   const buttonRef = useRef(null);
   const menuRef = useRef(null);
   const [menuBox, setMenuBox] = useState(null);
+
+  const labelEndsWithStar =
+    onboardingSurface && /\*\s*$/.test(label.trimEnd());
+  const labelDisplay = labelEndsWithStar
+    ? label.replace(/\s*\*\s*$/, "").trimEnd()
+    : label;
 
   const layoutMenu = useCallback(() => {
     if (!isOpen || !buttonRef.current) {
@@ -264,20 +320,28 @@ function MultiSelectDropdown({
     createPortal(
       <div
         ref={menuRef}
-        className="fixed z-[10000] overflow-y-auto overflow-x-hidden rounded-md border border-border text-popover-foreground"
+        className={cn(
+          "fixed z-[10000] overflow-y-auto overflow-x-hidden text-popover-foreground",
+          onboardingSurface
+            ? "rounded-[10px] border border-surface-border shadow-soft"
+            : "rounded-md border border-border",
+        )}
         style={{
           top: menuBox.top,
           left: menuBox.left,
           width: menuBox.width,
           maxHeight: menuBox.maxHeight,
           backgroundColor: "var(--popover)",
-          boxShadow: "var(--elevation-3)",
+          boxShadow: onboardingSurface ? undefined : "var(--elevation-3)",
         }}
       >
         {options.map((option) => (
           <label
             key={option}
-            className="flex cursor-pointer items-start gap-2 px-3 py-2.5 text-xs leading-snug hover:bg-muted"
+            className={cn(
+              "flex cursor-pointer items-start gap-2 px-3 py-2.5 text-xs leading-snug hover:bg-muted",
+              onboardingSurface && "transition-colors duration-200 ease-in-out",
+            )}
           >
             <input
               type="checkbox"
@@ -296,7 +360,21 @@ function MultiSelectDropdown({
 
   return (
     <div className="space-y-2">
-      <Label>{label}</Label>
+      <Label
+        className={
+          onboardingSurface
+            ? "font-body font-medium text-[13px] text-text-heading"
+            : undefined
+        }
+      >
+        {labelDisplay}
+        {labelEndsWithStar && (
+          <>
+            {" "}
+            <span className="text-status-error">*</span>
+          </>
+        )}
+      </Label>
       <div ref={dropdownRef} className="relative">
         <button
           ref={buttonRef}
@@ -306,22 +384,46 @@ function MultiSelectDropdown({
             setIsOpen(!isOpen);
           }}
           disabled={disabled}
-          className="flex h-10 w-full items-center justify-between rounded-md border border-border/70 bg-background px-3 text-left text-foreground disabled:opacity-50"
+          className={cn(
+            "flex h-10 w-full items-center justify-between px-3 text-left outline-none disabled:opacity-50",
+            onboardingSurface
+              ? "rounded-[10px] border-[1.5px] border-surface-border bg-white font-body text-sm transition-all duration-200 ease-in-out focus-visible:border-primary focus-visible:shadow-focus focus-visible:ring-0"
+              : "rounded-md border border-border/70 bg-background text-foreground",
+          )}
         >
           <span
-            className={`truncate ${selected.length > 0 ? "text-sm" : "text-xs text-muted-foreground"}`}
+            className={cn(
+              "truncate",
+              onboardingSurface
+                ? selected.length > 0
+                  ? "text-sm text-text-heading"
+                  : "text-sm text-text-muted"
+                : selected.length > 0
+                  ? "text-sm"
+                  : "text-xs text-muted-foreground",
+            )}
           >
             {selected.length > 0
               ? `${selected.length} selected: ${selected.slice(0, 2).join(", ")}${selected.length > 2 ? "..." : ""}`
               : placeholder}
           </span>
           <ChevronDown
-            className={`h-4 w-4 shrink-0 transition-transform ${isOpen ? "rotate-180" : ""}`}
+            className={cn(
+              "h-4 w-4 shrink-0 transition-transform duration-200 ease-in-out",
+              onboardingSurface && "text-text-body",
+              isOpen && "rotate-180",
+            )}
           />
         </button>
       </div>
       {selected.length > 0 && (
-        <p className="text-xs text-muted-foreground">
+        <p
+          className={
+            onboardingSurface
+              ? "font-body text-xs text-text-muted"
+              : "text-xs text-muted-foreground"
+          }
+        >
           {selected.length}
           {" item"}
           {selected.length !== 1 ? "s" : ""}
@@ -338,6 +440,8 @@ export default function ProfileCompletionModal({
   onClose,
   user,
   onUpdateUser,
+  /** `"page"` = dedicated full-screen onboarding route; `"overlay"` = centered modal shell */
+  variant = "overlay",
 }) {
   const [loading, setLoading] = useState(false);
 
@@ -613,30 +717,87 @@ export default function ProfileCompletionModal({
       setLoading(false);
     }
   };
+  const isPage = variant === "page";
+  const pageShellBackgroundStyle = isPage
+    ? {
+        background:
+          "radial-gradient(ellipse at 60% 10%, rgba(58,90,254,0.07) 0%, transparent 60%), radial-gradient(ellipse at 10% 80%, rgba(124,77,255,0.05) 0%, transparent 50%), #f4f5ff",
+      }
+    : undefined;
+
+  const onboardingControlClass = isPage
+    ? "rounded-[10px] border-[1.5px] border-surface-border bg-white font-body text-sm text-text-heading placeholder:text-text-muted placeholder:text-sm transition-all duration-200 ease-in-out outline-none focus-visible:ring-0 focus-visible:border-primary focus-visible:shadow-focus"
+    : undefined;
+
+  const onboardingLabelClass = "font-body font-medium text-[13px] text-text-heading";
+
   return (
     <div
       ref={(el) => {
         setDropdownPortalHost((prev) => (prev === el ? prev : el));
       }}
-      className="fixed inset-0 z-50 flex items-start justify-center p-4 sm:pt-8"
+      style={pageShellBackgroundStyle}
+      className={
+        isPage
+          ? "min-h-screen"
+          : "fixed inset-0 z-50 flex items-start justify-center p-4 sm:pt-8"
+      }
     >
-      <div className="absolute inset-0 sv-modal-backdrop" />
-      <div className="sv-modal-panel relative flex max-h-[90vh] w-full max-w-xl flex-col overflow-hidden rounded-[16px] border-0 shadow-modal">
-        <div className="flex shrink-0 items-start justify-between border-b border-[#e2e4f0] bg-white p-4 sm:p-5">
-          <div className="flex-1">
-            <h2 className="font-heading mb-0.5 text-lg font-bold text-[#0d0d0d]">
-              Complete Your Profile
-            </h2>
-            <p className="text-xs text-muted-foreground">
-              {role === "founder"
-                ? "Tell us about your startup to get personalized guidance"
-                : "Complete your profile to get matched with great startups"}
-            </p>
+      {!isPage ? <div className="absolute inset-0 sv-modal-backdrop" /> : null}
+      <div
+        className={
+          isPage
+            ? "mx-auto w-full max-w-2xl px-4 py-8 pb-16 sm:py-12"
+            : "relative flex w-full max-w-xl flex-col"
+        }
+      >
+        <div
+          className={
+            isPage
+              ? "flex flex-col overflow-visible rounded-[20px] border-0 bg-white shadow-[0_4px_32px_rgba(58,90,254,0.10)]"
+              : "sv-modal-panel relative flex max-h-[90vh] w-full flex-col overflow-hidden rounded-[16px] border-0 shadow-modal"
+          }
+        >
+          <div
+            className={cn(
+              "flex shrink-0 items-start justify-between border-b bg-white p-4 sm:p-5",
+              isPage
+                ? "rounded-t-[20px] border-surface-border"
+                : "border-[#e2e4f0]",
+            )}
+          >
+            <div className="flex-1">
+              <h2
+                className={
+                  isPage
+                    ? "font-heading mb-0.5 text-2xl font-extrabold text-text-heading"
+                    : "font-heading mb-0.5 text-lg font-bold text-[#0d0d0d]"
+                }
+              >
+                Complete Your Profile
+              </h2>
+              <p
+                className={
+                  isPage
+                    ? "font-body text-sm font-normal text-text-body"
+                    : "text-xs text-muted-foreground"
+                }
+              >
+                {role === "founder"
+                  ? "Tell us about your startup to get personalized guidance"
+                  : "Complete your profile to get matched with great startups"}
+              </p>
+            </div>
           </div>
-        </div>
-        <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain [scrollbar-gutter:stable]">
+          <div
+            className={
+              isPage
+                ? "overflow-visible"
+                : "flex-1 min-h-0 overflow-y-auto overscroll-contain [scrollbar-gutter:stable]"
+            }
+          >
         {role === "talent" ? (
-          <div className="px-6 pb-5 pt-4">
+          <div className="px-6 pb-8 pt-4 sm:pb-10">
             <TalentProfileForm
               loading={loading}
               initialData={persistedTalentToFormInitialData(user)}
@@ -706,13 +867,37 @@ export default function ProfileCompletionModal({
             />
           </div>
         ) : (
-          <form onSubmit={handleSubmit} className="p-6 space-y-6">
+          <form
+            onSubmit={handleSubmit}
+            className="space-y-6 p-6 pb-10 sm:pb-12"
+          >
             <div className="space-y-4">
               <div>
-                <h3 className="mb-4">Startup Information</h3>
+                <h3
+                  className={
+                    isPage
+                      ? "mb-4 border-l-[3px] border-primary pl-[10px] font-heading text-base font-bold text-text-heading"
+                      : "mb-4"
+                  }
+                >
+                  Startup Information
+                </h3>
                 <div className="space-y-4">
                   <div className="space-y-2">
-                    <Label htmlFor="startupName">Startup Name *</Label>
+                    <Label
+                      htmlFor="startupName"
+                      className={isPage ? onboardingLabelClass : undefined}
+                    >
+                      Startup Name
+                      {isPage ? (
+                        <>
+                          {" "}
+                          <span className="text-status-error">*</span>
+                        </>
+                      ) : (
+                        " *"
+                      )}
+                    </Label>
                     <Input
                       id="startupName"
                       type="text"
@@ -721,12 +906,27 @@ export default function ProfileCompletionModal({
                       onChange={(e) => setStartupName(e.target.value)}
                       required={true}
                       disabled={loading}
-                      className="border-border/70"
+                      className={
+                        isPage
+                          ? onboardingControlClass
+                          : "border-border/70"
+                      }
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="startupDescription">
-                      Startup Description *
+                    <Label
+                      htmlFor="startupDescription"
+                      className={isPage ? onboardingLabelClass : undefined}
+                    >
+                      Startup Description
+                      {isPage ? (
+                        <>
+                          {" "}
+                          <span className="text-status-error">*</span>
+                        </>
+                      ) : (
+                        " *"
+                      )}
                     </Label>
                     <Textarea
                       id="startupDescription"
@@ -736,7 +936,11 @@ export default function ProfileCompletionModal({
                       required={true}
                       disabled={loading}
                       rows={4}
-                      className="border-border/70"
+                      className={
+                        isPage
+                          ? onboardingControlClass
+                          : "border-border/70"
+                      }
                     />
                   </div>
                   <SingleSelectDropdown
@@ -748,11 +952,21 @@ export default function ProfileCompletionModal({
                     disabled={loading}
                     required={true}
                     portalContainer={dropdownPortalHost}
+                    onboardingSurface={isPage}
                   />
                   {industryFocus === "Others" && (
                     <div className="space-y-2">
-                      <Label htmlFor="otherIndustry">
+                      <Label
+                        htmlFor="otherIndustry"
+                        className={isPage ? onboardingLabelClass : undefined}
+                      >
                         Please specify your industry
+                        {isPage ? (
+                          <>
+                            {" "}
+                            <span className="text-status-error">*</span>
+                          </>
+                        ) : null}
                       </Label>
                       <Input
                         id="otherIndustry"
@@ -762,7 +976,11 @@ export default function ProfileCompletionModal({
                         onChange={(e) => setOtherIndustry(e.target.value)}
                         required={true}
                         disabled={loading}
-                        className="border-border/70"
+                        className={
+                          isPage
+                            ? onboardingControlClass
+                            : "border-border/70"
+                        }
                       />
                     </div>
                   )}
@@ -778,6 +996,7 @@ export default function ProfileCompletionModal({
                     disabled={loading}
                     required={true}
                     portalContainer={dropdownPortalHost}
+                    onboardingSurface={isPage}
                   />
                   <SingleSelectDropdown
                     label="Do you have an MVP or prototype?"
@@ -792,6 +1011,7 @@ export default function ProfileCompletionModal({
                     disabled={loading}
                     required={true}
                     portalContainer={dropdownPortalHost}
+                    onboardingSurface={isPage}
                   />
                   <SingleSelectDropdown
                     label="Do you have any customers or users?"
@@ -806,6 +1026,7 @@ export default function ProfileCompletionModal({
                     disabled={loading}
                     required={true}
                     portalContainer={dropdownPortalHost}
+                    onboardingSurface={isPage}
                   />
                   <MultiSelectDropdown
                     label="Target Audience *"
@@ -815,6 +1036,7 @@ export default function ProfileCompletionModal({
                     placeholder="Select target audience..."
                     disabled={loading}
                     portalContainer={dropdownPortalHost}
+                    onboardingSurface={isPage}
                   />
                   <SingleSelectDropdown
                     label="Team Size"
@@ -825,11 +1047,24 @@ export default function ProfileCompletionModal({
                     disabled={loading}
                     required={true}
                     portalContainer={dropdownPortalHost}
+                    onboardingSurface={isPage}
                   />
                 </div>
               </div>
-              <div>
-                <h3 className="mb-4">Team & Background</h3>
+              <div
+                className={
+                  isPage ? "border-t border-surface-border pt-6" : undefined
+                }
+              >
+                <h3
+                  className={
+                    isPage
+                      ? "mb-4 border-l-[3px] border-primary pl-[10px] font-heading text-base font-bold text-text-heading"
+                      : "mb-4"
+                  }
+                >
+                  Team & Background
+                </h3>
                 <div className="space-y-4">
                   <MultiSelectDropdown
                     label="Roles Needed"
@@ -839,10 +1074,16 @@ export default function ProfileCompletionModal({
                     placeholder="Select roles you're looking to fill..."
                     disabled={loading}
                     portalContainer={dropdownPortalHost}
+                    onboardingSurface={isPage}
                   />
                   {rolesNeeded.includes("Others") && (
                     <div className="space-y-2">
-                      <Label htmlFor="otherRole">Please specify the role</Label>
+                      <Label
+                        htmlFor="otherRole"
+                        className={isPage ? onboardingLabelClass : undefined}
+                      >
+                        Please specify the role
+                      </Label>
                       <Input
                         id="otherRole"
                         type="text"
@@ -850,12 +1091,21 @@ export default function ProfileCompletionModal({
                         value={otherRole}
                         onChange={(e) => setOtherRole(e.target.value)}
                         disabled={loading}
-                        className="border-border/70"
+                        className={
+                          isPage
+                            ? onboardingControlClass
+                            : "border-border/70"
+                        }
                       />
                     </div>
                   )}
                   <div className="space-y-2">
-                    <Label htmlFor="bio">Your Bio & Experience</Label>
+                    <Label
+                      htmlFor="bio"
+                      className={isPage ? onboardingLabelClass : undefined}
+                    >
+                      Your Bio & Experience
+                    </Label>
                     <Textarea
                       id="bio"
                       placeholder="Tell us about your background, expertise, and what drives you..."
@@ -863,23 +1113,39 @@ export default function ProfileCompletionModal({
                       onChange={(e) => setBio(e.target.value)}
                       disabled={loading}
                       rows={4}
-                      className="border-border/70"
+                      className={
+                        isPage
+                          ? onboardingControlClass
+                          : "border-border/70"
+                      }
                     />
                   </div>
                 </div>
               </div>
             </div>
-            <div className="flex flex-col sm:flex-row justify-end gap-3 pt-4 border-t border-border/70">
+            <div
+              className={cn(
+                "flex flex-col gap-3 pt-4 sm:flex-row sm:justify-end",
+                isPage
+                  ? "border-t border-surface-border"
+                  : "border-t border-border/70",
+              )}
+            >
               <Button
                 type="submit"
                 disabled={loading}
-                className="w-full sm:w-auto px-8"
+                className={
+                  isPage
+                    ? "w-full !rounded-[10px] border-0 !bg-gradient-to-br !from-primary !to-accent px-8 font-body text-[15px] font-semibold !text-white shadow-[0_4px_20px_rgba(58,90,254,0.25)] transition-opacity duration-200 ease-in-out hover:!bg-gradient-to-br hover:!from-primary hover:!to-accent hover:!opacity-[0.92] focus-visible:ring-2 focus-visible:ring-primary/35 sm:w-auto"
+                    : "w-full px-8 sm:w-auto"
+                }
               >
                 {loading ? "Saving..." : "Complete Profile"}
               </Button>
             </div>
           </form>
         )}
+          </div>
         </div>
       </div>
     </div>

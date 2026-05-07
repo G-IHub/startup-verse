@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Button } from "./ui/button";
 import {
   Card,
@@ -15,6 +15,7 @@ import { Progress } from "./ui/progress";
 import { toast } from "sonner";
 import { getTalentProfileCompletionPercent } from "../utils/talentProfileCompletion";
 import * as founderApi from "../utils/api/founderApi";
+import * as talentApi from "../utils/api/talentApi";
 import {
   FOUNDER_INDUSTRY_OPTIONS,
   FOUNDER_TARGET_AUDIENCE_OPTIONS,
@@ -132,6 +133,46 @@ export default function ProfilePage({ user, onUpdateUser, initialEditing = false
   });
   const [newSkill, setNewSkill] = useState("");
 
+  // Fetch talent profile from backend on mount to ensure data is current
+  useEffect(() => {
+    if (user?.role === "talent" && user?._id) {
+      const userId = String(user._id ?? user.id);
+      talentApi.getTalentProfile(userId)
+        .then((response) => {
+          if (response?.success && response?.data) {
+            const profile = response.data;
+            setEditedProfile((prev) => ({
+              ...prev,
+              fullName: profile.fullName || profile.name || prev.name,
+              professionalTitle: profile.professionalTitle || prev.professionalTitle,
+              headline: profile.headline || prev.headline,
+              location: profile.location || prev.location,
+              bio: profile.bio || prev.bio,
+              professionalGoals: profile.professionalGoals || prev.professionalGoals,
+              skills: profile.skills?.length ? profile.skills : prev.skills,
+              yearsOfExperience: profile.yearsOfExperience || prev.yearsOfExperience,
+              availability: profile.availability || prev.availability,
+              availabilityStatus: profile.availabilityStatus || prev.availabilityStatus,
+              preferredCommitment: profile.preferredCommitment || prev.preferredCommitment,
+              linkedin: profile.linkedinUrl || profile.linkedin || prev.linkedin,
+              github: profile.githubUrl || profile.github || prev.github,
+              website: profile.websiteUrl || profile.website || profile.portfolioWebsite || prev.website,
+              workExperience: profile.workExperiences?.length ? profile.workExperiences : profile.workExperience || prev.workExperience,
+              education: profile.educationList?.length ? profile.educationList : profile.education || prev.education,
+              certifications: profile.certifications?.length ? profile.certifications : prev.certifications,
+              portfolioItems: profile.portfolioItems?.length ? profile.portfolioItems : prev.portfolioItems,
+              preferredRoles: profile.preferredRoles?.length ? profile.preferredRoles : prev.preferredRoles,
+              industryPreferences: profile.industryPreferences?.length ? profile.industryPreferences : prev.industryPreferences,
+              interests: profile.interests?.length ? profile.interests : prev.interests,
+            }));
+          }
+        })
+        .catch((err) => {
+          console.warn("Failed to load talent profile:", err);
+        });
+    }
+  }, [user?._id, user?.id, user?.role]);
+
   const calculateProfileCompletion = () => {
     if (user.role !== "talent") return 100;
     return getTalentProfileCompletionPercent(user);
@@ -225,10 +266,18 @@ export default function ProfilePage({ user, onUpdateUser, initialEditing = false
         return;
       }
     } else {
-      onUpdateUser({
-        ...user,
-        ...editedProfile,
-      });
+      // Talent profile: save to backend API
+      const userId = String(user._id ?? user.id);
+      try {
+        await talentApi.saveTalentProfile(userId, editedProfile);
+        onUpdateUser({
+          ...user,
+          ...editedProfile,
+        });
+      } catch (err) {
+        toast.error(err?.message || "Failed to save talent profile");
+        return;
+      }
     }
 
     setIsEditing(false);
@@ -848,6 +897,7 @@ export default function ProfilePage({ user, onUpdateUser, initialEditing = false
                           }
                         />
                         <Input className={cn(SP_INPUT)}
+                          type="month"
                           placeholder="Start Date"
                           value={exp.startDate}
                           onChange={(e) =>
@@ -859,6 +909,7 @@ export default function ProfilePage({ user, onUpdateUser, initialEditing = false
                           }
                         />
                         <Input className={cn(SP_INPUT)}
+                          type="month"
                           placeholder="End Date"
                           value={exp.endDate}
                           onChange={(e) =>

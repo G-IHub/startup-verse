@@ -5,6 +5,7 @@ import Interest from "../models/Interest.js";
 import Task from "../models/Task.js";
 import User from "../models/User.js";
 import Activity from "../models/Activity.js";
+import Startup from "../models/Startup.js";
 import { emitRealtime } from "../services/realtime.service.js";
 import { SOCKET_EVENTS } from "../realtime/events.js";
 import { startupRoom } from "../realtime/rooms.js";
@@ -180,24 +181,85 @@ export const getPerformance = async (req, res) => {
 };
 
 export const getFounderTeamMembers = async (req, res) => {
-  const { founderId } = req.params;
-  const isFounderOrAdmin = req.user?.isAdmin === true || req.user?.id === String(founderId);
-  if (!isFounderOrAdmin) {
+  const requestedScopeId = String(req.params.founderId || "").trim();
+  let founderId = requestedScopeId;
+  let startupId = "";
+
+  if (mongoose.Types.ObjectId.isValid(requestedScopeId)) {
+    const startup = await Startup.findById(requestedScopeId, { _id: 1, founderId: 1 }).lean();
+    if (startup?.founderId) {
+      founderId = String(startup.founderId);
+      startupId = String(startup._id);
+    } else {
+      const startupByFounder = await Startup.findOne(
+        { founderId: requestedScopeId },
+        { _id: 1, founderId: 1 },
+      ).lean();
+      if (startupByFounder?._id) {
+        startupId = String(startupByFounder._id);
+      }
+    }
+  }
+
+  const requester = req.user?.id
+    ? await User.findById(req.user.id, { _id: 1, startupId: 1, founderId: 1, role: 1 }).lean()
+    : null;
+
+  const requesterStartupId = String(requester?.startupId || "");
+  const requesterFounderId = String(requester?.founderId || "");
+  const isFounderOrAdmin =
+    req.user?.isAdmin === true || req.user?.id === String(founderId);
+  const isMemberOfScope =
+    Boolean(requester) &&
+    (
+      requesterFounderId === String(founderId) ||
+      (startupId && requesterStartupId === String(startupId))
+    );
+
+  if (!isFounderOrAdmin && !isMemberOfScope) {
     return apiError(res, "Forbidden.", 403);
   }
 
-  const members = await User.find(
-    { founderId, role: "team-member" },
-    { name: 1, email: 1, avatarUrl: 1, role: 1, startupId: 1, founderId: 1, onboardingComplete: 1 },
-  ).sort({ createdAt: -1 });
-
-  const memberIds = members.map((m) => m._id);
-  const profiles = memberIds.length
-    ? await TeamMemberProfile.find({ userId: { $in: memberIds } }).lean()
-    : [];
+  const profileQuery = startupId
+    ? { $or: [{ founderId }, { startupId }] }
+    : { founderId };
+  const profiles = await TeamMemberProfile.find(profileQuery).lean();
   const profileByUserId = new Map(profiles.map((p) => [String(p.userId), p]));
 
-  const result = members.map((m) => {
+  const profileUserIds = profiles.map((p) => p.userId).filter(Boolean);
+  const userQuery = startupId
+    ? {
+        $or: [
+          { founderId, role: { $in: ["team-member", "team"] } },
+          { startupId, role: { $in: ["team-member", "team"] } },
+          { _id: { $in: profileUserIds } },
+        ],
+      }
+    : {
+        $or: [
+          { founderId, role: { $in: ["team-member", "team"] } },
+          { _id: { $in: profileUserIds } },
+        ],
+      };
+
+  const members = await User.find(
+    userQuery,
+    {
+      name: 1,
+      email: 1,
+      avatarUrl: 1,
+      role: 1,
+      startupId: 1,
+      founderId: 1,
+      onboardingComplete: 1,
+    },
+  ).sort({ createdAt: -1 });
+
+  const membersById = new Map(
+    members.map((member) => [String(member._id), member]),
+  );
+
+  const result = Array.from(membersById.values()).map((m) => {
     const profile = profileByUserId.get(String(m._id)) || {};
     return {
       id: String(m._id),
@@ -209,7 +271,7 @@ export const getFounderTeamMembers = async (req, res) => {
       title: profile.title || "",
       skills: Array.isArray(profile.skills) ? profile.skills : [],
       bio: profile.bio || "",
-      startupId: String(m.founderId || founderId),
+      startupId: String(m.startupId || startupId || founderId),
       founderId: String(founderId),
       isOnline: false,
       statusText: "",

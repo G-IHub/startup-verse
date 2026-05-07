@@ -7,7 +7,10 @@ import { Progress } from "../ui/progress";
 import OfferDisplay from "../OfferDisplay";
 import { toast } from "sonner";
 import { getTalentProfileCompletionPercent } from "../../utils/talentProfileCompletion";
-import { TALENT_ACTIONS_MIN_COMPLETION } from "../../constants/talentProfile.js";
+import {
+  TALENT_ACTIONS_MIN_COMPLETION,
+  TALENT_BROWSE_MIN_COMPLETION,
+} from "../../constants/talentProfile.js";
 import { useTalentHomeData } from "../../domains/talent/hooks/useTalentHomeData";
 import { getFirstName } from "../../utils/nameHelpers";
 import {
@@ -28,6 +31,8 @@ import {
   DollarSign,
   Bookmark,
   Sparkles,
+  Eye,
+  CheckCircle2,
 } from "lucide-react";
 import {
   Dialog,
@@ -146,6 +151,8 @@ export default function TalentDashboard({
   entryMode = "overview",
 }) {
   const talentCompletion = getTalentProfileCompletionPercent(user);
+  const visibleToFoundersInBrowse =
+    talentCompletion >= TALENT_BROWSE_MIN_COMPLETION;
   const canUsePrimaryTalentActions =
     talentCompletion >= TALENT_ACTIONS_MIN_COMPLETION;
   const [selectedStartup, setSelectedStartup] = useState(null);
@@ -502,18 +509,50 @@ export default function TalentDashboard({
             )}
 
             {!isLoading && topMatches.length === 0 && (
-              <div className="rounded-card bg-surface-card shadow-soft px-6 py-12 text-center transition-shadow duration-200 ease-in-out">
+              <div className="rounded-card bg-surface-card shadow-soft px-6 py-12 text-center transition-shadow duration-200 ease-in-out border border-border/60">
                 <Sparkles className="h-8 w-8 text-accent mx-auto mb-3" />
                 <p className="font-heading text-sm font-semibold text-text-heading">
                   No matches yet
                 </p>
-                <p className="font-body text-xs text-text-muted mt-1">
+                <p className="font-body text-xs text-text-muted mt-1 max-w-md mx-auto leading-relaxed">
                   Complete your profile to unlock personalized startup matches.
                 </p>
+                {!visibleToFoundersInBrowse && (
+                  <div className="mt-6 mx-auto max-w-md rounded-xl border border-primary/15 bg-gradient-to-br from-[#3a5afe]/[0.07] via-background to-[#7c4dff]/[0.06] px-4 py-3.5 text-left shadow-[0_1px_0_0_rgba(255,255,255,0.65)_inset] dark:shadow-none dark:from-[#3a5afe]/10 dark:to-background">
+                    <div className="flex gap-3">
+                      <div
+                        className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-white shadow-md"
+                        style={{
+                          background:
+                            "linear-gradient(145deg, #3a5afe 0%, #7c4dff 100%)",
+                        }}
+                        aria-hidden
+                      >
+                        <Eye className="h-[18px] w-[18px]" strokeWidth={2} />
+                      </div>
+                      <div className="min-w-0 pt-0.5">
+                        <p className="font-heading text-[12px] font-semibold text-text-heading tracking-tight">
+                          Founder discovery
+                        </p>
+                        <p className="font-body text-[11px] text-text-muted mt-1 leading-relaxed">
+                          Reach{" "}
+                          <span className="font-semibold text-primary tabular-nums">
+                            {TALENT_BROWSE_MIN_COMPLETION}%
+                          </span>{" "}
+                          profile completion to appear in{" "}
+                          <span className="font-medium text-foreground/90">
+                            Browse Talent
+                          </span>{" "}
+                          when founders search for teammates.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
                 <Button
                   size="sm"
                   variant="outline"
-                  className="mt-4 rounded-input border-[1.5px] border-primary bg-surface-card text-primary font-body font-semibold hover:bg-primary hover:text-white transition-colors duration-200 ease-in-out"
+                  className="mt-5 rounded-input border-[1.5px] border-primary bg-surface-card text-primary font-body font-semibold hover:bg-primary hover:text-white transition-colors duration-200 ease-in-out"
                   onClick={handleCompleteProfileClick}
                 >
                   Complete Profile
@@ -670,36 +709,60 @@ export default function TalentDashboard({
 
         {/* Complete Your Profile floating badge */}
         {talentCompletion < 100 && (
-          <div
-            className="fixed bottom-6 right-6 flex items-center gap-3 rounded-card bg-surface-card px-4 py-3 cursor-pointer shadow-[0_8px_32px_rgba(58,90,254,0.14)] hover:shadow-[0_12px_40px_rgba(58,90,254,0.18)] transition-shadow duration-200 ease-in-out max-w-[230px] z-50"
+          <button
+            type="button"
+            className="fixed bottom-6 right-6 z-50 flex max-w-[min(300px,calc(100vw-2rem))] cursor-pointer flex-col gap-2.5 rounded-card border border-primary/10 bg-surface-card px-4 py-3.5 text-left shadow-[0_8px_32px_rgba(58,90,254,0.14)] transition-shadow duration-200 ease-in-out hover:border-primary/18 hover:shadow-[0_12px_40px_rgba(58,90,254,0.18)]"
             onClick={handleCompleteProfileClick}
           >
-            <div
-              className="h-9 w-9 rounded-input flex items-center justify-center shrink-0"
-              style={{
-                background: "linear-gradient(135deg, #ffb300, #ff6b00)",
-              }}
-            >
-              <Sparkles className="h-4 w-4 text-white" />
-            </div>
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center justify-between mb-1">
-                <p className="font-heading text-[12px] font-semibold text-text-heading leading-tight">
-                  Complete Your Profile
-                </p>
-                <ArrowRight className="h-3 w-3 text-primary shrink-0" />
+            <div className="flex items-center gap-3">
+              <div
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-input"
+                style={{
+                  background: "linear-gradient(135deg, #ffb300, #ff6b00)",
+                }}
+              >
+                <Sparkles className="h-4 w-4 text-white" />
               </div>
-              <div className="flex items-center gap-1.5">
-                <Progress
-                  value={talentCompletion}
-                  className="h-1.5 flex-1 bg-surface-border rounded-pill border-0 [&>[data-slot=progress-indicator]]:!bg-[linear-gradient(90deg,#3a5afe,#7c4dff)]"
-                />
-                <span className="font-body text-[11px] font-bold text-primary shrink-0">
-                  {talentCompletion}%
-                </span>
+              <div className="min-w-0 flex-1">
+                <div className="mb-1 flex items-center justify-between gap-2">
+                  <p className="font-heading text-[12px] font-semibold leading-tight text-text-heading">
+                    Complete Your Profile
+                  </p>
+                  <ArrowRight className="h-3 w-3 shrink-0 text-primary" />
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <Progress
+                    value={talentCompletion}
+                    className="h-1.5 flex-1 rounded-pill border-0 bg-surface-border [&>[data-slot=progress-indicator]]:!bg-[linear-gradient(90deg,#3a5afe,#7c4dff)]"
+                  />
+                  <span className="shrink-0 font-body text-[11px] font-bold tabular-nums text-primary">
+                    {talentCompletion}%
+                  </span>
+                </div>
               </div>
             </div>
-          </div>
+            {!visibleToFoundersInBrowse ? (
+              <div className="rounded-xl border border-primary/12 bg-gradient-to-br from-[#3a5afe]/[0.06] via-transparent to-[#7c4dff]/[0.07] px-3 py-2.5">
+                <div className="flex gap-2">
+                  <Eye className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+                  <div className="min-w-0">
+                    <p className="font-heading text-[11px] font-semibold text-text-heading">
+                      Visible to founders at {TALENT_BROWSE_MIN_COMPLETION}%
+                    </p>
+                    <p className="mt-0.5 font-body text-[10px] leading-relaxed text-text-muted">
+                      Until then, your profile stays out of Browse Talent so
+                      founders only see ready candidates.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <p className="flex items-center gap-1.5 px-0.5 font-body text-[10px] font-medium text-emerald-700 dark:text-emerald-400/90">
+                <CheckCircle2 className="h-3.5 w-3.5 shrink-0" />
+                You appear in founder Browse Talent
+              </p>
+            )}
+          </button>
         )}
 
         {/* Detail Dialog (shared with browse view) */}
@@ -894,6 +957,20 @@ export default function TalentDashboard({
                     Reach {TALENT_ACTIONS_MIN_COMPLETION}% profile strength to
                     unlock browsing and applications.
                   </p>
+                  {!visibleToFoundersInBrowse ? (
+                    <p className="mt-2 text-[11px] leading-snug text-blue-900/90 border-l-2 border-indigo-400 pl-2">
+                      Founders only see profiles at{" "}
+                      <span className="font-semibold tabular-nums">
+                        {TALENT_BROWSE_MIN_COMPLETION}%+
+                      </span>{" "}
+                      in Browse Talent—bring yours up to get discovered.
+                    </p>
+                  ) : (
+                    <p className="mt-2 text-[11px] leading-snug text-emerald-800 dark:text-emerald-600 flex items-center gap-1">
+                      <CheckCircle2 className="h-3.5 w-3.5 shrink-0" />
+                      Your profile is listed for founders in Browse Talent.
+                    </p>
+                  )}
                 </div>
                 <button
                   type="button"

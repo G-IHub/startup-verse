@@ -102,6 +102,7 @@ export function TaskManagementPanel({
   const kanbanHeightRef = useRef(kanbanHeight);
   const isDraggingHandle = useRef(false);
   const panelRef = useRef(null);
+  const normalizedUserId = String(user?._id ?? user?.id ?? "");
 
   const clampKanbanHeight = useCallback((raw) => {
     const maxH = Math.round(window.innerHeight * 0.7);
@@ -125,12 +126,20 @@ export function TaskManagementPanel({
     isDraggingHandle.current = false;
   }, []);
 
-  const normalizeTask = (task) => ({
-    ...task,
-    id: String(task?.id || task?._id || ""),
-    blockerReason: task?.blockerReason || task?.blockedReason || "",
-    blockerNote: task?.blockerNote || task?.blockedNote || "",
-  });
+  const normalizeTask = (task) => {
+    const at = task?.assignedTo ?? task?.assigneeId;
+    const assignedTo =
+      at != null && at !== ""
+        ? String(typeof at === "object" ? at._id || at.id || "" : at)
+        : "";
+    return {
+      ...task,
+      id: String(task?.id || task?._id || ""),
+      assignedTo,
+      blockerReason: task?.blockerReason || task?.blockedReason || "",
+      blockerNote: task?.blockerNote || task?.blockedNote || "",
+    };
+  };
 
   // Sync openAddDialog from props
   useEffect(() => {
@@ -142,7 +151,7 @@ export function TaskManagementPanel({
   // Load tasks and team members
   useEffect(() => {
     if (!open) return;
-    if (!founderIdOverride && user.role === "founder" && !String(user?._id ?? user?.id ?? "")) return;
+    if (!founderIdOverride && user.role === "founder" && !normalizedUserId) return;
     const loadData = async () => {
       setLoading(true);
 
@@ -151,14 +160,13 @@ export function TaskManagementPanel({
         : JSON.parse(localStorage.getItem(STORAGE_KEYS.teamMembers) || "[]");
 
       // Determine the founder ID (we don't need the full founder object)
-      const resolvedUserId = String(user?._id ?? user?.id ?? "");
       let founderIdValue = "";
       if (founderIdOverride) {
         founderIdValue = founderIdOverride;
         setFounderId(founderIdOverride);
       } else if (user.role === "founder") {
-        founderIdValue = resolvedUserId;
-        setFounderId(resolvedUserId);
+        founderIdValue = normalizedUserId;
+        setFounderId(normalizedUserId);
       } else if (user.role === "team-member" && user.startupId) {
         founderIdValue = user.startupId;
         setFounderId(user.startupId);
@@ -206,7 +214,7 @@ export function TaskManagementPanel({
           tasks = backendTasks || [];
         } else if (user.role === "team-member" || user.role === "team") {
           // Load team member's assigned tasks from backend
-          const backendTasks = await taskApi.getTeamMemberTasks(user.id);
+          const backendTasks = await taskApi.getTeamMemberTasks(normalizedUserId);
           tasks = backendTasks || [];
         }
         setLocalTasks((tasks || []).map(normalizeTask));
@@ -224,7 +232,7 @@ export function TaskManagementPanel({
           let filteredTasks = allTasks;
           if (user.role === "team-member" || user.role === "team") {
             filteredTasks = allTasks.filter(
-              (t) => t.assignedTo === user.id || t.assigneeId === user.id,
+              (t) => t.assignedTo === normalizedUserId || t.assigneeId === normalizedUserId,
             );
           }
           setLoadError("Could not sync tasks from server. Showing cached tasks.");
@@ -291,7 +299,7 @@ export function TaskManagementPanel({
     loadData();
 
     // ✅ REALTIME: Removed task/team polling (was every 10s) - using real-time subscription
-  }, [open, user.id, user.role, user.startupId, user.founderId, founderIdOverride, startupId, strictMode]);
+  }, [open, normalizedUserId, user.role, user.startupId, user.founderId, founderIdOverride, startupId, strictMode]);
 
   useEffect(() => {
     if (!open || !founderId) return;
@@ -312,11 +320,11 @@ export function TaskManagementPanel({
       {
         role: user.role === "founder" ? "founder" : "team-member",
         founderId,
-        userId: user.id,
+        userId: normalizedUserId,
       },
     );
     return () => unsubscribe?.();
-  }, [open, founderId, user.id, user.role]);
+  }, [open, founderId, normalizedUserId, user.role]);
 
   // Handle initialTaskId - scroll to and highlight the task
   useEffect(() => {
@@ -477,16 +485,16 @@ export function TaskManagementPanel({
     if (task && (user.role === "team-member" || user.role === "team")) {
       console.log(`🔔 [NOTIFICATION V2] Team member toggling task ${taskId}`);
       console.log(
-        `🔔 [NOTIFICATION V2] User: ${user.name} (${user.id}), Status: ${task.status}`,
+        `🔔 [NOTIFICATION V2] User: ${user.name} (${normalizedUserId}), Status: ${task.status}`,
       );
       console.log(`🔔 [NOTIFICATION V2] Founder ID: ${founderId}`);
       teamMemberApi
-        .updateTaskStatus(user.id, taskId, {
+        .updateTaskStatus(normalizedUserId, taskId, {
           status: task.status,
           completedAt:
             task.status === "completed" ? new Date().toISOString() : undefined,
           founderId: founderId,
-          completedBy: user.id,
+          completedBy: normalizedUserId,
           completedByName: user.name,
         })
         .then(() => {
@@ -580,12 +588,12 @@ export function TaskManagementPanel({
         `🔔 [TaskManagementPanel.handleStatusChange] User role: ${user.role}, New status: ${newStatus}`,
       );
       teamMemberApi
-        .updateTaskStatus(user.id, taskId, {
+        .updateTaskStatus(normalizedUserId, taskId, {
           status: newStatus,
           completedAt:
             newStatus === "completed" ? new Date().toISOString() : undefined,
           founderId: founderId,
-          completedBy: user.id,
+          completedBy: normalizedUserId,
           completedByName: user.name,
         })
         .then(() =>
@@ -642,12 +650,12 @@ export function TaskManagementPanel({
 
     if (user.role === "team-member" || user.role === "team") {
       teamMemberApi
-        .updateTaskStatus(user.id, taskId, {
+        .updateTaskStatus(normalizedUserId, taskId, {
           status: "blocked",
           blockerReason: reason,
           blockerNote: note,
           founderId: founderId,
-          completedBy: user.id,
+          completedBy: normalizedUserId,
           completedByName: user.name,
         })
         .then(() =>
@@ -769,8 +777,8 @@ export function TaskManagementPanel({
       // Only tasks explicitly assigned to someone who is NOT the founder
       return Boolean(task.assignedTo) && task.assignedTo !== fid;
     }
-    // My Tasks: unassigned tasks + tasks assigned to founder
-    return !task.assignedTo || task.assignedTo === fid;
+    // My Tasks: only tasks explicitly assigned to the founder (unassigned → Office Home)
+    return Boolean(task.assignedTo) && task.assignedTo === fid;
   });
 
   const filteredTasks = tabScopedTasks.filter((task) => {
@@ -928,7 +936,7 @@ export function TaskManagementPanel({
                       }`}
                     >
                       My tasks
-                      {(() => { const fid = founderId || resolvedCurrentUserId; const n = localTasks.filter((t) => !t.assignedTo || t.assignedTo === fid).length; return n > 0 ? <span className="ml-1.5 rounded-full bg-primary/12 px-1.5 py-0.5 text-[10px] tabular-nums text-[#1a237e]">{n}</span> : null; })()}
+                      {(() => { const fid = founderId || resolvedCurrentUserId; const n = localTasks.filter((t) => Boolean(t.assignedTo) && t.assignedTo === fid).length; return n > 0 ? <span className="ml-1.5 rounded-full bg-primary/12 px-1.5 py-0.5 text-[10px] tabular-nums text-[#1a237e]">{n}</span> : null; })()}
                     </button>
                     <button
                       type="button"
@@ -952,8 +960,8 @@ export function TaskManagementPanel({
                       const n = localTasks.filter((t) => Boolean(t.assignedTo) && t.assignedTo !== fid).length;
                       return `${n} task${n !== 1 ? "s" : ""} assigned to teammates`;
                     }
-                    const n = localTasks.filter((t) => !t.assignedTo || t.assignedTo === fid).length;
-                    return `${n} personal task${n !== 1 ? "s" : ""}`;
+                    const n = localTasks.filter((t) => Boolean(t.assignedTo) && t.assignedTo === fid).length;
+                    return `${n} task${n !== 1 ? "s" : ""} assigned to you`;
                   })()}
                 </p>
               </div>

@@ -44,12 +44,15 @@ import { Checkbox } from "./ui/checkbox";
 import { toast } from "sonner";
 import * as founderApi from "../utils/api/founderApi";
 import * as inboxApi from "../utils/api/inboxApi";
+import { broadcastMessageUpdate } from "../utils/realtimeSubscriptions";
 import OfferDisplay from "./OfferDisplay";
-import TalentProfileDetailsDialog from "./TalentProfileDetailsDialog";
 import {
   generateSmartTeamRecommendations,
   getTalentMatchesForRoles,
 } from "../utils/smartTeamMatching";
+import { TALENT_BROWSE_MIN_COMPLETION } from "../constants/talentProfile.js";
+import { augmentTalentBrowseFields } from "../utils/talentBrowseNormalize";
+import { getTalentBrowseProfileCompletionPercent } from "../utils/talentProfileCompletion.js";
 import TeamOnboardingManager from "./compensation/TeamOnboardingManager";
 import CompensationSetupWizard from "./compensation/CompensationSetupWizard";
 import {
@@ -81,20 +84,28 @@ import {
   Edit,
 } from "lucide-react";
 function normalizeTalentProfile(profile) {
-  if (!profile || typeof profile !== "object") return null;
+  if (!profile) return null;
+  if (
+    getTalentBrowseProfileCompletionPercent(profile) <
+    TALENT_BROWSE_MIN_COMPLETION
+  ) {
+    return null;
+  }
+  const enriched = augmentTalentBrowseFields(profile);
+  if (!enriched) return null;
   const toArr = (v) => (Array.isArray(v) ? v : []);
   return {
-    ...profile,
+    ...enriched,
     id: String(profile._id || profile.id || ""),
-    interests: toArr(profile.interests),
-    skills: toArr(profile.skills),
-    industryPreferences: toArr(profile.industryPreferences),
-    preferredRoles: toArr(profile.preferredRoles),
-    workExperiences: toArr(profile.workExperiences),
-    educationList: toArr(profile.educationList),
-    certifications: toArr(profile.certifications),
-    portfolioItems: toArr(profile.portfolioItems),
-    portfolioLinks: toArr(profile.portfolioLinks),
+    interests: toArr(enriched.interests),
+    skills: toArr(enriched.skills),
+    industryPreferences: toArr(enriched.industryPreferences),
+    preferredRoles: toArr(enriched.preferredRoles),
+    workExperiences: toArr(enriched.workExperiences),
+    educationList: toArr(enriched.educationList),
+    certifications: toArr(enriched.certifications),
+    portfolioItems: toArr(enriched.portfolioItems),
+    portfolioLinks: toArr(enriched.portfolioLinks),
   };
 }
 
@@ -105,7 +116,6 @@ export default function TeamMatching({ user, onNavigate }) {
   const [isEditingExisting, setIsEditingExisting] = useState(false);
   const [selectedIdea, setSelectedIdea] = useState(null);
   const [showDetailsDialog, setShowDetailsDialog] = useState(false);
-  const [selectedMember, setSelectedMember] = useState(null);
   const [startupIdeas, setStartupIdeas] = useState([]);
   const [availableTalent, setAvailableTalent] = useState([]);
   const [sortBy, setSortBy] = useState("match");
@@ -608,6 +618,18 @@ export default function TeamMatching({ user, onNavigate }) {
       console.log("📨 Sending interest object:", interest);
       await inboxApi.sendInterest(interest);
       console.log("✅ Interest sent successfully");
+
+      // 🔥 REALTIME: Broadcast to founder that new chat connection is available
+      await broadcastMessageUpdate(null, "new_conversation", {
+        type: "interest",
+        talentId: interest.talentId,
+        talentName: interest.talentName,
+        founderId: interest.founderId,
+        startupId: interest.startupId,
+        startupTitle: interest.startupTitle,
+        message: `New interest from ${interest.talentName} for ${interest.startupTitle}`,
+      });
+
       toast.success(
         `✉️ Your interest has been sent to ${selectedIdea.founder}! Redirecting to your inbox...`,
       );
@@ -679,91 +701,36 @@ export default function TeamMatching({ user, onNavigate }) {
     setSelectedOnboardingTalent(null);
     loadPendingOnboarding();
   };
-  const handleSendInvitation = async (message) => {
-    if (!message.trim()) {
-      toast.error("Please write a message to invite this person");
-      return;
-    }
-    if (!selectedMember) return;
-    try {
-      // Send invitation to backend
-      const invitation = {
-        id: Date.now().toString(),
-        talentId: selectedMember.id,
-        talentName: selectedMember.name,
-        founderId: user.id,
-        founderName: user.name,
-        message: message,
-        sentAt: new Date().toISOString(),
-        status: "pending",
-        messages: [],
-        companyName: user.startupIdea || user.companyName || "Your Startup",
-        startupId: user.startupId || user.id,
-      };
-      console.log(
-        "📤 [TeamMatching] Sending invitation to backend...",
-        invitation,
-      );
-      const sendResult = await inboxApi.sendInvitation(invitation);
-      console.log(
-        "✅ [TeamMatching] Invitation sent successfully to backend",
-        sendResult,
-      );
-
-      // Log debug information from backend
-      if (sendResult.debug) {
-        console.log("🔍 [TeamMatching] Backend debug info:", sendResult.debug);
-        console.log("  - Saved keys:", sendResult.debug.savedKeys);
-        console.log(
-          "  - Verification prefix:",
-          sendResult.debug.verificationPrefix,
-        );
-        console.log(
-          "  - Verification count:",
-          sendResult.debug.verificationCount,
-        );
-        console.log(
-          "  - Verification data:",
-          sendResult.debug.verificationData,
-        );
-      }
-
-      // Verify it was saved by fetching immediately
-      console.log("🔍 [TeamMatching] Verifying invitation was saved...");
-      const sentInvitations = await inboxApi.getSentInvitations(user.id);
-      console.log(
-        "📊 [TeamMatching] Verification - sent invitations count:",
-        sentInvitations.length,
-      );
-      console.log(
-        "📋 [TeamMatching] Verification - sent invitations data:",
-        sentInvitations,
-      );
-      toast.success(
-        `🎯 Invitation sent to ${selectedMember.name}! Redirecting to your inbox...`,
-      );
-      setSelectedMember(null);
-
-      // Navigate to inbox with sent tab active
-      if (onNavigate) {
-        console.log("🚀 [TeamMatching] Navigating to inbox:sent in 1000ms...");
-        // Add delay to ensure backend has processed and saved the invitation
-        setTimeout(() => {
-          console.log('📍 [TeamMatching] Calling onNavigate("inbox:sent")');
-          onNavigate("inbox:sent");
-        }, 1000);
-      } else {
-        console.warn("⚠️ [TeamMatching] onNavigate prop not provided!");
-      }
-    } catch (error) {
-      console.error("❌ [TeamMatching] Error sending invitation:", error);
-      console.error("Error details:", {
-        message: error.message,
-        stack: error.stack,
+  const viewTalentProfile = (member) => {
+    if (!member) return;
+    
+    // Navigate to the talent profile page with formatted talent data
+    if (onNavigate) {
+      onNavigate("talent-profile", {
+        talent: {
+          id: member.id,
+          fullName: member.name,
+          professionalTitle: member.role,
+          location: member.location,
+          bio: member.bio,
+          skills: member.skills,
+          linkedinUrl: member.linkedinUrl,
+          githubUrl: member.githubUrl,
+          portfolioWebsite: member.portfolioWebsite,
+          workExperiences: member.workExperiences,
+          educationList: member.educationList,
+          certifications: member.certifications,
+          portfolioItems: member.portfolioItems,
+          availabilityStatus: member.availability,
+          preferredCommitment: member.preferredCommitment,
+          yearsOfExperience: member.experience,
+          email: member.email,
+          match: member.matchScore,
+          primaryRole: member.role,
+          interests: member.interests,
+          lookingFor: member.lookingFor,
+        }
       });
-      toast.error(
-        `Failed to send invitation: ${error.message || "Unknown error"}. Please try again.`,
-      );
     }
   };
 
@@ -890,22 +857,15 @@ export default function TeamMatching({ user, onNavigate }) {
               <div className="flex gap-2">
                 <Button
                   onClick={() => {
-                    if (hasExistingPost) {
-                      // Show preview directly for existing post
-                      setSelectedIdea(founderPost);
-                      setShowPreview(true);
-                    } else {
-                      // Open form for new post
-                      setIsEditingExisting(false);
-                      setIsPostIdeaOpen(true);
-                    }
+                    // Navigate to the new dedicated Post Startup page
+                    onNavigate?.("post-startup");
                   }}
                   className="rounded-input bg-primary font-body text-sm font-semibold text-white shadow-[0_4px_16px_rgba(58,90,254,0.20)] transition-colors duration-200 ease-in-out hover:bg-primary-hover"
                 >
                   {hasExistingPost ? (
                     <>
-                      <Eye className="w-4 h-4 mr-1.5" />
-                      Preview
+                      <Edit className="w-4 h-4 mr-1.5" />
+                      Edit Startup Post
                     </>
                   ) : (
                     <>
@@ -1132,37 +1092,33 @@ export default function TeamMatching({ user, onNavigate }) {
                             <Users className="w-4 h-4 text-blue-600" />
                             Top Matches
                           </h4>
-                          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                             {recommendedTalent.map((member) => (
                               <Card
                                 key={member.id}
-                                className="relative rounded-card border border-surface-border bg-surface-card shadow-soft transition-shadow duration-200 ease-in-out hover:shadow-[0_4px_16px_rgba(0,0,0,0.08)]"
+                                className="group relative overflow-hidden rounded-xl border border-slate-200/60 bg-white shadow-sm transition-all duration-300 ease-out hover:shadow-lg hover:border-primary/20 hover:-translate-y-0.5"
                               >
-                                <CardContent className="p-3">
+                                <CardContent className="p-4">
                                   {member.matchScore && (
                                     <Badge
-                                      className="absolute top-2 right-2 text-white border-0 text-xs"
-                                      style={{
-                                        background: "#3A5AFE",
-                                        boxShadow:
-                                          "0 2px 8px rgba(58, 90, 254, 0.3)",
-                                      }}
+                                      className="absolute top-3 right-3 text-white border-0 text-xs font-semibold px-2 py-0.5 bg-gradient-to-r from-primary to-primary/90 shadow-md"
                                     >
+                                      <Star className="w-3 h-3 mr-1 fill-white" />
                                       {member.matchScore}% Match
                                     </Badge>
                                   )}
-                                  <div className="flex items-start space-x-3 mb-2">
-                                    <Avatar className="w-10 h-10">
+                                  <div className="flex items-start gap-3 mb-3">
+                                    <Avatar className="w-11 h-11 ring-2 ring-slate-100 ring-offset-1.5 transition-transform duration-300 group-hover:scale-105">
                                       <AvatarImage src={member.avatar} />
-                                      <AvatarFallback>
-                                        {member.name?.substring(0, 2) || "??"}
+                                      <AvatarFallback className="bg-gradient-to-br from-primary/10 to-primary/5 text-primary font-semibold">
+                                        {member.name?.split(" ").map(n => n[0]).join("").slice(0, 2).toUpperCase() || "??"}
                                       </AvatarFallback>
                                     </Avatar>
-                                    <div className="flex-1 min-w-0">
-                                      <h3 className="text-sm font-semibold mb-0.5 truncate">
+                                    <div className="flex-1 min-w-0 pt-0.5">
+                                      <h3 className="text-sm font-semibold text-slate-900 truncate">
                                         {member.name || "Unknown"}
                                       </h3>
-                                      <div className="flex items-center space-x-1 text-xs text-muted-foreground">
+                                      <div className="flex items-center gap-1 text-xs text-slate-500">
                                         {getRoleIcon(member.role || "")}
                                         <span className="truncate">
                                           {member.role || "Role not specified"}
@@ -1170,47 +1126,40 @@ export default function TeamMatching({ user, onNavigate }) {
                                       </div>
                                     </div>
                                   </div>
-                                  <p className="text-xs text-muted-foreground mb-2 line-clamp-2">
+                                  <p className="text-xs text-slate-600 mb-3 line-clamp-2 leading-relaxed">
                                     {member.bio || "No bio provided"}
                                   </p>
-                                  <div className="flex flex-wrap gap-1 mb-2">
+                                  <div className="flex flex-wrap gap-1 mb-3">
                                     {(Array.isArray(member.skills)
                                       ? member.skills
                                       : []
                                     )
-                                      .slice(0, 4)
+                                      .slice(0, 3)
                                       .map((skill) => (
-                                        <Badge
+                                        <span
                                           key={skill}
-                                          variant="secondary"
-                                          className="text-xs h-5"
+                                          className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-slate-100 text-slate-600 border border-slate-200/60"
                                         >
                                           {skill}
-                                        </Badge>
+                                        </span>
                                       ))}
                                     {(Array.isArray(member.skills)
                                       ? member.skills
                                       : []
-                                    ).length > 4 && (
-                                      <Badge
-                                        variant="secondary"
-                                        className="text-xs h-5"
-                                      >
-                                        +
-                                        {(Array.isArray(member.skills)
+                                    ).length > 3 && (
+                                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-slate-50 text-slate-500 border border-slate-200/60">
+                                        +{(Array.isArray(member.skills)
                                           ? member.skills
-                                          : []
-                                        ).length - 4}
-                                      </Badge>
+                                          : []).length - 3}
+                                      </span>
                                     )}
                                   </div>
                                   <Button
                                     size="sm"
-                                    className="w-full text-xs h-7"
-                                    onClick={() => setSelectedMember(member)}
+                                    className="w-full text-xs bg-primary hover:bg-primary/90 text-white font-medium"
+                                    onClick={() => viewTalentProfile(member)}
                                   >
-                                    <Mail className="w-3 h-3 mr-1.5" />
-                                    View Profile & Invite
+                                    View Profile
                                   </Button>
                                 </CardContent>
                               </Card>
@@ -1258,133 +1207,146 @@ export default function TeamMatching({ user, onNavigate }) {
                     </CardContent>
                   </Card>
                 ) : (
-                  <div className="grid gap-4 md:grid-cols-3">
+                  <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-3">
                     {filteredTalent.map((member) => (
-                      <Card key={member.id} className="relative rounded-card border border-surface-border bg-surface-card shadow-soft transition-shadow duration-200 ease-in-out hover:shadow-[0_4px_16px_rgba(0,0,0,0.08)]">
-                        <CardContent className="p-4">
-                          {member.matchScore && member.matchScore >= 40 && (
+                      <Card 
+                        key={member.id} 
+                        className="group relative overflow-hidden rounded-2xl border border-slate-200/60 bg-white shadow-sm transition-all duration-300 ease-out hover:shadow-xl hover:shadow-primary/5 hover:border-primary/20 hover:-translate-y-1"
+                      >
+                        {/* Match Score Badge - Premium Style */}
+                        {member.matchScore && member.matchScore >= 40 && (
+                          <div className="absolute top-4 right-4 z-10">
                             <Badge
-                              className="absolute top-2 right-2 text-white border-0"
-                              style={{
-                                background:
-                                  member.matchScore >= 80
-                                    ? "#3A5AFE"
-                                    : member.matchScore >= 60
-                                      ? "#5B7FFF"
-                                      : "#10B981",
-                                boxShadow: "0 2px 8px rgba(58, 90, 254, 0.3)",
-                              }}
+                              className={`text-white border-0 font-semibold text-xs px-2.5 py-1 shadow-lg ${
+                                member.matchScore >= 80
+                                  ? "bg-gradient-to-r from-emerald-500 to-emerald-600"
+                                  : member.matchScore >= 60
+                                    ? "bg-gradient-to-r from-blue-500 to-blue-600"
+                                    : "bg-gradient-to-r from-slate-500 to-slate-600"
+                              }`}
                             >
+                              <Star className="w-3 h-3 mr-1 fill-white" />
                               {member.matchScore}% Match
                             </Badge>
-                          )}
-                          <div className="flex items-start space-x-3 mb-3">
-                            <Avatar className="w-12 h-12">
-                              <AvatarImage src={member.avatar} />
-                              <AvatarFallback>
-                                {member.name?.substring(0, 2) || "??"}
-                              </AvatarFallback>
-                            </Avatar>
-                            <div className="flex-1">
-                              <h3 className="mb-0.5">
-                                {member.name || "Unknown"}
-                              </h3>
-                              <div className="flex items-center space-x-1 text-xs text-muted-foreground mb-2">
-                                {getRoleIcon(member.role || "")}
-                                <span>
-                                  {member.role || "Role not specified"}
-                                </span>
-                              </div>
-                              <div className="flex flex-wrap gap-1">
-                                {(Array.isArray(member.skills)
-                                  ? member.skills
-                                  : []
-                                )
-                                  .slice(0, 3)
-                                  .map((skill) => (
-                                    <Badge
-                                      key={skill}
-                                      variant="secondary"
-                                      className="text-xs h-5"
-                                    >
-                                      {skill}
-                                    </Badge>
-                                  ))}
-                                {(Array.isArray(member.skills)
-                                  ? member.skills
-                                  : []
-                                ).length > 3 && (
-                                  <Badge
-                                    variant="secondary"
-                                    className="text-xs h-5"
-                                  >
-                                    +
-                                    {(Array.isArray(member.skills)
-                                      ? member.skills
-                                      : []
-                                    ).length - 3}
-                                  </Badge>
-                                )}
+                          </div>
+                        )}
+
+                        <CardContent className="p-0">
+                          {/* Header Section with Avatar */}
+                          <div className="p-5 pb-4">
+                            <div className="flex items-start gap-4">
+                              <Avatar className="w-14 h-14 ring-2 ring-slate-100 ring-offset-2 transition-transform duration-300 group-hover:scale-105">
+                                <AvatarImage src={member.avatar} />
+                                <AvatarFallback className="bg-gradient-to-br from-primary/10 to-primary/5 text-primary font-semibold text-lg">
+                                  {member.name?.split(" ").map(n => n[0]).join("").slice(0, 2).toUpperCase() || "??"}
+                                </AvatarFallback>
+                              </Avatar>
+                              <div className="flex-1 min-w-0 pt-0.5">
+                                <h3 className="font-semibold text-slate-900 text-lg leading-tight truncate">
+                                  {member.name || "Unknown"}
+                                </h3>
+                                <div className="flex items-center gap-1.5 text-sm text-slate-500 mt-1">
+                                  {getRoleIcon(member.role || "")}
+                                  <span className="truncate">
+                                    {member.role || "Role not specified"}
+                                  </span>
+                                </div>
                               </div>
                             </div>
                           </div>
-                          <p className="text-sm text-muted-foreground mb-3 line-clamp-2">
-                            {member.bio || "No bio provided"}
-                          </p>
-                          <div className="space-y-2 mb-3">
-                            <div className="flex items-center justify-between text-xs">
-                              <span className="text-muted-foreground">
-                                Location:
-                              </span>
-                              <span>{member.location || "Not specified"}</span>
-                            </div>
-                            <div className="flex items-center justify-between text-xs">
-                              <span className="text-muted-foreground">
-                                Experience:
-                              </span>
-                              <span>
-                                {member.experience || "Not specified"}
-                              </span>
-                            </div>
-                            <div className="flex items-center justify-between text-xs">
-                              <span className="text-muted-foreground">
-                                Available:
-                              </span>
-                              <Badge variant="outline" className="text-xs h-5">
-                                {member.availability || "Not specified"}
-                              </Badge>
-                            </div>
-                          </div>
-                          <div className="mb-3">
-                            <p className="text-xs text-muted-foreground mb-1">
-                              Interested in:
+
+                          {/* Bio Section */}
+                          <div className="px-5 pb-4">
+                            <p className="text-sm text-slate-600 line-clamp-2 leading-relaxed">
+                              {member.bio || "No bio provided"}
                             </p>
-                            <div className="flex flex-wrap gap-1">
-                              {(member.interests || []).map((interest) => (
-                                <Badge
-                                  key={interest}
-                                  variant="outline"
-                                  className="text-xs h-5"
-                                >
-                                  {interest}
-                                </Badge>
-                              ))}
-                              {(!member.interests ||
-                                member.interests.length === 0) && (
-                                <span className="text-xs text-muted-foreground">
-                                  Not specified
+                          </div>
+
+                          {/* Skills Section - Premium Tags */}
+                          <div className="px-5 pb-4">
+                            <div className="flex flex-wrap gap-1.5">
+                              {(Array.isArray(member.skills) ? member.skills : [])
+                                .slice(0, 4)
+                                .map((skill) => (
+                                  <span
+                                    key={skill}
+                                    className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-slate-100 text-slate-700 border border-slate-200/60"
+                                  >
+                                    {skill}
+                                  </span>
+                                ))}
+                              {(Array.isArray(member.skills) ? member.skills : []).length > 4 && (
+                                <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-slate-50 text-slate-500 border border-slate-200/60">
+                                  +{(Array.isArray(member.skills) ? member.skills : []).length - 4}
                                 </span>
                               )}
                             </div>
                           </div>
-                          <div className="flex space-x-2">
+
+                          {/* Info Grid */}
+                          <div className="px-5 pb-4">
+                            <div className="grid grid-cols-2 gap-3 text-sm">
+                              <div className="flex items-center gap-2 text-slate-600">
+                                <MapPin className="w-4 h-4 text-slate-400 flex-shrink-0" />
+                                <span className="truncate">{member.location || "Remote"}</span>
+                              </div>
+                              <div className="flex items-center gap-2 text-slate-600">
+                                <Briefcase className="w-4 h-4 text-slate-400 flex-shrink-0" />
+                                <span className="truncate">{member.experience || "N/A"}</span>
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Availability & Interests */}
+                          <div className="px-5 pb-5">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-2">
+                                {member.availability ? (
+                                  <Badge 
+                                    variant="outline" 
+                                    className={`text-xs font-medium ${
+                                      member.availability.toLowerCase().includes("full") 
+                                        ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                                        : member.availability.toLowerCase().includes("part")
+                                          ? "border-amber-200 bg-amber-50 text-amber-700"
+                                          : "border-slate-200 bg-slate-50 text-slate-700"
+                                    }`}
+                                  >
+                                    <div className={`w-1.5 h-1.5 rounded-full mr-1.5 ${
+                                      member.availability.toLowerCase().includes("full")
+                                        ? "bg-emerald-500"
+                                        : member.availability.toLowerCase().includes("part")
+                                          ? "bg-amber-500"
+                                          : "bg-slate-400"
+                                    }`} />
+                                    {member.availability}
+                                  </Badge>
+                                ) : (
+                                  <Badge variant="outline" className="text-xs font-medium border-slate-200 bg-slate-50 text-slate-600">
+                                    <div className="w-1.5 h-1.5 rounded-full mr-1.5 bg-slate-400" />
+                                    Unknown
+                                  </Badge>
+                                )}
+                              </div>
+                              
+                              {(member.interests || []).length > 0 && (
+                                <div className="flex items-center gap-1 text-xs text-slate-500">
+                                  <Heart className="w-3.5 h-3.5 text-rose-400" />
+                                  <span>{member.interests.length} interests</span>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Action Button */}
+                          <div className="px-5 pb-5 pt-0">
                             <Button
-                              size="sm"
-                              className="flex-1"
-                              onClick={() => setSelectedMember(member)}
+                              size="default"
+                              className="w-full bg-gradient-to-r from-primary to-primary/90 hover:from-primary/95 hover:to-primary/85 text-white font-medium shadow-lg shadow-primary/20 transition-all duration-200 hover:shadow-xl hover:shadow-primary/30"
+                              onClick={() => viewTalentProfile(member)}
                             >
-                              <Mail className="w-4 h-4 mr-1" />
-                              View Profile
+                              View Full Profile
+                              <ExternalLink className="w-4 h-4 ml-2" />
                             </Button>
                           </div>
                         </CardContent>
@@ -1484,21 +1446,11 @@ export default function TeamMatching({ user, onNavigate }) {
                         </div>
                         <div className="flex flex-col gap-2 pt-3 border-t mt-auto">
                           <Button
-                            size="sm"
+                            variant="outline"
                             className="w-full"
                             onClick={() => {
-                              console.log(
-                                "🔍 [Talent] Clicked to view startup details:",
-                                {
-                                  title: idea.title,
-                                  founder: idea.founder,
-                                  founderId: idea.founderId,
-                                  hasFounderId: !!idea.founderId,
-                                  fullIdea: idea,
-                                },
-                              );
-                              setSelectedIdea(idea);
-                              setShowDetailsDialog(true);
+                              // Navigate to the new dedicated Startup Detail page
+                              onNavigate?.("startup-detail", { startup: idea });
                             }}
                           >
                             View Details
@@ -2553,38 +2505,6 @@ export default function TeamMatching({ user, onNavigate }) {
           </ScrollArea>
         </DialogContent>
       </Dialog>
-      <TalentProfileDetailsDialog
-        isOpen={selectedMember !== null}
-        onClose={() => setSelectedMember(null)}
-        talent={
-          selectedMember
-            ? {
-                id: selectedMember.id,
-                fullName: selectedMember.name,
-                professionalTitle: selectedMember.role,
-                location: selectedMember.location,
-                bio: selectedMember.bio,
-                skills: selectedMember.skills,
-                linkedinUrl: selectedMember.linkedinUrl,
-                githubUrl: selectedMember.githubUrl,
-                portfolioWebsite: selectedMember.portfolioWebsite,
-                workExperiences: selectedMember.workExperiences,
-                educationList: selectedMember.educationList,
-                certifications: selectedMember.certifications,
-                portfolioItems: selectedMember.portfolioItems,
-                availabilityStatus: selectedMember.availability,
-                preferredCommitment: selectedMember.preferredCommitment,
-                yearsOfExperience: selectedMember.experience,
-                email: selectedMember.email,
-                match: selectedMember.matchScore,
-                primaryRole: selectedMember.role,
-                interests: selectedMember.interests,
-                lookingFor: selectedMember.lookingFor,
-              }
-            : null
-        }
-        onInvite={handleSendInvitation}
-      />
       {showCompensationManager && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sv-modal-backdrop">
           <div className="sv-modal-panel flex h-[90vh] w-full max-w-6xl flex-col overflow-hidden rounded-[16px] border-0 bg-white shadow-modal">

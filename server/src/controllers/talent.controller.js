@@ -5,6 +5,7 @@ import Startup from "../models/Startup.js";
 import StartupPost from "../models/StartupPost.js";
 import FounderTalentInvitation from "../models/FounderTalentInvitation.js";
 import { error as apiError, success as apiSuccess } from "../utils/apiResponse.js";
+import { filterTalentProfilesForBrowse } from "../domain/talentBrowseCompletion.js";
 import { attachMatchScores } from "../utils/talentMatching.js";
 
 export const createOrUpdateProfile = async (req, res) => {
@@ -60,12 +61,22 @@ export const getProfile = async (req, res) => {
 };
 
 export const getProfiles = async (req, res) => {
-  const profiles = await TalentProfile.find({}).sort({ createdAt: -1 }).limit(100);
+  const raw = await TalentProfile.find({})
+    .sort({ createdAt: -1 })
+    .limit(100)
+    .populate({ path: "userId", select: "name email" })
+    .lean();
+  const profiles = filterTalentProfilesForBrowse(raw);
   return apiSuccess(res, profiles);
 };
 
 export const browseTalent = async (req, res) => {
-  const profiles = await TalentProfile.find({}).sort({ createdAt: -1 }).limit(100);
+  const raw = await TalentProfile.find({})
+    .sort({ createdAt: -1 })
+    .limit(100)
+    .populate({ path: "userId", select: "name email" })
+    .lean();
+  const profiles = filterTalentProfilesForBrowse(raw);
   return apiSuccess(res, profiles);
 };
 

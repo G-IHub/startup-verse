@@ -1,97 +1,100 @@
 import React, { useEffect, useRef, useState, useMemo } from "react";
-import { getSentInterests } from "../../utils/api/inboxApi";
+import { getSentInterests, getReceivedInvitations } from "../../utils/api/inboxApi";
 import { SimpleTeamMessaging } from "../office/SimpleTeamMessaging";
 import { MessageCircle } from "lucide-react";
-
-function buildRosterFromInterests(interests) {
-  const byFounder = new Map();
-  for (const interest of interests) {
-    const fid = String(interest.founderId?._id || interest.founderId || "");
-    if (!fid) continue;
-    const existing = byFounder.get(fid);
-    if (!existing || new Date(interest.createdAt) > new Date(existing.createdAt)) {
-      byFounder.set(fid, interest);
-    }
-  }
-  return Array.from(byFounder.values()).map((interest) => ({
-    id: String(interest.founderId?._id || interest.founderId || ""),
-    name: String(
-      interest.founderName ||
-        interest.founderId?.name ||
-        interest.startupTitle ||
-        "Founder"
-    ),
-    role: "founder",
-    title: String(interest.startupTitle || ""),
-    avatar: "",
-    isOnline: false,
-    status: "away",
-  }));
-}
+import { buildTalentChatRoster } from "../../utils/chatRosterBuilder";
+import { Button } from "../ui/button";
 
 export default function TalentChatPage({ user, onNavigate }) {
   const talentId = String(user._id ?? user.id ?? "");
 
-  // Raw interests — only fetched once on mount, never re-fetched on re-render.
-  const [rawInterests, setRawInterests] = useState(null); // null = not yet loaded
+  // Fetch both sent interests and received invitations
+  const [sentInterests, setSentInterests] = useState([]);
+  const [receivedInvitations, setReceivedInvitations] = useState([]);
+  const [loading, setLoading] = useState(true);
   const fetchedRef = useRef(false);
 
   useEffect(() => {
     if (!talentId || fetchedRef.current) return;
     fetchedRef.current = true;
-    getSentInterests(talentId)
-      .then((interests) => setRawInterests(Array.isArray(interests) ? interests : []))
-      .catch(() => setRawInterests([]));
+
+    const loadData = async () => {
+      try {
+        const [interests, invitations] = await Promise.all([
+          getSentInterests(talentId),
+          getReceivedInvitations(talentId),
+        ]);
+        setSentInterests(interests || []);
+        setReceivedInvitations(invitations || []);
+      } catch (err) {
+        console.warn("Failed to load chat connections:", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadData();
   }, [talentId]);
 
-  // Stable roster — only recomputes when the set of founder IDs actually changes.
+  // Build unified roster combining interests and invitations
   const roster = useMemo(() => {
-    if (!rawInterests) return [];
-    return buildRosterFromInterests(rawInterests);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [rawInterests?.map((i) => String(i.founderId?._id || i.founderId || "")).join(",")]);
+    return buildTalentChatRoster(talentId, sentInterests, receivedInvitations);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    talentId,
+    sentInterests.map((i) => String(i._id || i.id)).join(","),
+    receivedInvitations.map((i) => String(i._id || i.id)).join(","),
+  ]);
 
-  // Still loading
-  if (rawInterests === null) {
+  if (loading) {
     return (
-      <div className="flex h-full items-center justify-center bg-surface-page">
-        <div className="space-y-2 text-center">
-          <div className="mx-auto h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-          <p className="font-body text-sm text-text-muted">Loading chats...</p>
-        </div>
+      <div className="flex h-full w-full items-center justify-center bg-[#f4f5ff]">
+          <div className="space-y-3 text-center">
+            <div className="mx-auto h-10 w-10 animate-spin rounded-full border-3 border-[#3a5afe] border-t-transparent" />
+            <p className="font-body text-sm text-[#4a4a5a]">Loading your conversations...</p>
+          </div>
       </div>
     );
   }
 
-  // Loaded but empty
-  if (roster.length === 0) {
+  if (!loading && roster.length === 0) {
     return (
-      <div className="flex h-full items-center justify-center bg-surface-page">
-        <div className="max-w-xs space-y-3 px-4 text-center">
-          <MessageCircle className="mx-auto h-12 w-12 text-surface-border" />
-          <p className="font-body text-sm font-medium text-text-heading">No chats yet</p>
-          <p className="font-body text-xs text-text-muted">
-            Express interest in a startup to start chatting with the founder.
-          </p>
-        </div>
+      <div className="flex h-full w-full items-center justify-center bg-[#f4f5ff]">
+          <div className="max-w-sm space-y-4 px-6 text-center">
+            <div className="mx-auto w-16 h-16 rounded-[14px] bg-[#f4f5ff] flex items-center justify-center">
+              <MessageCircle className="h-8 w-8 text-[#a0a0b0]" />
+            </div>
+            <div>
+              <p className="font-heading text-lg font-semibold text-[#0d0d0d]">No chats yet</p>
+              <p className="font-body text-sm text-[#4a4a5a] mt-2 leading-relaxed">
+                Express interest in startups to connect with founders, or wait for startup invitations.
+              </p>
+            </div>
+            <Button
+              onClick={() => onNavigate?.("team-matching")}
+              className="mt-4 bg-[#3a5afe] hover:bg-[#304ffe] text-white rounded-[10px] px-6 py-2.5 font-body text-sm font-medium shadow-[0_4px_12px_rgba(58,90,254,0.25)] transition-all duration-200 ease"
+            >
+              Browse Startups
+            </Button>
+          </div>
       </div>
     );
   }
 
-  // SimpleTeamMessaging is mounted once and never torn down — parent re-renders
-  // don't affect the conversation state inside it.
   return (
-    <div className="h-full w-full bg-surface-page">
-      <SimpleTeamMessaging
-        fullPage
-        onClose={() => onNavigate?.("dashboard")}
-        currentUserId={talentId}
-        currentUserName={String(user.name || "")}
-        currentUserRole="talent"
-        startupId={null}
-        teamMembers={roster}
-        strictMode={false}
-      />
+    <div className="flex h-full w-full flex-col bg-[#f4f5ff]">
+      <div className="flex-1 overflow-hidden">
+        <SimpleTeamMessaging
+          fullPage
+          onClose={() => onNavigate?.("dashboard")}
+          currentUserId={talentId}
+          currentUserName={String(user.name || "")}
+          currentUserRole="talent"
+          startupId={null}
+          teamMembers={roster}
+          strictMode={false}
+        />
+      </div>
     </div>
   );
 }

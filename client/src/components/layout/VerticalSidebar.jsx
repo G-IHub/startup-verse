@@ -23,7 +23,6 @@ export default function VerticalSidebar({
   unreadCount = 0,
   notificationCount = 0,
   talentDashboardMode = "overview",
-  hasSentInterest = false,
   isOpen = false,
   onClose,
 }) {
@@ -54,8 +53,8 @@ export default function VerticalSidebar({
       badge: null,
       roles: ["founder", "talent"],
     },
-    // Chat icon — only for talents who have sent at least one interest
-    ...(user.role === "talent" && hasSentInterest
+    // Chat icon — for all talents
+    ...(user.role === "talent"
       ? [{
           id: "talent-chat",
           icon: MessageCircle,
@@ -126,9 +125,12 @@ export default function VerticalSidebar({
 
   const handleNavClick = (item) => {
     if (item.page) {
-      onPageChange(item.page, item.options);
-    }
-    if (item.view && onVirtualOfficeViewChange) {
+      const opts =
+        item.view != null
+          ? { ...item.options, officeView: item.view }
+          : item.options;
+      onPageChange(item.page, opts);
+    } else if (item.view && onVirtualOfficeViewChange) {
       onVirtualOfficeViewChange(item.view);
     }
     if (onClose) {

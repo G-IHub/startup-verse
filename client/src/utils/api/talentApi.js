@@ -4,7 +4,10 @@
  * Handles all API calls for Talent users to the backend.
  * Follows the same pattern as founderApi and teamMemberApi.
  */
+import { TALENT_BROWSE_MIN_COMPLETION } from "../../constants/talentProfile.js";
 import { API_BASE_URL } from "../../config/apiBase.js";
+import { augmentTalentBrowseFields } from "../talentBrowseNormalize.js";
+import { getTalentBrowseProfileCompletionPercent } from "../talentProfileCompletion.js";
 
 const API_BASE = API_BASE_URL;
 
@@ -150,6 +153,40 @@ export async function browseTalents(params = {}) {
   return apiCall(`/talent/browse${queryString}`, {
     method: "GET",
   });
+}
+
+/**
+ * Founder browse — normalizes TalentProfile fields for list cards (name, role, experience aliases).
+ * Pagination is client-shaped for usePagination; `/talent/browse` returns a flat array today.
+ */
+export async function getAllTalent(params = {}) {
+  const raw = await browseTalents(params);
+  const list = Array.isArray(raw?.data) ? raw.data : [];
+  const items = list
+    .filter(
+      (row) =>
+        getTalentBrowseProfileCompletionPercent(row) >=
+        TALENT_BROWSE_MIN_COMPLETION,
+    )
+    .map((row) => augmentTalentBrowseFields(row))
+    .filter(Boolean);
+  const page = Math.max(1, Number(params.page) || 1);
+  const pageSize = Math.max(1, Number(params.pageSize) || items.length || 12);
+  const total = items.length;
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
+  const start = (page - 1) * pageSize;
+  const slice = items.slice(start, start + pageSize);
+  return {
+    items: slice,
+    pagination: {
+      page,
+      pageSize,
+      total,
+      totalPages,
+      hasNext: page < totalPages,
+      hasPrev: page > 1,
+    },
+  };
 }
 
 // ==========================================

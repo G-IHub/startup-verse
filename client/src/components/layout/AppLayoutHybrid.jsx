@@ -124,6 +124,11 @@ export default function AppLayoutHybrid({
   const [unreadMessagesCount, setUnreadMessagesCount] = useState(0);
   const [hasSentInterest, setHasSentInterest] = useState(false);
   const pageMeta = resolvePageMeta(currentPage, user.role);
+  const normalizedPage = String(currentPage || "dashboard").split(":")[0];
+  const isInboxPage = normalizedPage === "inbox";
+  const isTeamDashboardPage =
+    normalizedPage === "dashboard" &&
+    (user.role === "team-member" || user.role === "team");
   const isWorkspacePage =
     currentPage === "startup-office" ||
     currentPage === "talent-chat" ||
@@ -319,7 +324,13 @@ export default function AppLayoutHybrid({
         />
       )}
       <div className="flex flex-1 flex-col overflow-hidden">
-        <header className="z-50 border-b border-surface-border bg-surface-card shadow-[0_1px_8px_rgba(0,0,0,0.05)] transition-shadow duration-200 ease-in-out">
+        <header
+          className={
+            isInboxPage || isTeamDashboardPage
+              ? "z-50 border-b border-[#e2e4f0] bg-white shadow-[0_1px_8px_rgba(0,0,0,0.05)] transition-shadow duration-200 ease-in-out"
+              : "z-50 border-b border-surface-border bg-surface-card shadow-[0_1px_8px_rgba(0,0,0,0.05)] transition-shadow duration-200 ease-in-out"
+          }
+        >
           <PageViewport>
             <div className="flex items-center gap-3 py-2">
               {user.role === "organization-admin" ? (
@@ -336,10 +347,22 @@ export default function AppLayoutHybrid({
               )}
               {user.role !== "organization-admin" ? (
                 <div className="min-w-0">
-                  <p className="truncate font-heading text-sm font-bold text-text-heading">
+                  <p
+                    className={
+                      isInboxPage || isTeamDashboardPage
+                        ? "truncate font-heading text-sm font-bold text-[#0d0d0d]"
+                        : "truncate font-heading text-sm font-bold text-text-heading"
+                    }
+                  >
                     {pageMeta.title}
                   </p>
-                  <p className="truncate font-body text-xs text-text-body">
+                  <p
+                    className={
+                      isInboxPage || isTeamDashboardPage
+                        ? "truncate font-body text-xs font-normal text-[#4a4a5a]"
+                        : "truncate font-body text-xs text-text-body"
+                    }
+                  >
                     {pageMeta.description}
                   </p>
                 </div>

@@ -9,7 +9,6 @@ import {
   Command,
   Filter,
   HelpCircle,
-  MessageCircle,
   Plus,
   PhoneCall,
   Sparkles,
@@ -28,7 +27,6 @@ import {
   DrawerTitle,
 } from "../ui/drawer";
 import { TaskManagementPanel } from "./TaskManagementPanel";
-import { SimpleTeamMessaging } from "./SimpleTeamMessaging";
 import { TeamHubPanel } from "./TeamHubPanel";
 import CalendarHubPanel from "./CalendarHubPanel";
 import MeetingScheduler from "../calendar/MeetingScheduler";
@@ -55,7 +53,6 @@ function getTaskBadgeVariant(status) {
 }
 
 function getPanelTitle(panelKey) {
-  if (panelKey === "chat") return "Team Chat";
   if (panelKey === "tasks") return "My Tasks";
   if (panelKey === "updates") return "Team Updates";
   if (panelKey === "calendar") return "Calendar";
@@ -63,7 +60,6 @@ function getPanelTitle(panelKey) {
 }
 
 function getPanelDescription(panelKey) {
-  if (panelKey === "chat") return "Message teammates without leaving the office.";
   if (panelKey === "tasks") return "Track assigned work and jump into task management.";
   if (panelKey === "updates") return "Announcements, wins, and team pulse in one place.";
   if (panelKey === "calendar") return "Upcoming timeline and meeting scheduling.";
@@ -332,8 +328,6 @@ export default function VirtualStartupOfficeWorkspaceV2({
   onTaskOpened,
   announcementToOpen,
   onAnnouncementOpened,
-  messageUserToOpen,
-  onMessageUserOpened,
   winToOpen,
   onWinOpened,
 }) {
@@ -344,7 +338,6 @@ export default function VirtualStartupOfficeWorkspaceV2({
   const announcements = useOfficeStore((s) => s.announcements);
   const wins = useOfficeStore((s) => s.wins);
   const panels = useOfficePanels();
-  const [selectedMessageUserId, setSelectedMessageUserId] = useState(null);
   const [mobileTaskManagerOpen, setMobileTaskManagerOpen] = useState(false);
   const [mobileMeetingSchedulerOpen, setMobileMeetingSchedulerOpen] = useState(false);
 
@@ -364,12 +357,6 @@ export default function VirtualStartupOfficeWorkspaceV2({
     onAnnouncementOpened?.();
   }, [announcementToOpen, onAnnouncementOpened, panels.openPanel]);
 
-  useEffect(() => {
-    if (!messageUserToOpen) return;
-    setSelectedMessageUserId(String(messageUserToOpen));
-    panels.openPanel("chat");
-    onMessageUserOpened?.();
-  }, [messageUserToOpen, onMessageUserOpened, panels.openPanel]);
 
   useEffect(() => {
     if (!winToOpen) return;
@@ -380,7 +367,6 @@ export default function VirtualStartupOfficeWorkspaceV2({
   const actionButtons = useMemo(
     () => [
       { key: "team-call", label: "Team Call", panel: "calendar", icon: PhoneCall },
-      { key: "chat", label: "Chat", panel: "chat", icon: MessageCircle },
       { key: "tasks", label: "Tasks", panel: "tasks", icon: Target },
       { key: "calendar", label: "Calendar", panel: "calendar", icon: CalendarDays },
       { key: "updates", label: "Updates", panel: "updates", icon: Sparkles },
@@ -392,6 +378,15 @@ export default function VirtualStartupOfficeWorkspaceV2({
   const roster = office.teamRoster.slice(0, 10);
   const upcomingAgenda = office.agenda.slice(0, 8);
   const myTasks = office.myTasks.slice(0, 8);
+  const unassignedByMilestone = office.unassignedByMilestone || [];
+  const unassignedTotal = useMemo(
+    () =>
+      unassignedByMilestone.reduce(
+        (sum, row) => sum + (Number(row.count) || 0),
+        0,
+      ),
+    [unassignedByMilestone],
+  );
   const now = new Date();
   const monthLabel = now.toLocaleDateString([], { month: "short", year: "numeric" });
   const monthGrid = buildMonthGrid(now);
@@ -562,8 +557,8 @@ export default function VirtualStartupOfficeWorkspaceV2({
               No team members yet.
             </div>
           ) : (
-            <div className="grid h-[164px] grid-cols-1">
-              {roster.slice(0, 1).map((member) => (
+            <div className="grid grid-cols-1 gap-3">
+              {roster.map((member) => (
                 <div
                   key={member.id}
                   className="h-fit rounded-[12px] border border-surface-border bg-surface-page p-4"
@@ -766,15 +761,32 @@ export default function VirtualStartupOfficeWorkspaceV2({
 
         <OfficePanelCard
           title="Your Tasks"
-          className="min-h-[208px] office-workspace-grid-bottom__tasks"
+          action={
+            user?.role === "founder" && unassignedTotal > 0 ? (
+              <span
+                className="inline-flex shrink-0 items-center gap-1 rounded-full border border-primary/18 bg-primary/[0.06] px-2.5 py-1 font-body text-[11px] font-semibold tabular-nums text-primary"
+                title="Unassigned tasks waiting for an owner"
+              >
+                {unassignedTotal}
+                {" unassigned"}
+              </span>
+            ) : null
+          }
+          className="min-h-[208px] office-workspace-grid-bottom__tasks border-primary/18"
         >
           {myTasks.length === 0 ? (
             <div className="flex min-h-[126px] flex-col items-center justify-center text-center">
               <CheckCircle2 className="h-4 w-4 text-surface-border" />
-              <p className="mt-1.5 font-heading text-[11px] font-semibold text-text-heading">No tasks yet</p>
+              <p className="mt-1.5 font-heading text-[11px] font-semibold text-text-heading">
+                {user?.role === "founder" && unassignedTotal > 0
+                  ? "Nothing assigned to you yet"
+                  : "No tasks yet"}
+              </p>
               <p className="font-body text-[10px] text-text-muted">
                 {user?.role === "founder"
-                  ? "Tasks from your milestones will appear here"
+                  ? unassignedTotal > 0
+                    ? "Unassigned work is listed below by milestone — assign it from the dashboard or task panel."
+                    : "Tasks assigned to you from milestones will appear here."
                   : "No tasks assigned to you yet"}
               </p>
             </div>
@@ -810,6 +822,32 @@ export default function VirtualStartupOfficeWorkspaceV2({
               ))}
             </div>
           )}
+          {user?.role === "founder" &&
+            unassignedByMilestone.length > 0 && (
+              <div className="mt-3 rounded-xl border border-primary/15 bg-[#fafbff] px-3 py-3">
+                <p className="font-heading text-[11px] font-semibold tracking-wide text-[#0d0d0d]">
+                  Needs assignment
+                </p>
+                <p className="mt-0.5 font-body text-[10px] leading-snug text-[#4a4a5a]">
+                  Unassigned tasks by milestone — open Task manager or founder dashboard to assign owners.
+                </p>
+                <div className="mt-2.5 flex flex-wrap gap-1.5">
+                  {unassignedByMilestone.map((row) => (
+                    <span
+                      key={row.milestoneId || row.milestoneName || "none"}
+                      className="inline-flex max-w-full items-center gap-1.5 rounded-full border border-primary/18 bg-white px-2.5 py-1 font-body text-[11px] shadow-[0_1px_2px_rgba(58,90,254,0.06)]"
+                    >
+                      <span className="truncate text-[#4a4a5a]" title={row.milestoneName}>
+                        {row.milestoneName}
+                      </span>
+                      <span className="shrink-0 rounded-full bg-primary/12 px-1.5 py-0.5 text-[10px] font-bold tabular-nums text-[#1a237e]">
+                        {row.count}
+                      </span>
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
           <button
             type="button"
             className="group mt-1 flex h-9 w-full cursor-pointer items-center justify-center gap-1.5 rounded-input border-0 bg-transparent font-body text-[13px] font-semibold text-primary transition-colors duration-200 ease-in-out hover:text-accent"
@@ -828,20 +866,6 @@ export default function VirtualStartupOfficeWorkspaceV2({
       >
         <HelpCircle className="h-5 w-5" />
       </button>
-
-      {!panels.isMobile && panels.isOpen("chat") && (
-        <SimpleTeamMessaging
-          onClose={() => panels.closePanel("chat")}
-          onStartCall={() => panels.openPanel("calendar")}
-          currentUserId={String(user._id ?? user.id ?? "")}
-          currentUserName={user.name}
-          currentUserRole={user.role}
-          startupId={office.startupId}
-          teamMembers={office.chatRoster}
-          initialSelectedUserId={selectedMessageUserId}
-          strictMode={true}
-        />
-      )}
 
       {!panels.isMobile && panels.isOpen("updates") && (
         <TeamHubPanel
@@ -939,6 +963,13 @@ export default function VirtualStartupOfficeWorkspaceV2({
 
               {panels.mobileSheet === "tasks" && (
                 <div className="space-y-3 pb-20">
+                  {myTasks.length === 0 && user?.role === "founder" && (
+                    <p className="text-[13px] text-muted-foreground px-1">
+                      {unassignedTotal > 0
+                        ? "No tasks assigned to you right now. Unassigned counts by milestone are below."
+                        : "No tasks assigned to you yet."}
+                    </p>
+                  )}
                   {myTasks.slice(0, 6).map((task) => (
                     <div
                       key={`sheet-task-${task.id}`}
@@ -953,6 +984,23 @@ export default function VirtualStartupOfficeWorkspaceV2({
                       </div>
                     </div>
                   ))}
+                  {user?.role === "founder" && unassignedByMilestone.length > 0 && (
+                    <div className="rounded-xl border border-primary/20 bg-muted/30 px-3 py-2.5">
+                      <p className="text-[12px] font-semibold text-foreground">Needs assignment</p>
+                      <div className="mt-2 flex flex-wrap gap-1.5">
+                        {unassignedByMilestone.map((row) => (
+                          <Badge
+                            key={row.milestoneId || row.milestoneName || "none"}
+                            variant="outline"
+                            className="border-primary/25 font-normal"
+                          >
+                            <span className="max-w-[140px] truncate">{row.milestoneName}</span>
+                            <span className="ml-1 tabular-nums font-semibold">{row.count}</span>
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                   <div className="sticky bottom-0 bg-background/95 backdrop-blur-sm border-t border-border pt-3">
                     <Button
                       type="button"

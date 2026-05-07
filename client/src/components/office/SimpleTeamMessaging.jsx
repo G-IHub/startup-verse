@@ -319,25 +319,25 @@ export function SimpleTeamMessaging({
   // ── Full-page two-pane layout (talent chat page) ──────────────────────────
   if (fullPage) {
     return (
-      <div className="flex h-full w-full overflow-hidden bg-surface-page">
+      <div className="flex h-full w-full overflow-hidden bg-[#f4f5ff]">
         {/* Left: conversation list */}
-        <div className="flex w-72 flex-shrink-0 flex-col bg-surface-card">
+        <div className="flex w-72 shrink-0 flex-col bg-white">
           <div className="px-4 py-3">
             <div className="relative">
-              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-muted" />
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#a0a0b0]" />
               <Input
                 placeholder="Search..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="h-9 border-0 bg-surface-page pl-9 font-body text-xs text-text-body placeholder:text-text-muted transition-colors duration-200 ease-in-out focus-visible:bg-primary-tint focus-visible:ring-0 rounded-input"
+                className="h-9 border-0 bg-[#f4f5ff] pl-9 font-body text-xs text-[#4a4a5a] placeholder:text-[#a0a0b0] transition-all duration-200 ease focus-visible:bg-[#e8ebff] focus-visible:ring-0 rounded-[10px]"
               />
             </div>
           </div>
           <ScrollArea className="flex-1">
             {filteredConversations.length === 0 ? (
               <div className="p-6 text-center">
-                <MessageSquare className="mx-auto mb-2 h-8 w-8 text-surface-border" />
-                <p className="font-body text-xs text-text-muted">
+                <MessageSquare className="mx-auto mb-2 h-8 w-8 text-[#a0a0b0]" />
+                <p className="font-body text-xs text-[#a0a0b0]">
                   {searchQuery ? "No conversations found" : "No contacts yet"}
                 </p>
               </div>
@@ -350,14 +350,14 @@ export function SimpleTeamMessaging({
                   key={member.id}
                   onClick={() => setSelectedConversation(member.id)}
                   className={cn(
-                    "flex cursor-pointer items-start gap-3 rounded-[10px] border-l-[3px] py-2 pl-2.5 pr-2 transition-colors duration-200 ease-in-out",
+                    "flex w-full cursor-pointer items-start gap-3 overflow-hidden rounded-[10px] border-l-[3px] py-2 pl-2.5 pr-2 transition-all duration-200 ease",
                     isSel
-                      ? "border-l-primary bg-primary-tint"
-                      : "border-l-transparent hover:bg-surface-page bg-transparent",
+                      ? "border-l-[#3a5afe] bg-[#e8ebff]"
+                      : "border-l-transparent hover:bg-[#f4f5ff] bg-transparent",
                   )}
                 >
                   <Avatar className="h-9 w-9 shrink-0 rounded-[10px]">
-                    <AvatarFallback className="rounded-[10px] bg-primary font-heading text-xs font-bold text-white">
+                    <AvatarFallback className="rounded-[10px] bg-[#3a5afe] font-heading text-xs font-bold text-white">
                       {String(member.name || member.id || "?")
                         .split(" ")
                         .map((n) => n[0])
@@ -366,37 +366,37 @@ export function SimpleTeamMessaging({
                         .toUpperCase()}
                     </AvatarFallback>
                   </Avatar>
-                  <div className="min-w-0 flex-1">
+                  <div className="w-0 flex-1">
                     <div className="mb-0.5 flex items-center justify-between">
                       <p className={cn(
                         "truncate font-body text-xs",
                         isSel
-                          ? "font-semibold text-primary"
+                          ? "font-semibold text-[#3a5afe]"
                           : cn(
-                              "font-medium text-text-heading",
+                              "font-semibold text-[#0d0d0d]",
                               conversation?.unreadCount > 0 && "font-semibold",
                             ),
                       )}>{member.id === currentUserId ? `${member.name} (You)` : member.name}</p>
                       {conversation?.lastMessageTime > 0 && (
-                        <p className="ml-1 shrink-0 font-body text-[10px] text-text-muted">
+                        <p className="ml-1 shrink-0 font-body text-[10px] text-[#a0a0b0]">
                           {formatMessageTime(conversation.lastMessageTime)}
                         </p>
                       )}
                     </div>
                     {conversation?.lastMessage ? (
-                      <div className="flex items-center gap-1">
+                      <div className="flex min-w-0 items-center gap-1 overflow-hidden">
                         <p className={cn(
-                          "flex-1 truncate font-body text-[11px]",
+                          "block w-full min-w-0 flex-1 basis-0 overflow-hidden text-ellipsis whitespace-nowrap font-body text-[11px]",
                           isSel
                             ? conversation.unreadCount > 0
-                              ? "font-semibold text-text-body"
-                              : "text-text-body"
+                              ? "font-semibold text-[#4a4a5a]"
+                              : "text-[#4a4a5a]"
                             : conversation.unreadCount > 0
-                              ? "font-semibold text-text-heading"
-                              : "text-text-muted",
-                        )}>{conversation.lastMessage}</p>
+                              ? "font-semibold text-[#0d0d0d]"
+                              : "text-[#a0a0b0]",
+                        )} title={conversation.lastMessage}>{conversation.lastMessage}</p>
                         {conversation.unreadCount > 0 && (
-                          <span className="flex h-4 min-w-[1rem] shrink-0 items-center justify-center rounded-pill bg-primary px-1 font-body text-[9px] font-bold text-white">
+                          <span className="flex h-4 min-w-4 shrink-0 items-center justify-center rounded-full bg-[#3a5afe] px-1 font-body text-[9px] font-bold text-white">
                             {conversation.unreadCount}
                           </span>
                         )}
@@ -404,7 +404,7 @@ export function SimpleTeamMessaging({
                     ) : (
                       <p className={cn(
                         "font-body text-[11px]",
-                        isSel ? "text-text-body" : "text-text-muted",
+                        isSel ? "text-[#4a4a5a]" : "text-[#a0a0b0]",
                       )}>{member.title || member.role || ""}</p>
                     )}
                   </div>
@@ -417,18 +417,18 @@ export function SimpleTeamMessaging({
         </div>
 
         {/* Right: chat area */}
-        <div className="flex flex-1 flex-col overflow-hidden bg-surface-page">
+        <div className="flex flex-1 flex-col overflow-hidden bg-[#f4f5ff]">
           {!selectedConversation ? (
-            <div className="flex h-full flex-col items-center justify-center bg-surface-page text-center">
-              <MessageSquare className="mb-3 h-12 w-12 text-surface-border" />
-              <p className="font-body text-sm text-text-muted">Select a conversation</p>
+            <div className="flex h-full flex-col items-center justify-center bg-[#f4f5ff] text-center">
+              <MessageSquare className="mb-3 h-12 w-12 text-[#a0a0b0]" />
+              <p className="font-body text-sm text-[#a0a0b0]">Select a conversation</p>
             </div>
           ) : (
             <>
               {/* Chat header */}
-              <div className="flex items-center gap-3 border-b border-surface-border bg-surface-card px-4 py-3">
+              <div className="flex items-center gap-3 border-b border-[#e2e4f0] bg-white px-4 py-3">
                 <Avatar className="h-8 w-8 rounded-[10px]">
-                  <AvatarFallback className="rounded-[10px] bg-primary font-heading text-[10px] font-bold text-white">
+                  <AvatarFallback className="rounded-[10px] bg-[#3a5afe] font-heading text-[10px] font-bold text-white">
                     {String(stableMembers.find((m) => m.id === selectedConversation)?.name || selectedConversation || "?")
                       .split(" ")
                       .map((n) => n[0])
@@ -438,24 +438,24 @@ export function SimpleTeamMessaging({
                   </AvatarFallback>
                 </Avatar>
                 <div>
-                  <p className="font-heading text-sm font-semibold text-text-heading">
+                  <p className="font-heading text-sm font-semibold text-[#0d0d0d]">
                     {(() => {
                       const name = stableMembers.find((m) => m.id === selectedConversation)?.name || "Unknown";
                       return selectedConversation === currentUserId ? `${name} (You)` : name;
                     })()}
                   </p>
-                  <p className="font-body text-xs text-text-body">
+                  <p className="font-body text-xs text-[#4a4a5a]">
                     {stableMembers.find((m) => m.id === selectedConversation)?.title || "Founder"}
                   </p>
                 </div>
               </div>
               {/* Messages */}
-              <div className="flex-1 overflow-hidden bg-surface-page">
-                <ScrollArea className="h-full bg-surface-page p-4">
+              <div className="flex-1 overflow-hidden bg-[#f4f5ff]">
+                <ScrollArea className="h-full bg-[#f4f5ff] p-4">
                   {messages.length === 0 ? (
                     <div className="flex h-full flex-col items-center justify-center py-12">
-                      <MessageSquare className="mb-3 h-12 w-12 text-surface-border" />
-                      <p className="font-body text-xs text-text-muted">No messages yet — say hi!</p>
+                      <MessageSquare className="mb-3 h-12 w-12 text-[#a0a0b0]" />
+                      <p className="font-body text-xs text-[#a0a0b0]">No messages yet — say hi!</p>
                     </div>
                   ) : (
                     <div className="space-y-4">
@@ -469,8 +469,8 @@ export function SimpleTeamMessaging({
                           <div key={message.id}>
                             {showDate && (
                               <div className="my-4 flex items-center justify-center">
-                                <div className="rounded-pill bg-surface-card px-3 py-1 shadow-soft">
-                                  <p className="font-body text-[10px] text-text-muted">
+                                <div className="rounded-full bg-white px-4 py-1.5 shadow-[0_2px_8px_rgba(0,0,0,0.06)]">
+                                  <p className="font-body text-[12px] font-medium text-[#a0a0b0]">
                                     {new Date(message.timestamp).toLocaleDateString("en-US", {
                                       month: "short", day: "numeric", year: "numeric",
                                     })}
@@ -482,7 +482,7 @@ export function SimpleTeamMessaging({
                               <div className={`flex max-w-[75%] items-end gap-2 ${ isMe ? "flex-row-reverse" : "flex-row" }`}>
                                 {!isMe && (
                                   <Avatar className="h-6 w-6 shrink-0 rounded-[10px]">
-                                    <AvatarFallback className="rounded-[10px] bg-primary font-heading text-[9px] font-bold text-white">
+                                    <AvatarFallback className="rounded-[10px] bg-[#3a5afe] font-heading text-[9px] font-bold text-white">
                                       {String(
                                         message.senderName ||
                                         stableMembers.find((m) => String(m.id) === String(message.senderId))?.name ||
@@ -493,15 +493,15 @@ export function SimpleTeamMessaging({
                                 )}
                                 <div>
                                   <div className={cn(
-                                    "rounded-2xl px-3 py-2 shadow-soft",
+                                    "px-3 py-2",
                                     isMe
-                                      ? "bg-primary-tint text-text-heading"
-                                      : "border border-surface-border bg-surface-card text-text-heading",
+                                      ? "bg-[#3a5afe] text-white rounded-[14px_14px_4px_14px] shadow-[0_2px_8px_rgba(58,90,254,0.18)]"
+                                      : "bg-white text-[#0d0d0d] rounded-[14px_14px_14px_4px] shadow-[0_2px_8px_rgba(0,0,0,0.06)]",
                                   )}>
-                                    <p className="break-words font-body text-[11px] leading-relaxed">{message.content}</p>
+                                    <p className="wrap-break-word font-body text-[11px] leading-relaxed">{message.content}</p>
                                   </div>
                                   <p className={cn(
-                                    "mt-1 font-body text-[9px] text-text-muted",
+                                    "mt-1 font-body text-[11px] text-[#a0a0b0]",
                                     isMe ? "text-right" : "text-left",
                                   )}>
                                     {formatMessageTime(message.timestamp)}
@@ -518,9 +518,20 @@ export function SimpleTeamMessaging({
                 </ScrollArea>
               </div>
               {/* Input */}
-              <div className="flex-shrink-0 border-t border-surface-border bg-surface-card p-3">
+              <div className="shrink-0 border-t border-[#e2e4f0] bg-white p-3">
                 <div className="flex items-center gap-2">
-                  <Button size="sm" variant="ghost" className="h-9 w-9 p-0 text-text-muted transition-colors duration-200 ease-in-out hover:bg-transparent hover:text-primary"
+                  <input
+                    type="file"
+                    ref={fileInputRef}
+                    onChange={handleFileSelect}
+                    className="hidden"
+                    accept="image/*,.pdf,.doc,.docx,.txt"
+                  />
+                  <Button size="sm" variant="ghost" className="h-9 w-9 p-0 text-[#a0a0b0] transition-all duration-200 ease hover:bg-transparent hover:text-[#3a5afe]"
+                    onClick={() => fileInputRef.current?.click()}>
+                    <Paperclip className="h-4 w-4" />
+                  </Button>
+                  <Button size="sm" variant="ghost" className="h-9 w-9 p-0 text-[#a0a0b0] transition-all duration-200 ease hover:bg-transparent hover:text-[#ffb300]"
                     onClick={() => setShowEmojiPicker(!showEmojiPicker)}>
                     <Smile className="h-4 w-4" />
                   </Button>
@@ -529,10 +540,10 @@ export function SimpleTeamMessaging({
                     value={messageInput}
                     onChange={(e) => setMessageInput(e.target.value)}
                     onKeyPress={handleKeyPress}
-                    className="h-9 flex-1 border-0 bg-surface-page font-body text-xs text-text-heading placeholder:text-text-muted focus-visible:ring-0 rounded-input"
+                    className="h-9 flex-1 border-0 bg-[#f4f5ff] font-body text-xs text-[#0d0d0d] placeholder:text-[#a0a0b0] focus-visible:bg-[#e8ebff] focus-visible:ring-0 rounded-[10px] transition-all duration-200 ease"
                   />
                   <Button size="sm" onClick={sendMessage} disabled={!messageInput.trim()}
-                    className="h-9 w-9 rounded-input bg-primary p-0 text-white shadow-[0_4px_12px_rgba(58,90,254,0.20)] transition-colors duration-200 ease-in-out hover:bg-primary-hover disabled:opacity-50">
+                    className="h-9 w-9 rounded-[10px] bg-[#3a5afe] p-0 text-white shadow-[0_4px_12px_rgba(58,90,254,0.25)] transition-all duration-200 ease hover:bg-[#304ffe] disabled:opacity-50">
                     <Send className="h-4 w-4" />
                   </Button>
                 </div>
@@ -612,7 +623,7 @@ export function SimpleTeamMessaging({
                   <motion.div
                     key={member.id}
                     onClick={() => setSelectedConversation(member.id)}
-                    className="flex items-start gap-3 px-4 py-3 cursor-pointer border-b border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+                    className="flex w-full items-start gap-3 overflow-hidden px-4 py-3 cursor-pointer border-b border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
                   >
                     <div className="relative flex-shrink-0">
                       <Avatar className="w-10 h-10">
@@ -629,7 +640,7 @@ export function SimpleTeamMessaging({
                         <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 rounded-full border-2 border-white dark:border-gray-900" />
                       )}
                     </div>
-                    <div className="flex-1 min-w-0">
+                    <div className="w-0 flex-1">
                       <div className="flex items-center justify-between mb-0.5">
                         <p
                           className={`text-xs truncate ${conversation && conversation.unreadCount > 0 ? "font-bold text-gray-900 dark:text-white" : "font-medium text-gray-900 dark:text-white"}`}
@@ -643,9 +654,10 @@ export function SimpleTeamMessaging({
                         )}
                       </div>
                       {conversation && conversation.lastMessage ? (
-                        <div className="flex items-center gap-2">
+                        <div className="flex min-w-0 items-center gap-2 overflow-hidden">
                           <p
-                            className={`text-[11px] truncate flex-1 ${conversation.unreadCount > 0 ? "font-semibold text-gray-900 dark:text-white" : "text-gray-600 dark:text-gray-400"}`}
+                            className={`block w-full min-w-0 flex-1 basis-0 overflow-hidden text-ellipsis whitespace-nowrap text-[11px] ${conversation.unreadCount > 0 ? "font-semibold text-gray-900 dark:text-white" : "text-gray-600 dark:text-gray-400"}`}
+                            title={conversation.lastMessage}
                           >
                             {conversation.lastMessage}
                           </p>

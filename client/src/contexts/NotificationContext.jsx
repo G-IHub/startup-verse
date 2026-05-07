@@ -9,7 +9,7 @@ import { API_BASE_URL } from "../config/apiBase.js";
 import { toast } from "sonner";
 import { useAuth } from "./AuthContext";
 import { normalizeNotificationType } from "../utils/notificationType.js";
-import { subscribeToUnreadCount } from "../utils/socketIoRealtime.js";
+import { subscribeToUnreadCount, subscribeToInterests, subscribeToInvitations } from "../utils/socketIoRealtime.js";
 
 const NotificationContext = createContext(undefined);
 
@@ -227,11 +227,67 @@ export function NotificationProvider({ children }) {
       fetchNotifications();
     });
 
+    // Subscribe to interest events for real-time inbox updates
+    const unsubInterests = subscribeToInterests(user.id, (event) => {
+      if (event.action === "created") {
+        // Show toast notification for new interest received
+        if (user?.role === "founder") {
+          toast.info("New talent interest", {
+            description: "A talent expressed interest in your startup",
+            action: {
+              label: "View",
+              onClick: () => window.location.assign("/inbox"),
+            },
+          });
+        }
+        // Refresh notifications to update badge count
+        fetchNotifications();
+      } else if (event.action === "updated") {
+        // Interest status changed (accepted/declined)
+        const { interest } = event;
+        if (interest?.status === "accepted" && user?.role === "talent") {
+          toast.success("Interest accepted!", {
+            description: "A founder accepted your interest. You are now a team member!",
+          });
+        }
+        fetchNotifications();
+      }
+    });
+
+    // Subscribe to invitation events for real-time inbox updates
+    const unsubInvitations = subscribeToInvitations(user.id, (event) => {
+      if (event.action === "created") {
+        // Show toast notification for new invitation received
+        if (user?.role === "talent") {
+          toast.info("New invitation from founder", {
+            description: "A founder invited you to join their startup",
+            action: {
+              label: "View",
+              onClick: () => window.location.assign("/inbox"),
+            },
+          });
+        }
+        // Refresh notifications to update badge count
+        fetchNotifications();
+      } else if (event.action === "updated") {
+        // Invitation status changed (accepted/declined)
+        const { invitation } = event;
+        if (invitation?.status === "accepted" && user?.role === "founder") {
+          toast.success("Invitation accepted!", {
+            description: "A talent accepted your invitation. They are now a team member!",
+          });
+        }
+        fetchNotifications();
+      }
+    });
+
     return () => {
       clearInterval(interval);
       unsubRealtime?.();
+      unsubInterests?.();
+      unsubInvitations?.();
     };
-  }, [user?.id, backendAvailable, fetchNotifications, fetchPreferences]);
+  }, [user?.id, user?.role, backendAvailable, fetchNotifications, fetchPreferences]);
 
   const addNotification = async (notification) => {
     if (!user?.id || !backendAvailable) {

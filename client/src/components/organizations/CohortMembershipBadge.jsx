@@ -75,7 +75,10 @@ export default function CohortMembershipBadge({ startupId }) {
                       variant="secondary"
                       className="text-[7px] px-1 py-0 flex-shrink-0"
                     >
-                      {membership.organization.type.replace("-", " ")}
+                      {(membership.organization.type || "accelerator").replace(
+                        "-",
+                        " ",
+                      )}
                     </Badge>
                   </div>
                   <div className="flex items-center gap-1 mt-1 text-[8px] text-muted-foreground">

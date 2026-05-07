@@ -12,6 +12,7 @@ import {
   Building2,
   Users,
   Plus,
+  ArrowRight,
   Settings,
   LayoutGrid,
   FileText,
@@ -47,6 +48,7 @@ import PortfolioOverview from "../organizations/PortfolioOverview";
 import ProgramMilestones from "../organizations/ProgramMilestones";
 import CohortAnalyticsDashboard from "../organizations/CohortAnalyticsDashboard";
 import OrganizationAgenda from "../organizations/OrganizationAgenda";
+
 export default function OrganizationDashboard({
   user,
   onLogout,
@@ -57,6 +59,9 @@ export default function OrganizationDashboard({
   const [cohorts, setCohorts] = useState([]);
   const [selectedCohort, setSelectedCohort] = useState(null);
   const [showCreateOrgModal, setShowCreateOrgModal] = useState(false);
+
+  const dashboardUserId = String(user._id ?? user.id ?? "");
+
   const [showCreateCohortModal, setShowCreateCohortModal] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
   const [cohortToDelete, setCohortToDelete] = useState(null);
@@ -72,22 +77,22 @@ export default function OrganizationDashboard({
   };
   useEffect(() => {
     loadOrganizations();
-  }, [user.id]);
+  }, [dashboardUserId]);
   useEffect(() => {
     if (selectedOrg) {
       loadCohorts(selectedOrg.id);
       // Check admin status asynchronously
-      isOrganizationAdmin(user.id, selectedOrg.id).then(setIsAdmin);
+      isOrganizationAdmin(dashboardUserId, selectedOrg.id).then(setIsAdmin);
     } else {
       // Clear cohorts and admin status if no org selected
       setCohorts([]);
       setSelectedCohort(null);
       setIsAdmin(false);
     }
-  }, [selectedOrg, user.id]);
+  }, [selectedOrg, dashboardUserId]);
   const loadOrganizations = async () => {
     try {
-      const orgs = await getUserOrganizations(user.id);
+      const orgs = await getUserOrganizations(dashboardUserId);
       setOrganizations(orgs);
 
       // Auto-select first org if none selected
@@ -191,7 +196,7 @@ export default function OrganizationDashboard({
         "📡 FRONTEND: Calling backend DELETE API for cohort:",
         cohort.id,
       );
-      const response = await deleteCohort(cohort.id, user.id);
+      const response = await deleteCohort(cohort.id, dashboardUserId);
       console.log("✅ FRONTEND: Backend deletion response:", response);
 
       // STEP 7: Wait for backend to process
@@ -241,7 +246,7 @@ export default function OrganizationDashboard({
         <CreateOrganizationModal
           isOpen={showCreateOrgModal}
           onClose={() => setShowCreateOrgModal(false)}
-          userId={user.id}
+          userId={dashboardUserId}
           onSuccess={() => {
             loadOrganizations();
           }}
@@ -268,7 +273,10 @@ export default function OrganizationDashboard({
                                   {selectedOrg.name}
                                 </CardTitle>
                                 <Badge variant="outline" className="text-xs">
-                                  {selectedOrg.type.replace("-", " ")}
+                                  {(selectedOrg.type || "accelerator").replace(
+                                    "-",
+                                    " ",
+                                  )}
                                 </Badge>
                                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
                                   <LayoutGrid className="w-4 h-4" />
@@ -315,25 +323,48 @@ export default function OrganizationDashboard({
                         )}
                       </Card>
                       {cohorts.length === 0 ? (
-                        <Card>
-                          <CardContent className="p-12 text-center">
-                            <Users className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-                            <h3 className="text-sm font-semibold mb-2">
-                              No Cohorts Yet
-                            </h3>
-                            <p className="text-sm text-muted-foreground mb-4">
-                              Create a cohort to start inviting and managing
-                              startups
-                            </p>
-                            {isAdmin && (
-                              <Button
-                                onClick={() => setShowCreateCohortModal(true)}
-                                className="h-9 text-sm"
-                              >
-                                <Plus className="w-4 h-4 mr-2" />
-                                Create First Cohort
-                              </Button>
-                            )}
+                        <Card className="border-border/70 shadow-sm">
+                          <CardContent className="p-6 md:p-8">
+                            <div className="rounded-2xl border border-border/60 bg-gradient-to-br from-card to-muted/30 p-6 md:p-8">
+                              <div className="mx-auto max-w-2xl text-center">
+                                <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-primary/10 text-primary">
+                                  <Users className="h-7 w-7" />
+                                </div>
+                                <h3 className="text-lg font-semibold text-foreground">
+                                  Launch your first cohort
+                                </h3>
+                                <p className="mt-2 text-sm text-muted-foreground">
+                                  Cohorts let you invite startups, track execution, and manage
+                                  outcomes in one workspace.
+                                </p>
+
+                                <div className="mt-6 flex flex-col items-center justify-center gap-3 sm:flex-row">
+                                  <Button
+                                    onClick={() => setShowCreateCohortModal(true)}
+                                    className="h-10 min-w-[190px] text-sm"
+                                    disabled={!isAdmin}
+                                  >
+                                    <Plus className="mr-2 h-4 w-4" />
+                                    Create First Cohort
+                                    <ArrowRight className="ml-2 h-4 w-4" />
+                                  </Button>
+                                  <Button
+                                    variant="outline"
+                                    className="h-10 min-w-[170px] text-sm"
+                                    onClick={() => setCurrentView("settings")}
+                                  >
+                                    Open Settings
+                                  </Button>
+                                </div>
+
+                                {!isAdmin ? (
+                                  <p className="mt-3 text-xs text-muted-foreground">
+                                    You are currently in observer mode. Ask an organization admin
+                                    to grant cohort management access.
+                                  </p>
+                                ) : null}
+                              </div>
+                            </div>
                           </CardContent>
                         </Card>
                       ) : (
@@ -508,7 +539,7 @@ export default function OrganizationDashboard({
                   organizationId={selectedOrg.id}
                   organizationName={selectedOrg.name}
                   organizationType={selectedOrg.type}
-                  userId={user.id}
+                  userId={dashboardUserId}
                   userName={user.name}
                   user={user}
                   onLogout={onLogout}
@@ -523,7 +554,7 @@ export default function OrganizationDashboard({
       <CreateOrganizationModal
         isOpen={showCreateOrgModal}
         onClose={() => setShowCreateOrgModal(false)}
-        userId={user.id}
+        userId={dashboardUserId}
         onSuccess={() => {
           loadOrganizations();
           setShowCreateOrgModal(false);
@@ -535,7 +566,7 @@ export default function OrganizationDashboard({
           onClose={() => setShowCreateCohortModal(false)}
           organizationId={selectedOrg.id}
           organizationName={selectedOrg.name}
-          userId={user.id}
+          userId={dashboardUserId}
           onSuccess={() => {
             loadCohorts(selectedOrg.id);
             setShowCreateCohortModal(false);

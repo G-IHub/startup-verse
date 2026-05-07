@@ -2,6 +2,15 @@ import "./styles/globals.css";
 import "./utils/earlyErrorSuppression";
 
 import { useState, useEffect, lazy, Suspense } from "react";
+import {
+  Routes,
+  Route,
+  Navigate,
+  Outlet,
+  useNavigate,
+  useLocation,
+  useParams,
+} from "react-router-dom";
 import LoginPage from "./components/LoginPage";
 import ChooseYourPathPage from "./components/ChooseYourPathPage";
 import { Toaster } from "./components/ui/sonner";
@@ -19,12 +28,15 @@ import {
   APP_VIEWS,
   buildFounderProfile,
   buildTalentProfile,
+  resolveDashboardIntent,
   resolveInitialView,
   upsertStoredRecord,
   getAccessToken,
 } from "./app/session";
-
-// Lazy-loaded route components
+import {
+  dashboardIntentToPath,
+  DASHBOARD_ROUTE_PATHS,
+} from "./app/dashboardPaths";
 const DashboardHybrid = lazy(() => import("./components/DashboardHybrid"));
 const ProfileCompletionModal = lazy(
   () => import("./components/ProfileCompletionModal"),
@@ -109,12 +121,106 @@ const LoadingSpinner = () => (
   </div>
 );
 
+function BootstrapLegacyDashboardQuery() {
+  const { user, isLoading } = useAuth();
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  useEffect(() => {
+    if (isLoading || !user) return;
+    const params = new URLSearchParams(location.search || "");
+    const legacy =
+      params.has("dashboardPage") ||
+      params.has("officeView") ||
+      params.has("page") ||
+      params.get("view") === "virtual-office" ||
+      params.get("tab") === "inbox";
+    if (!legacy || location.pathname !== "/") return;
+    const intent = resolveDashboardIntent(location);
+    const path = dashboardIntentToPath(intent, user.role);
+    if (path) navigate(path, { replace: true });
+  }, [user, isLoading, location.pathname, location.search, navigate]);
+
+  return null;
+}
+
+function RequireDashboard() {
+  const { user, isLoading } = useAuth();
+  const [founderStartupOk, setFounderStartupOk] = useState(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function run() {
+      if (!user?.onboardingComplete) {
+        setFounderStartupOk(null);
+        return;
+      }
+      if (user.role !== "founder") {
+        setFounderStartupOk(true);
+        return;
+      }
+      const fid = String(user._id ?? user.id ?? "");
+      if (!fid) {
+        setFounderStartupOk(true);
+        return;
+      }
+      try {
+        const startup = await founderApi.getFounderStartupSafe(fid);
+        if (!cancelled) setFounderStartupOk(Boolean(startup));
+      } catch {
+        if (!cancelled) setFounderStartupOk(false);
+      }
+    }
+    run();
+    return () => {
+      cancelled = true;
+    };
+  }, [user]);
+
+  if (isLoading) return <LoadingSpinner />;
+  if (!user) return <Navigate to="/" replace />;
+  if (!user.onboardingComplete) return <Navigate to="/onboarding" replace />;
+
+  if (user.role === "founder" && user.onboardingComplete) {
+    if (founderStartupOk === null) return <LoadingSpinner />;
+    if (!founderStartupOk) return <Navigate to="/onboarding" replace />;
+  }
+
+  return <Outlet />;
+}
+
+function JoinMeetingRoute() {
+  const { roomName } = useParams();
+
+  return (
+    <Suspense fallback={<LoadingSpinner />}>
+      <JoinMeetingPage roomName={roomName || ""} />
+    </Suspense>
+  );
+}
+
+function UnknownPathFallback() {
+  const { isLoading: authLoading, user: u } = useAuth();
+  const nav = useNavigate();
+
+  useEffect(() => {
+    if (authLoading) return;
+    if (u && !u.onboardingComplete) nav("/onboarding", { replace: true });
+    else if (u?.onboardingComplete) nav("/home", { replace: true });
+    else nav("/", { replace: true });
+  }, [authLoading, u, nav]);
+
+  return <LoadingSpinner />;
+}
+
 // ---------------------------------------------------------------------------
 // Main app content
 // ---------------------------------------------------------------------------
 
 function AppContent() {
-  const { user, setUser, login, logout } = useAuth();
+  const { user, setUser, login, logout, isLoading: authLoading } = useAuth();
+  const navigate = useNavigate();
+  const location = useLocation();
   const [currentView, setCurrentView] = useState(APP_VIEWS.landing);
   const [invitationToken, setInvitationToken] = useState(null);
   /** null = resolving, 'cohort' | 'talent' | 'error' */
@@ -130,10 +236,24 @@ function AppContent() {
     return () => window.clearTimeout(timer);
   }, []);
 
-  // Resolve initial view from URL or persisted session
+  // Resolve initial marketing / shell view (URL-based dashboard uses separate routes).
   useEffect(() => {
     const initializeApp = async () => {
-      const urlView = resolveInitialView();
+      if (authLoading) return;
+
+      const pathname = location.pathname || "/";
+
+      if (
+        pathname.startsWith("/join/") ||
+        pathname === "/mentor/login" ||
+        DASHBOARD_ROUTE_PATHS.includes(pathname) ||
+        pathname === "/onboarding"
+      ) {
+        setIsLoading(false);
+        return;
+      }
+
+      const urlView = resolveInitialView(location);
 
       if (urlView === APP_VIEWS.admin) {
         if (user) {
@@ -146,7 +266,7 @@ function AppContent() {
       }
 
       if (urlView === APP_VIEWS.invitation) {
-        const token = new URLSearchParams(window.location.search).get(
+        const token = new URLSearchParams(location.search || "").get(
           "invitation",
         );
         setInvitationToken(token);
@@ -161,49 +281,35 @@ function AppContent() {
         return;
       }
 
-      // Restore existing session from server (via cookie)
-      // AuthContext already loads user on mount via /api/auth/me
-      // Just need to determine the correct view
-      if (user) {
-        let nextView = user.onboardingComplete
-          ? APP_VIEWS.dashboard
-          : APP_VIEWS.profileSetup;
-        if (user.role === "founder" && user.onboardingComplete) {
+      if (
+        user &&
+        (pathname === "/" || pathname === "") &&
+        !resolveInitialView(location)
+      ) {
+        let nextPath = "/home";
+        if (!user.onboardingComplete) {
+          nextPath = "/onboarding";
+        } else if (user.role === "founder") {
           const fid = String(user._id ?? user.id);
           if (fid) {
             const startup = await founderApi.getFounderStartupSafe(fid);
-            if (!startup) nextView = APP_VIEWS.profileSetup;
+            if (!startup) nextPath = "/onboarding";
           }
         }
-        setCurrentView(nextView);
+        navigate(nextPath, { replace: true });
+        setIsLoading(false);
+        return;
+      }
+
+      if (!user) {
+        setCurrentView(APP_VIEWS.landing);
       }
 
       setIsLoading(false);
     };
 
     initializeApp();
-  }, [user]);
-
-  // Guard: sync view with onboarding state
-  useEffect(() => {
-    if (!user) return;
-    if (!user.onboardingComplete && currentView === APP_VIEWS.dashboard) {
-      setCurrentView(APP_VIEWS.profileSetup);
-      return;
-    }
-    if (user.onboardingComplete && currentView === APP_VIEWS.profileSetup) {
-      if (user.role === "founder") {
-        const fid = String(user._id ?? user.id);
-        if (fid) {
-          founderApi.getFounderStartupSafe(fid).then((startup) => {
-            if (startup) setCurrentView(APP_VIEWS.dashboard);
-          });
-          return;
-        }
-      }
-      setCurrentView(APP_VIEWS.dashboard);
-    }
-  }, [user, currentView]);
+  }, [user, authLoading, navigate, location]);
 
   useEffect(() => {
     if (currentView !== APP_VIEWS.invitation || !invitationToken) {
@@ -250,7 +356,7 @@ function AppContent() {
     } catch {
       /* session unchanged */
     }
-    setCurrentView(APP_VIEWS.dashboard);
+    navigate("/home", { replace: true });
   };
 
   // ---------------------------------------------------------------------------
@@ -277,15 +383,13 @@ function AppContent() {
         ) {
           const fid = String(currentUser._id ?? currentUser.id);
           founderApi.getFounderStartupSafe(fid).then((startup) => {
-            setCurrentView(
-              startup ? APP_VIEWS.dashboard : APP_VIEWS.profileSetup,
-            );
+            navigate(startup ? "/home" : "/onboarding", { replace: true });
           });
         } else {
-          setCurrentView(APP_VIEWS.dashboard);
+          navigate("/home", { replace: true });
         }
       } else {
-        setCurrentView(APP_VIEWS.profileSetup);
+        navigate("/onboarding", { replace: true });
       }
       return;
     }
@@ -305,18 +409,20 @@ function AppContent() {
     }
 
     window.history.replaceState({}, document.title, window.location.pathname);
-    setCurrentView(APP_VIEWS.dashboard);
+    navigate("/home", { replace: true });
   };
 
   const handleLogout = () => {
     logout();
     setCurrentView(APP_VIEWS.landing);
+    navigate("/", { replace: true });
   };
 
   const handleUpdateUser = async (updatedUser) => {
     if (!updatedUser) {
       logout();
       setCurrentView(APP_VIEWS.landing);
+      navigate("/", { replace: true });
       return;
     }
 
@@ -354,16 +460,21 @@ function AppContent() {
     }
   };
 
-  // ---------------------------------------------------------------------------
-  // Render
-  // ---------------------------------------------------------------------------
+  const dashboardHybridElement =
+    user ? (
+      <Suspense fallback={<LoadingSpinner />}>
+        <DashboardHybrid
+          user={user}
+          onLogout={handleLogout}
+          onUpdateUser={handleUpdateUser}
+        />
+      </Suspense>
+    ) : (
+      <LoadingSpinner />
+    );
 
-  if (isLoading) {
-    return <LoadingSpinner />;
-  }
-
-  return (
-    <div className="min-h-screen bg-background">
+  const marketingTree = (
+    <>
       {currentView === APP_VIEWS.home && (
         <Suspense fallback={<LoadingSpinner />}>
           <DualPathHomePage
@@ -408,17 +519,17 @@ function AppContent() {
               user: completedUser,
               accessToken: accessToken || getAccessToken(),
             });
-            let nextView = APP_VIEWS.dashboard;
+            let nextPath = "/home";
             if (!completedUser.onboardingComplete) {
-              nextView = APP_VIEWS.profileSetup;
+              nextPath = "/onboarding";
             } else if (completedUser.role === "founder") {
               const fid = String(completedUser._id ?? completedUser.id);
               if (fid) {
                 const startup = await founderApi.getFounderStartupSafe(fid);
-                if (!startup) nextView = APP_VIEWS.profileSetup;
+                if (!startup) nextPath = "/onboarding";
               }
             }
-            setCurrentView(nextView);
+            navigate(nextPath, { replace: true });
           }}
         />
       )}
@@ -439,7 +550,7 @@ function AppContent() {
         <Suspense fallback={<LoadingSpinner />}>
           <TalentWaitlistPage
             onBack={() =>
-              setCurrentView(user ? APP_VIEWS.dashboard : APP_VIEWS.landing)
+              navigate(user ? "/home" : "/", { replace: true })
             }
           />
         </Suspense>
@@ -490,7 +601,8 @@ function AppContent() {
               onCohortResolved={handleCohortInvitationResolved}
               onCancel={() => {
                 clearInvitationQuery();
-                setCurrentView(user ? APP_VIEWS.dashboard : APP_VIEWS.landing);
+                if (user) navigate("/home", { replace: true });
+                else setCurrentView(APP_VIEWS.landing);
               }}
             />
           </Suspense>
@@ -516,50 +628,6 @@ function AppContent() {
         </div>
       )}
 
-      {currentView === APP_VIEWS.dashboard && user && (
-        <Suspense fallback={<LoadingSpinner />}>
-          <DashboardHybrid
-            user={user}
-            onLogout={handleLogout}
-            onUpdateUser={handleUpdateUser}
-          />
-        </Suspense>
-      )}
-
-      {currentView === APP_VIEWS.profileSetup && user && (
-        <Suspense fallback={<LoadingSpinner />}>
-          <ProfileCompletionModal
-            role={user.role}
-            user={user}
-            onUpdateUser={handleUpdateUser}
-            onComplete={() => setCurrentView(APP_VIEWS.dashboard)}
-            onClose={async () => {
-              if (user?.role === "founder") {
-                const fid = String(user._id ?? user.id);
-                if (fid) {
-                  const startup = await founderApi.getFounderStartupSafe(fid);
-                  if (!startup) {
-                    toast.error(
-                      "Complete startup profile (including startup name and type) before continuing.",
-                    );
-                    return;
-                  }
-                }
-              }
-              setCurrentView(APP_VIEWS.dashboard);
-            }}
-          />
-        </Suspense>
-      )}
-
-      {currentView === APP_VIEWS.joinMeeting && (
-        <Suspense fallback={<LoadingSpinner />}>
-          <JoinMeetingPage
-            roomName={window.location.pathname.split("/join/")[1] || ""}
-          />
-        </Suspense>
-      )}
-
       {currentView === APP_VIEWS.admin && user && (
         <Suspense fallback={<LoadingSpinner />}>
           <AdminDashboardRealTime />
@@ -571,7 +639,69 @@ function AppContent() {
           <MentorLogin />
         </Suspense>
       )}
+    </>
+  );
 
+  const onboardingRouteElement =
+    user ? (
+      <Suspense fallback={<LoadingSpinner />}>
+        <ProfileCompletionModal
+          variant="page"
+          role={user.role}
+          user={user}
+          onUpdateUser={handleUpdateUser}
+          onComplete={() => navigate("/home", { replace: true })}
+          onClose={async () => {
+            if (user?.role === "founder") {
+              const fid = String(user._id ?? user.id);
+              if (fid) {
+                const startup = await founderApi.getFounderStartupSafe(fid);
+                if (!startup) {
+                  toast.error(
+                    "Complete startup profile (including startup name and type) before continuing.",
+                  );
+                  return;
+                }
+              }
+            }
+            navigate("/home", { replace: true });
+          }}
+        />
+      </Suspense>
+    ) : (
+      <Navigate to="/" replace />
+    );
+
+  // ---------------------------------------------------------------------------
+  // Render
+  // ---------------------------------------------------------------------------
+
+  if (isLoading || authLoading) {
+    return <LoadingSpinner />;
+  }
+
+  return (
+    <div className="min-h-screen bg-background">
+      <BootstrapLegacyDashboardQuery />
+      <Routes>
+        <Route path="/join/:roomName" element={<JoinMeetingRoute />} />
+        <Route
+          path="/mentor/login"
+          element={
+            <Suspense fallback={<LoadingSpinner />}>
+              <MentorLogin />
+            </Suspense>
+          }
+        />
+        <Route path="/onboarding" element={onboardingRouteElement} />
+        <Route element={<RequireDashboard />}>
+          {DASHBOARD_ROUTE_PATHS.map((p) => (
+            <Route key={p} path={p} element={dashboardHybridElement} />
+          ))}
+        </Route>
+        <Route path="/" element={marketingTree} />
+        <Route path="*" element={<UnknownPathFallback />} />
+      </Routes>
       <Toaster />
     </div>
   );

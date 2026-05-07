@@ -1,13 +1,12 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useIsMobile } from "../../../components/ui/use-mobile";
 
-const PANEL_KEYS = ["chat", "tasks", "updates", "calendar"];
+const PANEL_KEYS = ["tasks", "updates", "calendar"];
 
 export function useOfficePanels() {
   const isMobile = useIsMobile();
   const [mobileSheet, setMobileSheet] = useState(null);
   const [desktopPanels, setDesktopPanels] = useState({
-    chat: false,
     tasks: false,
     updates: false,
     calendar: false,
@@ -16,7 +15,6 @@ export function useOfficePanels() {
   const closeAll = useCallback(() => {
     setMobileSheet(null);
     setDesktopPanels({
-      chat: false,
       tasks: false,
       updates: false,
       calendar: false,
@@ -33,8 +31,6 @@ export function useOfficePanels() {
       setDesktopPanels((previous) => ({
         ...previous,
         [panelKey]: true,
-        ...(panelKey === "chat" ? { updates: false } : {}),
-        ...(panelKey === "updates" ? { chat: false } : {}),
       }));
     },
     [isMobile],
@@ -64,7 +60,6 @@ export function useOfficePanels() {
   useEffect(() => {
     if (isMobile) {
       setDesktopPanels({
-        chat: false,
         tasks: false,
         updates: false,
         calendar: false,
@@ -89,9 +84,7 @@ export function useOfficePanels() {
         return;
       }
 
-      if (event.key.toLowerCase() === "c") {
-        openPanel("chat");
-      } else if (event.key.toLowerCase() === "t") {
+      if (event.key.toLowerCase() === "t") {
         openPanel("tasks");
       } else if (event.key.toLowerCase() === "u") {
         openPanel("updates");
@@ -107,7 +100,6 @@ export function useOfficePanels() {
   const actions = useMemo(
     () => [
       { id: "team-call", panel: "calendar", label: "Team Call", shortKey: "K" },
-      { id: "chat", panel: "chat", label: "Chat", shortKey: "C" },
       { id: "tasks", panel: "tasks", label: "Tasks", shortKey: "T" },
       { id: "calendar", panel: "calendar", label: "Calendar", shortKey: "K" },
       { id: "updates", panel: "updates", label: "Updates", shortKey: "U" },

@@ -57,6 +57,82 @@ export function resolveInitialView(location = window.location) {
   return null;
 }
 
+const DASHBOARD_PAGE_SET = new Set([
+  "dashboard",
+  "startup-office",
+  "inbox",
+  "inbox:received",
+  "inbox:sent",
+  "analytics",
+  "settings",
+  "my-performance",
+  "founder-chat",
+  "talent-chat",
+  "team-matching",
+  "documents",
+  "journey",
+  "ideation",
+  "formation",
+  "team-building",
+  "product-dev",
+  "go-to-market",
+  "operations",
+  "post-startup",
+  "browse-startups",
+  "startup-detail",
+  "talent-profile",
+  "compensation-demo",
+]);
+
+function normalizeInboxPage(tab) {
+  const normalized = String(tab || "").toLowerCase();
+  if (normalized === "sent") return "inbox:sent";
+  if (normalized === "received") return "inbox:received";
+  return "inbox";
+}
+
+/**
+ * Parses legacy `?dashboardPage=`, `?officeView=`, `?view=virtual-office`, etc.
+ * For SPA navigation to path-based URLs (`/inbox`, `/office`, …), use
+ * `dashboardIntentToPath` from `app/dashboardPaths.js` (see `BootstrapLegacyDashboardQuery` in `App.jsx`).
+ */
+export function resolveDashboardIntent(location = window.location) {
+  const params = new URLSearchParams(location.search || "");
+  const dashboardPage = params.get("dashboardPage") || params.get("page");
+  const officeView = params.get("officeView");
+
+  // Preferred format: ?dashboardPage=inbox or ?dashboardPage=startup-office
+  if (dashboardPage) {
+    const normalizedPage = String(dashboardPage).toLowerCase();
+    if (normalizedPage === "inbox") {
+      return { page: normalizeInboxPage(params.get("inboxTab")) };
+    }
+    if (DASHBOARD_PAGE_SET.has(normalizedPage)) {
+      return {
+        page: normalizedPage,
+        ...(normalizedPage === "startup-office" && officeView
+          ? { virtualOfficeView: officeView }
+          : {}),
+      };
+    }
+  }
+
+  // Backward compatibility: ?view=virtual-office&tab=inbox
+  const legacyView = params.get("view");
+  const legacyTab = params.get("tab");
+  if (legacyView === "virtual-office" && legacyTab === "inbox") {
+    return { page: "inbox" };
+  }
+  if (legacyView === "virtual-office") {
+    return { page: "startup-office" };
+  }
+  if (legacyTab === "inbox") {
+    return { page: "inbox" };
+  }
+
+  return null;
+}
+
 export function readStoredList(key) {
   return safeParseJson(localStorage.getItem(key), []);
 }

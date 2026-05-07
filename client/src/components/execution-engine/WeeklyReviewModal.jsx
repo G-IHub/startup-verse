@@ -1,16 +1,20 @@
 import { motion, AnimatePresence } from "motion/react";
 import { onWeeklyReviewCompleted } from "../../utils/outcomeBasedProgression";
 import React, { useState, useEffect } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "../ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "../ui/dialog";
 import { Button } from "../ui/button";
 import { Label } from "../ui/label";
 import { Textarea } from "../ui/textarea";
-import { Separator } from "../ui/separator";
 import { Progress } from "../ui/progress";
 import { Tooltip, TooltipTrigger, TooltipContent } from "../ui/tooltip";
 import {
   CheckCircle2,
-  Circle,
   XCircle,
   TrendingUp,
   TrendingDown,
@@ -25,6 +29,17 @@ import {
   Info,
 } from "lucide-react";
 import { toast } from "sonner";
+
+const footerBar =
+  "mt-5 flex gap-2 border-t border-primary/12 bg-[#fafbff] -mx-5 -mb-1 px-5 py-4";
+
+function stepLabel(step) {
+  if (step === "summary") return "Step 1 · Review";
+  if (step === "achievement") return "Step 2 · Outcome";
+  if (step === "reflection") return "Step 3 · Reflect";
+  return "";
+}
+
 export function WeeklyReviewModal({
   open,
   onClose,
@@ -42,7 +57,6 @@ export function WeeklyReviewModal({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submittedCompletionData, setSubmittedCompletionData] = useState(null);
 
-  // Calculate progress stats from normalized task list (source of truth on dashboard).
   const tasksCompleted = tasks.filter(
     (t) => String(t?.status || "").toLowerCase() === "completed",
   ).length;
@@ -68,12 +82,10 @@ export function WeeklyReviewModal({
     return d;
   })();
 
-  // Reset form when outcome changes
   useEffect(() => {
     if (outcome) {
       if (outcome.status === "active") {
         setStep("summary");
-        // Pre-select achievement based on completion rates
         if (taskCompletionRate >= 80 && milestoneCompletionRate >= 80) {
           setAchievement("completed");
         } else if (taskCompletionRate >= 50 || milestoneCompletionRate >= 50) {
@@ -90,10 +102,9 @@ export function WeeklyReviewModal({
       setSubmittedCompletionData(null);
     }
   }, [outcome, taskCompletionRate, milestoneCompletionRate]);
+
   const handleSubmit = async () => {
     if (!outcome) return;
-
-    // Validate reflection fields
     if (!whatWorked.trim() && achievement !== "not-achieved") {
       toast.error("Please share what worked this week");
       return;
@@ -116,7 +127,6 @@ export function WeeklyReviewModal({
       setSubmittedCompletionData(completionData);
       setStep("result");
 
-      // Trigger progression checks only after backend completion succeeds.
       await onWeeklyReviewCompleted(
         outcome.title,
         outcome.description || "",
@@ -131,530 +141,552 @@ export function WeeklyReviewModal({
       setIsSubmitting(false);
     }
   };
-  const getAchievementIcon = (type) => {
-    switch (type) {
-      case "completed":
-        return <CheckCircle2 className="w-5 h-5 text-green-600" />;
-      case "partial":
-        return <Minus className="w-5 h-5 text-yellow-600" />;
-      case "not-achieved":
-        return <XCircle className="w-5 h-5 text-red-600" />;
-      default:
-        return <Circle className="w-5 h-5" />;
+
+  const achievementOptionClass = (type, selected) => {
+    const base =
+      "w-full rounded-xl border px-3.5 py-3 text-left transition-all duration-200 outline-none focus-visible:ring-2 focus-visible:ring-primary/25";
+    if (!selected) {
+      return `${base} border-primary/15 bg-white hover:border-primary/25 hover:bg-[#fafbff]`;
     }
+    if (type === "completed") {
+      return `${base} border-emerald-400/55 bg-emerald-50/90 ring-2 ring-emerald-500/20`;
+    }
+    if (type === "partial") {
+      return `${base} border-amber-400/50 bg-amber-50/85 ring-2 ring-amber-400/18`;
+    }
+    return `${base} border-red-300/55 bg-red-50/90 ring-2 ring-red-400/15`;
   };
+
   const getAchievementColor = (type) => {
     switch (type) {
       case "completed":
-        return "bg-green-50 border-green-200 dark:bg-green-950/20 dark:border-green-800";
+        return "border-emerald-400/45 bg-emerald-50/95 text-[#0d0d0d]";
       case "partial":
-        return "bg-yellow-50 border-yellow-200 dark:bg-yellow-950/20 dark:border-yellow-800";
+        return "border-amber-400/45 bg-amber-50/95 text-[#0d0d0d]";
       case "not-achieved":
-        return "bg-red-50 border-red-200 dark:bg-red-950/20 dark:border-red-800";
+        return "border-red-300/50 bg-red-50/95 text-[#0d0d0d]";
       default:
         return "";
     }
   };
+
   const getStreakChange = () => {
     if (achievement === "completed" || achievement === "partial") {
       return currentStreak + 1;
     }
-    return 0; // Streak broken
+    return 0;
   };
+
   const resultData = submittedCompletionData || outcome?.completionData || null;
   if (!outcome) return null;
+
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-xl max-h-[85vh] overflow-y-auto">
-        <DialogHeader className="pb-2">
-          <DialogTitle className="flex items-center gap-2 text-base md:text-lg">
-            <Award className="w-5 h-5 text-primary" />
-            {"Complete Week "}
-            {outcome.weekNumber}
-            <Tooltip>
-              <TooltipTrigger asChild={true}>
-                <Info className="w-4 h-4 text-muted-foreground cursor-help ml-1" />
-              </TooltipTrigger>
-              <TooltipContent>
-                Review your progress and reflect on this week's outcome
-              </TooltipContent>
-            </Tooltip>
-          </DialogTitle>
+      <DialogContent
+        hideClose={step === "result"}
+        className="flex max-h-[min(88vh,640px)] w-full max-w-[calc(100%-2rem)] flex-col gap-0 overflow-hidden rounded-[16px] border border-primary/18 bg-white p-0 text-[#4a4a5a] shadow-modal sm:max-w-xl"
+      >
+        <DialogDescription className="sr-only">
+          Weekly outcome review and reflection for week {outcome.weekNumber}.
+        </DialogDescription>
+
+        <DialogHeader className="shrink-0 space-y-1 border-b border-primary/12 bg-[#fafbff] px-5 py-4 text-left">
+          <div className="flex items-start gap-3 pr-10">
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/[0.09] text-primary">
+              <Award className="h-5 w-5" aria-hidden />
+            </span>
+            <div className="min-w-0 flex-1">
+              <DialogTitle className="flex flex-wrap items-center gap-2 text-[17px] font-semibold tracking-tight text-[#0d0d0d]">
+                <span>
+                  Complete Week {outcome.weekNumber}
+                </span>
+                <Tooltip>
+                  <TooltipTrigger asChild={true}>
+                    <button
+                      type="button"
+                      className="rounded-md p-1 text-[#6b6b7a] transition-colors hover:bg-white hover:text-primary"
+                      aria-label="About this review"
+                    >
+                      <Info className="h-4 w-4" />
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom" className="max-w-xs">
+                    Review your progress and reflect on this week&apos;s outcome.
+                  </TooltipContent>
+                </Tooltip>
+              </DialogTitle>
+              {step !== "result" && (
+                <p className="font-body text-[11px] font-medium text-[#6b6b7a]">
+                  {stepLabel(step)}
+                </p>
+              )}
+            </div>
+          </div>
         </DialogHeader>
-        <AnimatePresence mode="wait">
-          {step === "summary" && (
-            <motion.div
-              key="summary"
-              initial={{
-                opacity: 0,
-                x: 20,
-              }}
-              animate={{
-                opacity: 1,
-                x: 0,
-              }}
-              exit={{
-                opacity: 0,
-                x: -20,
-              }}
-              className="space-y-4"
-            >
-              <div className="p-3 bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-950/20 dark:to-purple-950/20 rounded-lg border">
-                <h3 className="font-semibold text-sm md:text-base mb-1">
-                  {outcome.title}
-                </h3>
-                {outcome.description && (
-                  <p className="text-xs text-muted-foreground mb-2">
-                    {outcome.description}
-                  </p>
-                )}
-                <div className="flex items-center gap-4 text-xs text-muted-foreground">
-                  <div className="flex items-center gap-1">
-                    <Calendar className="w-3 h-3" />
-                    <span className="text-[10px]">
+
+        <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
+          <AnimatePresence mode="wait">
+            {step === "summary" && (
+              <motion.div
+                key="summary"
+                initial={{ opacity: 0, x: 12 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -12 }}
+                className="space-y-4"
+              >
+                <div className="rounded-xl border border-primary/15 bg-[#fafbff] px-4 py-3.5">
+                  <h3 className="font-heading text-sm font-semibold text-[#0d0d0d]">
+                    {outcome.title}
+                  </h3>
+                  {outcome.description ? (
+                    <p className="mt-1 font-body text-xs leading-relaxed text-[#4a4a5a]">
+                      {outcome.description}
+                    </p>
+                  ) : null}
+                  <div className="mt-2 flex items-center gap-1.5 font-body text-[11px] text-[#6b6b7a]">
+                    <Calendar className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                    <span>
                       {weekStartDate.toLocaleDateString()}
-                      {" - "}
+                      {" · "}
                       {weekEndDate.toLocaleDateString()}
                     </span>
                   </div>
                 </div>
-              </div>
-              <div className="space-y-3">
-                <h4 className="font-semibold text-sm flex items-center gap-2">
-                  <TrendingUp className="w-4 h-4 text-blue-600" />
-                  Progress Summary
-                </h4>
-                <div className="p-3 bg-primary/5 rounded-lg border">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-1.5">
-                      <div className="flex items-center justify-between">
-                        <span className="text-[10px] font-medium text-muted-foreground">
+
+                <div>
+                  <h4 className="mb-2.5 flex items-center gap-2 font-heading text-[13px] font-semibold text-[#0d0d0d]">
+                    <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary/[0.08] text-primary">
+                      <TrendingUp className="h-3.5 w-3.5" aria-hidden />
+                    </span>
+                    Progress summary
+                  </h4>
+                  <div className="rounded-xl border border-primary/12 bg-white px-3 py-3 shadow-[0_1px_3px_rgba(58,90,254,0.06)]">
+                    <div className="grid grid-cols-2 gap-4 divide-x divide-primary/10">
+                      <div className="space-y-2 pr-2">
+                        <span className="font-body text-[10px] font-semibold uppercase tracking-wide text-[#6b6b7a]">
                           Milestones
                         </span>
+                        <p className="font-body text-xs font-semibold tabular-nums text-[#0d0d0d]">
+                          {milestonesCompleted} / {milestonesTotal} completed
+                        </p>
+                        <Progress value={milestoneCompletionRate} className="h-1.5" />
+                        <p className="font-body text-[10px] text-[#6b6b7a]">
+                          {milestoneCompletionRate}% complete
+                        </p>
                       </div>
-                      <p className="text-xs font-semibold">
-                        {milestonesCompleted}
-                        {" / "}
-                        {milestonesTotal}
-                        {" completed"}
-                      </p>
-                      <Progress
-                        value={milestoneCompletionRate}
-                        className="h-1.5"
-                      />
-                      <p className="text-[9px] text-muted-foreground">
-                        {milestoneCompletionRate}% complete
-                      </p>
-                    </div>
-                    <div className="space-y-1.5">
-                      <div className="flex items-center justify-between">
-                        <span className="text-[10px] font-medium text-muted-foreground">
+                      <div className="space-y-2 pl-4">
+                        <span className="font-body text-[10px] font-semibold uppercase tracking-wide text-[#6b6b7a]">
                           Tasks
                         </span>
+                        <p className="font-body text-xs font-semibold tabular-nums text-[#0d0d0d]">
+                          {tasksCompleted} / {tasksTotal} completed
+                        </p>
+                        <Progress value={taskCompletionRate} className="h-1.5" />
+                        <p className="font-body text-[10px] text-[#6b6b7a]">
+                          {taskCompletionRate}% complete
+                        </p>
                       </div>
-                      <p className="text-xs font-semibold">
-                        {tasksCompleted}
-                        {" / "}
-                        {tasksTotal}
-                        {" completed"}
-                      </p>
-                      <Progress value={taskCompletionRate} className="h-1.5" />
-                      <p className="text-[9px] text-muted-foreground">
-                        {taskCompletionRate}% complete
-                      </p>
                     </div>
                   </div>
                 </div>
-              </div>
-              <Separator />
-              <div className="flex items-center justify-between p-3 bg-orange-50 dark:bg-orange-950/20 rounded-lg border border-orange-200 dark:border-orange-800">
-                <div className="flex items-center gap-2">
-                  <Flame className="w-5 h-5 text-orange-600" />
+
+                <div className="flex items-center justify-between rounded-xl border border-primary/15 bg-white px-4 py-3">
+                  <div className="flex items-center gap-2.5">
+                    <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-amber-500/12 text-amber-700">
+                      <Flame className="h-4 w-4" aria-hidden />
+                    </span>
+                    <div>
+                      <p className="font-body text-sm font-semibold text-[#0d0d0d]">
+                        Current streak
+                      </p>
+                      <p className="font-body text-[11px] text-[#6b6b7a]">
+                        Consecutive strong weeks
+                      </p>
+                    </div>
+                  </div>
+                  <span className="font-heading text-2xl font-bold tabular-nums text-[#b45309]">
+                    {currentStreak}
+                  </span>
+                </div>
+
+                <div className={footerBar}>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={onClose}
+                    className="h-9 flex-1 rounded-input border-primary/20 bg-white font-body text-xs font-semibold text-[#4a4a5a] hover:bg-[#f4f5ff]"
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    type="button"
+                    onClick={() => setStep("achievement")}
+                    className="h-9 flex-1 rounded-input bg-primary font-body text-xs font-semibold text-white shadow-[0_4px_16px_rgba(58,90,254,0.22)] hover:bg-primary-hover"
+                  >
+                    Continue
+                    <ArrowRight className="ml-1 h-3.5 w-3.5" />
+                  </Button>
+                </div>
+              </motion.div>
+            )}
+
+            {step === "achievement" && (
+              <motion.div
+                key="achievement"
+                initial={{ opacity: 0, x: 12 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -12 }}
+                className="space-y-4"
+              >
+                <div>
+                  <h4 className="mb-3 font-heading text-[13px] font-semibold text-[#0d0d0d]">
+                    How did you achieve your weekly outcome?
+                  </h4>
+                  <div className="space-y-2">
+                    <button
+                      type="button"
+                      onClick={() => setAchievement("completed")}
+                      className={achievementOptionClass(
+                        "completed",
+                        achievement === "completed",
+                      )}
+                    >
+                      <div className="flex items-start gap-3">
+                        <CheckCircle2
+                          className={`mt-0.5 h-5 w-5 shrink-0 ${achievement === "completed" ? "text-emerald-600" : "text-[#a0a0b0]"}`}
+                        />
+                        <div className="min-w-0">
+                          <p className="font-body text-sm font-semibold text-[#0d0d0d]">
+                            Completed
+                          </p>
+                          <p className="mt-0.5 font-body text-[11px] leading-snug text-[#4a4a5a]">
+                            Achieved the outcome and key milestones.
+                          </p>
+                        </div>
+                      </div>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setAchievement("partial")}
+                      className={achievementOptionClass(
+                        "partial",
+                        achievement === "partial",
+                      )}
+                    >
+                      <div className="flex items-start gap-3">
+                        <Minus
+                          className={`mt-0.5 h-5 w-5 shrink-0 ${achievement === "partial" ? "text-amber-600" : "text-[#a0a0b0]"}`}
+                        />
+                        <div className="min-w-0">
+                          <p className="font-body text-sm font-semibold text-[#0d0d0d]">
+                            Partially achieved
+                          </p>
+                          <p className="mt-0.5 font-body text-[11px] leading-snug text-[#4a4a5a]">
+                            Strong progress, but not everything shipped.
+                          </p>
+                        </div>
+                      </div>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setAchievement("not-achieved")}
+                      className={achievementOptionClass(
+                        "not-achieved",
+                        achievement === "not-achieved",
+                      )}
+                    >
+                      <div className="flex items-start gap-3">
+                        <XCircle
+                          className={`mt-0.5 h-5 w-5 shrink-0 ${achievement === "not-achieved" ? "text-red-600" : "text-[#a0a0b0]"}`}
+                        />
+                        <div className="min-w-0">
+                          <p className="font-body text-sm font-semibold text-[#0d0d0d]">
+                            Not achieved
+                          </p>
+                          <p className="mt-0.5 font-body text-[11px] leading-snug text-[#4a4a5a]">
+                            Limited meaningful progress this week.
+                          </p>
+                        </div>
+                      </div>
+                    </button>
+                  </div>
+                </div>
+
+                <div
+                  className={`rounded-xl border px-4 py-3 ${achievement === "not-achieved" ? "border-red-300/45 bg-red-50/70" : "border-emerald-300/40 bg-emerald-50/65"}`}
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      <Flame
+                        className={`h-4 w-4 shrink-0 ${achievement === "not-achieved" ? "text-red-600" : "text-amber-600"}`}
+                      />
+                      <span className="font-body text-sm font-semibold text-[#0d0d0d]">
+                        {achievement === "not-achieved"
+                          ? "Streak will reset"
+                          : "Streak continues"}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2 font-heading text-base font-bold tabular-nums">
+                      <span className="text-[#4a4a5a]">{currentStreak}</span>
+                      <ArrowRight className="h-4 w-4 text-[#a0a0b0]" />
+                      <span
+                        className={
+                          achievement === "not-achieved"
+                            ? "text-red-600"
+                            : "text-emerald-700"
+                        }
+                      >
+                        {getStreakChange()}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className={footerBar}>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setStep("summary")}
+                    className="h-9 flex-1 rounded-input border-primary/20 bg-white font-body text-xs font-semibold text-[#4a4a5a] hover:bg-[#f4f5ff]"
+                  >
+                    Back
+                  </Button>
+                  <Button
+                    type="button"
+                    onClick={() => setStep("reflection")}
+                    className="h-9 flex-1 rounded-input bg-primary font-body text-xs font-semibold text-white shadow-[0_4px_16px_rgba(58,90,254,0.22)] hover:bg-primary-hover"
+                  >
+                    Continue
+                    <ArrowRight className="ml-1 h-3.5 w-3.5" />
+                  </Button>
+                </div>
+              </motion.div>
+            )}
+
+            {step === "reflection" && (
+              <motion.div
+                key="reflection"
+                initial={{ opacity: 0, x: 12 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -12 }}
+                className="space-y-4"
+              >
+                <div className="flex items-center gap-2 rounded-lg border border-primary/12 bg-[#fafbff] px-3 py-2 font-body text-[12px] text-[#4a4a5a]">
+                  <Lightbulb className="h-4 w-4 shrink-0 text-primary" />
+                  Capture learnings so next week is sharper.
+                </div>
+
+                {achievement !== "not-achieved" && (
                   <div>
-                    <p className="text-sm font-medium">Current Streak</p>
-                    <p className="text-xs text-muted-foreground">
-                      Consecutive weeks achieved
+                    <Label className="mb-2 flex items-center gap-2 font-body text-xs font-semibold text-[#0d0d0d]">
+                      <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />
+                      What worked well?
+                    </Label>
+                    <Textarea
+                      value={whatWorked}
+                      onChange={(e) => setWhatWorked(e.target.value)}
+                      placeholder="e.g. Daily standups, smaller tasks, clearer priorities…"
+                      className="min-h-[88px] rounded-input border-primary/18 font-body text-sm"
+                    />
+                  </div>
+                )}
+
+                <div>
+                  <Label className="mb-2 flex items-center gap-2 font-body text-xs font-semibold text-[#0d0d0d]">
+                    <AlertCircle className="h-3.5 w-3.5 text-amber-600" />
+                    What blocked progress?
+                  </Label>
+                  <Textarea
+                    value={whatDidnt}
+                    onChange={(e) => setWhatDidnt(e.target.value)}
+                    placeholder="e.g. Rework, dependencies, scope creep…"
+                    className="min-h-[88px] rounded-input border-primary/18 font-body text-sm"
+                  />
+                </div>
+
+                <div>
+                  <Label className="mb-2 flex items-center gap-2 font-body text-xs font-semibold text-[#0d0d0d]">
+                    <Lightbulb className="h-3.5 w-3.5 text-primary" />
+                    Key learnings for next week
+                  </Label>
+                  <Textarea
+                    value={learnings}
+                    onChange={(e) => setLearnings(e.target.value)}
+                    placeholder="e.g. Validate earlier, add buffer, clarify ownership…"
+                    className="min-h-[88px] rounded-input border-primary/18 font-body text-sm"
+                  />
+                </div>
+
+                <div className={footerBar}>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setStep("achievement")}
+                    className="h-9 flex-1 rounded-input border-primary/20 bg-white font-body text-xs font-semibold text-[#4a4a5a] hover:bg-[#f4f5ff]"
+                  >
+                    Back
+                  </Button>
+                  <Button
+                    type="button"
+                    onClick={handleSubmit}
+                    disabled={isSubmitting}
+                    className="h-9 flex-1 rounded-input bg-primary font-body text-xs font-semibold text-white shadow-[0_4px_16px_rgba(58,90,254,0.22)] hover:bg-primary-hover disabled:opacity-70"
+                  >
+                    {isSubmitting ? (
+                      <>
+                        <span className="mr-2 inline-block h-3.5 w-3.5 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                        Completing…
+                      </>
+                    ) : (
+                      <>
+                        Complete review
+                        <CheckCircle2 className="ml-1 h-3.5 w-3.5" />
+                      </>
+                    )}
+                  </Button>
+                </div>
+              </motion.div>
+            )}
+
+            {step === "result" && resultData && (
+              <motion.div
+                key="result"
+                initial={{ opacity: 0, scale: 0.98 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.98 }}
+                className="space-y-4 pb-2"
+              >
+                <div
+                  className={`rounded-xl border px-4 py-5 text-center ${getAchievementColor(resultData.achievement)}`}
+                >
+                  <motion.div
+                    initial={{ scale: 0 }}
+                    animate={{ scale: 1 }}
+                    transition={{ type: "spring", delay: 0.12 }}
+                    className="mb-3 flex justify-center"
+                  >
+                    {resultData.achievement === "completed" ? (
+                      <PartyPopper className="h-11 w-11 text-emerald-600" />
+                    ) : resultData.achievement === "partial" ? (
+                      <TrendingUp className="h-11 w-11 text-amber-600" />
+                    ) : (
+                      <TrendingDown className="h-11 w-11 text-red-600" />
+                    )}
+                  </motion.div>
+                  <h3 className="font-heading text-base font-bold text-[#0d0d0d]">
+                    {resultData.achievement === "completed" &&
+                      "Outcome completed"}
+                    {resultData.achievement === "partial" &&
+                      "Solid partial progress"}
+                    {resultData.achievement === "not-achieved" &&
+                      "Week closed"}
+                  </h3>
+                  <p className="mt-1 font-body text-[11px] text-[#4a4a5a]">
+                    Your weekly review is saved.
+                  </p>
+                </div>
+
+                <div className="rounded-xl border border-primary/15 bg-[#fafbff] px-4 py-3">
+                  <div className="mb-2 flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Flame className="h-4 w-4 text-amber-600" />
+                      <span className="font-body text-sm font-semibold text-[#0d0d0d]">
+                        Weekly streak
+                      </span>
+                    </div>
+                    {resultData.achievement !== "not-achieved" ? (
+                      <Award className="h-4 w-4 text-primary" />
+                    ) : (
+                      <XCircle className="h-4 w-4 text-red-500" />
+                    )}
+                  </div>
+                  <div className="flex items-baseline gap-2">
+                    <span className="font-heading text-2xl font-bold tabular-nums text-[#b45309]">
+                      {resultData.achievement !== "not-achieved"
+                        ? currentStreak + 1
+                        : 0}
+                    </span>
+                    <span className="font-body text-[11px] text-[#4a4a5a]">
+                      {resultData.achievement !== "not-achieved"
+                        ? "weeks in a row — keep the cadence."
+                        : "Reset — start fresh next week."}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="rounded-xl border border-primary/12 bg-white px-3 py-2.5 shadow-[0_1px_2px_rgba(58,90,254,0.05)]">
+                    <p className="font-body text-[10px] font-medium uppercase tracking-wide text-[#6b6b7a]">
+                      Milestones
+                    </p>
+                    <p className="font-heading text-lg font-bold tabular-nums text-[#0d0d0d]">
+                      {resultData.milestonesCompleted}/{resultData.milestonesTotal}
+                    </p>
+                  </div>
+                  <div className="rounded-xl border border-primary/12 bg-white px-3 py-2.5 shadow-[0_1px_2px_rgba(58,90,254,0.05)]">
+                    <p className="font-body text-[10px] font-medium uppercase tracking-wide text-[#6b6b7a]">
+                      Tasks
+                    </p>
+                    <p className="font-heading text-lg font-bold tabular-nums text-[#0d0d0d]">
+                      {resultData.tasksCompleted}/{resultData.tasksTotal}
                     </p>
                   </div>
                 </div>
-                <div className="text-2xl font-bold text-orange-600">
-                  {currentStreak}
-                </div>
-              </div>
-              <div className="flex gap-2 pt-2">
-                <Button variant="outline" onClick={onClose} className="flex-1">
-                  Cancel
-                </Button>
-                <Button
-                  onClick={() => setStep("achievement")}
-                  className="flex-1 bg-blue-600 hover:bg-blue-700"
-                >
-                  Continue
-                  <ArrowRight className="w-4 h-4 ml-1" />
-                </Button>
-              </div>
-            </motion.div>
-          )}
-          {step === "achievement" && (
-            <motion.div
-              key="achievement"
-              initial={{
-                opacity: 0,
-                x: 20,
-              }}
-              animate={{
-                opacity: 1,
-                x: 0,
-              }}
-              exit={{
-                opacity: 0,
-                x: -20,
-              }}
-              className="space-y-4"
-            >
-              <div>
-                <h4 className="font-semibold text-sm mb-3">
-                  How did you achieve your weekly outcome?
-                </h4>
-                <div className="space-y-2">
-                  <button
-                    onClick={() => setAchievement("completed")}
-                    className={`w-full p-3 rounded-lg border-2 transition-all text-left ${achievement === "completed" ? "border-green-500 bg-green-50 dark:bg-green-950/20" : "border-gray-200 dark:border-gray-700 hover:border-green-300"}`}
-                  >
-                    <div className="flex items-start gap-2">
-                      <CheckCircle2
-                        className={`w-4 h-4 mt-0.5 ${achievement === "completed" ? "text-green-600" : "text-gray-400"}`}
-                      />
-                      <div className="flex-1">
-                        <p className="font-medium text-sm mb-0.5">Completed</p>
-                        <p className="text-xs text-muted-foreground">
-                          Achieved the outcome and all key milestones
+
+                {(resultData.whatWorked ||
+                  resultData.whatDidnt ||
+                  resultData.learnings) && (
+                  <div className="space-y-3 rounded-xl border border-primary/12 bg-[#fafbff] px-3 py-3">
+                    <h4 className="font-heading text-xs font-semibold text-[#0d0d0d]">
+                      Reflections
+                    </h4>
+                    {resultData.whatWorked && (
+                      <div>
+                        <p className="mb-1 flex items-center gap-1 font-body text-[10px] font-medium text-[#6b6b7a]">
+                          <CheckCircle2 className="h-3 w-3 text-emerald-600" />
+                          What worked
+                        </p>
+                        <p className="font-body text-sm leading-relaxed text-[#0d0d0d]">
+                          {resultData.whatWorked}
                         </p>
                       </div>
-                    </div>
-                  </button>
-                  <button
-                    onClick={() => setAchievement("partial")}
-                    className={`w-full p-3 rounded-lg border-2 transition-all text-left ${achievement === "partial" ? "border-yellow-500 bg-yellow-50 dark:bg-yellow-950/20" : "border-gray-200 dark:border-gray-700 hover:border-yellow-300"}`}
-                  >
-                    <div className="flex items-start gap-2">
-                      <Minus
-                        className={`w-4 h-4 mt-0.5 ${achievement === "partial" ? "text-yellow-600" : "text-gray-400"}`}
-                      />
-                      <div className="flex-1">
-                        <p className="font-medium text-sm mb-0.5">
-                          Partially Achieved
+                    )}
+                    {resultData.whatDidnt && (
+                      <div>
+                        <p className="mb-1 flex items-center gap-1 font-body text-[10px] font-medium text-[#6b6b7a]">
+                          <AlertCircle className="h-3 w-3 text-amber-600" />
+                          Blockers
                         </p>
-                        <p className="text-xs text-muted-foreground">
-                          Made significant progress but didn't complete
-                          everything
+                        <p className="font-body text-sm leading-relaxed text-[#0d0d0d]">
+                          {resultData.whatDidnt}
                         </p>
                       </div>
-                    </div>
-                  </button>
-                  <button
-                    onClick={() => setAchievement("not-achieved")}
-                    className={`w-full p-3 rounded-lg border-2 transition-all text-left ${achievement === "not-achieved" ? "border-red-500 bg-red-50 dark:bg-red-950/20" : "border-gray-200 dark:border-gray-700 hover:border-red-300"}`}
-                  >
-                    <div className="flex items-start gap-2">
-                      <XCircle
-                        className={`w-4 h-4 mt-0.5 ${achievement === "not-achieved" ? "text-red-600" : "text-gray-400"}`}
-                      />
-                      <div className="flex-1">
-                        <p className="font-medium text-sm mb-0.5">
-                          Not Achieved
+                    )}
+                    {resultData.learnings && (
+                      <div>
+                        <p className="mb-1 flex items-center gap-1 font-body text-[10px] font-medium text-[#6b6b7a]">
+                          <Lightbulb className="h-3 w-3 text-primary" />
+                          Learnings
                         </p>
-                        <p className="text-xs text-muted-foreground">
-                          Didn't make meaningful progress this week
+                        <p className="font-body text-sm leading-relaxed text-[#0d0d0d]">
+                          {resultData.learnings}
                         </p>
                       </div>
-                    </div>
-                  </button>
-                </div>
-              </div>
-              <div
-                className={`p-3 rounded-lg border ${achievement === "not-achieved" ? "bg-red-50 dark:bg-red-950/20 border-red-200 dark:border-red-800" : "bg-green-50 dark:bg-green-950/20 border-green-200 dark:border-green-800"}`}
-              >
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <Flame
-                      className={`w-4 h-4 ${achievement === "not-achieved" ? "text-red-600" : "text-orange-600"}`}
-                    />
-                    <span className="text-sm font-medium">
-                      {achievement === "not-achieved"
-                        ? "Streak will be broken"
-                        : "Streak continues!"}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-lg font-bold">{currentStreak}</span>
-                    <ArrowRight className="w-4 h-4" />
-                    <span
-                      className={`text-lg font-bold ${achievement === "not-achieved" ? "text-red-600" : "text-green-600"}`}
-                    >
-                      {getStreakChange()}
-                    </span>
-                  </div>
-                </div>
-              </div>
-              <div className="flex gap-2 pt-2">
-                <Button
-                  variant="outline"
-                  onClick={() => setStep("summary")}
-                  className="flex-1"
-                >
-                  Back
-                </Button>
-                <Button
-                  onClick={() => setStep("reflection")}
-                  className="flex-1 bg-blue-600 hover:bg-blue-700"
-                >
-                  Continue
-                  <ArrowRight className="w-4 h-4 ml-1" />
-                </Button>
-              </div>
-            </motion.div>
-          )}
-          {step === "reflection" && (
-            <motion.div
-              key="reflection"
-              initial={{
-                opacity: 0,
-                x: 20,
-              }}
-              animate={{
-                opacity: 1,
-                x: 0,
-              }}
-              exit={{
-                opacity: 0,
-                x: -20,
-              }}
-              className="space-y-4"
-            >
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <Lightbulb className="w-4 h-4" />
-                <span>Capture your learnings to improve next week</span>
-              </div>
-              {achievement !== "not-achieved" && (
-                <div>
-                  <Label className="text-sm font-medium flex items-center gap-2 mb-2">
-                    <CheckCircle2 className="w-4 h-4 text-green-600" />
-                    What worked well this week?
-                  </Label>
-                  <Textarea
-                    value={whatWorked}
-                    onChange={(e) => setWhatWorked(e.target.value)}
-                    placeholder="E.g., Daily standups kept team aligned, breaking tasks into smaller chunks helped momentum..."
-                    className="min-h-[100px]"
-                  />
-                </div>
-              )}
-              <div>
-                <Label className="text-sm font-medium flex items-center gap-2 mb-2">
-                  <AlertCircle className="w-4 h-4 text-orange-600" />
-                  What didn't work or blocked progress?
-                </Label>
-                <Textarea
-                  value={whatDidnt}
-                  onChange={(e) => setWhatDidnt(e.target.value)}
-                  placeholder="E.g., Unclear requirements caused rework, too many meetings, unexpected dependencies..."
-                  className="min-h-[100px]"
-                />
-              </div>
-              <div>
-                <Label className="text-sm font-medium flex items-center gap-2 mb-2">
-                  <Lightbulb className="w-4 h-4 text-purple-600" />
-                  Key learnings for next week
-                </Label>
-                <Textarea
-                  value={learnings}
-                  onChange={(e) => setLearnings(e.target.value)}
-                  placeholder="E.g., Need to validate designs earlier, should allocate more buffer time, team needs clearer priorities..."
-                  className="min-h-[100px]"
-                />
-              </div>
-              <div className="flex gap-2 pt-2">
-                <Button
-                  variant="outline"
-                  onClick={() => setStep("achievement")}
-                  className="flex-1"
-                >
-                  Back
-                </Button>
-                <Button
-                  onClick={handleSubmit}
-                  disabled={isSubmitting}
-                  className="flex-1 bg-blue-600 hover:bg-blue-700"
-                >
-                  {isSubmitting ? (
-                    <>
-                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />
-                      Completing...
-                    </>
-                  ) : (
-                    <>
-                      Complete Review
-                      <CheckCircle2 className="w-4 h-4 ml-1" />
-                    </>
-                  )}
-                </Button>
-              </div>
-            </motion.div>
-          )}
-          {step === "result" && resultData && (
-            <motion.div
-              key="result"
-              initial={{
-                opacity: 0,
-                scale: 0.95,
-              }}
-              animate={{
-                opacity: 1,
-                scale: 1,
-              }}
-              exit={{
-                opacity: 0,
-                scale: 0.95,
-              }}
-              className="space-y-4"
-            >
-              <div
-                className={`p-4 rounded-lg border-2 text-center ${getAchievementColor(resultData.achievement)}`}
-              >
-                <motion.div
-                  initial={{
-                    scale: 0,
-                  }}
-                  animate={{
-                    scale: 1,
-                  }}
-                  transition={{
-                    type: "spring",
-                    delay: 0.2,
-                  }}
-                  className="flex justify-center mb-2"
-                >
-                  {resultData.achievement === "completed" ? (
-                    <PartyPopper className="w-12 h-12 text-green-600" />
-                  ) : resultData.achievement === "partial" ? (
-                    <TrendingUp className="w-12 h-12 text-yellow-600" />
-                  ) : (
-                    <TrendingDown className="w-12 h-12 text-red-600" />
-                  )}
-                </motion.div>
-                <h3 className="text-base md:text-lg font-bold mb-1">
-                  {resultData.achievement === "completed" &&
-                    "Outcome Completed! 🎉"}
-                  {resultData.achievement === "partial" &&
-                    "Partial Progress Made"}
-                  {resultData.achievement === "not-achieved" &&
-                    "Week Complete"}
-                </h3>
-                <p className="text-xs text-muted-foreground">
-                  Your weekly review has been archived
-                </p>
-              </div>
-              <div className="p-3 bg-gradient-to-r from-orange-50 to-red-50 dark:from-orange-950/20 dark:to-red-950/20 rounded-lg border">
-                <div className="flex items-center justify-between mb-2">
-                  <div className="flex items-center gap-2">
-                    <Flame className="w-4 h-4 text-orange-600" />
-                    <span className="font-semibold text-sm">
-                      Weekly Outcome Streak
-                    </span>
-                  </div>
-                  {resultData.achievement !== "not-achieved" ? (
-                    <Award className="w-4 h-4 text-orange-600" />
-                  ) : (
-                    <XCircle className="w-4 h-4 text-red-600" />
-                  )}
-                </div>
-                <div className="flex items-center gap-3">
-                  <div className="text-2xl font-bold text-orange-600">
-                    {resultData.achievement !== "not-achieved"
-                      ? currentStreak + 1
-                      : 0}
-                  </div>
-                  <div className="text-xs text-muted-foreground">
-                    {resultData.achievement !== "not-achieved" ? (
-                      <>Weeks in a row! Keep the momentum going 🔥</>
-                    ) : (
-                      <>Streak reset. Start fresh next week! 💪</>
                     )}
                   </div>
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-2">
-                <div className="p-2 bg-blue-50 dark:bg-blue-950/20 rounded-lg border">
-                  <p className="text-[10px] text-muted-foreground mb-0.5">
-                    Milestones
-                  </p>
-                  <p className="text-base md:text-lg font-bold">
-                    {resultData.milestonesCompleted}/
-                    {resultData.milestonesTotal}
-                  </p>
-                </div>
-                <div className="p-2 bg-purple-50 dark:bg-purple-950/20 rounded-lg border">
-                  <p className="text-[10px] text-muted-foreground mb-0.5">
-                    Tasks
-                  </p>
-                  <p className="text-base md:text-lg font-bold">
-                    {resultData.tasksCompleted}/
-                    {resultData.tasksTotal}
-                  </p>
-                </div>
-              </div>
-              {(resultData.whatWorked ||
-                resultData.whatDidnt ||
-                resultData.learnings) && (
-                <div className="space-y-2 p-3 bg-slate-50 dark:bg-slate-900/50 rounded-lg border">
-                  <h4 className="font-semibold text-xs">Your Reflections</h4>
-                  {resultData.whatWorked && (
-                    <div>
-                      <p className="text-xs text-muted-foreground mb-1 flex items-center gap-1">
-                        <CheckCircle2 className="w-3 h-3 text-green-600" />
-                        What worked
-                      </p>
-                      <p className="text-sm">
-                        {resultData.whatWorked}
-                      </p>
-                    </div>
-                  )}
-                  {resultData.whatDidnt && (
-                    <div>
-                      <p className="text-xs text-muted-foreground mb-1 flex items-center gap-1">
-                        <AlertCircle className="w-3 h-3 text-orange-600" />
-                        What didn't work
-                      </p>
-                      <p className="text-sm">
-                        {resultData.whatDidnt}
-                      </p>
-                    </div>
-                  )}
-                  {resultData.learnings && (
-                    <div>
-                      <p className="text-xs text-muted-foreground mb-1 flex items-center gap-1">
-                        <Lightbulb className="w-3 h-3 text-purple-600" />
-                        Key learnings
-                      </p>
-                      <p className="text-sm">
-                        {resultData.learnings}
-                      </p>
-                    </div>
-                  )}
-                </div>
-              )}
-              <div className="pt-2">
+                )}
+
                 <Button
+                  type="button"
                   onClick={onClose}
-                  className="w-full bg-blue-600 hover:bg-blue-700"
+                  className="h-10 w-full rounded-input bg-primary font-body text-sm font-semibold text-white shadow-[0_4px_16px_rgba(58,90,254,0.22)] hover:bg-primary-hover"
                 >
                   Done
                 </Button>
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
       </DialogContent>
     </Dialog>
   );

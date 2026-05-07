@@ -84,7 +84,14 @@ const DialogOverlay = React.forwardRef(({ className, ...props }, ref) => (
 DialogOverlay.displayName = DialogPrimitive.Overlay.displayName;
 const DialogContent = React.forwardRef(
   (
-    { className, children, overlayClassName, closeClassName, ...props },
+    {
+      className,
+      children,
+      overlayClassName,
+      closeClassName,
+      hideClose = false,
+      ...props
+    },
     ref,
   ) => (
     <DialogPortal data-slot="dialog-portal">
@@ -104,15 +111,17 @@ const DialogContent = React.forwardRef(
         )}
       >
         {children}
-        <DialogPrimitive.Close
-          className={cn(
-            "absolute top-4 right-4 rounded-lg bg-transparent p-1.5 text-[#a0a0b0] transition-all duration-200 ease-in-out hover:bg-[#f4f5ff] hover:text-text-heading focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 disabled:pointer-events-none [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
-            closeClassName,
-          )}
-        >
-          <XIcon />
-          <span className="sr-only">Close</span>
-        </DialogPrimitive.Close>
+        {!hideClose ? (
+          <DialogPrimitive.Close
+            className={cn(
+              "absolute top-4 right-4 rounded-lg bg-transparent p-1.5 text-[#a0a0b0] transition-all duration-200 ease-in-out hover:bg-[#f4f5ff] hover:text-text-heading focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 disabled:pointer-events-none [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
+              closeClassName,
+            )}
+          >
+            <XIcon />
+            <span className="sr-only">Close</span>
+          </DialogPrimitive.Close>
+        ) : null}
       </DialogPrimitive.Content>
     </DialogPortal>
   ),

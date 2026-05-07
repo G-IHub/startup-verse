@@ -152,6 +152,57 @@ export function talentFormSnapshotToFlat(snapshot) {
 }
 
 /**
+ * TalentProfile API lean doc (+ populated userId name/email) → same flat shape as form snapshot.
+ * Used for browse eligibility without requiring full auth user object.
+ */
+export function talentBrowseProfileDocumentToFlat(profile) {
+  const p = profile || {};
+  const u =
+    p.userId && typeof p.userId === "object" && !Array.isArray(p.userId)
+      ? p.userId
+      : {};
+  return {
+    name: str(p.fullName ?? u.name),
+    email: str(u.email),
+    professionalTitle: str(p.professionalTitle),
+    yearsOfExperience: str(p.yearsOfExperience ?? ""),
+    bio: str(p.bio),
+    location: str(p.location),
+    skills: Array.isArray(p.skills) ? p.skills : [],
+    linkedin: str(p.linkedinUrl ?? p.linkedin),
+    github: str(p.githubUrl ?? p.github),
+    website: str(p.portfolioWebsite ?? p.websiteUrl ?? p.website),
+    workExperience: Array.isArray(p.workExperiences)
+      ? p.workExperiences
+      : Array.isArray(p.workExperience)
+        ? p.workExperience
+        : [],
+    education: Array.isArray(p.educationList)
+      ? p.educationList
+      : Array.isArray(p.education)
+        ? p.education
+        : [],
+    certifications: Array.isArray(p.certifications) ? p.certifications : [],
+    portfolioItems: Array.isArray(p.portfolioItems) ? p.portfolioItems : [],
+    availabilityStatus: str(p.availabilityStatus),
+    preferredCommitment: str(p.preferredCommitment),
+    experience: str(p.experience ?? p.yearsOfExperience ?? ""),
+    availability: str(p.availability),
+    professionalGoals: str(p.professionalGoals),
+    interests: Array.isArray(p.interests) ? p.interests : [],
+    industryPreferences: Array.isArray(p.industryPreferences)
+      ? p.industryPreferences
+      : [],
+  };
+}
+
+export function getTalentBrowseProfileCompletionPercent(profile) {
+  return computeTalentProfileCompletionFromFlat(
+    talentBrowseProfileDocumentToFlat(profile),
+  );
+}
+
+/**
  * Core / step2 / step3 weights — same as stored profile buckets (TalentProfile + user flags).
  * - Core: 40% (35% five required + 5% optional location; email from account counts)
  * - Structured + skills + links: 35%

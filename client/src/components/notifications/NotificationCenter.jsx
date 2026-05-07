@@ -22,7 +22,12 @@ import { ScrollArea } from "../ui/scroll-area";
 import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
 import { Separator } from "../ui/separator";
 import { useNotifications } from "../../contexts/NotificationContext";
+import { useAuth } from "../../contexts/AuthContext";
+import { resolveDashboardIntent } from "../../app/session";
+import { dashboardIntentToPath } from "../../app/dashboardPaths";
+
 export default function NotificationCenter({ onNavigate }) {
+  const { user } = useAuth();
   const {
     notifications,
     unreadCount,
@@ -129,7 +134,11 @@ export default function NotificationCenter({ onNavigate }) {
       const url = notification.actionUrl;
 
       if (url.startsWith("/?")) {
-        window.location.href = url;
+        const search = url.slice(1);
+        const intent = resolveDashboardIntent({ pathname: "/", search });
+        const path =
+          user && intent ? dashboardIntentToPath(intent, user.role) : null;
+        window.location.assign(path || url);
         setOpen(false);
         return;
       }

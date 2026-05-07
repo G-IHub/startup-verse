@@ -1,0 +1,2 @@
+# Netlify (and similar): serve SPA for client-side routes so /inbox etc. work on refresh.
+/*    /index.html   200

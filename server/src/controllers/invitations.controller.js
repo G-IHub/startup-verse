@@ -9,6 +9,7 @@ import Startup from "../models/Startup.js";
 import Organization from "../models/Organization.js";
 import OrganizationAdmin from "../models/OrganizationAdmin.js";
 import User from "../models/User.js";
+import TalentProfile from "../models/TalentProfile.js";
 import TeamMemberProfile from "../models/TeamMemberProfile.js";
 import Presence from "../models/Presence.js";
 import Activity from "../models/Activity.js";
@@ -31,6 +32,122 @@ const canAccessInterest = (req, interest) =>
   isAdmin(req) ||
   req.user?.id === String(interest?.founderId || "") ||
   req.user?.id === String(interest?.talentId || "");
+
+const toIdString = (value) => {
+  if (!value) return "";
+  if (typeof value === "string") return value;
+  if (typeof value === "object" && value._id) return String(value._id);
+  return String(value);
+};
+
+async function loadUsersMap(userIds) {
+  const ids = [...new Set(userIds.map(toIdString).filter(Boolean))];
+  if (!ids.length) return new Map();
+  const users = await User.find({ _id: { $in: ids } }, { name: 1, profile: 1 }).lean();
+  return new Map(users.map((user) => [String(user._id), user]));
+}
+
+async function loadStartupsMap(startupIds) {
+  const ids = [...new Set(startupIds.map(toIdString).filter(Boolean))];
+  if (!ids.length) return new Map();
+  const startups = await Startup.find({ _id: { $in: ids } }, { name: 1, founderId: 1 }).lean();
+  return new Map(startups.map((startup) => [String(startup._id), startup]));
+}
+
+async function loadTalentProfilesMap(userIds) {
+  const ids = [...new Set(userIds.map(toIdString).filter(Boolean))];
+  if (!ids.length) return new Map();
+  const profiles = await TalentProfile.find(
+    { userId: { $in: ids } },
+    { userId: 1, professionalTitle: 1, skills: 1, fullName: 1 },
+  ).lean();
+  return new Map(profiles.map((profile) => [String(profile.userId), profile]));
+}
+
+function mapConversationMessages(rawMessages, usersById) {
+  const messages = Array.isArray(rawMessages) ? rawMessages : [];
+  return messages.map((message) => {
+    const senderId = toIdString(message.senderId);
+    const sender = usersById.get(senderId);
+    return {
+      senderId,
+      sender: message.sender || sender?.name || "Unknown",
+      text: message.text || message.body || "",
+      timestamp: message.timestamp || message.sentAt || null,
+      companyName: message.companyName || "",
+    };
+  });
+}
+
+function buildLastActivityAt(item, messages) {
+  const lastMessage = messages[messages.length - 1];
+  return lastMessage?.timestamp || item.updatedAt || item.createdAt;
+}
+
+function serializeFounderTalentInvitation(invitation, context) {
+  const founderId = toIdString(invitation.founderId);
+  const talentId = toIdString(invitation.talentId);
+  const startupId = toIdString(invitation.startupId);
+  const founder = context.usersById.get(founderId);
+  const talent = context.usersById.get(talentId);
+  const startup = context.startupsById.get(startupId);
+  const messages = mapConversationMessages(invitation.metadata?.messages, context.usersById);
+
+  return {
+    ...invitation,
+    id: String(invitation._id),
+    _id: String(invitation._id),
+    founderId,
+    talentId,
+    startupId,
+    founderName: invitation.metadata?.founderName || founder?.name || "Founder",
+    talentName: invitation.metadata?.talentName || talent?.name || "Talent",
+    companyName: invitation.metadata?.startupTitle || startup?.name || "",
+    startupTitle: invitation.metadata?.startupTitle || startup?.name || "",
+    role: invitation.metadata?.role || talent?.profile?.professionalTitle || "",
+    message: invitation.message || "",
+    messages,
+    sentAt: invitation.createdAt,
+    lastActivityAt: buildLastActivityAt(invitation, messages),
+  };
+}
+
+function serializeInterest(interest, context) {
+  const founderId = toIdString(interest.founderId);
+  const talentId = toIdString(interest.talentId);
+  const startupId = toIdString(interest.startupId);
+  const founder = context.usersById.get(founderId);
+  const talent = context.usersById.get(talentId);
+  const startup = context.startupsById.get(startupId);
+  const talentProfile = context.talentProfilesById.get(talentId);
+  const messages = mapConversationMessages(interest.messages, context.usersById);
+
+  return {
+    ...interest,
+    id: String(interest._id),
+    _id: String(interest._id),
+    founderId,
+    talentId,
+    startupId,
+    founderName: founder?.name || "Founder",
+    talentName: talentProfile?.fullName || talent?.name || "Talent",
+    startupTitle: startup?.name || "",
+    talentArea:
+      talentProfile?.professionalTitle ||
+      talent?.profile?.professionalTitle ||
+      "",
+    talentSkills:
+      Array.isArray(talentProfile?.skills) && talentProfile.skills.length > 0
+        ? talentProfile.skills
+        : Array.isArray(talent?.profile?.skills)
+          ? talent.profile.skills
+          : [],
+    message: interest.message || "",
+    messages,
+    sentAt: interest.createdAt,
+    lastActivityAt: buildLastActivityAt(interest, messages),
+  };
+}
 
 async function isOrgAdminFor(userId, organizationId) {
   if (!organizationId) return false;
@@ -315,19 +432,41 @@ export const respondToInvitation = async (req, res) => {
 };
 
 export const sendFounderTalentInvitation = async (req, res) => {
-  const founderId = req.body?.founderId || req.user.id;
+  const body = req.body?.invitation || req.body || {};
+  const founderId = body.founderId || req.user.id;
   if (!isSelfOrAdmin(req, founderId)) {
     return apiError(res, "Forbidden.", 403);
   }
+  let resolvedTalentId = body.talentId || null;
+  if (resolvedTalentId) {
+    const userExists = mongoose.Types.ObjectId.isValid(String(resolvedTalentId))
+      ? await User.exists({ _id: resolvedTalentId })
+      : null;
+    if (!userExists && mongoose.Types.ObjectId.isValid(String(resolvedTalentId))) {
+      const talentProfile = await TalentProfile.findById(resolvedTalentId, { userId: 1 }).lean();
+      if (talentProfile?.userId) {
+        resolvedTalentId = String(talentProfile.userId);
+      }
+    }
+  }
+  if (!resolvedTalentId && !body.email) {
+    return apiError(res, "talentId or email is required.", 400);
+  }
   const invitation = await FounderTalentInvitation.create({
     founderId,
-    talentId: req.body?.talentId || null,
-    startupId: req.body?.startupId || null,
-    email: req.body?.email || "",
-    message: req.body?.message || "",
+    talentId: resolvedTalentId,
+    startupId: body.startupId || null,
+    email: body.email || "",
+    message: body.message || "",
     token: crypto.randomUUID(),
     status: "pending",
     kind: "founder-talent",
+    metadata: {
+      founderName: body.founderName || "",
+      talentName: body.talentName || "",
+      startupTitle: body.startupTitle || "",
+      role: body.role || "",
+    },
   });
 
   if (invitation.talentId) {
@@ -335,8 +474,8 @@ export const sendFounderTalentInvitation = async (req, res) => {
       userId: invitation.talentId,
       type: "talent-invitation-received",
       title: "New invitation from a founder",
-      message: req.body?.message
-        ? String(req.body.message).slice(0, 200)
+      message: body.message
+        ? String(body.message).slice(0, 200)
         : "You have a new invitation from a founder.",
       actionUrl: `/?view=virtual-office&tab=invitations&invitationId=${invitation._id}`,
       metadata: {
@@ -344,6 +483,19 @@ export const sendFounderTalentInvitation = async (req, res) => {
         founderId: String(founderId),
       },
     }).catch(() => null);
+
+    // Emit real-time event to talent's room for instant inbox update
+    emitRealtime(SOCKET_EVENTS.INVITATION_CREATED, {
+      invitation: {
+        id: String(invitation._id),
+        founderId: String(founderId),
+        talentId: String(invitation.talentId),
+        startupId: String(invitation.startupId || ""),
+        message: invitation.message,
+        status: invitation.status,
+        createdAt: invitation.createdAt,
+      },
+    }, [userRoom(invitation.talentId)]);
   }
 
   return apiSuccess(res, invitation, 201);
@@ -353,16 +505,48 @@ export const getSentFounderTalentInvitations = async (req, res) => {
   if (!isSelfOrAdmin(req, req.params.founderId)) {
     return apiError(res, "Forbidden.", 403);
   }
-  const invitations = await FounderTalentInvitation.find({ founderId: req.params.founderId }).sort({ createdAt: -1 });
-  return apiSuccess(res, invitations);
+  const invitations = await FounderTalentInvitation.find({
+    founderId: req.params.founderId,
+    kind: "founder-talent",
+  })
+    .sort({ createdAt: -1 })
+    .lean();
+  const usersById = await loadUsersMap(
+    invitations.flatMap((invitation) => [invitation.founderId, invitation.talentId]),
+  );
+  const startupsById = await loadStartupsMap(
+    invitations.map((invitation) => invitation.startupId),
+  );
+  return apiSuccess(
+    res,
+    invitations.map((invitation) =>
+      serializeFounderTalentInvitation(invitation, { usersById, startupsById }),
+    ),
+  );
 };
 
 export const getReceivedFounderTalentInvitations = async (req, res) => {
   if (!isSelfOrAdmin(req, req.params.talentId)) {
     return apiError(res, "Forbidden.", 403);
   }
-  const invitations = await FounderTalentInvitation.find({ talentId: req.params.talentId }).sort({ createdAt: -1 });
-  return apiSuccess(res, invitations);
+  const invitations = await FounderTalentInvitation.find({
+    talentId: req.params.talentId,
+    kind: "founder-talent",
+  })
+    .sort({ createdAt: -1 })
+    .lean();
+  const usersById = await loadUsersMap(
+    invitations.flatMap((invitation) => [invitation.founderId, invitation.talentId]),
+  );
+  const startupsById = await loadStartupsMap(
+    invitations.map((invitation) => invitation.startupId),
+  );
+  return apiSuccess(
+    res,
+    invitations.map((invitation) =>
+      serializeFounderTalentInvitation(invitation, { usersById, startupsById }),
+    ),
+  );
 };
 
 export const updateFounderTalentInvitationStatus = async (req, res) => {
@@ -371,8 +555,93 @@ export const updateFounderTalentInvitationStatus = async (req, res) => {
   if (!canAccessInvitation(req, invitation)) {
     return apiError(res, "Forbidden.", 403);
   }
-  invitation.status = req.body?.status || "pending";
+  const previousStatus = invitation.status;
+  const newStatus = req.body?.status || "pending";
+  invitation.status = newStatus;
   await invitation.save();
+
+  // On accept: automatically onboard talent as team member
+  if (newStatus === "accepted" && previousStatus !== "accepted" && invitation.talentId) {
+    try {
+      const talent = await User.findById(invitation.talentId);
+      if (talent) {
+        const startupId = invitation.startupId;
+
+        talent.role = "team-member";
+        talent.startupId = startupId;
+        talent.founderId = invitation.founderId;
+        talent.onboardingComplete = true;
+        await talent.save();
+
+        await TeamMemberProfile.findOneAndUpdate(
+          { userId: talent._id },
+          {
+            userId: talent._id,
+            founderId: invitation.founderId,
+            startupId,
+          },
+          { upsert: true, new: true, runValidators: true },
+        );
+
+        await Presence.findOneAndUpdate(
+          { startupId: String(startupId), userId: String(talent._id) },
+          {
+            startupId: String(startupId),
+            userId: String(talent._id),
+            userName: talent.name || "",
+            role: "team-member",
+            isOnline: false,
+            lastSeenAt: new Date(),
+            expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
+            metadata: { source: "invitation-acceptance" },
+          },
+          { upsert: true, new: true, runValidators: true },
+        );
+
+        // Create activity for team member joining
+        const createdActivity = await Activity.create({
+          startupId,
+          userId: talent._id,
+          type: "join",
+          text: "Team member joined from accepted invitation.",
+          metadata: {
+            invitationId: invitation._id,
+            founderId: invitation.founderId,
+            userName: talent.name || "",
+            icon: "👋",
+          },
+        });
+
+        const activityEvent = mapActivityToDto(createdActivity);
+        if (activityEvent?.startupId) {
+          emitRealtime(SOCKET_EVENTS.ACTIVITY_CREATED, activityEvent, [startupRoom(activityEvent.startupId)]);
+        }
+      }
+    } catch (onboardErr) {
+      console.error("[updateFounderTalentInvitationStatus] Onboarding failed:", onboardErr.message);
+      // Continue - status was already updated
+    }
+  }
+
+  // Emit real-time event to both parties for status update
+  const eventPayload = {
+    invitation: {
+      id: String(invitation._id),
+      founderId: String(invitation.founderId),
+      talentId: String(invitation.talentId),
+      startupId: String(invitation.startupId || ""),
+      status: invitation.status,
+      previousStatus,
+      updatedAt: new Date().toISOString(),
+    },
+  };
+
+  const rooms = [userRoom(invitation.founderId)];
+  if (invitation.talentId) {
+    rooms.push(userRoom(invitation.talentId));
+  }
+  emitRealtime(SOCKET_EVENTS.INVITATION_UPDATED, eventPayload, rooms);
+
   return apiSuccess(res, invitation);
 };
 
@@ -393,7 +662,14 @@ export const addMessageToFounderTalentInvitation = async (req, res) => {
   };
 
   await invitation.save();
-  return apiSuccess(res, invitation);
+  const [usersById, startupsById] = await Promise.all([
+    loadUsersMap([invitation.founderId, invitation.talentId]),
+    loadStartupsMap([invitation.startupId]),
+  ]);
+  return apiSuccess(
+    res,
+    serializeFounderTalentInvitation(invitation.toObject(), { usersById, startupsById }),
+  );
 };
 
 export const createInterest = async (req, res) => {
@@ -463,6 +739,19 @@ export const createInterest = async (req, res) => {
     },
   }).catch(() => null);
 
+  // Emit real-time event to founder's room for instant inbox update
+  emitRealtime(SOCKET_EVENTS.INTEREST_CREATED, {
+    interest: {
+      id: String(interest._id),
+      talentId: String(talentId),
+      founderId: String(body.founderId),
+      startupId: String(body.startupId || ""),
+      message: interest.message,
+      status: interest.status,
+      createdAt: interest.createdAt,
+    },
+  }, [userRoom(body.founderId)]);
+
   return apiSuccess(res, interest, 201);
 };
 
@@ -470,16 +759,44 @@ export const getReceivedInterests = async (req, res) => {
   if (!isSelfOrAdmin(req, req.params.founderId)) {
     return apiError(res, "Forbidden.", 403);
   }
-  const interests = await Interest.find({ founderId: req.params.founderId }).sort({ createdAt: -1 });
-  return apiSuccess(res, interests);
+  const interests = await Interest.find({ founderId: req.params.founderId })
+    .sort({ createdAt: -1 })
+    .lean();
+  const usersById = await loadUsersMap(
+    interests.flatMap((interest) => [interest.founderId, interest.talentId]),
+  );
+  const startupsById = await loadStartupsMap(interests.map((interest) => interest.startupId));
+  const talentProfilesById = await loadTalentProfilesMap(
+    interests.map((interest) => interest.talentId),
+  );
+  return apiSuccess(
+    res,
+    interests.map((interest) =>
+      serializeInterest(interest, { usersById, startupsById, talentProfilesById }),
+    ),
+  );
 };
 
 export const getSentInterests = async (req, res) => {
   if (!isSelfOrAdmin(req, req.params.talentId)) {
     return apiError(res, "Forbidden.", 403);
   }
-  const interests = await Interest.find({ talentId: req.params.talentId }).sort({ createdAt: -1 });
-  return apiSuccess(res, interests);
+  const interests = await Interest.find({ talentId: req.params.talentId })
+    .sort({ createdAt: -1 })
+    .lean();
+  const usersById = await loadUsersMap(
+    interests.flatMap((interest) => [interest.founderId, interest.talentId]),
+  );
+  const startupsById = await loadStartupsMap(interests.map((interest) => interest.startupId));
+  const talentProfilesById = await loadTalentProfilesMap(
+    interests.map((interest) => interest.talentId),
+  );
+  return apiSuccess(
+    res,
+    interests.map((interest) =>
+      serializeInterest(interest, { usersById, startupsById, talentProfilesById }),
+    ),
+  );
 };
 
 export const getInterestById = async (req, res) => {
@@ -497,8 +814,92 @@ export const updateInterestStatus = async (req, res) => {
   if (!canAccessInterest(req, interest)) {
     return apiError(res, "Forbidden.", 403);
   }
-  interest.status = req.body?.status || "pending";
+  const previousStatus = interest.status;
+  const newStatus = req.body?.status || "pending";
+  interest.status = newStatus;
   await interest.save();
+
+  // On accept: automatically onboard talent as team member
+  if (newStatus === "accepted" && previousStatus !== "accepted") {
+    try {
+      const talent = await User.findById(interest.talentId);
+      if (talent) {
+        const startupId = interest.startupId || interest.founderId;
+
+        talent.role = "team-member";
+        talent.startupId = startupId;
+        talent.founderId = interest.founderId;
+        talent.onboardingComplete = true;
+        await talent.save();
+
+        await TeamMemberProfile.findOneAndUpdate(
+          { userId: talent._id },
+          {
+            userId: talent._id,
+            founderId: interest.founderId,
+            startupId,
+          },
+          { upsert: true, new: true, runValidators: true },
+        );
+
+        await Presence.findOneAndUpdate(
+          { startupId: String(startupId), userId: String(talent._id) },
+          {
+            startupId: String(startupId),
+            userId: String(talent._id),
+            userName: talent.name || "",
+            role: "team-member",
+            isOnline: false,
+            lastSeenAt: new Date(),
+            expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
+            metadata: { source: "interest-acceptance" },
+          },
+          { upsert: true, new: true, runValidators: true },
+        );
+
+        // Create activity for team member joining
+        const createdActivity = await Activity.create({
+          startupId,
+          userId: talent._id,
+          type: "join",
+          text: "Team member joined from accepted interest.",
+          metadata: {
+            interestId: interest._id,
+            founderId: interest.founderId,
+            userName: talent.name || "",
+            icon: "👋",
+          },
+        });
+
+        const activityEvent = mapActivityToDto(createdActivity);
+        if (activityEvent?.startupId) {
+          emitRealtime(SOCKET_EVENTS.ACTIVITY_CREATED, activityEvent, [startupRoom(activityEvent.startupId)]);
+        }
+      }
+    } catch (onboardErr) {
+      console.error("[updateInterestStatus] Onboarding failed:", onboardErr.message);
+      // Continue - status was already updated
+    }
+  }
+
+  // Emit real-time event to both parties for status update
+  const eventPayload = {
+    interest: {
+      id: String(interest._id),
+      talentId: String(interest.talentId),
+      founderId: String(interest.founderId),
+      startupId: String(interest.startupId || ""),
+      status: interest.status,
+      previousStatus,
+      updatedAt: new Date().toISOString(),
+    },
+  };
+
+  emitRealtime(SOCKET_EVENTS.INTEREST_UPDATED, eventPayload, [
+    userRoom(interest.founderId),
+    userRoom(interest.talentId),
+  ]);
+
   return apiSuccess(res, interest);
 };
 
@@ -515,7 +916,15 @@ export const addMessageToInterest = async (req, res) => {
   ];
 
   await interest.save();
-  return apiSuccess(res, interest);
+  const [usersById, startupsById, talentProfilesById] = await Promise.all([
+    loadUsersMap([interest.founderId, interest.talentId]),
+    loadStartupsMap([interest.startupId]),
+    loadTalentProfilesMap([interest.talentId]),
+  ]);
+  return apiSuccess(
+    res,
+    serializeInterest(interest.toObject(), { usersById, startupsById, talentProfilesById }),
+  );
 };
 
 export const onboardInterest = async (req, res) => {

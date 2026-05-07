@@ -69,6 +69,15 @@ function normalizeAnnouncement(row) {
 function normalizeTask(row) {
   if (!row) return null;
   const id = toId(row);
+  const assignedRaw = row.assignedTo ?? row.assigneeId;
+  const assignedTo =
+    assignedRaw != null && assignedRaw !== ""
+      ? String(
+          typeof assignedRaw === "object"
+            ? assignedRaw._id || assignedRaw.id || ""
+            : assignedRaw,
+        )
+      : "";
   return {
     id,
     title: String(row.title || "Untitled task"),
@@ -76,8 +85,19 @@ function normalizeTask(row) {
     priority: String(row.priority || "medium"),
     dueDate: row.dueDate ? toDate(row.dueDate) : null,
     createdAt: toDate(row.createdAt),
-    assignedTo: String(row.assignedTo || row.assigneeId || ""),
+    assignedTo,
     assignedToName: String(row.assignedToName || row.assigneeName || ""),
+    milestoneId: String(
+      row.milestoneId?.id ||
+        row.milestoneId?._id ||
+        row.milestoneId ||
+        row.milestone?.id ||
+        row.milestone?._id ||
+        "",
+    ),
+    milestoneName: String(
+      row.milestoneName || row.milestone?.title || row.milestone?.name || "",
+    ),
     blockerReason: String(row.blockerReason || row.blockedReason || ""),
     blockerNote: String(row.blockerNote || row.blockedNote || ""),
     raw: row,
@@ -197,17 +217,52 @@ export function mapOfficeWorkspaceModel({
   const tasks = mergeByIdInternal((taskRows || []).map(normalizeTask).filter(Boolean), (row) => row.id)
     .sort((left, right) => compareByDateDesc(left, right, (row) => row.createdAt));
 
+  /** Founder "my tasks" = explicitly assigned to founder only (unassigned live on Home). */
   const myTasks = tasks.filter((task) => {
     if (user?.role === "founder") {
-      if (!task.assignedTo) return true;
-      return task.assignedTo === userId;
+      return Boolean(task.assignedTo) && task.assignedTo === userId;
     }
     return task.assignedTo === userId;
   });
 
-  const teamTasks = user?.role === "founder"
-    ? tasks.filter((task) => task.assignedTo && task.assignedTo !== userId)
-    : [];
+  const teamTasks =
+    user?.role === "founder"
+      ? tasks.filter(
+          (task) =>
+            Boolean(task.assignedTo) && task.assignedTo !== userId,
+        )
+      : [];
+
+  const unassignedByMilestone = (() => {
+    if (user?.role !== "founder") return [];
+    const buckets = new Map();
+    for (const task of tasks) {
+      if (task.assignedTo) continue;
+      const mid = task.milestoneId ? String(task.milestoneId) : "";
+      const key = mid || "_none";
+      if (!buckets.has(key)) {
+        buckets.set(key, {
+          milestoneId: mid,
+          milestoneName: task.milestoneName || "",
+          count: 0,
+        });
+      }
+      const bucket = buckets.get(key);
+      bucket.count += 1;
+      if (!bucket.milestoneName && task.milestoneName) {
+        bucket.milestoneName = task.milestoneName;
+      }
+    }
+    return Array.from(buckets.values())
+      .map((b) => ({
+        milestoneId: b.milestoneId,
+        milestoneName:
+          b.milestoneName ||
+          (b.milestoneId ? "Milestone" : "No milestone"),
+        count: b.count,
+      }))
+      .sort((a, b) => b.count - a.count);
+  })();
 
   const agenda = mergeByIdInternal(
     (agendaRows || []).map(normalizeAgendaItem).filter(Boolean),
@@ -249,6 +304,7 @@ export function mapOfficeWorkspaceModel({
     tasks,
     myTasks,
     teamTasks,
+    unassignedByMilestone,
     agenda,
     teamEnergy: {
       onlineCount,

@@ -23,7 +23,6 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "../ui/tooltip";
-import ProfileCompletionModal from "../ProfileCompletionModal";
 import { TalentProfileModal } from "../TalentProfileModal";
 import OutcomeSelectionModal from "../execution-engine/OutcomeSelectionModal";
 import MilestoneDetailView from "../execution-engine/MilestoneDetailView";
@@ -75,6 +74,7 @@ import {
   generateSmartTeamRecommendations,
   getTalentMatchesForRoles,
 } from "../../utils/smartTeamMatching";
+import { useNavigate } from "react-router-dom";
 import { JOURNEY_STAGES } from "../../utils/journeyProgress";
 import {
   buildWeeklyPlanCustom,
@@ -596,8 +596,7 @@ export default function FounderDashboard({
   onNavigate,
   onVirtualOfficeViewChange,
 }) {
-  /* Avoid auto-opening over App.jsx profile-setup route (race / double overlay). */
-  const [showProfileModal, setShowProfileModal] = useState(false);
+  const navigate = useNavigate();
   const [activeTaskId, setActiveTaskId] = useState(null);
   const [showSkipWarning, setShowSkipWarning] = useState(false);
   const [teamRecommendations, setTeamRecommendations] = useState([]);
@@ -1068,10 +1067,6 @@ export default function FounderDashboard({
     };
   };
   const smartInsight = getSmartInsight();
-  const handleProfileComplete = () => {
-    useJourneyStore.getState().setStageCompletion(1, 25);
-    setShowProfileModal(false);
-  };
 
   const [startupMissingBanner, setStartupMissingBanner] = useState(false);
   useEffect(() => {
@@ -1734,15 +1729,6 @@ export default function FounderDashboard({
           </span>
         </div>
       )}
-      {showProfileModal && !user.onboardingComplete && (
-        <ProfileCompletionModal
-          role={user.role}
-          user={user}
-          onUpdateUser={onUpdateUser}
-          onComplete={handleProfileComplete}
-          onClose={() => setShowProfileModal(false)}
-        />
-      )}
       {startupMissingBanner && (
         <div className="mx-3 md:mx-4 mb-2 rounded-lg border border-amber-500/40 bg-amber-500/10 px-4 py-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
           <p className="text-sm text-foreground">
@@ -1848,7 +1834,7 @@ export default function FounderDashboard({
                 <Button
                   size="sm"
                   className="mt-1 h-5 text-[9px] px-2"
-                  onClick={() => setShowProfileModal(true)}
+                  onClick={() => navigate("/onboarding")}
                 >
                   Complete Profile
                 </Button>

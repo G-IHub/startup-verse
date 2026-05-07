@@ -681,6 +681,58 @@ export function subscribeToUnreadCount(_startupId, userId, onUpdate) {
   });
 }
 
+// ========================================
+// INTERESTS — interest:created / interest:updated
+// ========================================
+
+export function subscribeToInterests(userId, onUpdate) {
+  const socket = SocketEngine.getSocket();
+  const roomId = userSocketRoom(userId);
+
+  const onCreated = (payload) => {
+    if (payload?.interest) onUpdate({ action: "created", interest: payload.interest });
+  };
+  const onUpdated = (payload) => {
+    if (payload?.interest) onUpdate({ action: "updated", interest: payload.interest });
+  };
+
+  joinRoom(roomId);
+  socket.on("interest:created", onCreated);
+  socket.on("interest:updated", onUpdated);
+
+  return () => {
+    socket.off("interest:created", onCreated);
+    socket.off("interest:updated", onUpdated);
+    leaveRoom(roomId);
+  };
+}
+
+// ========================================
+// INVITATIONS — invitation:created / invitation:updated
+// ========================================
+
+export function subscribeToInvitations(userId, onUpdate) {
+  const socket = SocketEngine.getSocket();
+  const roomId = userSocketRoom(userId);
+
+  const onCreated = (payload) => {
+    if (payload?.invitation) onUpdate({ action: "created", invitation: payload.invitation });
+  };
+  const onUpdated = (payload) => {
+    if (payload?.invitation) onUpdate({ action: "updated", invitation: payload.invitation });
+  };
+
+  joinRoom(roomId);
+  socket.on("invitation:created", onCreated);
+  socket.on("invitation:updated", onUpdated);
+
+  return () => {
+    socket.off("invitation:created", onCreated);
+    socket.off("invitation:updated", onUpdated);
+    leaveRoom(roomId);
+  };
+}
+
 export async function broadcastUnreadCountUpdate() {
   return false;
 }
