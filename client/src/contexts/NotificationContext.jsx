@@ -9,6 +9,7 @@ import { API_BASE_URL } from "../config/apiBase.js";
 import { toast } from "sonner";
 import { useAuth } from "./AuthContext";
 import { getAccessToken } from "../app/session";
+import { normalizeNotificationType } from "../utils/notificationType.js";
 
 const NotificationContext = createContext(undefined);
 
@@ -47,12 +48,44 @@ async function checkBackendAvailability() {
 }
 
 function isImportantNotificationType(type) {
+  const normalized = normalizeNotificationType(type);
   return [
-    "task_assigned",
-    "task_blocked",
-    "deadline_overdue",
-    "weekly_review_reminder",
-  ].includes(type);
+    "task-assigned",
+    "task-blocked",
+    "deadline-overdue",
+    "weekly-review-reminder",
+  ].includes(normalized);
+}
+
+function toIsoTimestamp(value) {
+  const source = value || new Date().toISOString();
+  const parsed = new Date(source);
+  if (!Number.isFinite(parsed.getTime())) return new Date().toISOString();
+  return parsed.toISOString();
+}
+
+function mapNotificationRow(row) {
+  const value = row || {};
+  const idValue = value.id ?? value._id ?? "";
+  const read =
+    typeof value.read === "boolean" ? value.read : Boolean(value.readAt);
+  const metadata =
+    value.metadata && typeof value.metadata === "object" ? value.metadata : {};
+
+  return {
+    ...value,
+    id: idValue ? String(idValue) : "",
+    type: normalizeNotificationType(value.type),
+    read,
+    timestamp: toIsoTimestamp(value.timestamp || value.createdAt),
+    actionUrl: value.actionUrl || metadata.actionUrl || "",
+    metadata,
+  };
+}
+
+function mapNotificationList(rows) {
+  if (!Array.isArray(rows)) return [];
+  return rows.map(mapNotificationRow).filter((n) => n.id || n.message);
 }
 
 export function NotificationProvider({ children }) {
@@ -74,7 +107,7 @@ export function NotificationProvider({ children }) {
       const cached = localStorage.getItem(`notifications_${user.id}`);
       if (cached) {
         try {
-          setNotifications(JSON.parse(cached));
+          setNotifications(mapNotificationList(JSON.parse(cached)));
         } catch (parseError) {
           console.error("Failed to parse cached notifications:", parseError);
         }
@@ -108,12 +141,8 @@ export function NotificationProvider({ children }) {
         return;
       }
 
-      const data = await response.json();
-      const mappedNotifications = (data.notifications || []).map((notif) => ({
-        ...notif,
-        timestamp:
-          notif.timestamp || notif.createdAt || new Date().toISOString(),
-      }));
+      const payload = await response.json();
+      const mappedNotifications = mapNotificationList(payload?.data);
 
       setNotifications(mappedNotifications);
       setError(null);
@@ -140,7 +169,7 @@ export function NotificationProvider({ children }) {
       const cached = localStorage.getItem(`notifications_${user.id}`);
       if (cached) {
         try {
-          setNotifications(JSON.parse(cached));
+          setNotifications(mapNotificationList(JSON.parse(cached)));
         } catch (parseError) {
           console.error("Failed to parse cached notifications:", parseError);
         }
@@ -166,8 +195,8 @@ export function NotificationProvider({ children }) {
       clearTimeout(timeoutId);
 
       if (response.ok) {
-        const data = await response.json();
-        setPreferences(data.preferences || DEFAULT_PREFERENCES);
+        const payload = await response.json();
+        setPreferences(payload?.data || DEFAULT_PREFERENCES);
       }
     } catch {
       // Silent fallback to defaults.
@@ -199,8 +228,10 @@ export function NotificationProvider({ children }) {
       const localNotification = {
         ...notification,
         id: `local-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
-        timestamp: new Date(),
+        type: normalizeNotificationType(notification.type),
+        timestamp: new Date().toISOString(),
         read: false,
+        actionUrl: notification.actionUrl || "",
       };
       setNotifications((prev) => [localNotification, ...prev]);
 
@@ -214,12 +245,23 @@ export function NotificationProvider({ children }) {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 5000);
 
+      const normalizedType = normalizeNotificationType(notification.type);
+      const metadata = {
+        ...(notification?.metadata || {}),
+      };
+      if (notification?.actionUrl) {
+        metadata.actionUrl = notification.actionUrl;
+      }
+
       const response = await fetch(`${API_BASE_URL}/notifications`, {
         method: "POST",
         headers: getAuthHeaders(),
         body: JSON.stringify({
           userId: user.id,
-          ...notification,
+          title: notification?.title || "Notification",
+          message: notification?.message || "",
+          type: normalizedType,
+          metadata,
         }),
         signal: controller.signal,
       });
@@ -230,11 +272,8 @@ export function NotificationProvider({ children }) {
         return;
       }
 
-      const data = await response.json();
-      const newNotification = {
-        ...data.notification,
-        timestamp: new Date(data.notification.timestamp),
-      };
+      const payload = await response.json();
+      const newNotification = mapNotificationRow(payload?.data);
       setNotifications((prev) => [newNotification, ...prev]);
 
       if (isImportantNotificationType(notification.type)) {
@@ -257,9 +296,8 @@ export function NotificationProvider({ children }) {
       const timeoutId = setTimeout(() => controller.abort(), 5000);
 
       const response = await fetch(`${API_BASE_URL}/notifications/${id}/read`, {
-        method: "PATCH",
+        method: "PUT",
         headers: getAuthHeaders(),
-        body: JSON.stringify({ userId: user.id }),
         signal: controller.signal,
       });
       clearTimeout(timeoutId);
@@ -393,7 +431,7 @@ export function NotificationProvider({ children }) {
       }
 
       const data = await response.json();
-      setPreferences(data.preferences);
+      setPreferences(data?.data || DEFAULT_PREFERENCES);
     } catch (prefsError) {
       setPreferences(previousPreferences);
       console.warn("Error updating notification preferences:", prefsError.message);

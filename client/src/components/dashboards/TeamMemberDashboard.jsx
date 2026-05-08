@@ -1,818 +1,549 @@
-import React, { useEffect, useState } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "../ui/card";
-import { Badge } from "../ui/badge";
-import { Button } from "../ui/button";
-import { Avatar, AvatarFallback } from "../ui/avatar";
-import { Progress } from "../ui/progress";
-import { getTasks } from "../../utils/executionEngine";
-import * as teamMemberApi from "../../utils/api/teamMemberApi";
-import * as compensationApi from "../../utils/api/compensationApi";
-import * as meetingApi from "../../utils/api/meetingApi";
-// ✅ Added pagination hook
-// ✅ Added pagination controls
-import { getInitials } from "../../utils/nameHelpers"; // ✅ Safe name handling
-import { STORAGE_KEYS } from "../../app/session";
-import PendingCompensationBanner from "../compensation/PendingCompensationBanner";
+import React, { useEffect, useMemo, useState } from "react";
+import { toast } from "sonner";
 import {
-  CheckCircle2,
-  Clock,
   AlertCircle,
-  Target,
   ArrowRight,
   Building,
-  Video,
-  CheckSquare,
-  Users,
   Calendar,
-  ListChecks,
-  Zap,
-  TrendingUp,
-  Activity,
+  CheckCircle2,
+  Clock,
+  Loader2,
+  MessageSquare,
+  PlayCircle,
+  ShieldAlert,
+  Users,
 } from "lucide-react";
+import { Button } from "../ui/button";
+import { Badge } from "../ui/badge";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "../ui/card";
+import { Progress } from "../ui/progress";
+import { Textarea } from "../ui/textarea";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "../ui/select";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "../ui/dialog";
+import { useTeamMemberHomeData } from "../../domains/team-member/hooks/useTeamMemberHomeData";
+
+const BLOCKER_REASONS = [
+  { value: "waiting-on-others", label: "Waiting on others" },
+  { value: "missing-info", label: "Missing information" },
+  { value: "technical-issue", label: "Technical issue" },
+  { value: "resource-constraint", label: "Resource constraint" },
+];
+
+function statusTone(status) {
+  if (status === "completed") return "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300";
+  if (status === "in-progress") return "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300";
+  if (status === "blocked") return "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300";
+  return "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300";
+}
+
+function formatWhen(value) {
+  if (!value) return "No due date";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "No due date";
+  return date.toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  });
+}
+
 export default function TeamMemberDashboard({ user, onNavigate }) {
-  const [founderId, setFounderId] = useState(null);
-  const [founderName, setFounderName] = useState("");
-  const [myTasks, setMyTasks] = useState([]);
-  const [teamMembers, setTeamMembers] = useState([]);
-  const [meetings, setMeetings] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [hasCompensation, setHasCompensation] = useState(false);
-  const [checkingCompensation, setCheckingCompensation] = useState(true);
+  const {
+    loading,
+    error,
+    updatingTaskId,
+    savingCheckIn,
+    viewModel,
+    saveCheckIn,
+    updateTaskStatus,
+    refresh,
+  } = useTeamMemberHomeData({ user });
 
-  // Find the founder based on startupId
+  const [checkInStatus, setCheckInStatus] = useState("available");
+  const [checkInNote, setCheckInNote] = useState("");
+
+  const [blockerTask, setBlockerTask] = useState(null);
+  const [blockerReason, setBlockerReason] = useState(BLOCKER_REASONS[0].value);
+  const [blockerNote, setBlockerNote] = useState("");
+  const [blocking, setBlocking] = useState(false);
+
   useEffect(() => {
-    loadDashboardData();
+    setCheckInStatus(viewModel.checkIn.status || "available");
+    setCheckInNote(viewModel.checkIn.note || "");
+  }, [viewModel.checkIn.note, viewModel.checkIn.status]);
 
-    // ✅ REALTIME: Removed dashboard polling (was every 10s) - using real-time subscription
+  const founderName = viewModel.founderName || "your founder";
 
-    return () => {
-      // Real-time subscription cleanup handled separately
-    };
-  }, [user.id, user.startupId, user.companyId]);
-  const loadDashboardData = async () => {
-    const startupId = user.startupId;
-    if (!startupId) {
-      setLoading(false);
+  const quickActions = useMemo(
+    () => [
+      {
+        id: "office",
+        label: "Open Virtual Office",
+        onClick: () => onNavigate?.("startup-office"),
+      },
+      {
+        id: "inbox",
+        label: "Open Inbox",
+        onClick: () => onNavigate?.("inbox"),
+      },
+      {
+        id: "performance",
+        label: "View Performance",
+        onClick: () => onNavigate?.("my-performance"),
+      },
+    ],
+    [onNavigate],
+  );
+
+  const handleTaskChange = async (task, status, extra = {}) => {
+    const result = await updateTaskStatus(task, { status, ...extra });
+    if (result.success) {
+      const label = status.replace("-", " ");
+      toast.success(`Task moved to ${label}`);
       return;
     }
-    try {
-      // 1. Load from localStorage FIRST (instant display)
-      const allUsers = JSON.parse(
-        localStorage.getItem(STORAGE_KEYS.teamMembers) || "[]",
-      );
 
-      // Find founder
-      const founder = allUsers.find(
-        (u) => u.id === startupId && u.role === "founder",
-      );
-      if (founder) {
-        setFounderId(founder.id);
-        setFounderName(founder.name);
-
-        // Load tasks from localStorage initially
-        const allTasks = getTasks(founder.id);
-        const assignedTasks = allTasks.filter((t) => t.assignedTo === user.id);
-        setMyTasks(assignedTasks);
-      }
-
-      // Load team members from localStorage
-      const team = allUsers.filter(
-        (u) =>
-          u.id !== user.id &&
-          (() => {
-            // Team member sees: founder + other team members in same startup ONLY
-            const founderIdToMatch = user.startupId || user.founderId;
-            return (
-              u.id === founderIdToMatch ||
-              // Include the founder
-              u.startupId === founderIdToMatch ||
-              // Other team members with same startupId
-              u.founderId === founderIdToMatch
-            ); // Other team members with same founderId
-          })(),
-      );
-      setTeamMembers(team);
-      setLoading(false);
-
-      // 2. Fetch tasks from backend in BACKGROUND
-      try {
-        const backendTasks = await teamMemberApi.getTeamMemberTasks(user.id);
-        setMyTasks(backendTasks);
-        console.log("✅ Tasks loaded from backend:", backendTasks.length);
-      } catch (error) {
-        // Silently fail and use localStorage data
-        if (process.env.NODE_ENV === "development") {
-          console.debug(
-            "Failed to load tasks from backend (expected in demo mode):",
-            error.message,
-          );
-        }
-      }
-
-      // 3. Check compensation status
-      try {
-        const compensationResult =
-          await compensationApi.getCompensationContract(user.id);
-        if (compensationResult.success && compensationResult.contract) {
-          setHasCompensation(true);
-          console.log("✅ Team member has compensation contract");
-        } else {
-          setHasCompensation(false);
-          console.log("⏳ Team member pending compensation setup");
-        }
-      } catch (error) {
-        console.error("Failed to check compensation status:", error);
-        setHasCompensation(false);
-      } finally {
-        setCheckingCompensation(false);
-      }
-
-      // 4. Optionally fetch team members from backend
-      if (startupId) {
-        try {
-          const backendTeamMembers =
-            await teamMemberApi.getStartupTeamMembers(startupId);
-          if (backendTeamMembers && backendTeamMembers.length > 0) {
-            const filteredTeam = backendTeamMembers.filter(
-              (m) => m.id !== user.id,
-            );
-            setTeamMembers(filteredTeam);
-            console.log(
-              "✅ Team members loaded from backend:",
-              filteredTeam.length,
-            );
-          }
-        } catch (error) {
-          // Silently fail and use localStorage data
-          if (process.env.NODE_ENV === "development") {
-            console.debug(
-              "Failed to load team members from backend (expected in demo mode):",
-              error.message,
-            );
-          }
-        }
-      }
-
-      // 5. Optionally fetch meetings from backend
-      if (startupId) {
-        try {
-          const backendMeetings =
-            await meetingApi.getStartupMeetings(startupId);
-          if (backendMeetings && backendMeetings.length > 0) {
-            setMeetings(backendMeetings);
-            console.log(
-              "✅ Meetings loaded from backend:",
-              backendMeetings.length,
-            );
-          }
-        } catch (error) {
-          // Silently fail and use localStorage data
-          if (process.env.NODE_ENV === "development") {
-            console.debug(
-              "Failed to load meetings from backend (expected in demo mode):",
-              error.message,
-            );
-          }
-        }
-      }
-    } catch (error) {
-      console.error("Error loading dashboard data:", error);
-      setLoading(false);
-    }
+    toast.error(result.error || "Could not update task");
   };
 
-  // Calculate task statistics
-  const totalTasks = myTasks.length;
-  const completedTasks = myTasks.filter((t) => t.status === "completed").length;
-  const inProgressTasks = myTasks.filter(
-    (t) => t.status === "in-progress",
-  ).length;
-  const pendingTasks = myTasks.filter((t) => t.status === "pending").length;
-  const blockedTasks = myTasks.filter((t) => t.status === "blocked").length;
-  const completionRate =
-    totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
-
-  // Get today's date
-  const today = new Date();
-  const todayFormatted = today.toLocaleDateString("en-US", {
-    weekday: "long",
-    month: "long",
-    day: "numeric",
-  });
-
-  // Generate recent activity feed
-  const generateRecentActivity = () => {
-    const activities = [];
-    const allUsers = JSON.parse(
-      localStorage.getItem(STORAGE_KEYS.teamMembers) || "[]",
-    );
-
-    // Get all tasks from founder
-    if (founderId) {
-      const allTasks = getTasks(founderId);
-
-      // Add completed tasks as activities
-      const completedTasksWithAssignees = allTasks
-        .filter((t) => t.status === "completed" && t.assignedTo)
-        .slice(0, 5);
-      completedTasksWithAssignees.forEach((task) => {
-        const assignee = allUsers.find((u) => u.id === task.assignedTo);
-        if (assignee) {
-          activities.push({
-            id: `completed-${task.id}`,
-            user: assignee,
-            action: "completed",
-            task: task.title,
-            time: getTimeAgo(
-              task.updatedAt || task.createdAt || new Date().toISOString(),
-            ),
-            icon: CheckCircle2,
-            color: "text-green-600",
-            bgColor: "bg-green-100 dark:bg-green-900/30",
-          });
-        }
-      });
-
-      // Add in-progress tasks as activities
-      const inProgressTasksWithAssignees = allTasks
-        .filter((t) => t.status === "in-progress" && t.assignedTo)
-        .slice(0, 3);
-      inProgressTasksWithAssignees.forEach((task) => {
-        const assignee = allUsers.find((u) => u.id === task.assignedTo);
-        if (assignee) {
-          activities.push({
-            id: `started-${task.id}`,
-            user: assignee,
-            action: "started",
-            task: task.title,
-            time: getTimeAgo(
-              task.updatedAt || task.createdAt || new Date().toISOString(),
-            ),
-            icon: Clock,
-            color: "text-blue-600",
-            bgColor: "bg-blue-100 dark:bg-blue-900/30",
-          });
-        }
-      });
+  const submitBlocker = async () => {
+    if (!blockerTask) return;
+    if (!blockerReason || !blockerNote.trim()) {
+      toast.error("Add a blocker reason and note before saving.");
+      return;
     }
 
-    // Sort by most recent
-    return activities.slice(0, 6);
-  };
-
-  // Helper function to get time ago
-  const getTimeAgo = (dateString) => {
-    const date = new Date(dateString);
-    const now = new Date();
-    const diffInMs = now.getTime() - date.getTime();
-    const diffInMins = Math.floor(diffInMs / (1000 * 60));
-    const diffInHours = Math.floor(diffInMs / (1000 * 60 * 60));
-    const diffInDays = Math.floor(diffInMs / (1000 * 60 * 60 * 24));
-    if (diffInMins < 1) return "Just now";
-    if (diffInMins < 60) return `${diffInMins}m ago`;
-    if (diffInHours < 24) return `${diffInHours}h ago`;
-    if (diffInDays < 7) return `${diffInDays}d ago`;
-    return date.toLocaleDateString("en-US", {
-      month: "short",
-      day: "numeric",
+    setBlocking(true);
+    const result = await updateTaskStatus(blockerTask, {
+      status: "blocked",
+      blockerReason,
+      blockerNote: blockerNote.trim(),
     });
+    setBlocking(false);
+
+    if (result.success) {
+      toast.info("Blocker submitted. Founder will see this update.");
+      setBlockerTask(null);
+      setBlockerNote("");
+      setBlockerReason(BLOCKER_REASONS[0].value);
+      return;
+    }
+
+    toast.error(result.error || "Could not save blocker");
   };
-  const recentActivities = generateRecentActivity();
 
-  // Generate upcoming events
-  const generateUpcomingEvents = () => {
-    const events = [];
-    const now = new Date();
-    const nextWeek = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
-
-    // Add upcoming meetings
-    const upcomingMeetings = meetings
-      .filter((meeting) => {
-        const meetingDate = new Date(meeting.date);
-        return (
-          meetingDate >= now &&
-          meetingDate <= nextWeek &&
-          meeting.status === "scheduled"
-        );
-      })
-      .map((meeting) => ({
-        id: `meeting-${meeting.id}`,
-        type: "meeting",
-        title: meeting.title,
-        date: meeting.date,
-        time: meeting.startTime,
-        icon: meeting.type === "video-call" ? Video : Users,
-        color: "text-purple-600",
-        bgColor: "bg-purple-100 dark:bg-purple-900/30",
-      }));
-    events.push(...upcomingMeetings);
-
-    // Add tasks with due dates
-    const tasksWithDueDates = myTasks
-      .filter((task) => {
-        if (!task.dueDate || task.status === "completed") return false;
-        const dueDate = new Date(task.dueDate);
-        return dueDate >= now && dueDate <= nextWeek;
-      })
-      .map((task) => ({
-        id: `task-${task.id}`,
-        type: "task",
-        title: task.title,
-        date: task.dueDate,
-        icon: CheckSquare,
-        color:
-          task.status === "in-progress" ? "text-blue-600" : "text-orange-600",
-        bgColor:
-          task.status === "in-progress"
-            ? "bg-blue-100 dark:bg-blue-900/30"
-            : "bg-orange-100 dark:bg-orange-900/30",
-        status: task.status,
-      }));
-    events.push(...tasksWithDueDates);
-
-    // Sort by date
-    events.sort((a, b) => {
-      const dateA = new Date(a.date);
-      const dateB = new Date(b.date);
-      return dateA.getTime() - dateB.getTime();
+  const handleCheckInSave = async () => {
+    const result = await saveCheckIn({
+      status: checkInStatus,
+      note: checkInNote.trim(),
     });
-    return events.slice(0, 6);
-  };
-  const upcomingEvents = generateUpcomingEvents();
 
-  // Helper to format relative time
-  const getRelativeTime = (dateString, timeString) => {
-    const date = new Date(dateString);
-    const now = new Date();
-    const diffInMs = date.getTime() - now.getTime();
-    const diffInDays = Math.floor(diffInMs / (1000 * 60 * 60 * 24));
-    const diffInHours = Math.floor(diffInMs / (1000 * 60 * 60));
-    if (diffInDays === 0) {
-      if (timeString) {
-        return `Today at ${timeString}`;
-      }
-      return "Today";
+    if (result.success) {
+      toast.success("Check-in updated");
+      return;
     }
-    if (diffInDays === 1) {
-      if (timeString) {
-        return `Tomorrow at ${timeString}`;
-      }
-      return "Tomorrow";
-    }
-    if (diffInDays < 7) {
-      const dayName = date.toLocaleDateString("en-US", {
-        weekday: "short",
-      });
-      if (timeString) {
-        return `${dayName} at ${timeString}`;
-      }
-      return dayName;
-    }
-    return date.toLocaleDateString("en-US", {
-      month: "short",
-      day: "numeric",
-    });
+
+    toast.error(result.error || "Could not save check-in");
   };
 
-  // Task metrics for the cards
-  const taskMetrics = [
-    {
-      label: "Total",
-      value: totalTasks,
-      icon: ListChecks,
-      color: "text-[#3A5AFE]",
-      bgColor: "bg-blue-100 dark:bg-blue-900/30",
-    },
-    {
-      label: "In Progress",
-      value: inProgressTasks,
-      icon: Clock,
-      color: "text-blue-600",
-      bgColor: "bg-blue-100 dark:bg-blue-900/30",
-    },
-    {
-      label: "Completed",
-      value: completedTasks,
-      icon: CheckCircle2,
-      color: "text-green-600",
-      bgColor: "bg-green-100 dark:bg-green-900/30",
-    },
-    {
-      label: "Pending",
-      value: pendingTasks,
-      icon: Target,
-      color: "text-orange-600",
-      bgColor: "bg-orange-100 dark:bg-orange-900/30",
-    },
-  ];
   if (loading) {
     return (
-      <div className="p-4 flex items-center justify-center">
-        <div className="text-center space-y-2">
-          <div className="w-6 h-6 border-3 border-primary border-t-transparent rounded-full animate-spin mx-auto" />
-          <p className="text-[10px] text-muted-foreground">
-            Loading dashboard...
-          </p>
+      <div className="flex min-h-[360px] items-center justify-center">
+        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          <Loader2 className="h-4 w-4 animate-spin" />
+          Loading My Work Today
         </div>
       </div>
     );
   }
+
   return (
-    <div className="p-2 md:p-3 space-y-2 max-w-[1400px] mx-auto min-h-screen">
-      {!checkingCompensation && !hasCompensation && (
-        <PendingCompensationBanner founderName={founderName} />
-      )}
-      <div className="flex items-start justify-between gap-2 md:gap-3">
-        <div className="flex-1">
-          <div className="flex items-center gap-1.5 mb-0.5">
-            <h1 className="text-sm md:text-base font-bold text-gray-900 dark:text-white">
-              {"Welcome back, "}
-              {user.name.split(" ")[0]}
-            </h1>
-            {completedTasks > 0 && (
-              <Badge className="bg-green-500/10 text-green-700 dark:text-green-400 border-green-500/20 text-[9px] px-1.5 py-0">
-                {completedTasks}
-                {" done"}
-              </Badge>
-            )}
+    <div className="space-y-4 py-4 pb-20">
+      <section className="rounded-2xl border border-blue-700/20 bg-blue-600 p-5 text-white">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+          <div className="space-y-1">
+            <p className="text-sm text-blue-100">My work today</p>
+            <h2 className="text-2xl font-semibold text-white">
+              {viewModel.activeTasks.length > 0
+                ? `${viewModel.activeTasks.length} active task${viewModel.activeTasks.length === 1 ? "" : "s"}`
+                : "You are fully caught up"}
+            </h2>
+            <p className="text-sm text-blue-100">{viewModel.todayLabel}</p>
           </div>
-          <p className="text-[10px] md:text-xs text-muted-foreground">
-            {todayFormatted}
-          </p>
+          <div className="flex flex-wrap gap-2">
+            {quickActions.map((action) => (
+              <Button
+                key={action.id}
+                variant="secondary"
+                className="bg-white/15 text-white hover:bg-white/25"
+                onClick={action.onClick}
+              >
+                {action.label}
+              </Button>
+            ))}
+          </div>
         </div>
-        <Button
-          size="sm"
-          onClick={() => onNavigate?.("startup-office")}
-          className="bg-gradient-to-r from-[#3A5AFE] to-[#304FFE] hover:from-[#304FFE] hover:to-[#2040EE] text-white shadow-lg hover:shadow-xl transition-all font-semibold h-7 text-[10px] px-2.5"
-        >
-          <Building className="w-3 h-3 mr-1.5" />
-          Virtual Office
-          <ArrowRight className="w-3 h-3 ml-1.5" />
-        </Button>
-      </div>
-      <div className="grid grid-cols-4 gap-1.5 md:gap-2">
-        {taskMetrics.map((metric) => {
-          const IconComponent = metric.icon;
-          return (
-            <Card
-              key={metric.label}
-              className="hover:shadow-md transition-all hover:border-[#3A5AFE]/20"
-            >
-              <CardContent className="p-2">
-                <div className="flex items-center gap-2">
-                  <div
-                    className={`w-7 h-7 md:w-8 md:h-8 ${metric.bgColor} rounded-lg flex items-center justify-center flex-shrink-0`}
-                  >
-                    <IconComponent
-                      className={`w-3.5 h-3.5 md:w-4 md:h-4 ${metric.color}`}
-                    />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-lg md:text-xl font-bold text-gray-900 dark:text-white">
-                      {metric.value}
-                    </p>
-                    <p className="text-[9px] md:text-[10px] text-muted-foreground truncate">
-                      {metric.label}
-                    </p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          );
-        })}
-      </div>
-      <div className="grid lg:grid-cols-5 gap-2 md:gap-3 flex-1">
-        <div className="flex flex-col lg:col-span-3">
-          <Card className="flex-1 flex flex-col">
-            <CardHeader className="pb-2 pt-2.5 px-3">
-              <div className="flex items-center justify-between">
-                <CardTitle className="flex items-center gap-1.5 text-xs md:text-sm">
-                  <Zap className="w-3.5 h-3.5 md:w-4 md:h-4 text-[#3A5AFE]" />
-                  Active Tasks
-                </CardTitle>
-                <div className="flex items-center gap-1.5">
-                  <Badge
-                    variant="secondary"
-                    className="text-[9px] md:text-[10px] px-1.5 py-0.5 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-800"
-                  >
-                    {myTasks.filter((t) => t.status !== "completed").length}
-                    {" need"}
-                    {myTasks.filter((t) => t.status !== "completed").length !==
-                    1
-                      ? ""
-                      : "s"}
-                    {" attention"}
-                  </Badge>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    className="text-[9px] h-6 px-2"
-                    onClick={() => onNavigate?.("startup-office")}
-                  >
-                    View All
-                    <ArrowRight className="w-2.5 h-2.5 ml-1" />
-                  </Button>
-                </div>
+      </section>
+
+      {error ? (
+        <Card className="border-amber-300 bg-amber-50 dark:border-amber-800 dark:bg-amber-950/20">
+          <CardContent className="flex items-center justify-between gap-3 py-3">
+            <p className="text-sm text-amber-800 dark:text-amber-200">{error}</p>
+            <Button variant="outline" size="sm" onClick={() => refresh()}>
+              Retry
+            </Button>
+          </CardContent>
+        </Card>
+      ) : null}
+
+      <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <Card>
+          <CardHeader className="pb-2">
+            <CardDescription>Completion</CardDescription>
+            <CardTitle className="text-3xl">{viewModel.metrics.completionRate}%</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <Progress value={viewModel.metrics.completionRate} className="h-2" />
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardDescription>In Progress</CardDescription>
+            <CardTitle className="text-3xl">{viewModel.metrics.inProgress}</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm text-muted-foreground">Tasks currently moving</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardDescription>Blocked</CardDescription>
+            <CardTitle className="text-3xl">{viewModel.metrics.blocked}</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm text-muted-foreground">Needs founder support</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardDescription>Completed</CardDescription>
+            <CardTitle className="text-3xl">{viewModel.metrics.completed}</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm text-muted-foreground">Done this cycle</p>
+          </CardContent>
+        </Card>
+      </section>
+
+      <section className="grid gap-4 lg:grid-cols-3">
+        <Card className="lg:col-span-2">
+          <CardHeader>
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <CardTitle>Assigned Tasks</CardTitle>
+                <CardDescription>
+                  Move tasks through pending, in progress, blocked, and completed states.
+                </CardDescription>
               </div>
-            </CardHeader>
-            <CardContent className="space-y-2 flex-1 flex flex-col px-3 pb-2.5">
-              {myTasks.filter((t) => t.status !== "completed").length > 0 ? (
-                <div className="space-y-1.5 flex-1 overflow-y-auto min-h-[350px] max-h-[calc(100vh-400px)]">
-                  {myTasks
-                    .filter((t) => t.status !== "completed")
-                    .map((task) => (
-                      <div
-                        key={task.id}
-                        className="flex items-start gap-2 p-2 bg-muted/40 hover:bg-muted/60 rounded-lg transition-all border border-transparent hover:border-[#3A5AFE]/30 cursor-pointer group"
-                        onClick={() => onNavigate?.("startup-office")}
-                      >
-                        <div
-                          className={`w-6 h-6 md:w-7 md:h-7 rounded-lg flex items-center justify-center flex-shrink-0 ${task.status === "in-progress" ? "bg-blue-100 dark:bg-blue-900/30" : task.status === "blocked" ? "bg-red-100 dark:bg-red-900/30" : "bg-slate-100 dark:bg-slate-800"}`}
-                        >
-                          {task.status === "in-progress" ? (
-                            <Clock className="w-3 h-3 md:w-3.5 md:h-3.5 text-blue-600" />
-                          ) : task.status === "blocked" ? (
-                            <AlertCircle className="w-3 h-3 md:w-3.5 md:h-3.5 text-red-600" />
-                          ) : (
-                            <CheckSquare className="w-3 h-3 md:w-3.5 md:h-3.5 text-slate-600" />
-                          )}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-[11px] md:text-xs font-medium text-gray-900 dark:text-white mb-0.5 group-hover:text-[#3A5AFE] transition-colors">
-                            {task.title}
-                          </p>
-                          <div className="flex items-center gap-1.5 flex-wrap">
-                            <Badge
-                              variant="outline"
-                              className="text-[8px] md:text-[9px] px-1 py-0 h-4"
-                            >
-                              {task.status === "in-progress"
-                                ? "In Progress"
-                                : task.status === "blocked"
-                                  ? "Blocked"
-                                  : "Pending"}
-                            </Badge>
-                            {task.dueDate && (
-                              <p className="text-[8px] md:text-[9px] text-muted-foreground flex items-center gap-0.5">
-                                <Calendar className="w-2.5 h-2.5" />
-                                {new Date(task.dueDate).toLocaleDateString(
-                                  "en-US",
-                                  {
-                                    month: "short",
-                                    day: "numeric",
-                                  },
-                                )}
-                              </p>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                </div>
-              ) : (
-                <div className="py-8 md:py-10 text-center flex-1 flex flex-col items-center justify-center min-h-[350px]">
-                  <div className="w-12 h-12 md:w-14 md:h-14 bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center mx-auto mb-2">
-                    <CheckCircle2 className="w-6 h-6 md:w-7 md:h-7 text-green-600" />
-                  </div>
-                  <p className="text-xs md:text-sm font-semibold mb-0.5">
-                    All caught up!
-                  </p>
-                  <p className="text-[9px] md:text-[10px] text-muted-foreground">
-                    No active tasks at the moment
-                  </p>
-                </div>
-              )}
-              {totalTasks > 0 && (
-                <div className="pt-2 border-t mt-auto">
-                  <div className="flex items-center gap-2.5 md:gap-3">
-                    <div className="w-9 h-9 md:w-10 md:h-10 bg-gradient-to-br from-[#3A5AFE]/10 to-purple-500/10 rounded-lg flex items-center justify-center flex-shrink-0">
-                      <TrendingUp className="w-4 h-4 md:w-5 md:h-5 text-[#3A5AFE]" />
-                    </div>
-                    <div className="flex-1 space-y-1">
-                      <div className="flex items-center justify-between">
-                        <p className="text-[10px] md:text-xs font-semibold">
-                          Overall Progress
-                        </p>
-                        <p className="text-lg md:text-xl font-bold text-[#3A5AFE]">
-                          {completionRate}%
-                        </p>
-                      </div>
-                      <Progress value={completionRate} className="h-1.5" />
-                      <div className="flex items-center justify-between text-[8px] md:text-[9px] text-muted-foreground">
-                        <span>
-                          {completedTasks}
-                          {" of "}
-                          {totalTasks}
-                          {" tasks completed"}
+              <Button variant="outline" size="sm" onClick={() => onNavigate?.("startup-office")}> 
+                <Building className="mr-1.5 h-4 w-4" />
+                Open Workspace
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {viewModel.tasks.length === 0 ? (
+              <div className="rounded-xl border border-dashed border-border p-8 text-center">
+                <p className="text-sm font-medium">No tasks assigned yet</p>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  New assignments will appear here automatically.
+                </p>
+              </div>
+            ) : (
+              viewModel.tasks.map((task) => (
+                <div key={task.id} className="rounded-xl border border-border bg-card p-3">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div className="space-y-1">
+                      <p className="text-sm font-semibold text-foreground">{task.title}</p>
+                      <p className="text-sm text-muted-foreground">{task.description || "No description provided"}</p>
+                      <div className="flex flex-wrap items-center gap-2 pt-1">
+                        <Badge className={statusTone(task.status)}>{task.status}</Badge>
+                        <span className="inline-flex items-center gap-1 text-sm text-muted-foreground">
+                          <Calendar className="h-4 w-4" />
+                          {formatWhen(task.dueDate)}
                         </span>
-                        {completionRate >= 80 && (
-                          <span className="text-green-600 font-medium">
-                            Excellent! 🎉
-                          </span>
-                        )}
                       </div>
+                      {task.status === "blocked" && (task.blockerReason || task.blockerNote) ? (
+                        <div className="rounded-lg border border-red-200 bg-red-50 p-2 text-sm text-red-800 dark:border-red-900 dark:bg-red-950/30 dark:text-red-200">
+                          <p className="font-medium">{task.blockerReason || "Blocked"}</p>
+                          {task.blockerNote ? <p>{task.blockerNote}</p> : null}
+                        </div>
+                      ) : null}
+                    </div>
+
+                    <div className="flex flex-wrap gap-2">
+                      {task.status === "pending" ? (
+                        <>
+                          <Button
+                            size="sm"
+                            onClick={() => handleTaskChange(task, "in-progress")}
+                            disabled={updatingTaskId === task.id}
+                          >
+                            <PlayCircle className="mr-1.5 h-4 w-4" />
+                            Start
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setBlockerTask(task)}
+                            disabled={updatingTaskId === task.id}
+                          >
+                            <ShieldAlert className="mr-1.5 h-4 w-4" />
+                            Block
+                          </Button>
+                        </>
+                      ) : null}
+
+                      {task.status === "in-progress" ? (
+                        <>
+                          <Button
+                            size="sm"
+                            onClick={() => handleTaskChange(task, "completed")}
+                            disabled={updatingTaskId === task.id}
+                          >
+                            <CheckCircle2 className="mr-1.5 h-4 w-4" />
+                            Complete
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setBlockerTask(task)}
+                            disabled={updatingTaskId === task.id}
+                          >
+                            <ShieldAlert className="mr-1.5 h-4 w-4" />
+                            Block
+                          </Button>
+                        </>
+                      ) : null}
+
+                      {task.status === "blocked" ? (
+                        <Button
+                          size="sm"
+                          onClick={() => handleTaskChange(task, "in-progress")}
+                          disabled={updatingTaskId === task.id}
+                        >
+                          <ArrowRight className="mr-1.5 h-4 w-4" />
+                          Resume
+                        </Button>
+                      ) : null}
+
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => onNavigate?.("startup-office", { taskId: task.id })}
+                      >
+                        Open
+                      </Button>
                     </div>
                   </div>
                 </div>
+              ))
+            )}
+          </CardContent>
+        </Card>
+
+        <div className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Daily Check-In</CardTitle>
+              <CardDescription>Share your current focus and availability with the team.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div className="space-y-1.5">
+                <label className="text-sm font-medium text-foreground">Status</label>
+                <Select value={checkInStatus} onValueChange={setCheckInStatus}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {viewModel.statusOptions.map((option) => (
+                      <SelectItem key={option} value={option}>
+                        {option}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-sm font-medium text-foreground">Check-in note</label>
+                <Textarea
+                  value={checkInNote}
+                  onChange={(event) => setCheckInNote(event.target.value)}
+                  placeholder="What are you working on right now?"
+                  rows={4}
+                />
+              </div>
+
+              <Button className="w-full" onClick={handleCheckInSave} disabled={savingCheckIn}>
+                {savingCheckIn ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : null}
+                Save Check-In
+              </Button>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Blockers Needing Help</CardTitle>
+              <CardDescription>Escalated items that need support.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              {viewModel.blockedTasks.length === 0 ? (
+                <p className="text-sm text-muted-foreground">No active blockers right now.</p>
+              ) : (
+                viewModel.blockedTasks.map((task) => (
+                  <div key={`blocked-${task.id}`} className="rounded-lg border border-border p-2.5">
+                    <p className="text-sm font-medium">{task.title}</p>
+                    <p className="text-sm text-muted-foreground">
+                      {task.blockerReason || "Missing reason"}
+                    </p>
+                    {task.blockerNote ? (
+                      <p className="mt-1 text-sm text-muted-foreground">{task.blockerNote}</p>
+                    ) : null}
+                  </div>
+                ))
               )}
             </CardContent>
           </Card>
-        </div>
-        <div className="flex flex-col space-y-2 lg:col-span-2">
-          <Card className="flex flex-col">
-            <CardHeader className="pb-2 pt-2.5 px-3">
-              <div className="flex items-center justify-between">
-                <CardTitle className="flex items-center gap-1.5 text-xs md:text-sm">
-                  <Users className="w-3.5 h-3.5 md:w-4 md:h-4 text-[#3A5AFE]" />
-                  Your Team
-                </CardTitle>
-                <Badge
-                  variant="secondary"
-                  className="text-[9px] md:text-[10px] px-1.5 py-0.5 bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 border-purple-200 dark:border-purple-800"
-                >
-                  {teamMembers.length}
-                  {" member"}
-                  {teamMembers.length !== 1 ? "s" : ""}
-                </Badge>
-              </div>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Live Team Context</CardTitle>
+              <CardDescription>
+                {viewModel.hasLivePresence
+                  ? "Live presence stream"
+                  : "Fallback roster (presence unavailable)"}
+              </CardDescription>
             </CardHeader>
-            <CardContent className="space-y-1.5 overflow-y-auto max-h-[280px] px-3 pb-2.5">
-              {teamMembers.length > 0 ? (
-                <>
-                  {teamMembers.map((member) => (
-                    <div
-                      key={member.id}
-                      className="flex items-center gap-2 p-2 bg-muted/40 hover:bg-muted/60 rounded-lg transition-colors"
-                    >
-                      <div className="relative">
-                        <Avatar className="w-8 h-8 md:w-9 md:h-9 border-2 border-background">
-                          <AvatarFallback className="bg-gradient-to-br from-[#3A5AFE] to-purple-600 text-white font-semibold text-[10px] md:text-xs">
-                            {getInitials(member.name)}
-                          </AvatarFallback>
-                        </Avatar>
-                        <div className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-green-500 border-2 border-background rounded-full" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-[11px] md:text-xs font-medium text-gray-900 dark:text-white truncate">
-                          {member.name}
-                        </p>
-                        <p className="text-[9px] md:text-[10px] text-muted-foreground truncate">
-                          {member.profile?.title || member.role === "founder"
-                            ? "Founder"
-                            : "Team Member"}
-                        </p>
-                      </div>
+            <CardContent className="space-y-2">
+              {viewModel.teamContext.length === 0 ? (
+                <p className="text-sm text-muted-foreground">No team context available.</p>
+              ) : (
+                viewModel.teamContext.slice(0, 6).map((member) => (
+                  <div key={`member-${member.id}`} className="flex items-start justify-between rounded-lg border border-border p-2.5">
+                    <div>
+                      <p className="text-sm font-medium">{member.name}</p>
+                      <p className="text-sm text-muted-foreground">{member.role}</p>
+                      {member.statusText ? (
+                        <p className="text-sm text-muted-foreground">{member.statusText}</p>
+                      ) : null}
                     </div>
-                  ))}
-                </>
-              ) : (
-                <div className="py-6 text-center">
-                  <Users className="w-8 h-8 md:w-9 md:h-9 mx-auto mb-2 text-muted-foreground opacity-30" />
-                  <p className="text-[9px] md:text-[10px] text-muted-foreground">
-                    No team members yet
-                  </p>
-                </div>
+                    <Badge variant={member.isOnline ? "default" : "outline"}>
+                      {member.isOnline ? "Online" : "Away"}
+                    </Badge>
+                  </div>
+                ))
               )}
             </CardContent>
           </Card>
-          <Card className="flex flex-col flex-1">
-            <CardHeader className="pb-2 pt-2.5 px-3">
-              <div className="flex items-center justify-between">
-                <CardTitle className="flex items-center gap-1.5 text-xs md:text-sm">
-                  <Activity className="w-3.5 h-3.5 md:w-4 md:h-4 text-[#3A5AFE]" />
-                  Last Activity
-                </CardTitle>
-                <Badge
-                  variant="secondary"
-                  className="text-[9px] md:text-[10px] px-1.5 py-0.5 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 border-green-200 dark:border-green-800"
-                >
-                  {recentActivities.length}
-                  {" update"}
-                  {recentActivities.length !== 1 ? "s" : ""}
-                </Badge>
-              </div>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Upcoming</CardTitle>
+              <CardDescription>From your calendar timeline.</CardDescription>
             </CardHeader>
-            <CardContent className="space-y-1.5 flex-1 overflow-y-auto max-h-[280px] px-3 pb-2.5">
-              {recentActivities.length > 0 ? (
-                <>
-                  {recentActivities.map((activity) => {
-                    const IconComponent = activity.icon;
-                    return (
-                      <div
-                        key={activity.id}
-                        className="flex items-start gap-2 p-2 bg-muted/40 hover:bg-muted/60 rounded-lg transition-colors"
-                      >
-                        <div
-                          className={`w-6 h-6 md:w-7 md:h-7 rounded-lg flex items-center justify-center flex-shrink-0 ${activity.bgColor}`}
-                        >
-                          <IconComponent
-                            className={`w-3 h-3 md:w-3.5 md:h-3.5 ${activity.color}`}
-                          />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-[11px] md:text-xs text-gray-900 dark:text-white mb-0.5">
-                            <span className="font-medium">
-                              {activity.user.name.split(" ")[0]}
-                            </span>{" "}
-                            <span className="text-muted-foreground">
-                              {activity.action}
-                            </span>
-                          </p>
-                          <p className="text-[10px] md:text-[11px] text-muted-foreground truncate mb-0.5">
-                            {activity.task}
-                          </p>
-                          <p className="text-[8px] md:text-[9px] text-muted-foreground">
-                            {activity.time}
-                          </p>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </>
+            <CardContent className="space-y-2">
+              {viewModel.upcoming.length === 0 ? (
+                <p className="text-sm text-muted-foreground">No upcoming items in the next 2 weeks.</p>
               ) : (
-                <div className="py-8 text-center flex-1 flex flex-col items-center justify-center">
-                  <Activity className="w-8 h-8 md:w-9 md:h-9 mx-auto mb-2 text-muted-foreground opacity-30" />
-                  <p className="text-[9px] md:text-[10px] text-muted-foreground">
-                    No recent activity
-                  </p>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-          <Card className="flex flex-col flex-1">
-            <CardHeader className="pb-2 pt-2.5 px-3">
-              <div className="flex items-center justify-between">
-                <CardTitle className="flex items-center gap-1.5 text-xs md:text-sm">
-                  <Calendar className="w-3.5 h-3.5 md:w-4 md:h-4 text-[#3A5AFE]" />
-                  Coming Up
-                </CardTitle>
-                <Badge
-                  variant="secondary"
-                  className="text-[9px] md:text-[10px] px-1.5 py-0.5 bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 border-indigo-200 dark:border-indigo-800"
-                >
-                  {upcomingEvents.length}
-                  {" event"}
-                  {upcomingEvents.length !== 1 ? "s" : ""}
-                </Badge>
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-1.5 flex-1 overflow-y-auto max-h-[280px] px-3 pb-2.5">
-              {upcomingEvents.length > 0 ? (
-                <>
-                  {upcomingEvents.map((event) => {
-                    const IconComponent = event.icon;
-                    return (
-                      <div
-                        key={event.id}
-                        className="flex items-start gap-2 p-2 bg-muted/40 hover:bg-muted/60 rounded-lg transition-colors"
-                      >
-                        <div
-                          className={`w-6 h-6 md:w-7 md:h-7 rounded-lg flex items-center justify-center flex-shrink-0 ${event.bgColor}`}
-                        >
-                          <IconComponent
-                            className={`w-3 h-3 md:w-3.5 md:h-3.5 ${event.color}`}
-                          />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-1.5 mb-0.5">
-                            <p className="text-[11px] md:text-xs font-medium text-gray-900 dark:text-white truncate">
-                              {event.title}
-                            </p>
-                            {event.type === "task" && event.status && (
-                              <Badge
-                                variant="outline"
-                                className="text-[7px] px-1 py-0 h-3"
-                              >
-                                {event.status === "in-progress"
-                                  ? "In Progress"
-                                  : "Pending"}
-                              </Badge>
-                            )}
-                          </div>
-                          <p className="text-[9px] md:text-[10px] text-muted-foreground flex items-center gap-0.5">
-                            <Clock className="w-2.5 h-2.5" />
-                            {getRelativeTime(event.date, event.time)}
-                          </p>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </>
-              ) : (
-                <div className="py-8 text-center flex-1 flex flex-col items-center justify-center">
-                  <Calendar className="w-8 h-8 md:w-9 md:h-9 mx-auto mb-2 text-muted-foreground opacity-30" />
-                  <p className="text-[9px] md:text-[10px] text-muted-foreground">
-                    No upcoming events
-                  </p>
-                  <p className="text-[8px] md:text-[9px] text-muted-foreground mt-0.5">
-                    Next 7 days
-                  </p>
-                </div>
+                viewModel.upcoming.slice(0, 5).map((item) => (
+                  <div key={`agenda-${item.id}`} className="rounded-lg border border-border p-2.5">
+                    <p className="text-sm font-medium">{item.title}</p>
+                    <p className="text-sm text-muted-foreground">{formatWhen(item.at)}</p>
+                    <div className="mt-1 flex items-center gap-1 text-sm text-muted-foreground">
+                      <Clock className="h-4 w-4" />
+                      {item.type}
+                    </div>
+                  </div>
+                ))
               )}
             </CardContent>
           </Card>
         </div>
-      </div>
+      </section>
+
+      <Dialog open={Boolean(blockerTask)} onOpenChange={(open) => (!open ? setBlockerTask(null) : null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Report Blocker</DialogTitle>
+            <DialogDescription>
+              Add blocker details so {founderName || "your founder"} can help unblock this task quickly.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-3">
+            <div className="rounded-lg border border-border bg-card p-3">
+              <p className="text-sm font-medium">{blockerTask?.title || "Task"}</p>
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium">Reason</label>
+              <Select value={blockerReason} onValueChange={setBlockerReason}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select blocker reason" />
+                </SelectTrigger>
+                <SelectContent>
+                  {BLOCKER_REASONS.map((reason) => (
+                    <SelectItem key={reason.value} value={reason.value}>
+                      {reason.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium">Details</label>
+              <Textarea
+                value={blockerNote}
+                onChange={(event) => setBlockerNote(event.target.value)}
+                placeholder="What is blocking progress and what do you need?"
+                rows={4}
+              />
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setBlockerTask(null)}>
+              Cancel
+            </Button>
+            <Button onClick={submitBlocker} disabled={blocking}>
+              {blocking ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <MessageSquare className="mr-1.5 h-4 w-4" />}
+              Save Blocker
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

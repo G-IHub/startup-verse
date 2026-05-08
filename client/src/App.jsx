@@ -369,8 +369,11 @@ function AppContent() {
       {currentView === APP_VIEWS.choosePath && (
         <ChooseYourPathPage
           onBack={() => setCurrentView(APP_VIEWS.landing)}
-          onComplete={(_role, completedUser) => {
-            setUser(completedUser);
+          onComplete={(_role, completedUser, accessToken) => {
+            login({
+              user: completedUser,
+              accessToken: accessToken || getAccessToken(),
+            });
             setCurrentView(APP_VIEWS.dashboard);
           }}
         />

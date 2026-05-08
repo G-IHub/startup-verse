@@ -69,6 +69,10 @@ export function TaskManagementPanel({
   onPlaySound,
   openAddDialog,
   initialTaskId,
+  strictMode = false,
+  startupId,
+  founderIdOverride,
+  onTasksSynced,
 }) {
   const [localTasks, setLocalTasks] = useState([]);
   const [teamMembers, setTeamMembers] = useState([]);
@@ -104,14 +108,16 @@ export function TaskManagementPanel({
     const loadData = async () => {
       setLoading(true);
 
-      // Get all users from localStorage
-      const allUsers = JSON.parse(
-        localStorage.getItem(STORAGE_KEYS.teamMembers) || "[]",
-      );
+      const allUsers = strictMode
+        ? []
+        : JSON.parse(localStorage.getItem(STORAGE_KEYS.teamMembers) || "[]");
 
       // Determine the founder ID (we don't need the full founder object)
       let founderIdValue = "";
-      if (user.role === "founder") {
+      if (founderIdOverride) {
+        founderIdValue = founderIdOverride;
+        setFounderId(founderIdOverride);
+      } else if (user.role === "founder") {
         founderIdValue = user.id;
         setFounderId(user.id);
       } else if (user.role === "team-member" && user.startupId) {
@@ -152,24 +158,28 @@ export function TaskManagementPanel({
           "❌ [TaskPanel] Error loading tasks from backend:",
           error,
         );
-        // Fallback to localStorage
-        const allTasks = getTasks(founderIdValue);
-        let filteredTasks = allTasks;
-        if (user.role === "team-member" || user.role === "team") {
-          filteredTasks = allTasks.filter(
-            (t) => t.assignedTo === user.id || t.assigneeId === user.id,
-          );
+        if (strictMode) {
+          setLoadError(error?.message || "Could not sync tasks from server.");
+          setLocalTasks([]);
+        } else {
+          const allTasks = getTasks(founderIdValue);
+          let filteredTasks = allTasks;
+          if (user.role === "team-member" || user.role === "team") {
+            filteredTasks = allTasks.filter(
+              (t) => t.assignedTo === user.id || t.assigneeId === user.id,
+            );
+          }
+          setLoadError("Could not sync tasks from server. Showing cached tasks.");
+          setLocalTasks(filteredTasks.map(normalizeTask));
         }
-        setLoadError("Could not sync tasks from server. Showing cached tasks.");
-        setLocalTasks(filteredTasks.map(normalizeTask));
       }
 
       // Load team members (for task assignment) - FROM BACKEND
       try {
-        const startupId = founderIdValue;
+        const resolvedStartupId = startupId || founderIdValue;
         console.log(
           "🔍 [TaskPanel] Loading team members for startup:",
-          startupId,
+          resolvedStartupId,
         );
 
         // Load from localStorage first
@@ -188,7 +198,7 @@ export function TaskManagementPanel({
 
         // Then fetch from backend
         const backendTeamMembers =
-          await teamMemberApi.getStartupTeamMembers(startupId);
+          await teamMemberApi.getStartupTeamMembers(resolvedStartupId);
         if (backendTeamMembers && backendTeamMembers.length > 0) {
           // Map backend data to consistent format
           const mappedMembers = backendTeamMembers
@@ -223,7 +233,7 @@ export function TaskManagementPanel({
     loadData();
 
     // ✅ REALTIME: Removed task/team polling (was every 10s) - using real-time subscription
-  }, [open, user.id, user.role, user.startupId, user.founderId]);
+  }, [open, user.id, user.role, user.startupId, user.founderId, founderIdOverride, startupId, strictMode]);
 
   useEffect(() => {
     if (!open || !founderId) return;
@@ -286,7 +296,7 @@ export function TaskManagementPanel({
     milestoneId: "",
     assigneeId: "",
   });
-  const handleCreateTask = () => {
+  const handleCreateTask = async () => {
     if (!newTask.title.trim()) {
       toast.error("Please enter a task title");
       return;
@@ -308,10 +318,24 @@ export function TaskManagementPanel({
     };
     const updatedTasks = [task, ...localTasks];
     setLocalTasks(updatedTasks);
-    saveTasks(founderId, updatedTasks);
+    if (strictMode) {
+      try {
+        const created = await taskApi.saveTask(founderId, task);
+        setLocalTasks((prev) =>
+          prev.map((row) => (row.id === task.id ? normalizeTask(created) : row)),
+        );
+      } catch (error) {
+        setLoadError(error?.message || "Task creation failed.");
+      }
+    } else {
+      saveTasks(founderId, updatedTasks);
+    }
 
     // 🚀 Sync tasks to milestones (new task increases totalTasks)
-    syncTasksToMilestones(founderId);
+    if (!strictMode) {
+      syncTasksToMilestones(founderId);
+    }
+    onTasksSynced?.();
     setShowCreateDialog(false);
     setNewTask({
       title: "",
@@ -323,15 +347,40 @@ export function TaskManagementPanel({
     onPlaySound?.();
     createTaskAssignedNotification(task, assignee?.name || "Unassigned");
   };
-  const handleToggleTask = (taskId) => {
+  const handleToggleTask = async (taskId) => {
     if (!founderId) return;
-    const updatedTasks = toggleTask(founderId, taskId);
-    setLocalTasks(
-      updatedTasks.filter(
-        (t) => user.role === "founder" || t.assignedTo === user.id,
-      ),
-    );
-    const task = updatedTasks.find((t) => t.id === taskId);
+    let task = null;
+    if (strictMode) {
+      const existing = localTasks.find((t) => t.id === taskId);
+      const nextStatus =
+        existing?.status === "completed" ? "pending" : "completed";
+      try {
+        const serverTask = await taskApi.updateTaskStatus(
+          founderId,
+          taskId,
+          nextStatus,
+          {
+            completedAt:
+              nextStatus === "completed" ? new Date().toISOString() : undefined,
+          },
+        );
+        task = normalizeTask(serverTask || existing);
+        setLocalTasks((prev) =>
+          prev.map((row) => (row.id === taskId ? task : row)),
+        );
+      } catch (error) {
+        setLoadError(error?.message || "Task toggle failed.");
+        return;
+      }
+    } else {
+      const updatedTasks = toggleTask(founderId, taskId);
+      setLocalTasks(
+        updatedTasks.filter(
+          (t) => user.role === "founder" || t.assignedTo === user.id,
+        ),
+      );
+      task = updatedTasks.find((t) => t.id === taskId);
+    }
 
     // 🔔 NOTIFICATION SYSTEM V2.0 - CLEAN REBUILD
     if (task && (user.role === "team-member" || user.role === "team")) {
@@ -365,16 +414,26 @@ export function TaskManagementPanel({
     } else {
       toast.success("Task marked as pending");
     }
+    onTasksSynced?.();
     onPlaySound?.();
   };
-  const handleDeleteTask = (taskId) => {
+  const handleDeleteTask = async (taskId) => {
     if (!founderId) return;
     const updatedTasks = localTasks.filter((t) => t.id !== taskId);
     setLocalTasks(updatedTasks);
-    saveTasks(founderId, updatedTasks);
+    if (strictMode) {
+      taskApi.deleteTask(founderId, taskId).catch((error) => {
+        setLoadError(error?.message || "Task deletion failed.");
+      });
+    } else {
+      saveTasks(founderId, updatedTasks);
+    }
 
     // 🚀 Sync tasks to milestones (deleting task updates counts)
-    syncTasksToMilestones(founderId);
+    if (!strictMode) {
+      syncTasksToMilestones(founderId);
+    }
+    onTasksSynced?.();
     toast.success("Task deleted");
     onPlaySound?.();
   };
@@ -398,8 +457,11 @@ export function TaskManagementPanel({
           )
         : updatedTasks;
       setLocalTasks(nextTasks);
-      saveTasks(founderId, nextTasks);
-      syncTasksToMilestones(founderId);
+      if (!strictMode) {
+        saveTasks(founderId, nextTasks);
+        syncTasksToMilestones(founderId);
+      }
+      onTasksSynced?.();
       setLoadError("");
       const statusLabel =
         newStatus === "in-progress"
@@ -471,8 +533,11 @@ export function TaskManagementPanel({
     );
     const applyBlockedSuccess = () => {
       setLocalTasks(updatedTasks);
-      saveTasks(founderId, updatedTasks);
-      syncTasksToMilestones(founderId);
+      if (!strictMode) {
+        saveTasks(founderId, updatedTasks);
+        syncTasksToMilestones(founderId);
+      }
+      onTasksSynced?.();
       setLoadError("");
       toast.error("Task marked as blocked");
       onPlaySound?.();
@@ -533,10 +598,15 @@ export function TaskManagementPanel({
           : t,
       );
       setLocalTasks(updatedTasks);
-      saveTasks(founderId, updatedTasks);
+      if (!strictMode) {
+        saveTasks(founderId, updatedTasks);
+      }
 
       // 🚀 Sync tasks to milestones when status changes
-      syncTasksToMilestones(founderId);
+      if (!strictMode) {
+        syncTasksToMilestones(founderId);
+      }
+      onTasksSynced?.();
       setDraggedTask(null);
       const statusLabel =
         status === "in-progress"
@@ -656,12 +726,12 @@ export function TaskManagementPanel({
               }}
               transition={{
                 type: "spring",
-                damping: 30,
-                stiffness: 300,
+                damping: 28,
+                stiffness: 260,
               }}
-              className="fixed right-0 top-0 h-full w-full md:w-[900px] bg-white dark:bg-slate-900 shadow-2xl z-[70] flex flex-col border-l-2 border-slate-200 dark:border-slate-700"
+              className="fixed right-0 top-0 h-full w-full md:w-[900px] office-panel office-panel-shell office-motion-soft z-[70] flex flex-col rounded-none md:rounded-l-xl"
             >
-              <div className="p-3 border-b-2 border-slate-200 dark:border-slate-700 bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-950/50 dark:to-purple-950/50">
+              <div className="p-3 office-panel-header">
                 <div className="flex items-center justify-between mb-3">
                   <div className="flex items-center gap-2">
                     <Target className="w-4 h-4 text-slate-700 dark:text-slate-300" />
@@ -687,7 +757,7 @@ export function TaskManagementPanel({
                   {localTasks.length !== 1 ? "s" : ""}
                 </p>
               </div>
-              <div className="p-4 border-b bg-slate-50 dark:bg-slate-900/50 space-y-3">
+              <div className="p-4 border-b border-border bg-surface-container-low space-y-3">
                 {loadError ? (
                   <div className="text-xs text-red-600 bg-red-50 border border-red-200 rounded p-2">
                     {loadError}
@@ -840,7 +910,26 @@ export function TaskManagementPanel({
                                       : t,
                                   );
                                   setLocalTasks(updatedTasks);
-                                  saveTasks(founderId, updatedTasks);
+                                  if (strictMode) {
+                                    const assigneeName = teamMembers.find(
+                                      (m) => m.id === assigneeId,
+                                    )?.name;
+                                    taskApi
+                                      .assignTask(
+                                        founderId,
+                                        taskId,
+                                        assigneeId,
+                                        assigneeName,
+                                      )
+                                      .then(() => onTasksSynced?.())
+                                      .catch((error) =>
+                                        setLoadError(
+                                          error?.message || "Task assignment failed.",
+                                        ),
+                                      );
+                                  } else {
+                                    saveTasks(founderId, updatedTasks);
+                                  }
                                   toast.success(
                                     `Task assigned to ${teamMembers.find((m) => m.id === assigneeId)?.name}`,
                                   );
@@ -920,7 +1009,26 @@ export function TaskManagementPanel({
                                       : t,
                                   );
                                   setLocalTasks(updatedTasks);
-                                  saveTasks(founderId, updatedTasks);
+                                  if (strictMode) {
+                                    const assigneeName = teamMembers.find(
+                                      (m) => m.id === assigneeId,
+                                    )?.name;
+                                    taskApi
+                                      .assignTask(
+                                        founderId,
+                                        taskId,
+                                        assigneeId,
+                                        assigneeName,
+                                      )
+                                      .then(() => onTasksSynced?.())
+                                      .catch((error) =>
+                                        setLoadError(
+                                          error?.message || "Task assignment failed.",
+                                        ),
+                                      );
+                                  } else {
+                                    saveTasks(founderId, updatedTasks);
+                                  }
                                   toast.success(
                                     `Task assigned to ${teamMembers.find((m) => m.id === assigneeId)?.name}`,
                                   );
@@ -955,7 +1063,7 @@ export function TaskManagementPanel({
       </AnimatePresence>
       {user.role === "founder" && (
         <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
-          <DialogContent className="max-w-md z-[75]">
+          <DialogContent className="max-w-md z-[75] office-dialog-panel">
             <DialogHeader>
               <DialogTitle>Create New Task</DialogTitle>
               <DialogDescription>
@@ -1266,7 +1374,7 @@ function TaskCard({
       </motion.div>
       <Dialog open={showAssignDialog} onOpenChange={setShowAssignDialog}>
         <DialogContent
-          className="max-w-sm z-[80]"
+          className="max-w-sm z-[80] office-dialog-panel"
           onClick={(e) => e.stopPropagation()}
         >
           <DialogHeader>
@@ -1329,7 +1437,7 @@ function TaskCard({
       </Dialog>
       <Dialog open={showBlockDialog} onOpenChange={setShowBlockDialog}>
         <DialogContent
-          className="max-w-sm z-[80]"
+          className="max-w-sm z-[80] office-dialog-panel"
           onClick={(e) => e.stopPropagation()}
         >
           <DialogHeader>

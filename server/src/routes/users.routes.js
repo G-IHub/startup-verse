@@ -26,6 +26,13 @@ usersRouter.get(
   asyncHandler(usersController.getNotifications)
 );
 
+usersRouter.delete(
+  "/users/:userId/notifications",
+  requireAuth,
+  requireSelfOrAdmin("userId"),
+  asyncHandler(usersController.clearNotifications)
+);
+
 usersRouter.post(
   "/users/:userId/notifications/mark-all-read",
   requireAuth,

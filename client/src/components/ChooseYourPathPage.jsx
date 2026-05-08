@@ -2,7 +2,6 @@ import React, { useState, useEffect, useRef } from "react";
 import { Button } from "./ui/button";
 import { Card, CardContent } from "./ui/card";
 import { Separator } from "./ui/separator";
-import ThemeToggle from "./ThemeToggle";
 import {
   ArrowLeft,
   Rocket,
@@ -21,6 +20,7 @@ export default function ChooseYourPathPage({ onBack, onComplete }) {
   const [selectedRole, setSelectedRole] = useState(null);
   const [showProfileSetup, setShowProfileSetup] = useState(false);
   const [newUser, setNewUser] = useState(null);
+  const [pendingAccessToken, setPendingAccessToken] = useState("");
   const [currentSlide, setCurrentSlide] = useState(0);
   const [isExiting, setIsExiting] = useState(false);
   const isMountedRef = useRef(true);
@@ -107,6 +107,7 @@ export default function ChooseYourPathPage({ onBack, onComplete }) {
 
     // Close signup modal and show profile setup
     setShowSignupModal(false);
+    setPendingAccessToken(data.backendToken || "");
 
     // Extract user from signup data
     let user;
@@ -142,7 +143,7 @@ export default function ChooseYourPathPage({ onBack, onComplete }) {
         ...newUser,
         onboardingComplete: true,
       };
-      onComplete(selectedRole, completedUser);
+      onComplete(selectedRole, completedUser, pendingAccessToken);
     }
   };
   const handleProfileUpdateUser = (updatedUser) => {
@@ -153,6 +154,7 @@ export default function ChooseYourPathPage({ onBack, onComplete }) {
   const handleSignupModalClose = () => {
     if (!isMountedRef.current) return;
     setShowSignupModal(false);
+    setPendingAccessToken("");
     setSelectedRole(null);
     setView("choose-path");
   };
@@ -160,310 +162,79 @@ export default function ChooseYourPathPage({ onBack, onComplete }) {
     if (!isMountedRef.current) return;
     setShowProfileSetup(false);
     setNewUser(null);
+    setPendingAccessToken("");
     setSelectedRole(null);
     setView("choose-path");
   };
+
+  const fullWidthOnboarding =
+    view === "signup" || view === "profile-setup";
+
+  if (fullWidthOnboarding) {
+    return (
+      <div className="min-h-screen min-h-[100dvh] bg-background flex flex-col items-stretch">
+        <div className="flex-1 w-full flex justify-center px-6 pb-[calc(8rem+env(safe-area-inset-bottom,0px))] pt-14 sm:px-8 sm:pt-16 md:px-8 md:py-10 md:pb-10">
+          <div className="w-full max-w-3xl my-auto">
+            {view === "signup" && selectedRole && (
+              <InlineSignupForm
+                role={selectedRole}
+                onBack={handleSignupModalClose}
+                onSignup={handleSignup}
+              />
+            )}
+            {view === "profile-setup" && newUser && selectedRole && (
+              <InlineProfileCompletion
+                user={newUser}
+                role={selectedRole}
+                onBack={handleProfileSetupClose}
+                onComplete={handleProfileComplete}
+                onUpdateUser={handleProfileUpdateUser}
+              />
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="min-h-screen flex">
-      <div className="hidden lg:flex lg:w-[42%] bg-primary relative overflow-hidden">
+    <div className="min-h-screen min-h-[100dvh] bg-background lg:flex">
+      <div className="hidden lg:flex lg:w-[42%] bg-primary relative overflow-hidden border-r border-primary/30">
         <div className="absolute inset-0 opacity-10">
           <div className="absolute top-1/4 left-20 w-16 h-16 rounded-full bg-white" />
           <div className="absolute bottom-1/3 right-32 w-12 h-12 rounded-full bg-white" />
           <div className="absolute top-1/3 right-16 w-8 h-8 rounded-full bg-white" />
         </div>
-        <div className="relative z-10 flex flex-col items-center justify-center w-full p-8 lg:p-12 text-white">
-          <div className="absolute top-8 left-8">
+        <div className="relative z-10 flex flex-col items-center justify-center w-full p-10 lg:p-14 text-white">
+          <div className="absolute top-8 left-10">
             <div className="flex items-center gap-2">
               <Building className="w-6 h-6 text-white" />
               <span className="text-lg font-semibold">StartupVerse</span>
             </div>
           </div>
-          <h1 className="text-3xl lg:text-4xl font-bold mb-16 text-center text-white">
+          <h1 className="text-3xl lg:text-4xl font-bold mb-14 text-center text-white tracking-tight">
             Welcome!
           </h1>
           <div className="mb-8 relative overflow-hidden w-full max-w-sm h-32">
             {features.map((feature, index) => {
               const isActive = currentSlide === index;
+              const SlideIcon = feature.icon;
               return (
                 <div
                   key={index}
                   className={`absolute inset-0 flex items-center justify-center ${isActive && !isExiting ? "translate-x-0 opacity-100 transition-all duration-[2000ms] ease-out" : isActive && isExiting ? "-translate-x-full opacity-0 transition-all duration-[2000ms] ease-in" : "translate-x-full opacity-0 transition-none"}`}
                 >
-                  {index === 0 && (
-                    <svg
-                      width="128"
-                      height="128"
-                      viewBox="0 0 128 128"
-                      fill="none"
-                      xmlns="http://www.w3.org/2000/svg"
-                    >
-                      <circle
-                        cx="64"
-                        cy="64"
-                        r="50"
-                        stroke="white"
-                        strokeWidth="3"
-                        opacity="0.6"
-                        fill="none"
-                      />
-                      <circle
-                        cx="64"
-                        cy="64"
-                        r="40"
-                        stroke="white"
-                        strokeWidth="2"
-                        opacity="0.4"
-                        fill="none"
-                      />
-                      <path
-                        d="M64 24 L72 56 L56 56 L64 24Z"
-                        fill="white"
-                        opacity="0.9"
-                      />
-                      <path
-                        d="M64 104 L56 72 L72 72 L64 104Z"
-                        fill="white"
-                        opacity="0.9"
-                      />
-                      <path
-                        d="M24 64 L56 56 L56 72 L24 64Z"
-                        fill="white"
-                        opacity="0.8"
-                      />
-                      <path
-                        d="M104 64 L72 72 L72 56 L104 64Z"
-                        fill="white"
-                        opacity="0.8"
-                      />
-                      <circle
-                        cx="64"
-                        cy="64"
-                        r="12"
-                        fill="white"
-                        opacity="0.95"
-                      />
-                    </svg>
-                  )}
-                  {index === 1 && (
-                    <svg
-                      width="128"
-                      height="128"
-                      viewBox="0 0 128 128"
-                      fill="none"
-                      xmlns="http://www.w3.org/2000/svg"
-                    >
-                      <circle
-                        cx="40"
-                        cy="40"
-                        r="16"
-                        fill="white"
-                        opacity="0.9"
-                      />
-                      <circle
-                        cx="88"
-                        cy="40"
-                        r="16"
-                        fill="white"
-                        opacity="0.9"
-                      />
-                      <circle
-                        cx="64"
-                        cy="88"
-                        r="16"
-                        fill="white"
-                        opacity="0.9"
-                      />
-                      <line
-                        x1="48"
-                        y1="48"
-                        x2="58"
-                        y2="78"
-                        stroke="white"
-                        strokeWidth="3"
-                        opacity="0.7"
-                      />
-                      <line
-                        x1="80"
-                        y1="48"
-                        x2="70"
-                        y2="78"
-                        stroke="white"
-                        strokeWidth="3"
-                        opacity="0.7"
-                      />
-                      <circle
-                        cx="40"
-                        cy="40"
-                        r="10"
-                        fill="white"
-                        opacity="0.3"
-                      />
-                      <circle
-                        cx="88"
-                        cy="40"
-                        r="10"
-                        fill="white"
-                        opacity="0.3"
-                      />
-                      <circle
-                        cx="64"
-                        cy="88"
-                        r="10"
-                        fill="white"
-                        opacity="0.3"
-                      />
-                    </svg>
-                  )}
-                  {index === 2 && (
-                    <svg
-                      width="128"
-                      height="128"
-                      viewBox="0 0 128 128"
-                      fill="none"
-                      xmlns="http://www.w3.org/2000/svg"
-                    >
-                      <rect
-                        x="20"
-                        y="30"
-                        width="88"
-                        height="60"
-                        rx="4"
-                        fill="white"
-                        opacity="0.9"
-                      />
-                      <rect
-                        x="24"
-                        y="34"
-                        width="80"
-                        height="52"
-                        fill="rgba(58, 90, 254, 0.3)"
-                      />
-                      <circle
-                        cx="48"
-                        cy="60"
-                        r="10"
-                        fill="white"
-                        opacity="0.8"
-                      />
-                      <circle
-                        cx="80"
-                        cy="60"
-                        r="10"
-                        fill="white"
-                        opacity="0.8"
-                      />
-                      <rect
-                        x="52"
-                        y="94"
-                        width="24"
-                        height="4"
-                        fill="white"
-                        opacity="0.7"
-                      />
-                      <rect
-                        x="44"
-                        y="98"
-                        width="40"
-                        height="6"
-                        fill="white"
-                        opacity="0.7"
-                      />
-                      <path
-                        d="M48 70 Q48 75 42 78"
-                        stroke="white"
-                        strokeWidth="2"
-                        opacity="0.6"
-                        fill="none"
-                      />
-                      <path
-                        d="M80 70 Q80 75 86 78"
-                        stroke="white"
-                        strokeWidth="2"
-                        opacity="0.6"
-                        fill="none"
-                      />
-                    </svg>
-                  )}
-                  {index === 3 && (
-                    <svg
-                      width="128"
-                      height="128"
-                      viewBox="0 0 128 128"
-                      fill="none"
-                      xmlns="http://www.w3.org/2000/svg"
-                    >
-                      <rect
-                        x="30"
-                        y="50"
-                        width="20"
-                        height="50"
-                        fill="white"
-                        opacity="0.8"
-                      />
-                      <rect
-                        x="54"
-                        y="35"
-                        width="20"
-                        height="65"
-                        fill="white"
-                        opacity="0.85"
-                      />
-                      <rect
-                        x="78"
-                        y="20"
-                        width="20"
-                        height="80"
-                        fill="white"
-                        opacity="0.9"
-                      />
-                      <path
-                        d="M20 100 L108 100"
-                        stroke="white"
-                        strokeWidth="2"
-                        opacity="0.6"
-                      />
-                      <path
-                        d="M40 45 L64 30 L88 15"
-                        stroke="#2ECC71"
-                        strokeWidth="4"
-                        opacity="0.9"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      />
-                      <circle
-                        cx="40"
-                        cy="45"
-                        r="4"
-                        fill="#2ECC71"
-                        opacity="0.9"
-                      />
-                      <circle
-                        cx="64"
-                        cy="30"
-                        r="4"
-                        fill="#2ECC71"
-                        opacity="0.9"
-                      />
-                      <circle
-                        cx="88"
-                        cy="15"
-                        r="4"
-                        fill="#2ECC71"
-                        opacity="0.9"
-                      />
-                      <path
-                        d="M88 15 L83 20 L88 20 L88 15"
-                        fill="#2ECC71"
-                        opacity="0.9"
-                      />
-                    </svg>
-                  )}
+                  <SlideIcon
+                    className="h-24 w-24 text-white drop-shadow-md sm:h-28 sm:w-28"
+                    strokeWidth={1.35}
+                    aria-hidden
+                  />
                 </div>
               );
             })}
           </div>
           <div
-            className="text-center mb-12 relative overflow-hidden w-full max-w-md"
+            className="text-center mb-10 relative overflow-hidden w-full max-w-md"
             style={{
               minHeight: "140px",
             }}
@@ -475,10 +246,10 @@ export default function ChooseYourPathPage({ onBack, onComplete }) {
                   key={index}
                   className={`absolute inset-0 ${isActive && !isExiting ? "translate-x-0 opacity-100 transition-all duration-[2000ms] ease-out" : isActive && isExiting ? "-translate-x-full opacity-0 transition-all duration-[2000ms] ease-in" : "translate-x-full opacity-0 transition-none"}`}
                 >
-                  <h2 className="text-xl font-semibold mb-3 text-white">
+                  <h2 className="text-xl font-semibold mb-3 text-white tracking-tight">
                     {feature.title}
                   </h2>
-                  <p className="text-sm text-white/90 leading-relaxed">
+                  <p className="text-sm text-white/90 leading-relaxed max-w-sm mx-auto">
                     {feature.description}
                   </p>
                 </div>
@@ -497,159 +268,164 @@ export default function ChooseYourPathPage({ onBack, onComplete }) {
           </div>
         </div>
       </div>
-      <div className="w-full lg:w-[58%] flex items-start justify-center p-4 md:p-8 relative overflow-y-auto max-h-screen">
-        <div className="absolute top-4 right-4 z-10">
-          <ThemeToggle />
-        </div>
-        <div className="w-full max-w-lg my-auto">
+      <div className="relative flex w-full max-h-[100dvh] items-start justify-center overflow-y-auto px-6 pb-[calc(8rem+env(safe-area-inset-bottom,0px))] pt-14 sm:px-8 sm:pt-16 md:max-h-screen md:px-8 md:py-10 md:pb-10 lg:w-[58%] lg:px-10 lg:py-10">
+        <div className="my-auto w-full max-w-2xl md:max-w-6xl">
           {view === "choose-path" && (
             <>
-              <div className="text-center mb-8 relative">
-                <h1 className="text-2xl md:text-3xl mb-2">Choose Your Path</h1>
-                <p className="text-muted-foreground text-sm">
+              <header className="relative mb-12 text-center md:mb-14">
+                <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl md:text-4xl">
+                  Choose Your Path
+                </h1>
+                <p className="mt-3 text-pretty text-sm leading-relaxed text-muted-foreground md:mt-4 md:text-base">
                   Select the option that fits you best
                 </p>
-              </div>
-              <div className="space-y-4">
-                <div className="grid md:grid-cols-2 gap-3.5 max-w-2xl mx-auto">
-                  <Card className="border-2 hover:shadow-lg transition-all">
-                    <CardContent className="p-4">
-                      <div className="flex items-center space-x-2.5 mb-3">
-                        <div className="w-9 h-9 rounded-full bg-foreground flex items-center justify-center shrink-0">
-                          <Rocket className="w-4.5 h-4.5 text-background" />
+              </header>
+              <div className="flex flex-col gap-14 md:gap-10">
+                <div className="mx-auto grid w-full max-w-6xl grid-cols-1 gap-8 md:grid-cols-2 md:gap-x-10 md:gap-y-8">
+                  <Card className="rounded-2xl border border-border/80 bg-card shadow-md ring-1 ring-black/[0.04] transition-all duration-200 dark:bg-card/95 dark:ring-white/[0.06] hover:shadow-lg active:scale-[0.99] md:bg-card/95 md:shadow-sm md:ring-0 md:hover:shadow-md md:hover:-translate-y-0.5">
+                    <CardContent className="flex flex-col px-6 pt-8 pb-14 sm:px-7 md:px-6 md:pt-7 md:pb-10">
+                      <div className="mb-5 flex items-center space-x-3 md:mb-4">
+                        <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
+                          <Rocket className="w-5 h-5 text-primary" />
                         </div>
                         <div className="text-left">
-                          <h4 className="text-base font-semibold">
+                          <h4 className="text-base md:text-lg font-semibold tracking-tight">
                             I'm a Founder
                           </h4>
-                          <p className="text-xs text-muted-foreground">
+                          <p className="mt-1.5 text-sm text-muted-foreground">
                             Build and scale your startup
                           </p>
                         </div>
                       </div>
-                      <Separator className="my-3" />
-                      <div className="space-y-2">
-                        <div className="flex items-center space-x-2 text-xs">
-                          <CheckCircle className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+                      <Separator className="my-6 shrink-0 md:my-5" />
+                      <div className="space-y-4 md:space-y-3.5">
+                        <div className="flex items-start gap-3 text-sm leading-relaxed md:items-center md:gap-2.5 md:leading-snug">
+                          <CheckCircle className="mt-0.5 size-4 shrink-0 text-muted-foreground md:mt-0 md:h-3.5 md:w-3.5" />
                           <span>Post your startup idea</span>
                         </div>
-                        <div className="flex items-center space-x-2 text-xs">
-                          <CheckCircle className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+                        <div className="flex items-start gap-3 text-sm leading-relaxed md:items-center md:gap-2.5 md:leading-snug">
+                          <CheckCircle className="mt-0.5 size-4 shrink-0 text-muted-foreground md:mt-0 md:h-3.5 md:w-3.5" />
                           <span>Find talented team members</span>
                         </div>
-                        <div className="flex items-center space-x-2 text-xs">
-                          <CheckCircle className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+                        <div className="flex items-start gap-3 text-sm leading-relaxed md:items-center md:gap-2.5 md:leading-snug">
+                          <CheckCircle className="mt-0.5 size-4 shrink-0 text-muted-foreground md:mt-0 md:h-3.5 md:w-3.5" />
                           <span>Turn vision into team execution</span>
                         </div>
-                        <div className="flex items-center space-x-2 text-xs">
-                          <CheckCircle className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+                        <div className="flex items-start gap-3 text-sm leading-relaxed md:items-center md:gap-2.5 md:leading-snug">
+                          <CheckCircle className="mt-0.5 size-4 shrink-0 text-muted-foreground md:mt-0 md:h-3.5 md:w-3.5" />
                           <span>Virtual office & collaboration</span>
                         </div>
                       </div>
-                      <Button
-                        className="w-full mt-4 h-8 text-xs"
-                        onClick={() => handleRoleClick("founder")}
-                      >
-                        Create Founder Account
-                        <ArrowRight className="w-3.5 h-3.5 ml-2" />
-                      </Button>
+                      <div className="mt-12 flex shrink-0 justify-center md:mt-9 md:block">
+                        <Button
+                          className="h-12 w-full max-w-sm rounded-xl px-6 text-base shadow-sm transition-shadow hover:shadow-md md:max-w-none md:rounded-lg md:px-5 md:h-11 md:text-sm"
+                          onClick={() => handleRoleClick("founder")}
+                        >
+                          Create Founder Account
+                          <ArrowRight className="w-3.5 h-3.5 ml-2" />
+                        </Button>
+                      </div>
                     </CardContent>
                   </Card>
-                  <Card className="border-2 hover:shadow-lg transition-all">
-                    <CardContent className="p-4">
-                      <div className="flex items-center space-x-2.5 mb-3">
-                        <div className="w-9 h-9 rounded-full bg-muted flex items-center justify-center shrink-0">
-                          <Star className="w-4.5 h-4.5 text-muted-foreground" />
+                  <Card className="rounded-2xl border border-border/80 bg-card shadow-md ring-1 ring-black/[0.04] transition-all duration-200 dark:bg-card/95 dark:ring-white/[0.06] hover:shadow-lg active:scale-[0.99] md:bg-card/95 md:shadow-sm md:ring-0 md:hover:shadow-md md:hover:-translate-y-0.5">
+                    <CardContent className="flex flex-col px-6 pt-8 pb-14 sm:px-7 md:px-6 md:pt-7 md:pb-10">
+                      <div className="mb-5 flex items-center space-x-3 md:mb-4">
+                        <div className="w-10 h-10 rounded-xl bg-muted flex items-center justify-center shrink-0">
+                          <Star className="w-5 h-5 text-muted-foreground" />
                         </div>
                         <div className="text-left">
-                          <h4 className="text-base font-semibold">
+                          <h4 className="text-base md:text-lg font-semibold tracking-tight">
                             I'm Looking to Join
                           </h4>
-                          <p className="text-xs text-muted-foreground">
+                          <p className="mt-1.5 text-sm text-muted-foreground">
                             Find exciting startup opportunities
                           </p>
                         </div>
                       </div>
-                      <Separator className="my-3" />
-                      <div className="space-y-2">
-                        <div className="flex items-center space-x-2 text-xs">
-                          <CheckCircle className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+                      <Separator className="my-6 shrink-0 md:my-5" />
+                      <div className="space-y-4 md:space-y-3.5">
+                        <div className="flex items-start gap-3 text-sm leading-relaxed md:items-center md:gap-2.5 md:leading-snug">
+                          <CheckCircle className="mt-0.5 size-4 shrink-0 text-muted-foreground md:mt-0 md:h-3.5 md:w-3.5" />
                           <span>Browse startup opportunities</span>
                         </div>
-                        <div className="flex items-center space-x-2 text-xs">
-                          <CheckCircle className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+                        <div className="flex items-start gap-3 text-sm leading-relaxed md:items-center md:gap-2.5 md:leading-snug">
+                          <CheckCircle className="mt-0.5 size-4 shrink-0 text-muted-foreground md:mt-0 md:h-3.5 md:w-3.5" />
                           <span>Connect with founders</span>
                         </div>
-                        <div className="flex items-center space-x-2 text-xs">
-                          <CheckCircle className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+                        <div className="flex items-start gap-3 text-sm leading-relaxed md:items-center md:gap-2.5 md:leading-snug">
+                          <CheckCircle className="mt-0.5 size-4 shrink-0 text-muted-foreground md:mt-0 md:h-3.5 md:w-3.5" />
                           <span>Showcase your skills</span>
                         </div>
-                        <div className="flex items-center space-x-2 text-xs">
-                          <CheckCircle className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+                        <div className="flex items-start gap-3 text-sm leading-relaxed md:items-center md:gap-2.5 md:leading-snug">
+                          <CheckCircle className="mt-0.5 size-4 shrink-0 text-muted-foreground md:mt-0 md:h-3.5 md:w-3.5" />
                           <span>Join innovative teams</span>
                         </div>
                       </div>
-                      <Button
-                        className="w-full mt-4 h-8 text-xs"
-                        onClick={() => handleRoleClick("talent")}
-                      >
-                        Create Talent Account
-                        <ArrowRight className="w-3.5 h-3.5 ml-2" />
-                      </Button>
+                      <div className="mt-12 flex shrink-0 justify-center md:mt-9 md:block">
+                        <Button
+                          className="h-12 w-full max-w-sm rounded-xl px-6 text-base shadow-sm transition-shadow hover:shadow-md md:max-w-none md:rounded-lg md:px-5 md:h-11 md:text-sm"
+                          onClick={() => handleRoleClick("talent")}
+                        >
+                          Create Talent Account
+                          <ArrowRight className="w-3.5 h-3.5 ml-2" />
+                        </Button>
+                      </div>
                     </CardContent>
                   </Card>
                 </div>
-                <div className="max-w-2xl mx-auto mt-6">
-                  <details className="group">
-                    <summary className="cursor-pointer text-xs text-muted-foreground hover:text-foreground transition-colors text-center list-none flex items-center justify-center gap-2">
+                <div className="mx-auto w-full max-w-2xl md:max-w-6xl">
+                  <details className="group rounded-xl py-2">
+                    <summary className="mx-auto flex max-w-md cursor-pointer list-none flex-wrap items-center justify-center gap-x-2 gap-y-2 px-2 py-4 text-center text-sm leading-snug text-muted-foreground transition-colors hover:text-foreground md:py-3">
                       <Building className="w-3.5 h-3.5" />
                       <span>
                         Are you an accelerator, competition, or program?
                       </span>
                       <ArrowRight className="w-3 h-3 group-open:rotate-90 transition-transform" />
                     </summary>
-                    <Card className="border-2 hover:shadow-lg transition-all mt-3">
-                      <CardContent className="p-4">
-                        <div className="flex items-center space-x-2.5 mb-3">
-                          <div className="w-9 h-9 rounded-full bg-purple-100 dark:bg-purple-950 flex items-center justify-center shrink-0">
-                            <Building className="w-4.5 h-4.5 text-purple-600 dark:text-purple-400" />
+                    <Card className="mt-6 rounded-2xl border border-border/80 bg-card shadow-md ring-1 ring-black/[0.04] transition-all hover:shadow-lg dark:bg-card/95 dark:ring-white/[0.06] md:mt-5 md:bg-card/95 md:shadow-sm md:ring-0 md:hover:shadow-md">
+                      <CardContent className="flex flex-col px-6 pt-8 pb-14 sm:px-7 md:px-6 md:pt-7 md:pb-10">
+                        <div className="mb-5 flex items-center space-x-3 md:mb-4">
+                          <div className="w-10 h-10 rounded-xl bg-purple-100 dark:bg-purple-950 flex items-center justify-center shrink-0">
+                            <Building className="w-5 h-5 text-purple-600 dark:text-purple-400" />
                           </div>
                           <div className="text-left">
-                            <h4 className="text-base font-semibold">
+                            <h4 className="text-base md:text-lg font-semibold tracking-tight">
                               Organization Admin
                             </h4>
-                            <p className="text-xs text-muted-foreground">
+                            <p className="mt-1.5 text-sm text-muted-foreground">
                               Manage startup cohorts & programs
                             </p>
                           </div>
                         </div>
-                        <Separator className="my-3" />
-                        <div className="space-y-2">
-                          <div className="flex items-center space-x-2 text-xs">
-                            <CheckCircle className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+                        <Separator className="my-6 shrink-0 md:my-5" />
+                        <div className="space-y-4 md:space-y-3.5">
+                          <div className="flex items-start gap-3 text-sm leading-relaxed md:items-center md:gap-2.5 md:leading-snug">
+                            <CheckCircle className="mt-0.5 size-4 shrink-0 text-muted-foreground md:mt-0 md:h-3.5 md:w-3.5" />
                             <span>Create and manage cohorts</span>
                           </div>
-                          <div className="flex items-center space-x-2 text-xs">
-                            <CheckCircle className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+                          <div className="flex items-start gap-3 text-sm leading-relaxed md:items-center md:gap-2.5 md:leading-snug">
+                            <CheckCircle className="mt-0.5 size-4 shrink-0 text-muted-foreground md:mt-0 md:h-3.5 md:w-3.5" />
                             <span>Invite startups to your program</span>
                           </div>
-                          <div className="flex items-center space-x-2 text-xs">
-                            <CheckCircle className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+                          <div className="flex items-start gap-3 text-sm leading-relaxed md:items-center md:gap-2.5 md:leading-snug">
+                            <CheckCircle className="mt-0.5 size-4 shrink-0 text-muted-foreground md:mt-0 md:h-3.5 md:w-3.5" />
                             <span>Monitor real-time execution progress</span>
                           </div>
-                          <div className="flex items-center space-x-2 text-xs">
-                            <CheckCircle className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+                          <div className="flex items-start gap-3 text-sm leading-relaxed md:items-center md:gap-2.5 md:leading-snug">
+                            <CheckCircle className="mt-0.5 size-4 shrink-0 text-muted-foreground md:mt-0 md:h-3.5 md:w-3.5" />
                             <span>Export reports for stakeholders</span>
                           </div>
                         </div>
-                        <Button
-                          className="w-full mt-4 h-8 text-xs bg-purple-600 hover:bg-purple-700"
-                          onClick={() => handleRoleClick("organization-admin")}
-                        >
-                          Create Organization Account
-                          <ArrowRight className="w-3.5 h-3.5 ml-2" />
-                        </Button>
-                        <p className="text-[10px] text-muted-foreground mt-2 text-center">
+                        <div className="mt-12 flex shrink-0 justify-center md:mt-9 md:block">
+                          <Button
+                            className="h-12 w-full max-w-sm rounded-xl bg-purple-600 px-6 text-base shadow-sm transition-shadow hover:bg-purple-700 hover:shadow-md md:max-w-none md:rounded-lg md:px-5 md:h-11 md:text-sm"
+                            onClick={() => handleRoleClick("organization-admin")}
+                          >
+                            Create Organization Account
+                            <ArrowRight className="w-3.5 h-3.5 ml-2" />
+                          </Button>
+                        </div>
+                        <p className="mt-5 text-center text-xs leading-relaxed text-muted-foreground md:mt-4">
                           For accelerators, competitions, university programs,
                           and more
                         </p>
@@ -657,16 +433,16 @@ export default function ChooseYourPathPage({ onBack, onComplete }) {
                     </Card>
                   </details>
                 </div>
-                <p className="text-xs text-muted-foreground text-center mt-6">
+                <p className="mx-auto max-w-md text-center text-xs leading-relaxed text-muted-foreground">
                   By creating an account, you agree to our Terms of Service and
                   Privacy Policy
                 </p>
-                <div className="text-center mt-4">
+                <div className="text-center">
                   <Button
                     variant="ghost"
                     size="sm"
                     onClick={onBack}
-                    className="h-8 px-3 text-xs"
+                    className="h-11 px-6 text-sm md:h-10 md:px-5"
                   >
                     <ArrowLeft className="w-3.5 h-3.5 mr-1.5" />
                     Back to Sign In
@@ -674,22 +450,6 @@ export default function ChooseYourPathPage({ onBack, onComplete }) {
                 </div>
               </div>
             </>
-          )}
-          {view === "signup" && selectedRole && (
-            <InlineSignupForm
-              role={selectedRole}
-              onBack={handleSignupModalClose}
-              onSignup={handleSignup}
-            />
-          )}
-          {view === "profile-setup" && newUser && selectedRole && (
-            <InlineProfileCompletion
-              user={newUser}
-              role={selectedRole}
-              onBack={handleProfileSetupClose}
-              onComplete={handleProfileComplete}
-              onUpdateUser={handleProfileUpdateUser}
-            />
           )}
         </div>
       </div>

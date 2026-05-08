@@ -87,6 +87,15 @@ export const updateProfile = async (req, res) => {
     }
   });
 
+  if (Object.prototype.hasOwnProperty.call(req.body || {}, "virtualOfficeTourCompleted")) {
+    const v = req.body.virtualOfficeTourCompleted;
+    if (v === true) {
+      updates.virtualOfficeTourCompleted = true;
+    } else if (v === false && req.user?.isAdmin === true) {
+      updates.virtualOfficeTourCompleted = false;
+    }
+  }
+
   const updated = await User.findByIdAndUpdate(userId, updates, {
     new: true,
     runValidators: true,

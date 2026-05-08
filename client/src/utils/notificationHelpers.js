@@ -4,7 +4,7 @@ export const createTaskAssignedNotification = (
   assignedTo,
   taskId,
 ) => ({
-  type: "task_assigned",
+  type: "task-assigned",
   title: "New task assigned to you",
   message: `${assignedBy} assigned you "${taskTitle}"`,
   actionUrl: taskId ? `/tasks/${taskId}` : undefined,
@@ -21,7 +21,7 @@ export const createTaskCompletedNotification = (
   completedBy,
   taskId,
 ) => ({
-  type: "task_completed",
+  type: "task-completed",
   title: "Task completed! 🎉",
   message: `${completedBy} completed "${taskTitle}"`,
   actionUrl: taskId ? `/tasks/${taskId}` : undefined,
@@ -38,7 +38,7 @@ export const createTaskBlockedNotification = (
   reason,
   taskId,
 ) => ({
-  type: "task_blocked",
+  type: "task-blocked",
   title: "⚠️ Task blocked",
   message: `"${taskTitle}" is blocked by ${blockedBy}${reason ? `: ${reason}` : ""}`,
   actionUrl: taskId ? `/tasks/${taskId}` : undefined,
@@ -55,7 +55,7 @@ export const createDeadlineApproachingNotification = (
   daysLeft,
   taskId,
 ) => ({
-  type: "deadline_approaching",
+  type: "deadline-approaching",
   title: "⏰ Deadline approaching",
   message: `"${taskTitle}" is due in ${daysLeft} day${daysLeft !== 1 ? "s" : ""}`,
   actionUrl: taskId ? `/tasks/${taskId}` : undefined,
@@ -71,7 +71,7 @@ export const createDeadlineOverdueNotification = (
   daysOverdue,
   taskId,
 ) => ({
-  type: "deadline_overdue",
+  type: "deadline-overdue",
   title: "🚨 Task overdue",
   message: `"${taskTitle}" is ${daysOverdue} day${daysOverdue !== 1 ? "s" : ""} overdue`,
   actionUrl: taskId ? `/tasks/${taskId}` : undefined,
@@ -83,7 +83,7 @@ export const createDeadlineOverdueNotification = (
 });
 
 export const createWeeklyReviewReminderNotification = (outcomeTitle) => ({
-  type: "weekly_review_reminder",
+  type: "weekly-review-reminder",
   title: "📊 Time for weekly review",
   message: `Complete your review for "${outcomeTitle}" to update your streak!`,
   metadata: {
@@ -95,7 +95,7 @@ export const createMilestoneCompletedNotification = (
   milestoneTitle,
   outcomeTitle,
 ) => ({
-  type: "milestone_completed",
+  type: "milestone-completed",
   title: "🎯 Milestone completed!",
   message: `"${milestoneTitle}" completed for ${outcomeTitle}`,
   metadata: {
@@ -105,7 +105,7 @@ export const createMilestoneCompletedNotification = (
 });
 
 export const createOutcomeAchievedNotification = (outcomeTitle, streak) => ({
-  type: "outcome_achieved",
+  type: "outcome-achieved",
   title: "🏆 Weekly outcome achieved!",
   message: `You crushed "${outcomeTitle}"! Current streak: ${streak} week${streak !== 1 ? "s" : ""} 🔥`,
   metadata: {
@@ -115,7 +115,7 @@ export const createOutcomeAchievedNotification = (outcomeTitle, streak) => ({
 });
 
 export const createOutcomePartialNotification = (outcomeTitle, streak) => ({
-  type: "outcome_partial",
+  type: "outcome-partial",
   title: "⚡ Partial progress on outcome",
   message: `Made progress on "${outcomeTitle}". Current streak: ${streak} week${streak !== 1 ? "s" : ""} ⚡`,
   metadata: {
@@ -146,7 +146,7 @@ export const createStreakMilestoneNotification = (streak) => {
   }
 
   return {
-    type: "streak_milestone",
+    type: "streak-milestone",
     title: `${emoji} ${streak} Week Streak!`,
     message,
     metadata: {
@@ -156,7 +156,7 @@ export const createStreakMilestoneNotification = (streak) => {
 };
 
 export const createTeamMemberJoinedNotification = (memberName, role) => ({
-  type: "team_member_joined",
+  type: "team-member-joined",
   title: "👋 New team member",
   message: `${memberName} joined as ${role}`,
   metadata: {
@@ -166,7 +166,7 @@ export const createTeamMemberJoinedNotification = (memberName, role) => ({
 });
 
 export const createCommentAddedNotification = (taskTitle, commenterName) => ({
-  type: "comment_added",
+  type: "comment-added",
   title: "💬 New comment",
   message: `${commenterName} commented on "${taskTitle}"`,
   metadata: {
@@ -231,3 +231,4 @@ export const checkWeeklyReview = (currentOutcome) => {
 
   return null;
 };
+

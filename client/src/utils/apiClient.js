@@ -1,230 +1,168 @@
-/**
- * API client with backend detection and graceful fallback.
- */
-import { getAccessToken } from "../app/session";
+import axios from "axios";
 import { API_BASE_URL } from "../config/apiBase.js";
+import { getAccessToken } from "../app/session";
 
-class ApiClient {
-  isBackendOnline = null;
-  lastHealthCheck = 0;
-  healthCheckInterval = 30000;
-  config = {
-    enableFallback: true,
-    fallbackMode: "localStorage",
-    onBackendOffline: () => {},
-    onBackendOnline: () => {},
-  };
+/**
+ * Shared Axios client for the founder Home wiring.
+ *
+ * Responsibilities:
+ * - Base URL from `VITE_API_URL` (via `apiBase.js`).
+ * - Auth interceptor injecting `Authorization: Bearer <token>` from the session module.
+ * - Response interceptor that unwraps the `{ success, data }` envelope used by the backend,
+ *   keeping parity with `utils/backendClient.js` so stores can consume `data` directly.
+ * - Normalized error object `{ status, code, message, details, isApiError }`
+ *   and a `session:unauthorized` DOM event on 401s so the app shell can react.
+ * - Request ID header for traceability and sensible timeouts.
+ * - AbortController helper for cancelation.
+ */
 
-  constructor(config) {
-    if (config) {
-      this.config = { ...this.config, ...config };
-    }
-    this.checkBackendHealth().catch(() => {});
+const REQUEST_TIMEOUT_MS = 20000;
+
+function generateRequestId() {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID();
   }
+  return `req_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`;
+}
 
-  async checkBackendHealth() {
-    const now = Date.now();
-
-    if (
-      this.isBackendOnline !== null &&
-      now - this.lastHealthCheck < this.healthCheckInterval
-    ) {
-      return this.isBackendOnline;
-    }
-
-    try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 5000);
-
-      const response = await fetch(`${API_BASE_URL}/health`, {
-        method: "GET",
-        headers: {
-          Authorization: `Bearer ${getAccessToken()}`,
-        },
-        signal: controller.signal,
-      });
-
-      clearTimeout(timeoutId);
-
-      const wasOffline = this.isBackendOnline === false;
-      this.isBackendOnline = response.ok;
-      this.lastHealthCheck = now;
-
-      if (this.isBackendOnline && wasOffline) {
-        this.config.onBackendOnline?.();
-      } else if (!this.isBackendOnline && !wasOffline) {
-        this.config.onBackendOffline?.();
-      }
-
-      return this.isBackendOnline;
-    } catch {
-      const wasOnline = this.isBackendOnline === true;
-      this.isBackendOnline = false;
-      this.lastHealthCheck = now;
-
-      if (wasOnline) {
-        this.config.onBackendOffline?.();
-      }
-
-      return false;
-    }
-  }
-
-  async request(endpoint, options = {}) {
-    const isHealthy = await this.checkBackendHealth();
-
-    if (!isHealthy && !this.config.enableFallback) {
-      return {
-        data: null,
-        error: "Backend server is offline. Please deploy the backend function.",
-        usingFallback: false,
-      };
-    }
-
-    if (isHealthy) {
-      try {
-        const response = await fetch(`${API_BASE_URL}${endpoint}`, {
-          ...options,
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${getAccessToken()}`,
-            ...options.headers,
-          },
-        });
-
-        const payload = await response.json().catch(() => null);
-        if (!payload || typeof payload !== "object") {
-          throw new Error("Invalid JSON response");
-        }
-        if (!response.ok) {
-          throw new Error(
-            payload.message ||
-              payload.error ||
-              `HTTP ${response.status}: ${response.statusText}`,
-          );
-        }
-        if (
-          payload.success !== true ||
-          !Object.prototype.hasOwnProperty.call(payload, "data")
-        ) {
-          throw new Error("Invalid API envelope");
-        }
-
-        return { data: payload, error: null, usingFallback: false };
-      } catch (error) {
-        this.isBackendOnline = false;
-        if (this.config.enableFallback) {
-          return this.handleFallback(endpoint, options);
-        }
-        return { data: null, error: error.message, usingFallback: false };
-      }
-    }
-
-    if (this.config.enableFallback) {
-      return this.handleFallback(endpoint, options);
-    }
-
-    return {
-      data: null,
-      error: "Backend server is offline",
-      usingFallback: false,
-    };
-  }
-
-  handleFallback(endpoint, options) {
-    if (this.config.fallbackMode === "none") {
-      return {
-        data: null,
-        error: "Backend offline and no fallback configured",
-        usingFallback: false,
-      };
-    }
-
-    try {
-      const method = options.method || "GET";
-      const body = options.body ? JSON.parse(options.body) : null;
-
-      if (method === "GET") {
-        const data = this.getFallbackData(endpoint);
-        return { data, error: null, usingFallback: true };
-      }
-
-      if (method === "POST" || method === "PUT" || method === "PATCH") {
-        const data = this.setFallbackData(endpoint, body);
-        return { data, error: null, usingFallback: true };
-      }
-
-      if (method === "DELETE") {
-        this.deleteFallbackData(endpoint);
-        return { data: { success: true }, error: null, usingFallback: true };
-      }
-
-      return {
-        data: null,
-        error: "Unsupported method in fallback mode",
-        usingFallback: true,
-      };
-    } catch (error) {
-      console.error("Fallback error:", error);
-      return { data: null, error: error.message, usingFallback: true };
-    }
-  }
-
-  getFallbackData(endpoint) {
-    if (this.config.fallbackMode === "localStorage") {
-      const key = this.endpointToKey(endpoint);
-      const stored = localStorage.getItem(key);
-      return stored ? JSON.parse(stored) : null;
-    }
-    return null;
-  }
-
-  setFallbackData(endpoint, data) {
-    if (this.config.fallbackMode === "localStorage") {
-      const key = this.endpointToKey(endpoint);
-      localStorage.setItem(key, JSON.stringify(data));
-      return { success: true, ...data };
-    }
-    return { success: true, ...data };
-  }
-
-  deleteFallbackData(endpoint) {
-    if (this.config.fallbackMode === "localStorage") {
-      const key = this.endpointToKey(endpoint);
-      localStorage.removeItem(key);
-    }
-  }
-
-  endpointToKey(endpoint) {
-    return `fallback:${endpoint.replace(/\//g, ":")}`;
-  }
-
-  getStatus() {
-    return {
-      online: this.isBackendOnline,
-      lastCheck: this.lastHealthCheck,
-    };
-  }
-
-  async forceHealthCheck() {
-    this.lastHealthCheck = 0;
-    return this.checkBackendHealth();
+function emitUnauthorized(detail) {
+  if (typeof window === "undefined") return;
+  try {
+    window.dispatchEvent(new CustomEvent("session:unauthorized", { detail }));
+  } catch {
+    // noop
   }
 }
 
-export const apiClient = new ApiClient({
-  enableFallback: true,
-  fallbackMode: "localStorage",
+export class ApiError extends Error {
+  constructor({ status, code, message, details }) {
+    super(message || `HTTP ${status || "error"}`);
+    this.name = "ApiError";
+    this.status = status ?? 0;
+    this.code = code ?? null;
+    this.details = details ?? null;
+    this.isApiError = true;
+  }
+}
+
+function normalizeAxiosError(error) {
+  if (axios.isCancel?.(error) || error?.name === "CanceledError") {
+    return new ApiError({
+      status: 0,
+      code: "CANCELED",
+      message: "Request canceled",
+      details: null,
+    });
+  }
+
+  const response = error?.response;
+  const payload = response?.data;
+  const status = response?.status ?? 0;
+
+  const message =
+    (payload && typeof payload === "object" &&
+      (payload.message || payload.error || payload.data?.message)) ||
+    error?.message ||
+    `HTTP ${status || "error"}`;
+
+  const code =
+    (payload && typeof payload === "object" && (payload.code || payload.data?.code)) || null;
+
+  return new ApiError({
+    status,
+    code,
+    message,
+    details: payload && typeof payload === "object" ? payload : null,
+  });
+}
+
+export const apiClient = axios.create({
+  baseURL: API_BASE_URL,
+  timeout: REQUEST_TIMEOUT_MS,
+  headers: {
+    "Content-Type": "application/json",
+    Accept: "application/json",
+  },
 });
 
-export async function isBackendOnline() {
-  return apiClient.checkBackendHealth();
+apiClient.interceptors.request.use((config) => {
+  const token = getAccessToken();
+  if (token) {
+    config.headers = config.headers || {};
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+
+  config.headers = config.headers || {};
+  if (!config.headers["X-Request-Id"]) {
+    config.headers["X-Request-Id"] = generateRequestId();
+  }
+
+  return config;
+});
+
+apiClient.interceptors.response.use(
+  (response) => {
+    const payload = response?.data;
+
+    if (!payload || typeof payload !== "object") {
+      throw new ApiError({
+        status: response.status,
+        code: "INVALID_RESPONSE",
+        message: `Invalid JSON response from ${response.config?.url || "API"}`,
+        details: payload ?? null,
+      });
+    }
+
+    if (payload.success !== true || !Object.prototype.hasOwnProperty.call(payload, "data")) {
+      throw new ApiError({
+        status: response.status,
+        code: "INVALID_ENVELOPE",
+        message: payload.message || `Invalid API envelope from ${response.config?.url || "API"}`,
+        details: payload,
+      });
+    }
+
+    return payload.data;
+  },
+  (error) => {
+    const normalized = normalizeAxiosError(error);
+    if (normalized.status === 401) {
+      emitUnauthorized({
+        url: error?.config?.url,
+        method: error?.config?.method,
+      });
+    }
+    return Promise.reject(normalized);
+  },
+);
+
+/** Creates an AbortController for a request. Returns `{ signal, abort }`. */
+export function createAbort() {
+  const controller = new AbortController();
+  return {
+    signal: controller.signal,
+    abort: (reason) => controller.abort(reason),
+  };
 }
 
-export async function forceBackendHealthCheck() {
-  return apiClient.forceHealthCheck();
+export async function apiGet(url, config = {}) {
+  return apiClient.get(url, config);
 }
 
-export function getBackendStatus() {
-  return apiClient.getStatus();
+export async function apiPost(url, body, config = {}) {
+  return apiClient.post(url, body, config);
 }
+
+export async function apiPut(url, body, config = {}) {
+  return apiClient.put(url, body, config);
+}
+
+export async function apiPatch(url, body, config = {}) {
+  return apiClient.patch(url, body, config);
+}
+
+export async function apiDelete(url, config = {}) {
+  return apiClient.delete(url, config);
+}
+
+export default apiClient;

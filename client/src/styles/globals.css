@@ -1,19 +1,23 @@
-/* Google Material Design System for StartupVerse */
+/* StartupVerse design system foundation */
 
 @custom-variant dark (&:is(.dark *));
 
+html {
+  font-size: 18px;
+}
+
 :root {
-  /* 🎨 MATERIAL DESIGN COLOR SYSTEM */
+  /* Core color system */
 
   /* Primary (Brand Blue) */
   --primary-500: #3a5afe;
   --primary-600: #304ffe;
   --primary-700: #1e40ff;
 
-  /* Secondary (Emerald Green) */
-  --secondary-500: #2ecc71;
-  --secondary-600: #25b864;
-  --secondary-700: #1d9b54;
+  /* Support scale */
+  --secondary-500: #16a34a;
+  --secondary-600: #15803d;
+  --secondary-700: #166534;
 
   /* Google Accent Colors (for charts & highlights) */
   --google-red: #ea4335;
@@ -21,49 +25,49 @@
   --google-green: #34a853;
   --google-blue: #4285f4;
 
-  /* Light Mode - Modern App Background */
-  --background: #f8f9fa;
-  --foreground: #1f1f1f;
+  /* Light mode - blue/white baseline */
+  --background: #f7f9fc;
+  --foreground: #0f172a;
   --surface: #ffffff;
-  --surface-variant: #f8f9fa;
-  --surface-container: #f1f3f4;
-  --surface-container-low: #fafbfc;
-  --surface-container-high: #eceff1;
-  --outline: #e0e0e0;
-  --outline-variant: #c6c6c6;
-  --text-primary: #1f1f1f;
-  --text-secondary: #5f6368;
+  --surface-variant: #f4f7ff;
+  --surface-container: #eef3fb;
+  --surface-container-low: #f9fbff;
+  --surface-container-high: #e8eef9;
+  --outline: #dbe3f0;
+  --outline-variant: #c7d4e8;
+  --text-primary: #0f172a;
+  --text-secondary: #475569;
   --text-disabled: #9aa0a6;
   --text-hint: #80868b;
 
   /* Card & Components - Elevated white cards */
   --card: #ffffff;
-  --card-foreground: #1f1f1f;
+  --card-foreground: #0f172a;
   --popover: #ffffff;
-  --popover-foreground: #1f1f1f;
+  --popover-foreground: #0f172a;
 
   /* Design Tokens */
   --primary: #3a5afe;
   --primary-foreground: #ffffff;
-  --secondary: #f8f9fa;
-  --secondary-foreground: #1f1f1f;
-  --muted: #f1f3f4;
-  --muted-foreground: #5f6368;
+  --secondary: #f0f4fb;
+  --secondary-foreground: #0f172a;
+  --muted: #edf2fb;
+  --muted-foreground: #475569;
   --accent: #3a5afe;
   --accent-foreground: #ffffff;
   --destructive: #ea4335;
   --destructive-foreground: #ffffff;
   --success: #34a853;
   --success-foreground: #ffffff;
-  --warning: #fbbc05;
-  --warning-foreground: #1f1f1f;
+  --warning: #f59e0b;
+  --warning-foreground: #111827;
 
   /* Borders & Inputs - Lighter, cleaner for white background */
-  --border: #e0e0e0;
+  --border: #d8e2f0;
   --input: #ffffff;
-  --input-border: #dadce0;
+  --input-border: #cfdaea;
   --input-background: #ffffff;
-  --input-hover: #f8f9fa;
+  --input-hover: #f5f8ff;
   --ring: #3a5afe;
 
   /* Material Elevation Shadows - Enhanced for white background */
@@ -92,17 +96,18 @@
   --radius-xl: 1rem; /* 16px */
   --radius-full: 1.875rem; /* 30px for AI command bar */
 
-  /* Sidebar (Material Navigation Drawer) - White with subtle borders */
+  /* Sidebar */
   --sidebar: #ffffff;
-  --sidebar-foreground: #5f6368;
-  --sidebar-selected: #e8f0fe;
+  --sidebar-foreground: #475569;
+  --sidebar-selected: #e6eeff;
   --sidebar-selected-text: #1967d2;
-  --sidebar-border: #e0e0e0;
+  --sidebar-border: #d8e2f0;
   --sidebar-ring: #3a5afe;
-  --sidebar-hover: #f8f9fa;
+  --sidebar-hover: #f3f7ff;
 
-  /* Typography System */
-  --font-roboto: "Roboto", -apple-system, BlinkMacSystemFont, sans-serif;
+  /* Typography system */
+  --font-heading: "Syne", "Segoe UI", sans-serif;
+  --font-body: "DM Sans", "Segoe UI", sans-serif;
 
   /* Spacing System (8px grid) */
   --spacing-1: 0.5rem; /* 8px */
@@ -114,29 +119,29 @@
 }
 
 .dark {
-  /* Dark Mode - Material Design Dark Theme */
-  --background: #202124;
-  --foreground: #e8eaed;
-  --surface: #2c2d2f;
-  --surface-variant: #3c4043;
-  --outline: #3c4043;
-  --text-primary: #e8eaed;
-  --text-secondary: #b0b3b8;
+  /* Dark mode */
+  --background: #0b1220;
+  --foreground: #e5edf9;
+  --surface: #101a2e;
+  --surface-variant: #17233b;
+  --outline: #253653;
+  --text-primary: #e5edf9;
+  --text-secondary: #9fb1ca;
   --text-disabled: #80868b;
 
   /* Cards in Dark Mode */
-  --card: #2c2d2f;
-  --card-foreground: #e8eaed;
-  --popover: #2c2d2f;
-  --popover-foreground: #e8eaed;
+  --card: #101a2e;
+  --card-foreground: #e5edf9;
+  --popover: #101a2e;
+  --popover-foreground: #e5edf9;
 
   /* Primary stays same in dark mode (Google standard) */
   --primary: #3a5afe;
   --primary-foreground: #ffffff;
-  --secondary: #2c2d2f;
-  --secondary-foreground: #e8eaed;
-  --muted: #3c4043;
-  --muted-foreground: #b0b3b8;
+  --secondary: #17233b;
+  --secondary-foreground: #e5edf9;
+  --muted: #17233b;
+  --muted-foreground: #9fb1ca;
   --accent: #3a5afe;
   --accent-foreground: #ffffff;
   --destructive: #ea4335;
@@ -145,9 +150,9 @@
   --success-foreground: #ffffff;
 
   /* Borders in Dark Mode */
-  --border: rgba(255, 255, 255, 0.08);
-  --input: #2c2d2f;
-  --input-background: #2c2d2f;
+  --border: rgba(165, 192, 227, 0.2);
+  --input: #101a2e;
+  --input-background: #101a2e;
   --ring: #3a5afe;
 
   /* Elevation in Dark Mode (no shadows, use borders) */
@@ -158,11 +163,11 @@
   --elevation-4: 0 0 0 1px rgba(255, 255, 255, 0.12);
 
   /* Sidebar Dark Mode */
-  --sidebar: #202124;
-  --sidebar-foreground: #b0b3b8;
+  --sidebar: #0b1220;
+  --sidebar-foreground: #9fb1ca;
   --sidebar-selected: rgba(58, 90, 254, 0.12);
   --sidebar-selected-text: #3a5afe;
-  --sidebar-border: rgba(255, 255, 255, 0.08);
+  --sidebar-border: rgba(165, 192, 227, 0.2);
 }
 
 @theme inline {
@@ -226,8 +231,8 @@
 
   body {
     @apply bg-background text-foreground;
-    font-family: var(--font-roboto);
-    font-size: 16px;
+    font-family: var(--font-body);
+    font-size: 1rem;
     line-height: 1.5;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
@@ -261,6 +266,7 @@
   :where(:not([class*="text-"])) {
     /* H1 - Page Headers (Reduced from 32px to 20px) */
     h1 {
+      font-family: var(--font-heading);
       font-size: 20px;
       font-weight: 600;
       line-height: 1.3;
@@ -270,6 +276,7 @@
 
     /* H2 - Section Headers (Reduced from 24px to 18px) */
     h2 {
+      font-family: var(--font-heading);
       font-size: 18px;
       font-weight: 600;
       line-height: 1.35;
@@ -279,6 +286,7 @@
 
     /* H3 - Subsection Headers (Reduced from 20px to 16px) */
     h3 {
+      font-family: var(--font-heading);
       font-size: 16px;
       font-weight: 600;
       line-height: 1.4;
@@ -287,6 +295,7 @@
 
     /* H4 - Card Titles (Reduced from 18px to 15px) */
     h4 {
+      font-family: var(--font-heading);
       font-size: 15px;
       font-weight: 600;
       line-height: 1.4;
@@ -295,6 +304,7 @@
 
     /* H5 - Small Headers (Reduced from 16px to 14px) */
     h5 {
+      font-family: var(--font-heading);
       font-size: 14px;
       font-weight: 600;
       line-height: 1.4;
@@ -303,41 +313,42 @@
 
     /* H6 - Tiny Headers (Reduced from 14px to 13px) */
     h6 {
+      font-family: var(--font-heading);
       font-size: 13px;
       font-weight: 600;
       line-height: 1.4;
       color: var(--text-primary);
     }
 
-    /* Body 1 - Main text (Reduced from 16px to 14px) */
+    /* Body 1 - Main text (Readable baseline) */
     p {
-      font-size: 14px;
+      font-size: 16px;
       font-weight: 400;
       line-height: 1.5;
       color: var(--text-primary);
     }
 
-    /* Label text (Reduced from 14px to 13px) */
+    /* Label text */
     label {
-      font-size: 13px;
+      font-size: 14px;
       font-weight: 500;
       line-height: 1.45;
       color: var(--text-primary);
     }
 
-    /* Button text (Reduced from 14px to 13px) */
+    /* Button text */
     button {
-      font-size: 13px;
+      font-size: 14px;
       font-weight: 600;
       line-height: 1.5;
       letter-spacing: 0.01em;
     }
 
-    /* Input text (Reduced from 16px to 14px) */
+    /* Input text */
     input,
     textarea,
     select {
-      font-size: 14px;
+      font-size: 16px;
       font-weight: 400;
       line-height: 1.5;
       color: var(--text-primary);
@@ -347,6 +358,185 @@
 
 /* Material Design Utilities */
 @layer utilities {
+  /* Readability guardrail: prevent ultra-micro text in dashboards */
+  .text-\[8px\] {
+    font-size: 12px !important;
+    line-height: 1.35 !important;
+  }
+
+  .text-\[9px\] {
+    font-size: 12px !important;
+    line-height: 1.35 !important;
+  }
+
+  .text-\[10px\] {
+    font-size: 13px !important;
+    line-height: 1.4 !important;
+  }
+
+  .text-\[11px\] {
+    font-size: 14px !important;
+    line-height: 1.45 !important;
+  }
+
+  /* ========================================
+     OFFICE STEP 2 DESIGN PRIMITIVES
+     ======================================== */
+  .office-surface {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-xl);
+    box-shadow: var(--elevation-1);
+  }
+
+  .office-card {
+    background: var(--card);
+    border: 1px solid color-mix(in srgb, var(--border) 88%, transparent);
+    border-radius: 12px;
+    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+  }
+
+  .office-panel-shell {
+    border: 1px solid var(--border);
+    border-radius: var(--radius-xl);
+    box-shadow: var(--elevation-3);
+    overflow: hidden;
+    background: var(--card);
+  }
+
+  .office-panel-header {
+    background: var(--surface-container-low);
+    border-bottom: 1px solid color-mix(in srgb, var(--border) 84%, transparent);
+  }
+
+  .office-panel-body {
+    background: var(--card);
+  }
+
+  .office-motion-soft {
+    transition: all 180ms cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .office-animate-in {
+    animation: office-fade-up 220ms cubic-bezier(0.2, 0.6, 0.2, 1) both;
+  }
+
+  .office-panel {
+    color: var(--text-primary);
+  }
+
+  .office-panel :is(p, label, input, textarea, select, button) {
+    font-size: 13px;
+    line-height: 1.4;
+  }
+
+  .office-panel .text-xs,
+  .office-panel .text-\[11px\] {
+    font-size: 13px !important;
+    line-height: 1.45 !important;
+  }
+
+  .office-panel .text-\[10px\],
+  .office-panel .text-\[9px\] {
+    font-size: 11px !important;
+    line-height: 1.35 !important;
+  }
+
+  .office-dialog-panel :is(label, input, textarea, select, button, p) {
+    font-size: 14px;
+    line-height: 1.45;
+  }
+
+  .office-dialog-panel .text-\[11px\],
+  .office-dialog-panel .text-\[10px\],
+  .office-dialog-panel .text-\[9px\] {
+    font-size: 12px !important;
+    line-height: 1.35 !important;
+  }
+
+  .office-micro {
+    font-size: 12px !important;
+    line-height: 1.35 !important;
+  }
+
+  .office-sheet-content {
+    max-height: 84vh;
+    overscroll-behavior: contain;
+  }
+
+  .office-workspace-grid-top,
+  .office-workspace-grid-bottom,
+  .office-calendar-split {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  @media (min-width: 960px) {
+    .office-workspace-grid-top {
+      grid-template-columns: 1.05fr 2.2fr 1.1fr;
+    }
+
+    .office-workspace-grid-top__activity {
+      grid-column: 1;
+    }
+
+    .office-workspace-grid-top__team {
+      grid-column: 2;
+    }
+
+    .office-workspace-grid-top__energy {
+      grid-column: 3;
+    }
+
+    .office-workspace-grid-bottom {
+      grid-template-columns: 2.35fr 1fr;
+    }
+
+    .office-workspace-grid-bottom__calendar {
+      grid-column: 1;
+    }
+
+    .office-workspace-grid-bottom__tasks {
+      grid-column: 2;
+    }
+
+    .office-calendar-split {
+      grid-template-columns: 168px minmax(0, 1fr);
+    }
+
+    .office-calendar-split__month {
+      grid-column: 1;
+    }
+
+    .office-calendar-split__agenda {
+      grid-column: 2;
+    }
+  }
+
+  @media (max-width: 1279px) {
+    .office-card {
+      border-radius: 11px;
+    }
+  }
+
+  @media (max-width: 1023px) {
+    .office-panel :is(p, label, input, textarea, select, button) {
+      font-size: 12px;
+      line-height: 1.4;
+    }
+
+    .office-panel .text-xs,
+    .office-panel .text-\[11px\] {
+      font-size: 12px !important;
+      line-height: 1.4 !important;
+    }
+
+    .office-panel .text-\[10px\],
+    .office-panel .text-\[9px\] {
+      font-size: 10px !important;
+      line-height: 1.3 !important;
+    }
+  }
+
   /* Elevation Classes */
   .elevation-0 {
     box-shadow: var(--elevation-0);
@@ -691,6 +881,17 @@
 
 .material-exit {
   animation: material-exit 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+@keyframes office-fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 /* Admin Debug Animations */

@@ -13,6 +13,7 @@ import { Textarea } from "./ui/textarea";
 import { Badge } from "./ui/badge";
 import { Progress } from "./ui/progress";
 import { toast } from "sonner";
+import { getTalentProfileCompletionPercent } from "../utils/talentProfileCompletion";
 import {
   UserCircle,
   Briefcase,
@@ -74,40 +75,9 @@ export default function ProfilePage({ user, onUpdateUser }) {
   });
   const [newSkill, setNewSkill] = useState("");
 
-  // Calculate profile completion for talent users
   const calculateProfileCompletion = () => {
     if (user.role !== "talent") return 100;
-    const requiredFields = [
-      user.name,
-      user.email,
-      user.professionalTitle,
-      user.location,
-      user.yearsOfExperience,
-      user.bio,
-      user.skills && user.skills.length > 0,
-      user.linkedin,
-      user.workExperience && user.workExperience.length > 0,
-      user.availabilityStatus,
-      user.preferredCommitment,
-    ];
-    const optionalFields = [
-      user.github,
-      user.website,
-      user.education && user.education.length > 0,
-      user.certifications && user.certifications.length > 0,
-      user.portfolioItems && user.portfolioItems.length > 0,
-    ];
-    const requiredCompleted = requiredFields.filter(
-      (field) => field && field !== "",
-    ).length;
-    const optionalCompleted = optionalFields.filter(
-      (field) => field && field !== "",
-    ).length;
-
-    // Required fields worth 70%, optional worth 30%
-    const requiredScore = (requiredCompleted / requiredFields.length) * 70;
-    const optionalScore = (optionalCompleted / optionalFields.length) * 30;
-    return Math.round(requiredScore + optionalScore);
+    return getTalentProfileCompletionPercent(user);
   };
   const profileCompletion = calculateProfileCompletion();
   const getCompletionMessage = (percentage) => {

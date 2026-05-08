@@ -34,37 +34,37 @@ export default function NotificationCenter({ onNavigate }) {
   const [open, setOpen] = useState(false);
   const getNotificationIcon = (type) => {
     switch (type) {
-      case "task_assigned":
+      case "task-assigned":
         return <Target className="w-4 h-4 text-blue-600" />;
-      case "task_completed":
+      case "task-completed":
         return <CheckCircle2 className="w-4 h-4 text-green-600" />;
-      case "task_blocked":
+      case "task-blocked":
         return <AlertCircle className="w-4 h-4 text-red-600" />;
-      case "deadline_approaching":
-      case "deadline_overdue":
+      case "deadline-approaching":
+      case "deadline-overdue":
         return <Clock className="w-4 h-4 text-orange-600" />;
-      case "weekly_review_reminder":
+      case "weekly-review-reminder":
         return <Target className="w-4 h-4 text-purple-600" />;
-      case "milestone_completed":
+      case "milestone-completed":
         return <CheckCircle2 className="w-4 h-4 text-emerald-600" />;
-      case "outcome_achieved":
-      case "outcome_partial":
+      case "outcome-achieved":
+      case "outcome-partial":
         return <Target className="w-4 h-4 text-primary" />;
-      case "streak_milestone":
+      case "streak-milestone":
         return <Flame className="w-4 h-4 text-orange-600" />;
-      case "team_member_joined":
+      case "team-member-joined":
         return <Users className="w-4 h-4 text-blue-600" />;
-      case "comment_added":
+      case "comment-added":
         return <MessageSquare className="w-4 h-4 text-gray-600" />;
-      case "announcement_reaction":
+      case "announcement-reaction":
         return <Users className="w-4 h-4 text-pink-600" />;
-      case "announcement_comment":
+      case "announcement-comment":
         return <MessageSquare className="w-4 h-4 text-blue-600" />;
-      case "event_reminder":
+      case "event-reminder":
         // 🔥 NEW: Event reminder icon
         return <Calendar className="w-4 h-4 text-indigo-600" />;
-      case "org_announcement": // 🔥 NEW: Organization announcement icon
-      case "org_announcement_urgent":
+      case "org-announcement": // 🔥 NEW: Organization announcement icon
+      case "org-announcement-urgent":
         // 🔥 NEW: Urgent organization announcement icon
         return <Megaphone className="w-4 h-4 text-pink-600" />;
       default:
@@ -73,28 +73,28 @@ export default function NotificationCenter({ onNavigate }) {
   };
   const getNotificationBgColor = (type) => {
     switch (type) {
-      case "task_assigned":
+      case "task-assigned":
         return "bg-blue-50 dark:bg-blue-950/20 border-blue-200 dark:border-blue-900";
-      case "task_completed":
-      case "milestone_completed":
-      case "outcome_achieved":
+      case "task-completed":
+      case "milestone-completed":
+      case "outcome-achieved":
         return "bg-green-50 dark:bg-green-950/20 border-green-200 dark:border-green-900";
-      case "task_blocked":
-      case "deadline_overdue":
+      case "task-blocked":
+      case "deadline-overdue":
         return "bg-red-50 dark:bg-red-950/20 border-red-200 dark:border-red-900";
-      case "deadline_approaching":
+      case "deadline-approaching":
         return "bg-orange-50 dark:bg-orange-950/20 border-orange-200 dark:border-orange-900";
-      case "weekly_review_reminder":
+      case "weekly-review-reminder":
         return "bg-purple-50 dark:bg-purple-950/20 border-purple-200 dark:border-purple-900";
-      case "streak_milestone":
+      case "streak-milestone":
         return "bg-orange-50 dark:bg-orange-950/20 border-orange-200 dark:border-orange-900";
-      case "event_reminder":
+      case "event-reminder":
         // 🔥 NEW: Event reminder background color
         return "bg-indigo-50 dark:bg-indigo-950/20 border-indigo-200 dark:border-indigo-900";
-      case "org_announcement":
+      case "org-announcement":
         // 🔥 NEW: Organization announcement background color
         return "bg-pink-50 dark:bg-pink-950/20 border-pink-200 dark:border-pink-900";
-      case "org_announcement_urgent":
+      case "org-announcement-urgent":
         // 🔥 NEW: Urgent organization announcement background color
         return "bg-red-50 dark:bg-red-950/20 border-red-200 dark:border-red-900";
       default:
@@ -351,3 +351,4 @@ export default function NotificationCenter({ onNavigate }) {
     </Popover>
   );
 }
+

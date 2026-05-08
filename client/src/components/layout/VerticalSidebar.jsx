@@ -1,6 +1,7 @@
 import React from "react";
 import { Badge } from "../ui/badge";
 import { Separator } from "../ui/separator";
+import { cn } from "../ui/utils";
 import {
   Building,
   Users,
@@ -9,8 +10,9 @@ import {
   Settings,
   Inbox,
   BarChart3,
-  Award,
+  X,
 } from "lucide-react";
+
 export default function VerticalSidebar({
   user,
   currentPage,
@@ -19,34 +21,10 @@ export default function VerticalSidebar({
   onVirtualOfficeViewChange,
   unreadCount = 0,
   notificationCount = 0,
+  talentDashboardMode = "overview",
   isOpen = false,
   onClose,
 }) {
-  // Calculate profile completion for talent users
-  const calculateProfileCompletion = () => {
-    if (user.role !== "talent") return 100;
-    const requiredFields = [
-      user.name,
-      user.email,
-      user.professionalTitle,
-      user.location,
-      user.yearsOfExperience,
-      user.bio,
-      user.skills && user.skills.length > 0,
-      user.linkedin,
-      user.workExperience && user.workExperience.length > 0,
-      user.availabilityStatus,
-      user.preferredCommitment,
-    ];
-    const requiredCompleted = requiredFields.filter(
-      (field) => field && field !== "",
-    ).length;
-    return Math.round((requiredCompleted / requiredFields.length) * 100);
-  };
-  const profileCompletion = calculateProfileCompletion();
-  const showProfileBadge = user.role === "talent" && profileCompletion < 100;
-
-  // Define all possible navigation items
   const allNavItems = [
     {
       id: "dashboard",
@@ -54,7 +32,7 @@ export default function VerticalSidebar({
       label: "Home",
       page: "dashboard",
       badge: null,
-      roles: ["founder", "team-member", "team", "talent", "organization-admin"], // Available to all roles
+      roles: ["founder", "team-member", "team", "talent", "organization-admin"],
     },
     {
       id: "virtual-office",
@@ -63,42 +41,30 @@ export default function VerticalSidebar({
       page: "startup-office",
       view: "workspace",
       badge: null,
-      roles: ["founder", "team-member", "team"], // Only founders and team members have offices (team = backward compatibility)
+      roles: ["founder", "team-member", "team"],
     },
-    // Journey removed from navigation - now embedded in execution flow
     {
-      id: "team-matching",
+      id: "team",
       icon: Users,
-      label: user.role === "talent" ? "Browse" : "Team",
-      // ✅ UPDATED: "Browse" for talent, "Team" for founders
-      page: "startup-office",
-      view: "matching",
+      label: "Team",
+      page: user.role === "talent" ? "dashboard" : "startup-office",
+      view: user.role === "talent" ? undefined : "matching",
+      options: user.role === "talent" ? { mode: "opportunities" } : undefined,
       badge: null,
-      // ✅ REMOVED: No badge on Team page, only Inbox should have badges
-      roles: ["founder", "talent"], // Founders find team members, Talent finds opportunities
+      roles: ["founder", "talent"],
     },
   ];
 
-  // Filter navigation items based on user role
-  const primaryNavItems = allNavItems.filter((item) =>
-    item.roles.includes(user.role),
-  );
+  const primaryNavItems = allNavItems.filter((item) => item.roles.includes(user.role));
+
   const allUtilityNavItems = [
     {
       id: "inbox",
       icon: Inbox,
       label: "Inbox",
       page: "inbox",
-      badge: unreadCount > 0 ? unreadCount : null,
-      roles: ["founder", "team-member", "team", "talent"], // All roles have inbox (team = backward compatibility)
-    },
-    {
-      id: "my-performance",
-      icon: Award,
-      label: "Performance",
-      page: "my-performance",
-      badge: null,
-      roles: ["team-member", "team"], // Only team members see performance (team = backward compatibility)
+      badge: unreadCount > 0 ? unreadCount : notificationCount > 0 ? notificationCount : null,
+      roles: ["founder", "team-member", "team", "talent"],
     },
     {
       id: "analytics",
@@ -106,7 +72,7 @@ export default function VerticalSidebar({
       label: "Analytics",
       page: "analytics",
       badge: null,
-      roles: ["founder"], // Only founders see analytics
+      roles: ["founder"],
     },
     {
       id: "settings",
@@ -114,103 +80,140 @@ export default function VerticalSidebar({
       label: "Settings",
       page: "settings",
       badge: null,
-      roles: ["founder", "team-member", "team", "talent", "organization-admin"], // All roles have settings
+      roles: ["founder", "team-member", "team", "talent", "organization-admin"],
     },
   ];
 
-  // Filter utility navigation items based on user role
   const utilityNavItems = allUtilityNavItems.filter((item) =>
     item.roles.includes(user.role),
   );
+
   const isActive = (item) => {
+    if (user.role === "talent" && item.id === "team") {
+      return currentPage === "dashboard" && talentDashboardMode === "opportunities";
+    }
+    if (user.role === "talent" && item.id === "dashboard") {
+      return currentPage === "dashboard" && talentDashboardMode !== "opportunities";
+    }
     if (item.page && item.view) {
       return currentPage === item.page && virtualOfficeView === item.view;
     }
     return currentPage === item.page;
   };
+
   const handleNavClick = (item) => {
-    if (item.action) {
-      item.action();
-    } else {
-      if (item.page) {
-        onPageChange(item.page);
-      }
-      if (item.view && onVirtualOfficeViewChange) {
-        onVirtualOfficeViewChange(item.view);
-      }
+    if (item.page) {
+      onPageChange(item.page, item.options);
     }
-    // Close mobile menu after navigation
+    if (item.view && onVirtualOfficeViewChange) {
+      onVirtualOfficeViewChange(item.view);
+    }
     if (onClose) {
       onClose();
     }
   };
+
   const NavButton = ({ item }) => {
     const Icon = item.icon;
     const active = isActive(item);
+
     return (
       <button
+        type="button"
         data-tour={item.id}
-        className={`w-full flex flex-col items-center justify-center py-3 px-2 rounded-lg transition-all duration-200 relative group ${active ? "bg-primary/10 text-primary" : "text-muted-foreground hover:bg-muted/50 hover:text-foreground"}`}
+        className={cn(
+          "group relative flex w-full flex-col items-center justify-center gap-1 rounded-2xl px-2 py-2.5 text-center transition-colors",
+          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/45",
+          active ? "bg-blue-50 text-blue-700 dark:bg-blue-950/35 dark:text-blue-200" : "text-muted-foreground hover:bg-muted/50 hover:text-foreground",
+        )}
         onClick={() => handleNavClick(item)}
       >
-        {active && (
-          <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-8 bg-primary rounded-r-full" />
-        )}
-        <Icon className={`w-5 h-5 mb-1 ${active ? "text-primary" : ""}`} />
-        <span className="text-[10px] leading-tight text-center">
+        {active ? (
+          <span className="absolute left-0 top-1/2 h-8 w-1 -translate-y-1/2 rounded-r-full bg-blue-600" />
+        ) : null}
+        <span
+          className={cn(
+            "relative inline-flex h-12 w-12 items-center justify-center rounded-2xl transition-colors",
+            active ? "bg-blue-100 text-blue-700 dark:bg-blue-900/45 dark:text-blue-100" : "bg-muted/40 text-muted-foreground group-hover:bg-muted/80 group-hover:text-foreground",
+          )}
+        >
+          <Icon className="h-6 w-6" />
+          {item.badge ? (
+            <span className="absolute -right-1 -top-1">
+              <Badge
+                variant={item.id === "inbox" ? "destructive" : "default"}
+                className="h-5 min-w-5 rounded-full px-1.5 text-[10px] leading-none"
+              >
+                {item.badge}
+              </Badge>
+            </span>
+          ) : null}
+        </span>
+        <span className="mt-0.5 max-w-[72px] truncate text-[12px] font-medium leading-4">
           {item.label}
         </span>
-        {item.badge && (
-          <Badge
-            variant={
-              item.id === "profile" && showProfileBadge
-                ? "destructive"
-                : item.id === "inbox"
-                  ? "destructive"
-                  : "default"
-            }
-            className={`absolute -top-0.5 -right-0.5 text-[9px] flex items-center justify-center rounded-full ${item.id === "profile" && showProfileBadge ? "w-auto h-4 px-1 min-w-[20px] bg-yellow-500 hover:bg-yellow-600" : item.id === "inbox" ? "w-4 h-4 p-0 bg-red-500 hover:bg-red-600" : "w-4 h-4 p-0"}`}
-          >
-            {item.id === "profile" && showProfileBadge
-              ? `${item.badge}%`
-              : item.badge}
-          </Badge>
-        )}
+        <span className="absolute right-2 top-2 flex items-center gap-1">
+          {item.badge ? (
+            <span className="h-1.5 w-1.5 rounded-full bg-blue-500/70" />
+          ) : null}
+          {active ? <span className="h-1.5 w-1.5 rounded-full bg-blue-600" /> : null}
+        </span>
       </button>
     );
   };
+
   return (
     <>
-      {isOpen && onClose && (
-        <div
-          className="fixed inset-0 bg-black/50 z-40 md:hidden"
-          onClick={onClose}
-        />
-      )}
+      {isOpen && onClose ? (
+        <div className="fixed inset-0 z-40 bg-black/45 md:hidden" onClick={onClose} />
+      ) : null}
       <aside
-        className={`
-        w-20 bg-background/95 border-r border-border flex flex-col h-screen
-        fixed md:static left-0 top-0 z-50
-        transition-transform duration-300 ease-in-out
-        ${isOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"}
-      `}
+        className={[
+          "fixed left-0 top-0 z-50 flex h-screen w-24 flex-col border-r border-border/60 bg-background/95 backdrop-blur",
+          "transition-transform duration-300 ease-out md:static",
+          isOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0",
+        ].join(" ")}
       >
-        <div className="p-3 flex items-center justify-center">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary to-accent flex items-center justify-center shadow-lg shadow-primary/20">
-            <Sparkles className="w-5 h-5 text-white" />
-          </div>
+        <div className="relative flex items-center justify-center px-2 py-3">
+          <button
+            type="button"
+            className="relative inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-blue-600 text-white shadow-[0_8px_20px_rgba(30,64,255,0.22)] ring-1 ring-blue-200/40 dark:ring-blue-800/40"
+            aria-label="StartupVerse"
+          >
+            <Sparkles className="h-6 w-6" />
+          </button>
+          {isOpen && onClose ? (
+            <button
+              type="button"
+              className="absolute right-2 top-2 inline-flex h-8 w-8 items-center justify-center rounded-xl bg-muted/60 text-foreground md:hidden"
+              onClick={onClose}
+              aria-label="Close sidebar"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          ) : null}
         </div>
-        <Separator />
-        <nav className="flex-1 py-4 px-2 space-y-1 overflow-y-auto">
-          {primaryNavItems.map((item) => (
-            <NavButton key={item.id} item={item} />
-          ))}
-        </nav>
-        <Separator />
-        <div className="px-2 py-4 space-y-1">
-          {utilityNavItems.map((item) => (
-            <NavButton key={item.id} item={item} />
-          ))}
+
+        <Separator className="opacity-70" />
+
+        <div className="flex-1 overflow-y-auto py-2">
+          <div className="flex h-full flex-col">
+          <nav className="space-y-1">
+            {primaryNavItems.map((item) => (
+              <NavButton key={item.id} item={item} />
+            ))}
+          </nav>
+
+          <div className="my-4 flex items-center justify-center">
+            <span className="h-px w-14 bg-border/70" />
+          </div>
+
+          <div className="mt-auto space-y-1 pb-3">
+            {utilityNavItems.map((item) => (
+              <NavButton key={item.id} item={item} />
+            ))}
+          </div>
+          </div>
         </div>
       </aside>
     </>

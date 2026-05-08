@@ -1,8 +1,6 @@
-import { getAccessToken } from "../app/session";
-import { API_BASE_URL } from "../config/apiBase.js";
+import { get, post } from "./backendClient.js";
 
-const BASE_URL = API_BASE_URL;
-const DEFAULT_ICON = "📋";
+const DEFAULT_ICON = "\uD83D\uDCCB";
 
 function toActivity(raw) {
   if (!raw || typeof raw !== "object") return null;
@@ -22,66 +20,38 @@ function toActivity(raw) {
 
 export async function postActivity(params) {
   try {
-    const url = `${BASE_URL}/startups/${params.startupId}/activities`;
-
-    const response = await fetch(url, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${getAccessToken()}`,
-      },
-      body: JSON.stringify({
-        userId: params.userId,
-        userName: params.userName,
-        type: params.type,
-        message: params.message,
-        icon: params.icon || DEFAULT_ICON,
-        metadata: params.metadata || {},
-      }),
+    const path = `/startups/${encodeURIComponent(params.startupId)}/activities`;
+    const payload = await post(path, {
+      userId: params.userId,
+      userName: params.userName,
+      type: params.type,
+      message: params.message,
+      icon: params.icon || DEFAULT_ICON,
+      metadata: params.metadata || {},
     });
-
-    if (!response.ok) {
-      const statusText = response.statusText || "Server error";
-      const errorText = await response.text();
-      return {
-        success: false,
-        error: `HTTP ${response.status}: ${statusText || errorText}`,
-      };
-    }
-
-    const payload = await response.json();
     const activity = toActivity(payload?.data);
     if (!activity) {
       return { success: false, error: "Invalid activity response" };
     }
-
-    return {
-      success: true,
-      activity,
-    };
+    return { success: true, activity };
   } catch (error) {
-    return { success: false, error: error.message || "Network error" };
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Network error",
+    };
   }
 }
 
 export async function getStartupActivities(startupId, options) {
   try {
     const limit = Number(options?.pageSize || options?.limit || 50);
-    const url = `${BASE_URL}/startups/${startupId}/activities?limit=${encodeURIComponent(limit)}`;
-
-    const response = await fetch(url, {
-      method: "GET",
-      headers: {
-        Authorization: `Bearer ${getAccessToken()}`,
-      },
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      return { success: false, error: `HTTP ${response.status}: ${errorText}` };
+    const params = new URLSearchParams();
+    params.set("limit", String(limit));
+    if (options?.type) {
+      params.set("type", String(options.type));
     }
-
-    const payload = await response.json();
+    const path = `/startups/${encodeURIComponent(startupId)}/activities?${params.toString()}`;
+    const payload = await get(path);
     const activities = (Array.isArray(payload?.data) ? payload.data : [])
       .map((row) => toActivity(row))
       .filter(Boolean);
@@ -96,63 +66,40 @@ export async function getStartupActivities(startupId, options) {
       },
     };
   } catch (error) {
-    return { success: false, error: error.message || "Network error" };
+    return { success: false, error: error instanceof Error ? error.message : "Network error" };
   }
 }
 
 export async function getStartupWins(startupId, options) {
   try {
     const limit = Number(options?.pageSize || options?.limit || 50);
-    const url = `${BASE_URL}/startups/${startupId}/wins?limit=${encodeURIComponent(limit)}`;
-    const response = await fetch(url, {
-      method: "GET",
-      headers: {
-        Authorization: `Bearer ${getAccessToken()}`,
-      },
-    });
-    if (!response.ok) {
-      const errorText = await response.text();
-      return { success: false, error: `HTTP ${response.status}: ${errorText}` };
-    }
-    const payload = await response.json();
+    const path = `/startups/${encodeURIComponent(startupId)}/wins?limit=${encodeURIComponent(limit)}`;
+    const payload = await get(path);
     const wins = (Array.isArray(payload?.data) ? payload.data : [])
       .map((row) => toActivity(row))
       .filter(Boolean);
     return { success: true, wins };
   } catch (error) {
-    return { success: false, error: error.message || "Network error" };
+    return { success: false, error: error instanceof Error ? error.message : "Network error" };
   }
 }
 
 export async function postWin(params) {
   try {
-    const url = `${BASE_URL}/startups/${params.startupId}/wins`;
-    const response = await fetch(url, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${getAccessToken()}`,
-      },
-      body: JSON.stringify({
-        userId: params.userId,
-        message: params.message,
-      }),
+    const path = `/startups/${encodeURIComponent(params.startupId)}/wins`;
+    const payload = await post(path, {
+      userId: params.userId,
+      message: params.message,
     });
-    if (!response.ok) {
-      const statusText = response.statusText || "Server error";
-      const errorText = await response.text();
-      return {
-        success: false,
-        error: `HTTP ${response.status}: ${statusText || errorText}`,
-      };
-    }
-    const payload = await response.json();
     const win = toActivity(payload?.data);
     if (!win) {
       return { success: false, error: "Invalid win response" };
     }
     return { success: true, win };
   } catch (error) {
-    return { success: false, error: error.message || "Network error" };
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Network error",
+    };
   }
 }

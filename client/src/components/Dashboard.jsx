@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import AppLayout from "./layout/AppLayout";
 import MessagingSystem from "./messaging/MessagingSystem";
 import VideoCallSystem from "./video/VideoCallSystem";
-import VirtualStartupOffice from "./office/VirtualStartupOfficeWorkspace";
+import AdaptiveVirtualOffice from "./office/AdaptiveVirtualOffice";
 import TeamManagement from "./team/TeamManagement";
 import TaskBoard from "./tasks/TaskBoard";
 import TeamMatching from "./TeamMatching";
@@ -15,10 +15,8 @@ import GoToMarket from "./stages/GoToMarket";
 import Operations from "./stages/Operations";
 import ProfileSetup from "./stages/ProfileSetup";
 import PitchDeck from "./PitchDeck";
-import OnboardingModal from "./OnboardingModal";
 import ProfileCompletionModal from "./ProfileCompletionModal";
 import DataBackup from "./DataBackup";
-import { loadSampleData } from "../utils/sampleData";
 import { toast } from "sonner";
 
 // Import updated dashboard components
@@ -30,7 +28,6 @@ import InvestorDashboard from "./dashboards/InvestorDashboard";
 import FreelancerDashboard from "./dashboards/FreelancerDashboard";
 export default function Dashboard({ user, onLogout, onUpdateUser }) {
   const [currentPage, setCurrentPage] = useState("startup-office");
-  const [showOnboarding, setShowOnboarding] = useState(false);
   const [showProfileCompletion, setShowProfileCompletion] = useState(false);
 
   // Check URL hash for pagination test page (disabled for now)
@@ -53,17 +50,6 @@ export default function Dashboard({ user, onLogout, onUpdateUser }) {
     }
   }, [user.onboardingComplete]);
 
-  // Check if user has seen onboarding
-  useEffect(() => {
-    const hasSeenOnboarding = localStorage.getItem("has_seen_onboarding");
-    if (
-      !hasSeenOnboarding &&
-      user.role === "founder" &&
-      user.onboardingComplete
-    ) {
-      setShowOnboarding(true);
-    }
-  }, [user.role, user.onboardingComplete]);
   const handleProfileComplete = (profileData) => {
     const updatedUser = {
       ...user,
@@ -76,20 +62,6 @@ export default function Dashboard({ user, onLogout, onUpdateUser }) {
     onUpdateUser(updatedUser);
     setShowProfileCompletion(false);
     toast.success("Profile completed successfully!");
-  };
-  const handleCloseOnboarding = () => {
-    localStorage.setItem("has_seen_onboarding", "true");
-    setShowOnboarding(false);
-  };
-  const handleLoadSampleData = () => {
-    loadSampleData();
-    toast.success(
-      'Sample startup "TechFlow AI" loaded! Explore all stages to see what a complete journey looks like.',
-    );
-    localStorage.setItem("has_seen_onboarding", "true");
-    setShowOnboarding(false);
-    // Refresh the page to show new data
-    window.location.reload();
   };
   const renderPageContent = () => {
     // Global pages available to all users
@@ -209,7 +181,14 @@ export default function Dashboard({ user, onLogout, onUpdateUser }) {
       case "profile-setup":
         return <ProfileSetup />;
       case "startup-office":
-        return <VirtualStartupOffice user={user} onNavigate={setCurrentPage} />;
+        return (
+          <AdaptiveVirtualOffice
+            user={user}
+            onNavigate={setCurrentPage}
+            onUpdateUser={onUpdateUser}
+            view="workspace"
+          />
+        );
       case "team-matching":
         // If founder has a startup (has companyName, startupName, or startupId), show Team Management
         // Otherwise show Team Matching to find co-founders
@@ -259,7 +238,13 @@ export default function Dashboard({ user, onLogout, onUpdateUser }) {
           />
         );
       case "startup-office":
-        return <VirtualStartupOffice user={user} onNavigate={setCurrentPage} />;
+        return (
+          <VirtualStartupOffice
+            user={user}
+            onNavigate={setCurrentPage}
+            onUpdateUser={onUpdateUser}
+          />
+        );
       case "tasks":
         return <TaskBoard user={user} />;
       default:
@@ -369,12 +354,6 @@ export default function Dashboard({ user, onLogout, onUpdateUser }) {
           role={user.role}
           onComplete={handleProfileComplete}
           onClose={() => {}}
-        />
-      )}
-      {showOnboarding && !showProfileCompletion && (
-        <OnboardingModal
-          onClose={handleCloseOnboarding}
-          onLoadSampleData={handleLoadSampleData}
         />
       )}
     </>

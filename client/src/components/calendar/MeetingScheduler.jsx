@@ -156,26 +156,26 @@ export default function MeetingScheduler({
   };
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="max-w-md w-[calc(100%-2rem)] sm:w-full">
+      <DialogContent className="max-w-md w-[calc(100%-2rem)] sm:w-full office-dialog-panel">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-sm">
             <Calendar className="w-4 h-4 text-[#3A5AFE]" />
             Schedule Meeting
           </DialogTitle>
-          <DialogDescription className="text-[10px]">
+          <DialogDescription className="text-sm">
             Create a new meeting or video call with your team
           </DialogDescription>
         </DialogHeader>
         <ScrollArea className="max-h-[60vh] pr-3">
           <div className="space-y-3">
             <div className="space-y-1.5">
-              <Label className="text-[10px]">Meeting Type</Label>
+              <Label className="text-sm">Meeting Type</Label>
               <div className="grid grid-cols-2 gap-2">
                 <Button
                   type="button"
                   variant={type === "meeting" ? "default" : "outline"}
                   onClick={() => setType("meeting")}
-                  className="h-8 text-[10px]"
+                  className="h-8 text-sm"
                 >
                   <Users className="w-3 h-3 mr-1.5" />
                   In-Person
@@ -184,7 +184,7 @@ export default function MeetingScheduler({
                   type="button"
                   variant={type === "video-call" ? "default" : "outline"}
                   onClick={() => setType("video-call")}
-                  className="h-8 text-[10px]"
+                  className="h-8 text-sm"
                 >
                   <Video className="w-3 h-3 mr-1.5" />
                   Video Call
@@ -192,7 +192,7 @@ export default function MeetingScheduler({
               </div>
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="title" className="text-[10px]">
+              <Label htmlFor="title" className="text-sm">
                 Meeting Title *
               </Label>
               <Input
@@ -200,11 +200,11 @@ export default function MeetingScheduler({
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
                 placeholder="Weekly standup"
-                className="h-8 text-[11px]"
+                className="h-8 text-sm"
               />
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="description" className="text-[10px]">
+              <Label htmlFor="description" className="text-sm">
                 Description
               </Label>
               <Textarea
@@ -212,12 +212,12 @@ export default function MeetingScheduler({
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 placeholder="Discuss weekly progress and blockers..."
-                className="min-h-[60px] text-[11px] resize-none"
+                className="min-h-[60px] text-sm resize-none"
               />
             </div>
             <div className="grid grid-cols-3 gap-2">
               <div className="space-y-1.5">
-                <Label htmlFor="date" className="text-[10px]">
+                <Label htmlFor="date" className="text-sm">
                   Date *
                 </Label>
                 <div className="relative">
@@ -227,12 +227,12 @@ export default function MeetingScheduler({
                     type="date"
                     value={date}
                     onChange={(e) => setDate(e.target.value)}
-                    className="h-8 text-[11px] pl-8"
+                    className="h-8 text-sm pl-8"
                   />
                 </div>
               </div>
               <div className="space-y-1.5">
-                <Label htmlFor="startTime" className="text-[10px]">
+                <Label htmlFor="startTime" className="text-sm">
                   Start *
                 </Label>
                 <div className="relative">
@@ -242,12 +242,12 @@ export default function MeetingScheduler({
                     type="time"
                     value={startTime}
                     onChange={(e) => setStartTime(e.target.value)}
-                    className="h-8 text-[11px] pl-8"
+                    className="h-8 text-sm pl-8"
                   />
                 </div>
               </div>
               <div className="space-y-1.5">
-                <Label htmlFor="endTime" className="text-[10px]">
+                <Label htmlFor="endTime" className="text-sm">
                   End *
                 </Label>
                 <div className="relative">
@@ -257,14 +257,14 @@ export default function MeetingScheduler({
                     type="time"
                     value={endTime}
                     onChange={(e) => setEndTime(e.target.value)}
-                    className="h-8 text-[11px] pl-8"
+                    className="h-8 text-sm pl-8"
                   />
                 </div>
               </div>
             </div>
             {type === "meeting" && (
               <div className="space-y-1.5">
-                <Label htmlFor="location" className="text-[10px]">
+                <Label htmlFor="location" className="text-sm">
                   Location
                 </Label>
                 <div className="relative">
@@ -274,7 +274,7 @@ export default function MeetingScheduler({
                     value={location}
                     onChange={(e) => setLocation(e.target.value)}
                     placeholder="Conference Room A"
-                    className="h-8 text-[11px] pl-8"
+                    className="h-8 text-sm pl-8"
                   />
                 </div>
               </div>
@@ -283,7 +283,7 @@ export default function MeetingScheduler({
               <div className="flex items-center gap-2">
                 <Repeat className="w-3.5 h-3.5 text-[#3A5AFE]" />
                 <div>
-                  <Label className="text-[10px] font-medium">
+                  <Label className="text-sm font-medium">
                     Recurring Meeting
                   </Label>
                   <p className="text-[9px] text-muted-foreground">
@@ -296,7 +296,7 @@ export default function MeetingScheduler({
             {isRecurring && (
               <div className="space-y-3 p-3 rounded-lg border bg-muted/20">
                 <div className="space-y-1.5">
-                  <Label className="text-[10px]">Repeat Every</Label>
+                  <Label className="text-sm">Repeat Every</Label>
                   <div className="grid grid-cols-3 gap-2">
                     <Button
                       type="button"
@@ -304,7 +304,7 @@ export default function MeetingScheduler({
                         recurrencePattern === "daily" ? "default" : "outline"
                       }
                       onClick={() => setRecurrencePattern("daily")}
-                      className="h-8 text-[10px]"
+                      className="h-8 text-sm"
                     >
                       Daily
                     </Button>
@@ -314,7 +314,7 @@ export default function MeetingScheduler({
                         recurrencePattern === "weekly" ? "default" : "outline"
                       }
                       onClick={() => setRecurrencePattern("weekly")}
-                      className="h-8 text-[10px]"
+                      className="h-8 text-sm"
                     >
                       Weekly
                     </Button>
@@ -324,7 +324,7 @@ export default function MeetingScheduler({
                         recurrencePattern === "monthly" ? "default" : "outline"
                       }
                       onClick={() => setRecurrencePattern("monthly")}
-                      className="h-8 text-[10px]"
+                      className="h-8 text-sm"
                     >
                       Monthly
                     </Button>
@@ -332,7 +332,7 @@ export default function MeetingScheduler({
                 </div>
                 {recurrencePattern === "weekly" && (
                   <div className="space-y-1.5">
-                    <Label className="text-[10px]">Repeat On</Label>
+                    <Label className="text-sm">Repeat On</Label>
                     <div className="grid grid-cols-7 gap-1">
                       {["S", "M", "T", "W", "T", "F", "S"].map((day, index) => {
                         const isSelected = weeklyDays.includes(index);
@@ -359,7 +359,7 @@ export default function MeetingScheduler({
                   </div>
                 )}
                 <div className="space-y-1.5">
-                  <Label className="text-[10px]">Ends</Label>
+                  <Label className="text-sm">Ends</Label>
                   <div className="grid grid-cols-2 gap-2">
                     <Button
                       type="button"
@@ -369,7 +369,7 @@ export default function MeetingScheduler({
                           : "outline"
                       }
                       onClick={() => setRecurrenceEndType("occurrences")}
-                      className="h-8 text-[10px]"
+                      className="h-8 text-sm"
                     >
                       After
                     </Button>
@@ -379,7 +379,7 @@ export default function MeetingScheduler({
                         recurrenceEndType === "date" ? "default" : "outline"
                       }
                       onClick={() => setRecurrenceEndType("date")}
-                      className="h-8 text-[10px]"
+                      className="h-8 text-sm"
                     >
                       On Date
                     </Button>
@@ -387,7 +387,7 @@ export default function MeetingScheduler({
                 </div>
                 {recurrenceEndType === "occurrences" && (
                   <div className="space-y-1.5">
-                    <Label htmlFor="occurrences" className="text-[10px]">
+                    <Label htmlFor="occurrences" className="text-sm">
                       Number of Occurrences
                     </Label>
                     <Input
@@ -397,13 +397,13 @@ export default function MeetingScheduler({
                       max="52"
                       value={recurrenceOccurrences}
                       onChange={(e) => setRecurrenceOccurrences(e.target.value)}
-                      className="h-8 text-[11px]"
+                      className="h-8 text-sm"
                     />
                   </div>
                 )}
                 {recurrenceEndType === "date" && (
                   <div className="space-y-1.5">
-                    <Label htmlFor="endDate" className="text-[10px]">
+                    <Label htmlFor="endDate" className="text-sm">
                       End Date
                     </Label>
                     <Input
@@ -412,14 +412,14 @@ export default function MeetingScheduler({
                       value={recurrenceEndDate}
                       onChange={(e) => setRecurrenceEndDate(e.target.value)}
                       min={date}
-                      className="h-8 text-[11px]"
+                      className="h-8 text-sm"
                     />
                   </div>
                 )}
               </div>
             )}
             <div className="space-y-1.5">
-              <Label className="text-[10px]">
+              <Label className="text-sm">
                 Attendees ({selectedAttendees.length})
               </Label>
               <div className="space-y-1.5 border rounded-lg p-2 bg-muted/30 max-h-[180px] overflow-y-auto">
@@ -438,7 +438,7 @@ export default function MeetingScheduler({
                           </AvatarFallback>
                         </Avatar>
                         <div className="flex-1 min-w-0">
-                          <p className="text-[10px] font-medium truncate">
+                          <p className="text-sm font-medium truncate">
                             {member.name}
                           </p>
                           <p className="text-[9px] text-muted-foreground truncate">
@@ -454,7 +454,7 @@ export default function MeetingScheduler({
                     );
                   })
                 ) : (
-                  <p className="text-[10px] text-muted-foreground text-center py-3">
+                  <p className="text-sm text-muted-foreground text-center py-3">
                     No team members available
                   </p>
                 )}
@@ -489,7 +489,7 @@ export default function MeetingScheduler({
             variant="outline"
             onClick={handleClose}
             disabled={loading}
-            className="h-8 text-[10px]"
+            className="h-8 text-sm"
           >
             Cancel
           </Button>
@@ -497,7 +497,7 @@ export default function MeetingScheduler({
             type="button"
             onClick={handleSchedule}
             disabled={loading}
-            className="h-8 text-[10px] bg-[#3A5AFE] hover:bg-[#304FFE]"
+            className="h-8 text-sm bg-[#3A5AFE] hover:bg-[#304FFE]"
           >
             {loading ? (
               <>
@@ -516,3 +516,4 @@ export default function MeetingScheduler({
     </Dialog>
   );
 }
+

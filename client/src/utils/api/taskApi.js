@@ -1,6 +1,15 @@
 // Task API wrapper for backend-first task management
 import { request } from "../backendClient";
 
+function normalizeTaskList(payload) {
+  const data = payload?.data;
+  if (Array.isArray(data)) return data;
+  if (Array.isArray(data?.tasks)) return data.tasks;
+  if (Array.isArray(payload?.tasks)) return payload.tasks;
+  if (Array.isArray(payload)) return payload;
+  return [];
+}
+
 function normalizeTask(task) {
   if (!task) return null;
   return {
@@ -16,7 +25,7 @@ function normalizeTask(task) {
  */
 export async function getFounderTasks(founderId) {
   const payload = await request(`/founders/${founderId}/tasks`, { method: "GET" });
-  const tasks = payload?.data?.tasks || payload?.tasks || [];
+  const tasks = normalizeTaskList(payload);
   return tasks.map(normalizeTask).filter(Boolean);
 }
 
@@ -25,7 +34,7 @@ export async function getFounderTasks(founderId) {
  */
 export async function getTeamMemberTasks(teamMemberId) {
   const payload = await request(`/team-members/${teamMemberId}/tasks`, { method: "GET" });
-  const tasks = payload?.data?.tasks || payload?.tasks || [];
+  const tasks = normalizeTaskList(payload);
   return tasks.map(normalizeTask).filter(Boolean);
 }
 
@@ -101,7 +110,7 @@ export async function getTasks(founderId, params) {
   );
   const data = payload?.data || payload || {};
   return {
-    tasks: (data.tasks || []).map(normalizeTask).filter(Boolean),
+    tasks: normalizeTaskList(payload).map(normalizeTask).filter(Boolean),
     pagination: data.pagination,
   };
 }
@@ -120,7 +129,7 @@ export async function getTasksByAssignee(assigneeId, params) {
   );
   const data = payload?.data || payload || {};
   return {
-    tasks: (data.tasks || []).map(normalizeTask).filter(Boolean),
+    tasks: normalizeTaskList(payload).map(normalizeTask).filter(Boolean),
     pagination: data.pagination,
   };
 }

@@ -1,6 +1,6 @@
 /**
- * Email Notification Triggers (MVP Gap 3)
- * Frontend utility to trigger email notifications via backend
+ * Notification Triggers (legacy filename retained)
+ * Frontend utility to trigger backend notification routes.
  */
 
 import { getAccessToken } from "../app/session";
@@ -8,176 +8,197 @@ import { API_BASE_URL } from "../config/apiBase.js";
 
 const API_BASE = API_BASE_URL;
 
-/**
- * Send weekly outcome reminder to founder
- */
-export async function sendWeeklyOutcomeReminder(
-  founderEmail,
-  founderName,
-  weekNumber,
-) {
-  try {
-    const response = await fetch(
-      `${API_BASE}/notifications/weekly-outcome-reminder`,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${getAccessToken()}`,
-        },
-        body: JSON.stringify({
-          founderEmail,
-          founderName,
-          weekNumber,
-        }),
-      },
-    );
-
-    const result = await response.json();
-    return result.success && result.sent;
-  } catch (error) {
-    console.warn("Failed to send weekly outcome reminder:", error);
-    return false;
+function resolveArgs(args, orderedKeys) {
+  if (args.length === 1 && args[0] && typeof args[0] === "object") {
+    return args[0];
   }
+  const resolved = {};
+  orderedKeys.forEach((key, index) => {
+    resolved[key] = args[index];
+  });
+  return resolved;
 }
 
-/**
- * Send task assigned notification to team member
- */
-export async function sendTaskAssignedNotification(
-  teamMemberEmail,
-  teamMemberName,
-  taskTitle,
-  taskDescription,
-  founderName,
-  milestoneName,
-) {
+async function postNotification(path, payload) {
   try {
-    const response = await fetch(`${API_BASE}/notifications/task-assigned`, {
+    const response = await fetch(`${API_BASE}${path}`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         Authorization: `Bearer ${getAccessToken()}`,
       },
-      body: JSON.stringify({
-        teamMemberEmail,
-        teamMemberName,
-        taskTitle,
-        taskDescription,
-        founderName,
-        milestoneName,
-      }),
+      body: JSON.stringify(payload),
     });
 
+    if (!response.ok) {
+      console.warn(`Failed notification request (${path}):`, await response.text());
+      return false;
+    }
+
     const result = await response.json();
-    return result.success && result.sent;
+    return result?.success === true;
   } catch (error) {
-    console.warn("Failed to send task assigned notification:", error);
+    console.warn(`Failed notification request (${path}):`, error);
     return false;
   }
 }
 
-/**
- * Send task blocked notification to founder
- */
-export async function sendTaskBlockedNotification(
-  founderEmail,
-  founderName,
-  taskTitle,
-  blockerReason,
-  blockerNote,
-  teamMemberName,
-) {
-  try {
-    const response = await fetch(`${API_BASE}/notifications/task-blocked`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${getAccessToken()}`,
-      },
-      body: JSON.stringify({
-        founderEmail,
-        founderName,
-        taskTitle,
-        blockerReason,
-        blockerNote,
-        teamMemberName,
-      }),
-    });
-
-    const result = await response.json();
-    return result.success && result.sent;
-  } catch (error) {
-    console.warn("Failed to send task blocked notification:", error);
-    return false;
-  }
+function buildPayload(userId, message, metadata = {}) {
+  const normalizedUserId = String(userId || "").trim();
+  if (!normalizedUserId) return null;
+  return {
+    userId: normalizedUserId,
+    message,
+    metadata,
+  };
 }
 
 /**
- * Send weekly review reminder to founder
+ * Send weekly outcome reminder to founder.
  */
-export async function sendWeeklyReviewReminder(
-  founderEmail,
-  founderName,
-  weekNumber,
-  tasksCompleted,
-  totalTasks,
-) {
-  try {
-    const response = await fetch(
-      `${API_BASE}/notifications/weekly-review-reminder`,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${getAccessToken()}`,
-        },
-        body: JSON.stringify({
-          founderEmail,
-          founderName,
-          weekNumber,
-          tasksCompleted,
-          totalTasks,
-        }),
-      },
-    );
+export async function sendWeeklyOutcomeReminder(...args) {
+  const params = resolveArgs(args, [
+    "userId",
+    "founderEmail",
+    "founderName",
+    "weekNumber",
+  ]);
 
-    const result = await response.json();
-    return result.success && result.sent;
-  } catch (error) {
-    console.warn("Failed to send weekly review reminder:", error);
-    return false;
-  }
+  const payload = buildPayload(
+    params.userId,
+    params.message || `Weekly outcome reminder for week ${params.weekNumber || ""}`.trim(),
+    {
+      founderEmail: params.founderEmail || "",
+      founderName: params.founderName || "",
+      weekNumber: params.weekNumber || null,
+      ...(params.metadata || {}),
+    },
+  );
+
+  if (!payload) return false;
+  return postNotification("/notifications/weekly-outcome-reminder", payload);
 }
 
 /**
- * Send streak at risk notification to founder
+ * Send task assigned notification to a team member.
  */
-export async function sendStreakAtRiskNotification(
-  founderEmail,
-  founderName,
-  currentStreak,
-) {
-  try {
-    const response = await fetch(`${API_BASE}/notifications/streak-at-risk`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${getAccessToken()}`,
-      },
-      body: JSON.stringify({
-        founderEmail,
-        founderName,
-        currentStreak,
-      }),
-    });
+export async function sendTaskAssignedNotification(...args) {
+  const params = resolveArgs(args, [
+    "userId",
+    "teamMemberEmail",
+    "teamMemberName",
+    "taskTitle",
+    "taskDescription",
+    "founderName",
+    "milestoneName",
+  ]);
 
-    const result = await response.json();
-    return result.success && result.sent;
-  } catch (error) {
-    console.warn("Failed to send streak at risk notification:", error);
-    return false;
-  }
+  const payload = buildPayload(
+    params.userId,
+    params.message ||
+      `${params.founderName || "A founder"} assigned "${params.taskTitle || "a task"}" to you.`,
+    {
+      teamMemberEmail: params.teamMemberEmail || "",
+      teamMemberName: params.teamMemberName || "",
+      taskTitle: params.taskTitle || "",
+      taskDescription: params.taskDescription || "",
+      founderName: params.founderName || "",
+      milestoneName: params.milestoneName || "",
+      ...(params.metadata || {}),
+    },
+  );
+
+  if (!payload) return false;
+  return postNotification("/notifications/task-assigned", payload);
+}
+
+/**
+ * Send task blocked notification (typically to founder).
+ */
+export async function sendTaskBlockedNotification(...args) {
+  const params = resolveArgs(args, [
+    "userId",
+    "founderEmail",
+    "founderName",
+    "taskTitle",
+    "blockerReason",
+    "blockerNote",
+    "teamMemberName",
+  ]);
+
+  const payload = buildPayload(
+    params.userId,
+    params.message ||
+      `Task "${params.taskTitle || ""}" is blocked${params.blockerReason ? `: ${params.blockerReason}` : ""}.`,
+    {
+      founderEmail: params.founderEmail || "",
+      founderName: params.founderName || "",
+      taskTitle: params.taskTitle || "",
+      blockerReason: params.blockerReason || "",
+      blockerNote: params.blockerNote || "",
+      teamMemberName: params.teamMemberName || "",
+      ...(params.metadata || {}),
+    },
+  );
+
+  if (!payload) return false;
+  return postNotification("/notifications/task-blocked", payload);
+}
+
+/**
+ * Send weekly review reminder to founder.
+ */
+export async function sendWeeklyReviewReminder(...args) {
+  const params = resolveArgs(args, [
+    "userId",
+    "founderEmail",
+    "founderName",
+    "weekNumber",
+    "tasksCompleted",
+    "totalTasks",
+  ]);
+
+  const payload = buildPayload(
+    params.userId,
+    params.message || `Weekly review reminder for week ${params.weekNumber || ""}`.trim(),
+    {
+      founderEmail: params.founderEmail || "",
+      founderName: params.founderName || "",
+      weekNumber: params.weekNumber || null,
+      tasksCompleted: params.tasksCompleted || null,
+      totalTasks: params.totalTasks || null,
+      ...(params.metadata || {}),
+    },
+  );
+
+  if (!payload) return false;
+  return postNotification("/notifications/weekly-review-reminder", payload);
+}
+
+/**
+ * Send streak-at-risk notification to founder.
+ */
+export async function sendStreakAtRiskNotification(...args) {
+  const params = resolveArgs(args, [
+    "userId",
+    "founderEmail",
+    "founderName",
+    "currentStreak",
+  ]);
+
+  const payload = buildPayload(
+    params.userId,
+    params.message || `Your execution streak (${params.currentStreak || 0}) is at risk.`,
+    {
+      founderEmail: params.founderEmail || "",
+      founderName: params.founderName || "",
+      currentStreak: params.currentStreak || 0,
+      ...(params.metadata || {}),
+    },
+  );
+
+  if (!payload) return false;
+  return postNotification("/notifications/streak-at-risk", payload);
 }
 
 /**

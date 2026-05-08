@@ -17,6 +17,12 @@ const milestoneSchema = new mongoose.Schema(
       maxlength: [5000, "Description cannot exceed 5000 characters"]
     },
     dueDate: { type: Date },
+    weeklyOutcomeId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "WeeklyOutcome",
+      default: null,
+      index: true,
+    },
     sequence: { type: Number, default: 1 },
     status: { type: String, default: "pending" },
     totalTasks: { type: Number, default: 0, min: 0 },

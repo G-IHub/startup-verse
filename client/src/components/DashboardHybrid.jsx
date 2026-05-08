@@ -2,15 +2,14 @@
  * DashboardHybrid - Main dashboard router component
  * Handles routing between different views based on user role
  */
-import React, { useState, useEffect, lazy, Suspense } from "react";
+import React, { useState, lazy, Suspense, useCallback } from "react";
 import AppLayoutHybrid from "./layout/AppLayoutHybrid";
 import AdaptiveVirtualOffice from "./office/AdaptiveVirtualOffice";
-import InteractiveTour from "./tours/InteractiveTour";
-import { homepageTourSteps } from "./tours/tourSteps";
-import { toast } from "sonner";
+import { featureFlags } from "../config/featureFlags";
 
 // ⚡ LAZY LOAD HEAVY COMPONENTS - Only load when navigating to them
 const FounderDashboard = lazy(() => import("./dashboards/FounderDashboard"));
+const FounderHomeV2 = lazy(() => import("./founder/FounderHomeV2"));
 const TeamMemberDashboard = lazy(
   () => import("./dashboards/TeamMemberDashboard"),
 );
@@ -66,11 +65,18 @@ export default function DashboardHybrid({ user, onLogout, onUpdateUser }) {
   };
   const [currentPage, setCurrentPage] = useState(getDefaultPage());
   const [virtualOfficeView, setVirtualOfficeView] = useState("workspace");
-  const [showOnboarding, setShowOnboarding] = useState(false);
   const [taskToOpen, setTaskToOpen] = useState(null);
   const [announcementToOpen, setAnnouncementToOpen] = useState(null);
   const [messageUserToOpen, setMessageUserToOpen] = useState(null);
   const [winToOpen, setWinToOpen] = useState(null);
+  const [talentDashboardMode, setTalentDashboardMode] = useState("overview");
+
+  const handleVirtualOfficeViewChange = useCallback(
+    (view) => {
+      setVirtualOfficeView(view);
+    },
+    [],
+  );
 
   // Wrapper for setCurrentPage with logging
   const handleNavigate = (page, options) => {
@@ -109,39 +115,14 @@ export default function DashboardHybrid({ user, onLogout, onUpdateUser }) {
       setCurrentPage("startup-office");
       setVirtualOfficeView("workspace");
     } else {
+      if (page === "dashboard" && user.role === "talent") {
+        setTalentDashboardMode(options?.mode || "overview");
+      }
       setCurrentPage(page);
     }
     console.log("✅ [DashboardHybrid] Page navigation triggered to:", page);
   };
 
-  // Check if user has seen onboarding (only for founders with completed profiles)
-  useEffect(() => {
-    const hasSeenOnboarding = localStorage.getItem("has_seen_onboarding");
-    if (
-      !hasSeenOnboarding &&
-      user.role === "founder" &&
-      user.onboardingComplete
-    ) {
-      setShowOnboarding(true);
-    }
-  }, [user.role, user.onboardingComplete]);
-  const handleProfileComplete = (profileData) => {
-    const updatedUser = {
-      ...user,
-      profile: {
-        ...user.profile,
-        ...profileData,
-      },
-      onboardingComplete: true,
-    };
-    onUpdateUser(updatedUser);
-    setShowOnboarding(false);
-    toast.success("Profile completed successfully!");
-  };
-  const handleCloseOnboarding = () => {
-    localStorage.setItem("has_seen_onboarding", "true");
-    setShowOnboarding(false);
-  };
   const renderPageContent = () => {
     // Only render pages outside Virtual Office when explicitly navigated to
     switch (currentPage) {
@@ -151,13 +132,21 @@ export default function DashboardHybrid({ user, onLogout, onUpdateUser }) {
           case "founder":
             return (
               <Suspense fallback={<PageLoadingFallback />}>
-                <FounderDashboard
-                  user={user}
-                  onLogout={onLogout}
-                  onUpdateUser={onUpdateUser}
-                  onNavigate={handleNavigate}
-                  onVirtualOfficeViewChange={setVirtualOfficeView}
-                />
+                {featureFlags.redesignedFounderHome ? (
+                  <FounderHomeV2
+                    user={user}
+                    onNavigate={handleNavigate}
+                    onVirtualOfficeViewChange={setVirtualOfficeView}
+                  />
+                ) : (
+                  <FounderDashboard
+                    user={user}
+                    onLogout={onLogout}
+                    onUpdateUser={onUpdateUser}
+                    onNavigate={handleNavigate}
+                    onVirtualOfficeViewChange={setVirtualOfficeView}
+                  />
+                )}
               </Suspense>
             );
           case "team-member":
@@ -171,14 +160,15 @@ export default function DashboardHybrid({ user, onLogout, onUpdateUser }) {
           case "talent":
             return (
               <Suspense fallback={<PageLoadingFallback />}>
-                <TalentDashboard
-                  user={user}
-                  onLogout={onLogout}
-                  onUpdateUser={onUpdateUser}
-                  onNavigate={handleNavigate}
-                />
-              </Suspense>
-            );
+              <TalentDashboard
+                user={user}
+                onLogout={onLogout}
+                onUpdateUser={onUpdateUser}
+                onNavigate={handleNavigate}
+                entryMode={talentDashboardMode}
+              />
+            </Suspense>
+          );
           case "organization-admin":
             return (
               <Suspense fallback={<PageLoadingFallback />}>
@@ -299,6 +289,19 @@ export default function DashboardHybrid({ user, onLogout, onUpdateUser }) {
 
       // Team Matching
       case "team-matching":
+        if (user.role === "talent") {
+          return (
+            <Suspense fallback={<PageLoadingFallback />}>
+              <TalentDashboard
+                user={user}
+                onLogout={onLogout}
+                onUpdateUser={onUpdateUser}
+                onNavigate={handleNavigate}
+                entryMode="opportunities"
+              />
+            </Suspense>
+          );
+        }
         return (
           <Suspense fallback={<PageLoadingFallback />}>
             <TeamMatching user={user} onNavigate={handleNavigate} />
@@ -353,8 +356,9 @@ export default function DashboardHybrid({ user, onLogout, onUpdateUser }) {
           <AdaptiveVirtualOffice
             user={user}
             onNavigate={handleNavigate}
+            onUpdateUser={onUpdateUser}
             view={virtualOfficeView}
-            onViewChange={setVirtualOfficeView}
+            onViewChange={handleVirtualOfficeViewChange}
             taskToOpen={taskToOpen}
             onTaskOpened={() => setTaskToOpen(null)}
             announcementToOpen={announcementToOpen}
@@ -384,21 +388,14 @@ export default function DashboardHybrid({ user, onLogout, onUpdateUser }) {
             currentPage={currentPage}
             onPageChange={handleNavigate}
             virtualOfficeView={virtualOfficeView}
-            onVirtualOfficeViewChange={setVirtualOfficeView}
+            onVirtualOfficeViewChange={handleVirtualOfficeViewChange}
+            talentDashboardMode={talentDashboardMode}
           >
             {renderPageContent()}
           </AppLayoutHybrid>
           <Suspense fallback={<PageLoadingFallback />}>
             <AdminDebugIndicator />
           </Suspense>
-          {showOnboarding && (
-            <InteractiveTour
-              steps={homepageTourSteps}
-              tourKey="homepage-welcome"
-              run={showOnboarding}
-              onComplete={handleCloseOnboarding}
-            />
-          )}
         </>
       )}
     </>

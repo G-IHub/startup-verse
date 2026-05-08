@@ -12,10 +12,19 @@ function assertContains(content, needle, label, failures) {
   if (!content.includes(needle)) failures.push(`Missing ${label}: ${needle}`);
 }
 
+function assertMatches(content, pattern, label, failures) {
+  if (!pattern.test(content)) failures.push(`Missing ${label}: ${pattern}`);
+}
+
+function assertNotContains(content, needle, label, failures) {
+  if (content.includes(needle)) failures.push(`Unexpected ${label}: ${needle}`);
+}
+
 async function main() {
   const failures = [];
 
   const usersController = await read("controllers/users.controller.js");
+  const usersRoutes = await read("routes/users.routes.js");
   const orgRoutes = await read("routes/organizations.routes.js");
   const messagesRoutes = await read("routes/messages.routes.js");
   const deliverablesRoutes = await read("routes/deliverables.routes.js");
@@ -33,6 +42,24 @@ async function main() {
   assertContains(invitationsController, "canAccessInterest", "interests authorization helper", failures);
   assertContains(invitationsController, "canAccessInvitation", "invitations authorization helper", failures);
   assertContains(notificationsRoutes, "isSelfOrAdmin", "notifications ownership guard", failures);
+  assertContains(usersController, "export const clearNotifications", "users notifications clear controller", failures);
+  assertContains(usersController, "Notification.deleteMany({ userId: req.params.userId })", "users notifications clear deleteMany", failures);
+  assertContains(usersRoutes, "usersRouter.delete(", "users notifications clear route method", failures);
+  assertContains(usersRoutes, "\"/users/:userId/notifications\"", "users notifications clear route path", failures);
+  assertContains(usersRoutes, "requireSelfOrAdmin(\"userId\")", "users notifications clear route ownership guard", failures);
+  assertContains(usersRoutes, "usersController.clearNotifications", "users notifications clear handler wiring", failures);
+  assertNotContains(
+    notificationsRoutes,
+    "/users/:userId/notifications/mark-all-read",
+    "duplicate notifications mark-all-read route in notifications router",
+    failures,
+  );
+  assertMatches(
+    notificationsRoutes,
+    /\/notifications\/streak-at-risk[\s\S]*?const targetUserId = req\.body\?\.userId \|\| req\.user\.id;[\s\S]*?if \(!isSelfOrAdmin\(req, targetUserId\)\) \{[\s\S]*?return apiError\(res, "Forbidden\.", 403\);[\s\S]*?\}[\s\S]*?userId: targetUserId,/,
+    "streak-at-risk route enforces ownership and uses targetUserId",
+    failures,
+  );
 
   if (failures.length) {
     console.error("Phase 8 security alignment smoke FAILED");

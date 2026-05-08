@@ -123,15 +123,11 @@ export default function TeamMatching({ user, onNavigate }) {
 
   // Load data from localStorage on mount
   React.useEffect(() => {
-    if (user.role === "talent") {
-      loadStartupIdeasForTalent();
-    } else {
-      loadStartupIdeas();
-    }
-    loadTalentProfiles();
     if (user.role === "founder") {
+      loadStartupIdeas();
       loadPendingOnboarding();
     }
+    loadTalentProfiles();
   }, [user.role]);
 
   // Generate smart recommendations for founders
@@ -314,114 +310,6 @@ export default function TeamMatching({ user, onNavigate }) {
         // Keep using cached data if backend fails
       });
   };
-  const loadStartupIdeasForTalent = () => {
-    console.log("🔄 [TeamMatching-Talent] Loading startup ideas for talent...");
-
-    // Load from localStorage immediately
-    const cachedIdeas = JSON.parse(
-      localStorage.getItem("startupverse_startup_posts") || "[]",
-    );
-    const founderProfiles = JSON.parse(
-      localStorage.getItem("startupverse_founder_profiles") || "[]",
-    );
-    console.log("📦 [TeamMatching-Talent] Cached posts:", cachedIdeas.length);
-    console.log(
-      "📦 [TeamMatching-Talent] Founder profiles:",
-      founderProfiles.length,
-    );
-
-    // If user is talent, calculate match scores
-    if (user.role === "talent") {
-      if (cachedIdeas.length > 0) {
-        const scoredIdeas = cachedIdeas.map((idea) => {
-          const founderProfile = founderProfiles.find(
-            (p) => p.founderName === idea.founder,
-          );
-          return {
-            ...idea,
-            matchScore: calculateStartupMatchScore(
-              idea,
-              founderProfile,
-              user.profile || {},
-            ),
-            postedDate: new Date(idea.postedDate),
-          };
-        });
-        scoredIdeas.sort((a, b) => b.matchScore - a.matchScore);
-        setStartupIdeas(scoredIdeas);
-      }
-    } else {
-      if (cachedIdeas.length > 0) {
-        setStartupIdeas(
-          cachedIdeas.map((idea) => ({
-            ...idea,
-            postedDate: new Date(idea.postedDate),
-          })),
-        );
-      }
-    }
-
-    // Fetch latest from backend
-    console.log("🌐 [TeamMatching-Talent] Fetching from backend...");
-    founderApi
-      .getAllPosts()
-      .then((response) => {
-        console.log("✅ [TeamMatching-Talent] Backend response:", response);
-        if (response.success && response.posts) {
-          console.log(
-            "📊 [TeamMatching-Talent] Received",
-            response.posts.length,
-            "posts from backend",
-          );
-          // Update localStorage cache
-          localStorage.setItem(
-            "startupverse_startup_posts",
-            JSON.stringify(response.posts),
-          );
-
-          // Update UI with backend data
-          if (user.role === "talent") {
-            const scoredIdeas = response.posts.map((idea) => {
-              const founderProfile = founderProfiles.find(
-                (p) => p.founderName === idea.founder,
-              );
-              return {
-                ...idea,
-                matchScore: calculateStartupMatchScore(
-                  idea,
-                  founderProfile,
-                  user.profile || {},
-                ),
-                postedDate: new Date(idea.postedDate),
-              };
-            });
-            scoredIdeas.sort((a, b) => b.matchScore - a.matchScore);
-            setStartupIdeas(scoredIdeas);
-          } else {
-            setStartupIdeas(
-              response.posts.map((idea) => ({
-                ...idea,
-                postedDate: new Date(idea.postedDate),
-              })),
-            );
-          }
-        } else {
-          console.log("⚠️ [TeamMatching-Talent] Backend returned no posts");
-        }
-      })
-      .catch((error) => {
-        console.error("❌ [TeamMatching-Talent] Backend fetch failed:", error);
-        console.error("Error details:", {
-          message: error.message,
-          stack: error.stack,
-        });
-        if (cachedIdeas.length === 0) {
-          console.warn(
-            "⚠️ [TeamMatching-Talent] No cached data and backend failed",
-          );
-        }
-      });
-  };
   const loadPendingOnboarding = () => {
     // Load accepted invitations that haven't been onboarded yet
     const invitations = JSON.parse(
@@ -501,74 +389,6 @@ export default function TeamMatching({ user, onNavigate }) {
   };
 
   // Calculate how well a startup matches talent's profile
-  const calculateStartupMatchScore = (idea, founderProfile, talentProfile) => {
-    let score = 0;
-
-    // Match based on roles looking for (high weight)
-    const lookingFor = Array.isArray(idea.lookingFor) ? idea.lookingFor : [];
-    const talentRole =
-      talentProfile.primaryRole ||
-      talentProfile.role ||
-      talentProfile.professionalTitle ||
-      "";
-    if (
-      lookingFor.length > 0 &&
-      lookingFor.some(
-        (role) =>
-          role.toLowerCase().includes(talentRole.toLowerCase()) ||
-          talentRole.toLowerCase().includes(role.toLowerCase()),
-      )
-    ) {
-      score += 40;
-    }
-
-    // Match based on industry/interests (high weight)
-    const talentInterests = Array.isArray(talentProfile.interests)
-      ? talentProfile.interests
-      : Array.isArray(talentProfile.industryPreferences)
-        ? talentProfile.industryPreferences
-        : [];
-    const startupIndustry = idea.industry || "";
-    const startupTags = Array.isArray(idea.tags) ? idea.tags : [];
-    if (
-      talentInterests.length > 0 &&
-      talentInterests.some(
-        (interest) =>
-          startupIndustry.toLowerCase().includes(interest.toLowerCase()) ||
-          interest.toLowerCase().includes(startupIndustry.toLowerCase()),
-      )
-    ) {
-      score += 35;
-    }
-
-    // Match on tags/skills
-    const talentSkills = Array.isArray(talentProfile.skills)
-      ? talentProfile.skills
-      : [];
-    const matchingTags =
-      startupTags.length > 0
-        ? startupTags.filter((tag) =>
-            talentSkills.some(
-              (skill) =>
-                skill.toLowerCase().includes(tag.toLowerCase()) ||
-                tag.toLowerCase().includes(skill.toLowerCase()),
-            ),
-          )
-        : [];
-    score += matchingTags.length * 5;
-
-    // Recency bonus (newly posted)
-    const daysOld = Math.floor(
-      (Date.now() - new Date(idea.postedDate).getTime()) /
-        (1000 * 60 * 60 * 24),
-    );
-    if (daysOld <= 3) {
-      score += 10;
-    } else if (daysOld <= 7) {
-      score += 5;
-    }
-    return score;
-  };
   const handlePostIdea = () => {
     if (!postFormData.title || !postFormData.description) {
       toast.error("Please fill in title and description");
@@ -1061,6 +881,28 @@ export default function TeamMatching({ user, onNavigate }) {
     "user.role:",
     user.role,
   );
+  if (user.role === "talent") {
+    return (
+      <div className="p-4">
+        <Card className="mx-auto max-w-2xl border border-border">
+          <CardHeader>
+            <CardTitle className="text-xl">Talent Browse Moved</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <p className="text-sm text-muted-foreground">
+              Opportunities are now canonical on Talent Home. Use Home/Browse to discover startups, save items, and send interests.
+            </p>
+            <Button
+              type="button"
+              onClick={() => onNavigate?.("dashboard", { mode: "opportunities" })}
+            >
+              Open Talent Home
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
   return (
     <div className="p-2 md:p-3 lg:p-4 space-y-3 md:space-y-4">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 mb-4 md:mb-6">
