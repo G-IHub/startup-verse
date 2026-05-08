@@ -10,6 +10,7 @@ function toAnnouncement(row) {
     body: String(row.body || row.message || ""),
     priority: String(row.priority || "normal"),
     category: String(row.category || "general"),
+    emoji: typeof row.emoji === "string" ? row.emoji : "",
     createdBy: String(row.createdBy || ""),
     createdByName: String(row.createdByName || ""),
     createdAt: row.createdAt ? new Date(row.createdAt) : new Date(),

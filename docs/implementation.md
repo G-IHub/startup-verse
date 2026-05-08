@@ -12,6 +12,8 @@ This file turns [`startup-verse_master_blueprint.md`](startup-verse_master_bluep
 
 **Virtual Office Team Hub polish (2026-04-13):** Team Hub now uses canonical message/announcement contracts via backend APIs, message and announcement access is startup-scoped with ownership guards, notification deep-links can open Team Hub context (including targeted message threads), and realtime subscriptions (`message:created`, `announcement:created`) include bounded polling fallback so chat and announcement streams stay fresh during socket outages.
 
+**Virtual Office Wall of Wins polish (2026-04-13):** Wall of Wins now has startup-scoped persistent REST endpoints (`GET/POST /api/v1/startups/:startupId/wins`) backed by immutable `Activity` rows (`type: "win"`), canonical win payload normalization across backend/client, dedicated realtime fanout (`win:created`) with bounded polling fallback, optimistic create/reconcile behavior in UI, and notification deeplinks that can open Team Hub in wins context.
+
 ---
 
 ## How each feature should be built (repeatable pattern)

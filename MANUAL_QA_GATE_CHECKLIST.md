@@ -76,6 +76,9 @@ cd server && node scripts/phase3-weekly-loop-smoke.mjs
 - [ ] Team Hub messaging: send/receive between two users updates unread/read state correctly after refresh.
 - [ ] Team Hub announcements: create announcement appears for both users and realtime fallback works if socket disconnects.
 - [ ] Notification deep-links into Team Hub open the expected context (announcement or message thread).
+- [ ] Wall of Wins: create a win from Team Hub (`category: wall-of-wins`), refresh, and confirm it persists for all startup members.
+- [ ] Wall of Wins: with socket disconnected, wins list still updates via bounded polling fallback and resumes realtime on reconnect.
+- [ ] Win notification deep-link (`/wins/:winId`) opens Virtual Office with Team Hub context.
 
 ---
 

@@ -207,6 +207,13 @@ export default function NotificationCenter({ onNavigate }) {
           announcementId,
           openTeamHub: true,
         }); // Announcements are in Team Hub
+      } else if (url.includes("/wins")) {
+        const match = url.match(/\/wins\/([^/?#]+)/);
+        const winId = match ? decodeURIComponent(match[1]) : "";
+        onNavigate("startup-office", {
+          openTeamHub: true,
+          winId,
+        });
       } else if (url.includes("/dashboard")) {
         console.log("🔔 Notification clicked - navigating to dashboard");
         onNavigate("dashboard");

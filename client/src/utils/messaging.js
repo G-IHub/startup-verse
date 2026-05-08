@@ -8,6 +8,12 @@ const API_BASE = API_BASE_URL;
 
 function mapMessageDto(row) {
   if (!row) return null;
+  const attachments = Array.isArray(row.attachments) ? row.attachments : [];
+  const firstAtt = attachments[0] && typeof attachments[0] === "object" ? attachments[0] : null;
+  const fileUrl = row.fileUrl || firstAtt?.url || "";
+  const fileName = row.fileName || firstAtt?.fileName || "";
+  const fileSize = row.fileSize ?? firstAtt?.fileSize ?? 0;
+  const fileType = row.fileType || firstAtt?.fileType || "";
   return {
     id: String(row.id || row._id || ""),
     senderId: String(row.senderId || row.fromUserId || ""),
@@ -19,10 +25,10 @@ function mapMessageDto(row) {
     timestamp: row.timestamp ? Number(row.timestamp) : new Date(row.createdAt || Date.now()).getTime(),
     startupId: String(row.startupId || ""),
     read: Boolean(row.read || row.readAt),
-    fileUrl: row.fileUrl || "",
-    fileName: row.fileName || "",
-    fileSize: row.fileSize || 0,
-    fileType: row.fileType || "",
+    fileUrl,
+    fileName,
+    fileSize,
+    fileType,
     createdAt: row.createdAt || null,
   };
 }
@@ -131,9 +137,10 @@ export async function getUserConversations(userId, startupId, teamMembers) {
     const rows = payload?.data || payload?.conversations || [];
     return rows.map(mapMessageDto).filter(Boolean).map((row) => {
       const teammate =
-        teamMembers.find((m) => String(m.id) === String(row.fromUserId)) ||
-        teamMembers.find((m) => String(m.id) === String(row.toUserId));
-      const otherId = String(row.fromUserId) === String(userId) ? row.toUserId : row.fromUserId;
+        teamMembers.find((m) => String(m.id) === String(row.senderId)) ||
+        teamMembers.find((m) => String(m.id) === String(row.recipientId));
+      const otherId =
+        String(row.senderId) === String(userId) ? row.recipientId : row.senderId;
       return {
         userId: String(otherId),
         userName: teammate?.name || "Team Member",

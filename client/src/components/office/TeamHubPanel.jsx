@@ -28,7 +28,9 @@ import {
   getStartupAnnouncements,
   postStartupAnnouncement,
 } from "../../utils/announcementApi";
+import { getStartupWins, postWin } from "../../utils/activityApi";
 import { subscribeToAnnouncements } from "../../utils/realtimeSubscriptions";
+import { subscribeToWins } from "../../utils/realtimeSubscriptions";
 import {
   X,
   Plus,
@@ -91,6 +93,9 @@ export function TeamHubPanel({
   });
   const [announcementsLoading, setAnnouncementsLoading] = useState(false);
   const [announcementsError, setAnnouncementsError] = useState("");
+  const [wins, setWins] = useState([]);
+  const [winsLoading, setWinsLoading] = useState(false);
+  const [winsError, setWinsError] = useState("");
 
   // Persist to localStorage
   useEffect(() => {
@@ -104,7 +109,12 @@ export function TeamHubPanel({
   }, [announcements]);
 
   useEffect(() => {
-    if (!startupId) return;
+    if (!startupId) {
+      setAnnouncements([]);
+      setAnnouncementsLoading(false);
+      setAnnouncementsError("");
+      return;
+    }
     let stopped = false;
     setAnnouncementsLoading(true);
     setAnnouncementsError("");
@@ -128,9 +138,55 @@ export function TeamHubPanel({
       if (!incoming?.id) return;
       setAnnouncements((prev) => {
         const byId = new Map(prev.map((row) => [String(row.id), row]));
-        byId.set(String(incoming.id), incoming);
+        const prevRow = byId.get(String(incoming.id));
+        byId.set(String(incoming.id), {
+          ...incoming,
+          emoji: incoming.emoji || prevRow?.emoji || "",
+        });
         return Array.from(byId.values()).sort(
           (a, b) => new Date(b.createdAt || b.timestamp || 0) - new Date(a.createdAt || a.timestamp || 0),
+        );
+      });
+    });
+    return () => {
+      stopped = true;
+      unsub?.();
+    };
+  }, [startupId]);
+
+  useEffect(() => {
+    if (!startupId) {
+      setWins([]);
+      setWinsLoading(false);
+      setWinsError("");
+      return;
+    }
+    let stopped = false;
+    setWinsLoading(true);
+    setWinsError("");
+    getStartupWins(startupId, { limit: 100 })
+      .then((result) => {
+        if (stopped) return;
+        if (result?.success) {
+          setWins(result.wins || []);
+        } else {
+          setWinsError("Could not load wins.");
+        }
+      })
+      .catch(() => {
+        if (!stopped) setWinsError("Could not load wins.");
+      })
+      .finally(() => {
+        if (!stopped) setWinsLoading(false);
+      });
+    const unsub = subscribeToWins(startupId, (update) => {
+      const incoming = update?.win;
+      if (!incoming?.id) return;
+      setWins((prev) => {
+        const byId = new Map(prev.map((row) => [String(row.id), row]));
+        byId.set(String(incoming.id), incoming);
+        return Array.from(byId.values()).sort(
+          (a, b) => new Date(b.timestamp || 0) - new Date(a.timestamp || 0),
         );
       });
     });
@@ -209,19 +265,38 @@ export function TeamHubPanel({
       toast.error("Startup context missing.");
       return;
     }
-    postStartupAnnouncement(startupId, {
-      title: "Announcement",
-      message: newAnnouncement.message,
-      priority: newAnnouncement.priority,
-      category: newAnnouncement.category,
-      userId: currentUserId,
-    })
+    const submitPromise =
+      newAnnouncement.category === "wall-of-wins"
+        ? postWin(startupId ? { startupId, userId: currentUserId, message: newAnnouncement.message } : {})
+        : postStartupAnnouncement(startupId, {
+            title: "Announcement",
+            message: newAnnouncement.message,
+            priority: newAnnouncement.priority,
+            category: newAnnouncement.category,
+            emoji: newAnnouncement.emoji,
+            userId: currentUserId,
+          });
+    submitPromise
       .then((result) => {
-        if (!result?.success || !result?.announcement) {
-          throw new Error("Announcement publish failed.");
+        if (newAnnouncement.category === "wall-of-wins") {
+          if (!result?.success || !result?.win) {
+            throw new Error("Win publish failed.");
+          }
+          setWins((prev) => [result.win, ...prev]);
+        } else {
+          if (!result?.success || !result?.announcement) {
+            throw new Error("Announcement publish failed.");
+          }
+          setAnnouncements((prev) => [
+            {
+              ...result.announcement,
+              emoji: result.announcement?.emoji || newAnnouncement.emoji,
+            },
+            ...prev,
+          ]);
         }
-        setAnnouncements((prev) => [result.announcement, ...prev]);
         setAnnouncementsError("");
+        setWinsError("");
         setShowCreateAnnouncement(false);
         setNewAnnouncement({
           message: "",
@@ -230,15 +305,24 @@ export function TeamHubPanel({
           category: "general",
         });
         onActivity?.(
-          "announcement-create",
-          "created an announcement",
-          newAnnouncement.emoji,
+          newAnnouncement.category === "wall-of-wins" ? "win" : "announcement-create",
+          newAnnouncement.category === "wall-of-wins" ? "shared a team win" : "created an announcement",
+          newAnnouncement.category === "wall-of-wins" ? "🏆" : newAnnouncement.emoji,
         );
-        toast.success("📢 Announcement sent!");
+        toast.success(
+          newAnnouncement.category === "wall-of-wins"
+            ? "🏆 Win shared with your startup!"
+            : "📢 Announcement sent!",
+        );
       })
       .catch((error) => {
-        setAnnouncementsError(error?.message || "Unable to publish announcement.");
-        toast.error("Unable to publish announcement.");
+        if (newAnnouncement.category === "wall-of-wins") {
+          setWinsError(error?.message || "Unable to publish win.");
+          toast.error("Unable to publish win.");
+        } else {
+          setAnnouncementsError(error?.message || "Unable to publish announcement.");
+          toast.error("Unable to publish announcement.");
+        }
       });
   };
   const votePoll = (pollId, optionId) => {
@@ -345,17 +429,37 @@ export function TeamHubPanel({
     comments: [],
   }));
 
-  const localAnnouncements = announcements.map((ann) => ({
-    ...ann,
-    sender: ann.sender || ann.createdByName || currentUserName,
-    timestamp: ann.timestamp || ann.createdAt || new Date(),
-    emoji:
-      ann.emoji ||
-      (ann.priority === "urgent" ? "🚨" : ann.priority === "high" ? "⚠️" : "📢"),
+  const localAnnouncements = announcements.map((ann) => {
+    const rawTs = ann.timestamp ?? ann.createdAt;
+    const timestamp =
+      rawTs instanceof Date ? rawTs : new Date(rawTs || Date.now());
+    const safeTs = Number.isNaN(timestamp.getTime()) ? new Date() : timestamp;
+    const priorityEmoji =
+      ann.priority === "urgent" ? "🚨" : ann.priority === "high" ? "⚠️" : "📢";
+    return {
+      ...ann,
+      sender: ann.sender || ann.createdByName || currentUserName,
+      timestamp: safeTs,
+      emoji:
+        typeof ann.emoji === "string" && ann.emoji.trim()
+          ? ann.emoji
+          : priorityEmoji,
+    };
+  });
+  const winAnnouncements = wins.map((win) => ({
+    id: win.id,
+    message: win.message,
+    sender: win.userName || currentUserName,
+    timestamp: win.timestamp ? new Date(win.timestamp) : new Date(),
+    emoji: "🏆",
+    priority: "normal",
+    category: "wall-of-wins",
+    reactions: [],
+    comments: [],
   }));
 
   // Merge local and organization announcements
-  const allAnnouncements = [...localAnnouncements, ...convertedOrgAnnouncements];
+  const allAnnouncements = [...winAnnouncements, ...localAnnouncements, ...convertedOrgAnnouncements];
   const filteredItems = () => {
     if (filter === "polls") return polls;
     if (filter === "announcements") return allAnnouncements;
@@ -486,6 +590,18 @@ export function TeamHubPanel({
       <div className="flex-1 overflow-hidden">
         <ScrollArea className="h-full">
           <div className="p-4 space-y-3">
+            {announcementsLoading ? (
+              <div className="text-xs text-muted-foreground">Loading announcements...</div>
+            ) : null}
+            {announcementsError ? (
+              <div className="text-xs text-red-600">{announcementsError}</div>
+            ) : null}
+            {winsLoading ? (
+              <div className="text-xs text-muted-foreground">Loading wins...</div>
+            ) : null}
+            {winsError ? (
+              <div className="text-xs text-red-600">{winsError}</div>
+            ) : null}
             {filteredItems().length === 0 ? (
               <div className="text-center py-12 text-muted-foreground">
                 <Sparkles className="w-12 h-12 mx-auto mb-3 opacity-20" />
@@ -496,12 +612,6 @@ export function TeamHubPanel({
               </div>
             ) : (
               <>
-                {announcementsLoading ? (
-                  <div className="text-xs text-muted-foreground">Loading announcements...</div>
-                ) : null}
-                {announcementsError ? (
-                  <div className="text-xs text-red-600">{announcementsError}</div>
-                ) : null}
                 {filteredItems().map((item) => {
                 const isPoll = "question" in item;
                 if (isPoll) {
@@ -659,6 +769,7 @@ export function TeamHubPanel({
                 } else {
                   const announcement = item;
                   const priorityColors = {
+                    low: "border-border",
                     normal: "border-border",
                     high: "border-orange-500",
                     urgent: "border-red-500",

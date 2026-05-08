@@ -24,6 +24,7 @@ async function main() {
   const socketServer = await readServer("realtime/socketServer.js");
   const realtimeService = await readServer("services/realtime.service.js");
   const notificationsRoutes = await readServer("routes/notifications.routes.js");
+  const announcementsRoutes = await readServer("routes/announcements.routes.js");
 
   assertContains(events, "SOCKET_EVENTS", "server SOCKET_EVENTS export", failures);
   assertContains(socketIo, "socket.io-client", "client uses socket.io-client", failures);
@@ -32,6 +33,8 @@ async function main() {
   assertContains(socketIo, "task:updated", "task realtime event name", failures);
   assertContains(socketIo, "TASK_POLL_MS", "task polling fallback interval", failures);
   assertContains(socketIo, "announcement:created", "announcement realtime event name", failures);
+  assertContains(socketIo, "announcementSocketRoom", "announcement isolated socket room helper", failures);
+  assertContains(socketIo, "win:created", "win realtime event name", failures);
   assertContains(
     socketIo,
     "ANNOUNCEMENT_POLL_MS",
@@ -42,12 +45,19 @@ async function main() {
   assertContains(socketIo, "activity:created", "activity realtime event name", failures);
   assertContains(socketIo, "presence:updated", "presence realtime event name", failures);
   assertContains(socketIo, "MESSAGE_POLL_MS", "messages REST polling fallback", failures);
+  assertContains(socketIo, "WIN_POLL_MS", "wins REST polling fallback", failures);
   assertContains(socketIo, "getConversation", "messages fallback uses REST conversation", failures);
   assertContains(realtimeService, "emitRealtime", "realtime service exposes emit helper", failures);
   assertContains(
     notificationsRoutes,
     "emitRealtime(SOCKET_EVENTS",
     "notifications route emits via SOCKET_EVENTS contract",
+    failures,
+  );
+  assertContains(
+    announcementsRoutes,
+    "SOCKET_EVENTS.ANNOUNCEMENT_CREATED",
+    "announcements route emits ANNOUNCEMENT_CREATED",
     failures,
   );
 
