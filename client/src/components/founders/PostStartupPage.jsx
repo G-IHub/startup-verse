@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { Textarea } from "../ui/textarea";
@@ -9,6 +9,7 @@ import { Checkbox } from "../ui/checkbox";
 import { Separator } from "../ui/separator";
 import { toast } from "sonner";
 import * as founderApi from "../../utils/api/founderApi";
+import StartupDetailPage from "./StartupDetailPage";
 import {
   ArrowLeft,
   Rocket,
@@ -211,6 +212,55 @@ export function PostStartupPage({ user, onNavigate }) {
     }
   };
 
+  const buildOfferFromForm = () => {
+    if (!formData.compensationPhilosophy) return undefined;
+    return {
+      compensationPhilosophy: formData.compensationPhilosophy,
+      equityMin: formData.equityMin,
+      equityMax: formData.equityMax,
+      salaryApproach: formData.salaryApproach,
+      salaryMin: formData.salaryMin,
+      salaryMax: formData.salaryMax,
+      benefits: formData.benefits,
+      whyJoinUs: formData.whyJoinUs.filter((r) => r.trim()),
+      customPerks: formData.customPerks,
+    };
+  };
+
+  const previewStartup = useMemo(() => {
+    const userId = String(user?._id ?? user?.id ?? "");
+    const offer = buildOfferFromForm();
+    return {
+      id: existingPost?.id || "preview-draft",
+      title: formData.title,
+      description: formData.description,
+      founder: user?.name || "You",
+      founderId: userId,
+      founderAvatar: user?.profile?.avatar,
+      industry: formData.industry,
+      stage: formData.stage,
+      lookingFor: formData.lookingFor
+        .split(",")
+        .map((r) => r.trim())
+        .filter(Boolean),
+      location: formData.location || "Remote",
+      commitment: formData.commitment,
+      postedDate: existingPost?.postedDate || new Date(),
+      interested: existingPost?.interested ?? 0,
+      tags: formData.tags
+        .split(",")
+        .map((t) => t.trim())
+        .filter(Boolean),
+      offer,
+      website: formData.website,
+      linkedinUrl: formData.linkedinUrl,
+      twitterUrl: formData.twitterUrl,
+      githubUrl: formData.githubUrl,
+      contactEmail: formData.contactEmail,
+      pitchDeckUrl: formData.pitchDeckUrl,
+    };
+  }, [formData, user, existingPost]);
+
   const handleSubmit = async () => {
     const userId = String(user?._id ?? user?.id ?? "");
     if (!userId) {
@@ -218,19 +268,7 @@ export function PostStartupPage({ user, onNavigate }) {
       return;
     }
 
-    const offer = formData.compensationPhilosophy
-      ? {
-          compensationPhilosophy: formData.compensationPhilosophy,
-          equityMin: formData.equityMin,
-          equityMax: formData.equityMax,
-          salaryApproach: formData.salaryApproach,
-          salaryMin: formData.salaryMin,
-          salaryMax: formData.salaryMax,
-          benefits: formData.benefits,
-          whyJoinUs: formData.whyJoinUs.filter((r) => r.trim()),
-          customPerks: formData.customPerks,
-        }
-      : undefined;
+    const offer = buildOfferFromForm();
 
     const postData = {
       id: existingPost?.id || Date.now().toString(),
@@ -279,99 +317,35 @@ export function PostStartupPage({ user, onNavigate }) {
 
   if (showPreview) {
     return (
-      <div className="min-h-screen bg-surface-page">
-        <div className="max-w-4xl mx-auto px-6 py-8">
-          <Button variant="ghost" onClick={() => setShowPreview(false)} className="mb-6">
-            <ArrowLeft className="w-4 h-4 mr-2" />
-            Back to Edit
-          </Button>
-
-          <Card className="surface-card border-surface-border">
-            <CardHeader className="border-b border-surface-border">
-              <div className="flex items-center gap-3">
-                <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center">
-                  <Rocket className="w-6 h-6 text-primary" />
-                </div>
-                <div>
-                  <CardTitle className="text-2xl font-bold text-text-heading">{formData.title}</CardTitle>
-                  <p className="text-text-muted text-sm mt-1">
-                    Posted by {user.name} • {formData.industry} • {formData.stage}
-                  </p>
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent className="p-6 space-y-6">
-              <div>
-                <h3 className="font-semibold text-text-heading mb-2">Description</h3>
-                <p className="text-text-body whitespace-pre-wrap">{formData.description}</p>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div className="bg-surface-page rounded-lg p-4">
-                  <p className="text-sm text-text-muted mb-1">Location</p>
-                  <p className="font-medium text-text-heading">{formData.location || "Remote"}</p>
-                </div>
-                <div className="bg-surface-page rounded-lg p-4">
-                  <p className="text-sm text-text-muted mb-1">Commitment</p>
-                  <p className="font-medium text-text-heading">{formData.commitment}</p>
-                </div>
-              </div>
-
-              <div>
-                <h3 className="font-semibold text-text-heading mb-2">Looking For</h3>
-                <div className="flex flex-wrap gap-2">
-                  {formData.lookingFor.split(",").map((role, i) => (
-                    <Badge key={i} variant="secondary" className="text-sm py-1 px-3">
-                      {role.trim()}
-                    </Badge>
-                  ))}
-                </div>
-              </div>
-
-              {formData.tags && (
-                <div>
-                  <h3 className="font-semibold text-text-heading mb-2">Tags</h3>
-                  <div className="flex flex-wrap gap-2">
-                    {formData.tags.split(",").map((tag, i) => (
-                      <Badge key={i} variant="outline" className="text-sm">
-                        {tag.trim()}
-                      </Badge>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {formData.offer && (
-                <div className="bg-primary/5 rounded-xl p-5 border border-primary/20">
-                  <h3 className="font-semibold text-text-heading mb-3 flex items-center gap-2">
-                    <DollarSign className="w-5 h-5 text-primary" />
-                    Compensation Offer
-                  </h3>
-                  <div className="space-y-2 text-sm">
-                    <p className="text-text-body">
-                      <span className="font-medium">Philosophy:</span>{" "}
-                      {COMPENSATION_PHILOSOPHIES.find((p) => p.value === formData.offer.compensationPhilosophy)?.label}
-                    </p>
-                    {formData.offer.equityMin && formData.offer.equityMax && (
-                      <p className="text-text-body">
-                        <span className="font-medium">Equity:</span> {formData.offer.equityMin}% - {formData.offer.equityMax}%
-                      </p>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              <div className="flex gap-3 pt-4 border-t border-surface-border">
-                <Button variant="outline" onClick={() => setShowPreview(false)} className="flex-1">
-                  Edit
-                </Button>
-                <Button onClick={handleSubmit} className="flex-1 bg-primary hover:bg-primary-hover">
-                  <CheckCircle2 className="w-4 h-4 mr-2" />
-                  {isEditing ? "Update Post" : "Publish Post"}
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
+      <div className="relative min-h-screen bg-surface-page">
+        <StartupDetailPage
+          user={user}
+          startup={previewStartup}
+          previewMode
+          onPreviewBack={() => setShowPreview(false)}
+          onNavigate={(page) => {
+            if (page === "browse-startups") setShowPreview(false);
+          }}
+        />
+        <div className="pointer-events-none fixed inset-x-0 bottom-0 z-50 flex justify-center px-4 pb-4 pt-2">
+          <div className="pointer-events-auto flex w-full max-w-xl gap-3 rounded-2xl border border-surface-border bg-surface-card/95 p-3 shadow-lg backdrop-blur-md">
+            <Button
+              type="button"
+              variant="outline"
+              className="flex-1 h-11 bg-background/80"
+              onClick={() => setShowPreview(false)}
+            >
+              Edit
+            </Button>
+            <Button
+              type="button"
+              className="flex-1 h-11 bg-primary hover:bg-primary-hover"
+              onClick={handleSubmit}
+            >
+              <CheckCircle2 className="w-4 h-4 mr-2" />
+              {isEditing ? "Update Post" : "Publish Post"}
+            </Button>
+          </div>
         </div>
       </div>
     );

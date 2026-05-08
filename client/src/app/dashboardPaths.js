@@ -128,7 +128,7 @@ export function pathToDashboardState(pathname, search, role) {
 
   if (path === "/browse-talent") {
     if (role !== "founder" && role !== "talent") return null;
-    return { currentPage: "team-matching" };
+    return { currentPage: role === "talent" ? "browse-startups" : "team-matching" };
   }
 
   const page = PATH_TO_PAGE[path];

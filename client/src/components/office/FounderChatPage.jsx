@@ -6,7 +6,12 @@ import { MessageCircle } from "lucide-react";
 import { buildFounderChatRoster } from "../../utils/chatRosterBuilder";
 import * as inboxApi from "../../utils/api/inboxApi";
 
-export default function FounderChatPage({ user, onNavigate }) {
+export default function FounderChatPage({
+  user,
+  onNavigate,
+  initialSelectedUserId = null,
+  onInitialSelectionApplied,
+}) {
   const currentUserId = String(user._id ?? user.id ?? "");
   const startupId = getStartupId(user);
   const office = useOfficeWorkspaceData({ user });
@@ -38,6 +43,12 @@ export default function FounderChatPage({ user, onNavigate }) {
 
     loadData();
   }, [currentUserId]);
+
+  useEffect(() => {
+    if (initialSelectedUserId && onInitialSelectionApplied) {
+      onInitialSelectionApplied();
+    }
+  }, [initialSelectedUserId, onInitialSelectionApplied]);
 
   // Build unified roster combining interests, invitations, and team members
   const roster = useMemo(() => {
@@ -92,6 +103,7 @@ export default function FounderChatPage({ user, onNavigate }) {
         currentUserRole={user.role}
         startupId={startupId}
         teamMembers={roster}
+        initialSelectedUserId={initialSelectedUserId}
         strictMode={true}
       />
     </div>

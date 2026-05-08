@@ -60,6 +60,7 @@ const StartupDetailPage = lazy(() => import("./founders/StartupDetailPage"));
 
 // API and realtime imports
 import * as inboxApi from "../utils/api/inboxApi";
+import * as founderApi from "../utils/api/founderApi";
 import { broadcastMessageUpdate } from "../utils/realtimeSubscriptions";
 import { toast } from "sonner";
 
@@ -164,10 +165,15 @@ export default function DashboardHybrid({ user, onLogout, onUpdateUser }) {
       );
       return;
     }
-    if (options?.openTeamHub || options?.messageUserId) {
-      if (options?.messageUserId) {
-        setMessageUserToOpen(options.messageUserId);
+    if (options?.messageUserId) {
+      setMessageUserToOpen(options.messageUserId);
+      if (page === "founder-chat" || page === "talent-chat") {
+        const targetPath = dashboardStateToPath({ currentPage: page });
+        navigate(targetPath);
+        return;
       }
+    }
+    if (options?.openTeamHub) {
       if (options?.winId) {
         setWinToOpen(options.winId);
       }
@@ -429,11 +435,44 @@ export default function DashboardHybrid({ user, onLogout, onUpdateUser }) {
                   selectedTalent.id ??
                   "",
                 );
-                const startupId = user.startupId || user.companyId;
-                const startupTitle = user.startupName || user.companyName || "My Startup";
-
                 if (!talentId) {
                   toast.error("Unable to identify this talent profile. Please refresh and try again.");
+                  return;
+                }
+
+                let founderStartup = null;
+                try {
+                  const postsRes = await founderApi.getAllPosts();
+                  if (postsRes?.success && Array.isArray(postsRes.posts)) {
+                    founderStartup = postsRes.posts.find(
+                      (post) => String(post.founderId ?? "") === founderId,
+                    );
+                  }
+                } catch (error) {
+                  console.error("Failed to verify founder startup before invitation:", error);
+                }
+
+                if (!founderStartup) {
+                  toast.error("Please launch your startup before browsing talent or sending invites.");
+                  handleNavigate("post-startup");
+                  return;
+                }
+
+                const startupId =
+                  String(founderStartup._id ?? founderStartup.id ?? "") ||
+                  String(user.startupId ?? user.companyId ?? "");
+                const startupTitle = String(
+                  founderStartup.title ||
+                    founderStartup.startupTitle ||
+                    founderStartup.companyName ||
+                    user.startupName ||
+                    user.companyName ||
+                    "",
+                ).trim();
+
+                if (!startupTitle) {
+                  toast.error("Please complete your startup post title before sending invitations.");
+                  handleNavigate("post-startup");
                   return;
                 }
 
@@ -468,7 +507,12 @@ export default function DashboardHybrid({ user, onLogout, onUpdateUser }) {
                   toast.success(`Invitation sent to ${invitation.talentName}!`);
                 } catch (err) {
                   console.error("Failed to send invitation:", err);
-                  toast.error("Failed to send invitation. Please try again.");
+                  const msg = String(err?.message || "");
+                  if (msg.toLowerCase().includes("already sent")) {
+                    toast.error(msg);
+                  } else {
+                    toast.error("Failed to send invitation. Please try again.");
+                  }
                 }
               }}
             />
@@ -482,6 +526,8 @@ export default function DashboardHybrid({ user, onLogout, onUpdateUser }) {
             <FounderChatPage
               user={user}
               onNavigate={handleNavigate}
+              initialSelectedUserId={messageUserToOpen}
+              onInitialSelectionApplied={() => setMessageUserToOpen(null)}
             />
           </Suspense>
         );
@@ -493,6 +539,8 @@ export default function DashboardHybrid({ user, onLogout, onUpdateUser }) {
             <TalentChatPage
               user={user}
               onNavigate={handleNavigate}
+              initialSelectedUserId={messageUserToOpen}
+              onInitialSelectionApplied={() => setMessageUserToOpen(null)}
             />
           </Suspense>
         );

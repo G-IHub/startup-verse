@@ -5,7 +5,12 @@ import { MessageCircle } from "lucide-react";
 import { buildTalentChatRoster } from "../../utils/chatRosterBuilder";
 import { Button } from "../ui/button";
 
-export default function TalentChatPage({ user, onNavigate }) {
+export default function TalentChatPage({
+  user,
+  onNavigate,
+  initialSelectedUserId = null,
+  onInitialSelectionApplied,
+}) {
   const talentId = String(user._id ?? user.id ?? "");
 
   // Fetch both sent interests and received invitations
@@ -35,6 +40,12 @@ export default function TalentChatPage({ user, onNavigate }) {
 
     loadData();
   }, [talentId]);
+
+  useEffect(() => {
+    if (initialSelectedUserId && onInitialSelectionApplied) {
+      onInitialSelectionApplied();
+    }
+  }, [initialSelectedUserId, onInitialSelectionApplied]);
 
   // Build unified roster combining interests and invitations
   const roster = useMemo(() => {
@@ -92,6 +103,7 @@ export default function TalentChatPage({ user, onNavigate }) {
           currentUserRole="talent"
           startupId={null}
           teamMembers={roster}
+        initialSelectedUserId={initialSelectedUserId}
           strictMode={false}
         />
       </div>

@@ -6,15 +6,12 @@ import { Card, CardContent, CardHeader, CardTitle } from "../ui/card";
 import { toast } from "sonner";
 import * as founderApi from "../../utils/api/founderApi";
 import {
-  ArrowLeft,
   Search,
-  Building2,
   MapPin,
   Users,
   Briefcase,
   ExternalLink,
   Clock,
-  Rocket,
   Filter,
   ChevronDown,
   Heart,
@@ -118,6 +115,28 @@ export function BrowseStartupsPage({ user, onNavigate, onViewStartup }) {
     return d.toLocaleDateString();
   };
 
+  const startupMeta = (startup) => {
+    const roles = Array.isArray(startup.lookingFor) ? startup.lookingFor.filter(Boolean) : [];
+    const rolesLabel =
+      roles.length === 0
+        ? "Role requirements not specified"
+        : roles.length <= 2
+          ? roles.join(", ")
+          : `${roles.slice(0, 2).join(", ")} +${roles.length - 2} more`;
+
+    return {
+      founderName: startup.founder || startup.founderName || "Founder",
+      location: startup.location || "Remote / Flexible",
+      commitment: startup.commitment || "Flexible",
+      industry: startup.industry || "General",
+      stage: startup.stage || "Not specified",
+      rolesLabel,
+      description:
+        startup.description?.trim() ||
+        "No public description yet. Open details to learn more about this opportunity.",
+    };
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-surface-page flex items-center justify-center">
@@ -130,54 +149,31 @@ export function BrowseStartupsPage({ user, onNavigate, onViewStartup }) {
   }
 
   return (
-    <div className="min-h-screen bg-surface-page">
-      <div className="max-w-7xl mx-auto px-6 py-8">
-        {/* Header */}
-        <div className="mb-8">
-          <Button variant="ghost" onClick={() => onNavigate?.("dashboard")} className="mb-4">
-            <ArrowLeft className="w-4 h-4 mr-2" />
-            Back to Dashboard
-          </Button>
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-            <div className="flex items-center gap-4">
-              <div className="w-14 h-14 rounded-2xl bg-primary/10 flex items-center justify-center">
-                <Rocket className="w-7 h-7 text-primary" />
-              </div>
-              <div>
-                <h1 className="text-3xl font-bold text-text-heading">Browse Startups</h1>
-                <p className="text-text-muted mt-1">
-                  Discover exciting opportunities and find your next startup adventure
-                </p>
-              </div>
-            </div>
-            {user?.role === "founder" && (
-              <Button
-                onClick={() => onNavigate?.("post-startup")}
-                className="bg-primary hover:bg-primary-hover"
-              >
-                <Building2 className="w-4 h-4 mr-2" />
-                Post Your Startup
-              </Button>
-            )}
-          </div>
+    <div className="min-h-full bg-surface-page p-2 font-body md:p-3 lg:p-4">
+      <div className="mx-auto max-w-7xl">
+        <div className="mb-5 rounded-card border border-surface-border bg-surface-card p-4 shadow-soft">
+          <p className="text-sm font-semibold text-text-heading">Find startup opportunities</p>
+          <p className="mt-1 text-sm text-text-muted">
+            Discover active startup posts, review role requirements, and open details to apply.
+          </p>
         </div>
 
         {/* Search and Filters */}
-        <div className="mb-8 space-y-4">
-          <div className="flex gap-3">
+        <div className="mb-6 space-y-4">
+          <div className="flex flex-col gap-3 sm:flex-row">
             <div className="relative flex-1 max-w-2xl">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-text-muted" />
               <Input
                 placeholder="Search startups by name, description, founder, or role..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10 h-12 bg-surface-card border-surface-border focus:border-primary"
+                className="h-12 rounded-input border-surface-border bg-surface-card pl-10 text-sm"
               />
             </div>
             <Button
               variant="outline"
               onClick={() => setShowFilters(!showFilters)}
-              className="h-12 px-4"
+              className="h-12 rounded-input px-4"
             >
               <Filter className="w-4 h-4 mr-2" />
               Filters
@@ -188,7 +184,7 @@ export function BrowseStartupsPage({ user, onNavigate, onViewStartup }) {
           </div>
 
           {showFilters && (
-            <Card className="surface-card border-surface-border">
+            <Card className="rounded-card border-surface-border bg-surface-card shadow-soft">
               <CardContent className="p-4">
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                   <div>
@@ -198,7 +194,7 @@ export function BrowseStartupsPage({ user, onNavigate, onViewStartup }) {
                     <select
                       value={selectedIndustry}
                       onChange={(e) => setSelectedIndustry(e.target.value)}
-                      className="w-full h-10 rounded-md border border-surface-border bg-surface-page px-3 text-sm focus:border-primary focus:outline-none"
+                      className="h-10 w-full rounded-input border border-surface-border bg-surface-page px-3 text-sm focus:border-primary focus:outline-none"
                     >
                       {INDUSTRIES.map((ind) => (
                         <option key={ind} value={ind}>
@@ -214,7 +210,7 @@ export function BrowseStartupsPage({ user, onNavigate, onViewStartup }) {
                     <select
                       value={selectedStage}
                       onChange={(e) => setSelectedStage(e.target.value)}
-                      className="w-full h-10 rounded-md border border-surface-border bg-surface-page px-3 text-sm focus:border-primary focus:outline-none"
+                      className="h-10 w-full rounded-input border border-surface-border bg-surface-page px-3 text-sm focus:border-primary focus:outline-none"
                     >
                       {STAGES.map((stage) => (
                         <option key={stage} value={stage}>
@@ -230,7 +226,7 @@ export function BrowseStartupsPage({ user, onNavigate, onViewStartup }) {
                     <select
                       value={selectedCommitment}
                       onChange={(e) => setSelectedCommitment(e.target.value)}
-                      className="w-full h-10 rounded-md border border-surface-border bg-surface-page px-3 text-sm focus:border-primary focus:outline-none"
+                      className="h-10 w-full rounded-input border border-surface-border bg-surface-page px-3 text-sm focus:border-primary focus:outline-none"
                     >
                       {COMMITMENTS.map((c) => (
                         <option key={c} value={c}>
@@ -246,12 +242,12 @@ export function BrowseStartupsPage({ user, onNavigate, onViewStartup }) {
         </div>
 
         {/* Results Count */}
-        <div className="mb-4 flex items-center justify-between">
-          <p className="text-text-muted">
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+          <p className="text-sm text-text-muted">
             Showing <span className="font-semibold text-text-heading">{filteredStartups.length}</span> startups
           </p>
           {favorites.size > 0 && (
-            <p className="text-sm text-primary">
+            <p className="text-sm font-medium text-primary">
               <Heart className="w-4 h-4 inline mr-1" />
               {favorites.size} favorites
             </p>
@@ -284,24 +280,26 @@ export function BrowseStartupsPage({ user, onNavigate, onViewStartup }) {
             </CardContent>
           </Card>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {filteredStartups.map((startup) => (
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+            {filteredStartups.map((startup) => {
+              const meta = startupMeta(startup);
+              return (
               <Card
                 key={startup.id}
-                className="surface-card border-surface-border hover:border-primary/50 hover:shadow-lg transition-all group cursor-pointer"
+                className="group flex h-full cursor-pointer flex-col rounded-card border border-surface-border bg-surface-card shadow-soft transition-all hover:-translate-y-0.5 hover:border-primary/45 hover:shadow-md"
                 onClick={() => onViewStartup?.(startup)}
               >
-                <CardHeader className="pb-4">
+                <CardHeader className="pb-3">
                   <div className="flex items-start justify-between">
                     <div className="flex items-center gap-3">
-                      <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center text-lg font-bold text-primary">
+                      <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-primary/10 text-base font-bold text-primary">
                         {startup.title?.charAt(0).toUpperCase() || "S"}
                       </div>
-                      <div>
-                        <CardTitle className="text-lg font-semibold text-text-heading line-clamp-1">
+                      <div className="min-w-0">
+                        <CardTitle className="line-clamp-1 text-lg font-semibold text-text-heading">
                           {startup.title}
                         </CardTitle>
-                        <p className="text-sm text-text-muted">by {startup.founder}</p>
+                        <p className="line-clamp-1 text-sm text-text-muted">by {meta.founderName}</p>
                       </div>
                     </div>
                     <button
@@ -309,7 +307,7 @@ export function BrowseStartupsPage({ user, onNavigate, onViewStartup }) {
                         e.stopPropagation();
                         toggleFavorite(startup.id);
                       }}
-                      className="p-2 hover:bg-surface-page rounded-full transition-colors"
+                      className="rounded-full p-2 transition-colors hover:bg-surface-page"
                     >
                       <Heart
                         className={`w-5 h-5 ${
@@ -321,43 +319,41 @@ export function BrowseStartupsPage({ user, onNavigate, onViewStartup }) {
                     </button>
                   </div>
                 </CardHeader>
-                <CardContent className="pt-0">
-                  <p className="text-text-body text-sm line-clamp-3 mb-4">
-                    {startup.description}
+                <CardContent className="flex flex-1 flex-col pt-0">
+                  <p className="mb-4 min-h-[4.5rem] text-sm leading-6 text-text-body line-clamp-3">
+                    {meta.description}
                   </p>
 
-                  <div className="flex flex-wrap gap-2 mb-4">
+                  <div className="mb-4 flex flex-wrap gap-2">
                     <Badge variant="secondary" className="text-xs">
-                      {startup.industry}
+                      {meta.industry}
                     </Badge>
                     <Badge variant="outline" className="text-xs">
-                      {startup.stage}
+                      {meta.stage}
                     </Badge>
                   </div>
 
-                  <div className="space-y-2 text-sm mb-4">
+                  <div className="mb-4 space-y-2 border-t border-surface-border pt-4 text-sm">
                     <div className="flex items-center gap-2 text-text-muted">
                       <MapPin className="w-4 h-4" />
-                      <span>{startup.location || "Remote"}</span>
+                      <span className="line-clamp-1">{meta.location}</span>
                     </div>
                     <div className="flex items-center gap-2 text-text-muted">
                       <Briefcase className="w-4 h-4" />
-                      <span>{startup.commitment}</span>
+                      <span className="line-clamp-1">{meta.commitment}</span>
                     </div>
                     <div className="flex items-center gap-2 text-text-muted">
-                      <Users className="w-4 h-4" />
-                      <span>Looking for: {startup.lookingFor?.slice(0, 2).join(", ")}
-                        {startup.lookingFor?.length > 2 && "..."}
-                      </span>
+                      <Users className="h-4 w-4 shrink-0" />
+                      <span className="line-clamp-2">Looking for: {meta.rolesLabel}</span>
                     </div>
                     <div className="flex items-center gap-2 text-text-muted">
-                      <Clock className="w-4 h-4" />
+                      <Clock className="h-4 w-4 shrink-0" />
                       <span>Posted {formatDate(startup.postedDate)}</span>
                     </div>
                   </div>
 
                   {startup.offer && (
-                    <div className="bg-primary/5 rounded-lg p-3 mb-4">
+                    <div className="mb-4 rounded-lg bg-primary/5 p-3">
                       <div className="flex items-center gap-2 text-sm">
                         <Sparkles className="w-4 h-4 text-primary" />
                         <span className="text-text-heading font-medium">
@@ -373,7 +369,7 @@ export function BrowseStartupsPage({ user, onNavigate, onViewStartup }) {
 
                   <Button
                     variant="ghost"
-                    className="w-full group-hover:bg-primary group-hover:text-white transition-colors"
+                    className="mt-auto w-full rounded-input border border-surface-border bg-surface-page text-sm font-medium text-text-heading transition-colors hover:border-primary hover:bg-primary hover:text-white"
                     onClick={(e) => {
                       e.stopPropagation();
                       onViewStartup?.(startup);
@@ -384,7 +380,7 @@ export function BrowseStartupsPage({ user, onNavigate, onViewStartup }) {
                   </Button>
                 </CardContent>
               </Card>
-            ))}
+            )})}
           </div>
         )}
       </div>

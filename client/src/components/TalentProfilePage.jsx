@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Button } from "./ui/button";
 import { Badge } from "./ui/badge";
 import { Avatar, AvatarFallback } from "./ui/avatar";
@@ -28,11 +28,149 @@ import {
   Zap,
   CheckCircle2,
 } from "lucide-react";
+import * as talentApi from "../utils/api/talentApi";
+import { augmentTalentBrowseFields } from "../utils/talentBrowseNormalize";
 
-export default function TalentProfilePage({ talent, currentUser, onBack, onSendInvitation }) {
+function hasExpandedTalentProfile(profile) {
+  if (!profile) return false;
+  return Boolean(
+    (Array.isArray(profile.workExperiences) && profile.workExperiences.length > 0) ||
+      (Array.isArray(profile.educationList) && profile.educationList.length > 0) ||
+      (Array.isArray(profile.certifications) && profile.certifications.length > 0) ||
+      (Array.isArray(profile.portfolioItems) && profile.portfolioItems.length > 0) ||
+      String(profile.bio || "").trim() ||
+      String(profile.professionalGoals || "").trim(),
+  );
+}
+
+function extractTalentUserIds(profile) {
+  const ids = new Set();
+  const candidates = [
+    profile?.userId,
+    profile?.user?._id,
+    profile?.user?.id,
+    profile?.id,
+    profile?._id,
+  ];
+  for (const value of candidates) {
+    if (!value) continue;
+    if (typeof value === "object" && value._id) {
+      ids.add(String(value._id));
+      continue;
+    }
+    ids.add(String(value));
+  }
+  return [...ids].filter(Boolean);
+}
+
+function doesProfileMatchUserId(profile, userIdsSet) {
+  if (!profile || !userIdsSet?.size) return false;
+  const profileUserId =
+    typeof profile.userId === "object" && profile.userId?._id
+      ? String(profile.userId._id)
+      : String(profile.userId || "");
+  const profileId = String(profile._id || profile.id || "");
+  return userIdsSet.has(profileUserId) || userIdsSet.has(profileId);
+}
+
+export default function TalentProfilePage({
+  talent: initialTalent,
+  currentUser,
+  onBack,
+  onSendInvitation,
+}) {
+  const [talent, setTalent] = useState(initialTalent || null);
+  const [isHydratingProfile, setIsHydratingProfile] = useState(false);
   const [inviteMessage, setInviteMessage] = useState("");
   const [showInviteForm, setShowInviteForm] = useState(false);
   const [invitationSent, setInvitationSent] = useState(false);
+
+  useEffect(() => {
+    setTalent(initialTalent || null);
+  }, [initialTalent]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const hydrateTalentProfile = async () => {
+      if (!initialTalent || hasExpandedTalentProfile(initialTalent)) return;
+
+      const userIds = extractTalentUserIds(initialTalent);
+      if (!userIds.length) return;
+
+      setIsHydratingProfile(true);
+      try {
+        let resolved = null;
+
+        for (const userId of userIds) {
+          try {
+            const response = await talentApi.getTalentProfile(userId);
+            if (response?.success && response?.data) {
+              resolved = response.data;
+              break;
+            }
+          } catch (_) {
+            // Continue trying other candidate IDs
+          }
+        }
+
+        if (!resolved) {
+          const browseResponse = await talentApi.browseTalents();
+          const list = Array.isArray(browseResponse?.data) ? browseResponse.data : [];
+          const userIdsSet = new Set(userIds.map(String));
+          resolved =
+            list.find((row) => doesProfileMatchUserId(row, userIdsSet)) || null;
+        }
+
+        if (!resolved || cancelled) return;
+
+        const normalized = augmentTalentBrowseFields(resolved) || resolved;
+        setTalent((prev) => ({
+          ...(prev || {}),
+          ...normalized,
+          id:
+            String(
+              normalized.userId?._id ||
+                normalized.userId ||
+                normalized._id ||
+                normalized.id ||
+                prev?._id ||
+                prev?.id ||
+                "",
+            ) || prev?.id,
+          _id:
+            String(
+              normalized._id ||
+                normalized.id ||
+                normalized.userId?._id ||
+                normalized.userId ||
+                prev?._id ||
+                prev?.id ||
+                "",
+            ) || prev?._id,
+          fullName:
+            normalized.fullName ||
+            normalized.name ||
+            prev?.fullName ||
+            prev?.name ||
+            "Talent",
+          professionalTitle:
+            normalized.professionalTitle ||
+            normalized.headline ||
+            normalized.role ||
+            prev?.professionalTitle ||
+            prev?.headline ||
+            prev?.role ||
+            "",
+        }));
+      } finally {
+        if (!cancelled) setIsHydratingProfile(false);
+      }
+    };
+    void hydrateTalentProfile();
+    return () => {
+      cancelled = true;
+    };
+  }, [initialTalent]);
 
   if (!talent) {
     return (
@@ -99,6 +237,11 @@ export default function TalentProfilePage({ talent, currentUser, onBack, onSendI
       </div>
 
       <div className="max-w-5xl mx-auto px-4 space-y-6">
+        {isHydratingProfile && (
+          <div className="rounded-lg border border-primary/20 bg-primary/5 px-3 py-2 text-xs text-primary">
+            Loading full talent profile details...
+          </div>
+        )}
         {/* Hero Profile Card */}
         <Card className="border-0 overflow-hidden bg-white">
           <div className="bg-slate-50/80 p-8">

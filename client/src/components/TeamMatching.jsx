@@ -610,7 +610,12 @@ export default function TeamMatching({ user, onNavigate }) {
       }
     } catch (error) {
       console.error("❌ Error sending interest:", error);
-      toast.error("Failed to send interest. Please try again.");
+      const msg = String(error?.message || "");
+      if (msg.toLowerCase().includes("already sent")) {
+        toast.error(msg);
+      } else {
+        toast.error("Failed to send interest. Please try again.");
+      }
     }
   };
   const handleStartOnboarding = (talent) => {
@@ -790,6 +795,12 @@ export default function TeamMatching({ user, onNavigate }) {
     "user.role:",
     user.role,
   );
+  const founderUserId = String(user._id ?? user.id ?? "");
+  const founderStartupPost =
+    user.role === "founder"
+      ? startupIdeas.find((idea) => String(idea.founderId ?? "") === founderUserId)
+      : null;
+  const founderCanBrowseTalent = user.role !== "founder" || Boolean(founderStartupPost);
   return (
     <div className="min-h-full bg-surface-page p-2 font-body md:p-3 lg:p-4 space-y-3 md:space-y-4">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 mb-4 md:mb-6">
@@ -809,11 +820,7 @@ export default function TeamMatching({ user, onNavigate }) {
         </div>
         {user.role === "founder" &&
           (() => {
-            // Check if founder has an existing post
-            const founderPost = startupIdeas.find(
-              (idea) => idea.founderId === String(user._id ?? user.id ?? ""),
-            );
-            const hasExistingPost = !!founderPost;
+            const hasExistingPost = Boolean(founderStartupPost);
             return (
               <div className="flex gap-2">
                 <Button
@@ -874,7 +881,33 @@ export default function TeamMatching({ user, onNavigate }) {
           </CardContent>
         </Card>
       )}
-      {(user.role === "founder" || user.role === "talent") && (
+      {user.role === "founder" && !founderCanBrowseTalent && (
+        <Card className="rounded-card border border-amber-200 bg-amber-50/90 shadow-soft dark:border-amber-800 dark:bg-amber-950/20">
+          <CardContent className="p-4 md:p-6">
+            <div className="flex items-start gap-3">
+              <div className="w-10 h-10 rounded-full bg-amber-200 dark:bg-amber-800 flex items-center justify-center flex-shrink-0">
+                <AlertCircle className="w-5 h-5 text-amber-700 dark:text-amber-200" />
+              </div>
+              <div className="space-y-2">
+                <h3 className="text-base md:text-lg font-medium text-amber-900 dark:text-amber-100">
+                  Post your startup first
+                </h3>
+                <p className="text-xs md:text-sm text-amber-800 dark:text-amber-200">
+                  Founders must publish at least one startup before browsing talent or sending invitations.
+                </p>
+                <Button
+                  onClick={() => onNavigate?.("post-startup")}
+                  className="rounded-input bg-primary font-body text-sm font-semibold text-white hover:bg-primary-hover"
+                >
+                  <Plus className="w-4 h-4 mr-1.5" />
+                  Launch Startup
+                </Button>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+      {(user.role === "talent" || (user.role === "founder" && founderCanBrowseTalent)) && (
         <>
           <div className="flex flex-col sm:flex-row gap-2 mb-4">
             <div className="flex-1 relative">

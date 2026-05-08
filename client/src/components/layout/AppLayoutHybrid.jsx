@@ -54,6 +54,10 @@ const PAGE_META = {
     title: "Browse Talent",
     description: "Discover talent that can grow into your team",
   },
+  "browse-startups": {
+    title: "Browse Startups",
+    description: "Discover startup opportunities that match your skills",
+  },
   inbox: {
     title: "Inbox",
     description: "Invitations, interests, and responses",

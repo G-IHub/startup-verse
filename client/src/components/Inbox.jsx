@@ -64,13 +64,43 @@ const normalizeItem = (item) => {
     : Array.isArray(item.metadata?.messages)
       ? item.metadata.messages
       : [];
-  const messages = rawMessages.map((message) => ({
-    ...message,
-    senderId: String(message.senderId ?? ""),
-    sender: String(message.sender || message.senderName || "Unknown"),
-    text: String(message.text ?? message.body ?? ""),
-    timestamp: message.timestamp || message.sentAt || null,
-  }));
+  const messages = rawMessages.map((message) => {
+    const nestedText =
+      message?.text && typeof message.text === "object" ? message.text : null;
+    const resolvedSender =
+      message.sender ||
+      message.senderName ||
+      nestedText?.sender ||
+      nestedText?.senderName ||
+      "Unknown";
+    const resolvedSenderId =
+      message.senderId || nestedText?.senderId || nestedText?.sender_id || "";
+    const resolvedText =
+      typeof message.text === "string"
+        ? message.text
+        : typeof message.body === "string"
+          ? message.body
+          : typeof message.content === "string"
+            ? message.content
+            : typeof nestedText?.text === "string"
+              ? nestedText.text
+              : typeof nestedText?.body === "string"
+                ? nestedText.body
+                : "";
+    const resolvedTimestamp =
+      message.timestamp ||
+      message.sentAt ||
+      nestedText?.timestamp ||
+      nestedText?.sentAt ||
+      null;
+    return {
+      ...message,
+      senderId: String(resolvedSenderId),
+      sender: String(resolvedSender),
+      text: String(resolvedText),
+      timestamp: resolvedTimestamp,
+    };
+  });
   // MongoDB may populate founderId/talentId as objects — extract name if missing
   const founderName = item.founderName ||
     (item.founderId && typeof item.founderId === "object" ? item.founderId.name : "") ||
@@ -477,17 +507,21 @@ export default function Inbox({ user, onBack, initialTab = "received", onNavigat
         if (activeTab === "sent") {
           // Founder viewing sent invitation
           const updated = await inboxApi.getSentInvitations(userId);
-          const updatedItem = updated.find((i) => i.id === item.id);
+          const updatedItem = updated.find(
+            (i) => String(i.id ?? i._id ?? "") === String(item.id ?? item._id ?? ""),
+          );
           if (updatedItem) {
-            setSelectedItem(updatedItem);
+            setSelectedItem(normalizeItem(updatedItem));
             console.log("✅ Updated sent invitation with new message");
           }
         } else {
           // Talent viewing received invitation
           const updated = await inboxApi.getReceivedInvitations(userId);
-          const updatedItem = updated.find((i) => i.id === item.id);
+          const updatedItem = updated.find(
+            (i) => String(i.id ?? i._id ?? "") === String(item.id ?? item._id ?? ""),
+          );
           if (updatedItem) {
-            setSelectedItem(updatedItem);
+            setSelectedItem(normalizeItem(updatedItem));
             console.log("✅ Updated received invitation with new message");
           }
         }
@@ -496,17 +530,21 @@ export default function Inbox({ user, onBack, initialTab = "received", onNavigat
         if (activeTab === "sent") {
           // Talent viewing sent interest
           const updated = await inboxApi.getSentInterests(userId);
-          const updatedItem = updated.find((i) => i.id === item.id);
+          const updatedItem = updated.find(
+            (i) => String(i.id ?? i._id ?? "") === String(item.id ?? item._id ?? ""),
+          );
           if (updatedItem) {
-            setSelectedItem(updatedItem);
+            setSelectedItem(normalizeItem(updatedItem));
             console.log("✅ Updated sent interest with new message");
           }
         } else {
           // Founder viewing received interest
           const updated = await inboxApi.getReceivedInterests(userId);
-          const updatedItem = updated.find((i) => i.id === item.id);
+          const updatedItem = updated.find(
+            (i) => String(i.id ?? i._id ?? "") === String(item.id ?? item._id ?? ""),
+          );
           if (updatedItem) {
-            setSelectedItem(updatedItem);
+            setSelectedItem(normalizeItem(updatedItem));
             console.log("✅ Updated received interest with new message");
           }
         }
@@ -520,10 +558,6 @@ export default function Inbox({ user, onBack, initialTab = "received", onNavigat
   };
   const handleRespondToInvitation = async (item, action) => {
     const message = responseMessage.trim();
-    if (!message && action === "accept") {
-      toast.error("Please write a message with your response");
-      return;
-    }
     setIsSending(true);
     console.log("🎯 [Talent] Responding to invitation:", {
       action,
@@ -550,11 +584,16 @@ export default function Inbox({ user, onBack, initialTab = "received", onNavigat
         toast.error("Invalid action for your role");
         return;
       }
-      toast.success(
-        action === "accept"
-          ? "✅ Accepted! You're now a team member. Check your chat to connect with the founder."
-          : "❌ Declined and response sent!",
-      );
+      if (action === "accept") {
+        // Silent refresh so auth/session state rehydrates with new role (team-member).
+        setPendingInvitationAcceptance(null);
+        setAcceptanceConfirmed(false);
+        setSelectedItem(null);
+        setResponseMessage("");
+        window.location.reload();
+        return;
+      }
+      toast.success("❌ Declined and response sent!");
       setSelectedItem(null);
       setPendingInvitationAcceptance(null);
       setAcceptanceConfirmed(false);
@@ -1140,7 +1179,7 @@ export default function Inbox({ user, onBack, initialTab = "received", onNavigat
                           onClick={(e) => {
                             e.stopPropagation();
                             const talentId = String(item.talentId?._id || item.talentId || "");
-                            onNavigate("startup-office", { messageUserId: talentId });
+                            onNavigate("founder-chat", { messageUserId: talentId });
                           }}
                         >
                           <MessageCircle className="w-3 h-3" />
@@ -1310,6 +1349,60 @@ export default function Inbox({ user, onBack, initialTab = "received", onNavigat
     });
     setShowOnboardingWizard(true);
     setSelectedItem(null);
+  };
+  const openChatForItem = (item) => {
+    if (!onNavigate || !item) return;
+    const targetId = isInvitation(item)
+      ? String(item.founderId?._id || item.founderId || "")
+      : String(item.talentId?._id || item.talentId || "");
+    if (!targetId) {
+      toast.error("Chat user unavailable for this conversation.");
+      return;
+    }
+    setSelectedItem(null);
+    const chatPage = isTalentInboxUser ? "talent-chat" : "founder-chat";
+    onNavigate(chatPage, { messageUserId: targetId });
+  };
+  const getTalentIdFromItem = (item) =>
+    String(item?.talentId?._id || item?.talentId || "");
+  const openTalentProfileFromItem = (item) => {
+    if (!onNavigate || !item) return;
+    const talentId = getTalentIdFromItem(item);
+    if (!talentId) {
+      toast.error("Talent profile is unavailable for this conversation.");
+      return;
+    }
+    const talent = {
+      id: talentId,
+      _id: talentId,
+      fullName:
+        item.talentName ||
+        (item.talentId && typeof item.talentId === "object"
+          ? item.talentId.name
+          : "Talent"),
+      professionalTitle:
+        item.talentArea ||
+        item.role ||
+        (item.talentId && typeof item.talentId === "object"
+          ? item.talentId.professionalTitle
+          : "") ||
+        "Talent",
+      skills: Array.isArray(item.talentSkills)
+        ? item.talentSkills
+        : item.talentSkills
+          ? [String(item.talentSkills)]
+          : [],
+      location:
+        (item.talentId && typeof item.talentId === "object"
+          ? item.talentId.location
+          : "") || "",
+      email:
+        (item.talentId && typeof item.talentId === "object"
+          ? item.talentId.email
+          : "") || "",
+    };
+    setSelectedItem(null);
+    onNavigate("talent-profile", { talent });
   };
   const renderConversationDialog = () => {
     if (!selectedItem) return null;
@@ -1500,87 +1593,46 @@ export default function Inbox({ user, onBack, initialTab = "received", onNavigat
                     )}
                   </div>
                   <p className="font-body text-xs font-normal text-[#a0a0b0]">
-                    {formatDate(selectedItem.sentAt)}
+                    {formatDateTime(
+                      selectedItem.lastActivityAt ||
+                        selectedItem.sentAt ||
+                        selectedItem.createdAt,
+                    )}
                   </p>
                 </div>
               </div>
               <p className="border-b border-[#e2e4f0] pb-3 font-body text-sm font-normal text-[#0d0d0d]">{selectedItem.message}</p>
             </div>
             {selectedItem.messages && selectedItem.messages.length > 0 && (
-              <div className="space-y-3">
-                {selectedItem.messages.map((msg, idx) => {
-                  const isCurrentUser = msg.senderId === userId;
-                  return (
-                    <div
-                      key={idx}
-                      className={`flex gap-3 ${isCurrentUser ? "flex-row-reverse" : ""}`}
-                    >
-                      <Avatar className="w-8 h-8">
-                        <AvatarFallback
-                          className={`text-xs ${isCurrentUser ? "bg-blue-100 dark:bg-blue-900/30 text-blue-900 dark:text-blue-100" : "bg-muted"}`}
-                        >
-                          {msg.sender
-                            .split(" ")
-                            .map((n) => n[0])
-                            .join("")}
-                        </AvatarFallback>
-                      </Avatar>
-                      <div
-                        className={`flex-1 ${isCurrentUser ? "text-right" : ""}`}
-                      >
-                        <div className="flex items-center gap-2 mb-1">
-                          <p className="font-semibold text-sm">{msg.sender}</p>
-                          {msg.companyName && (
-                            <p className="text-xs text-primary">
-                              {msg.companyName}
-                            </p>
-                          )}
-                        </div>
-                        <div
-                          className={`inline-block p-3 rounded-lg ${isCurrentUser ? "bg-blue-100 dark:bg-blue-900/30 text-blue-900 dark:text-blue-100" : "bg-muted"}`}
-                        >
-                          <p className="text-sm">{msg.text}</p>
-                        </div>
-                        <p className="text-xs text-muted-foreground mt-1">
-                          {formatDate(msg.timestamp)}
-                        </p>
-                      </div>
-                    </div>
-                  );
-                })}
+              <div className="rounded-[10px] border border-[#e2e4f0] bg-[#f8f9ff] p-3">
+                <p className="text-xs text-[#4a4a5a]">
+                  Conversation history is available in Chat.
+                </p>
               </div>
+            )}
+            {isFounderInboxUser && onNavigate && getTalentIdFromItem(selectedItem) && (
+              <Button
+                onClick={() => openTalentProfileFromItem(selectedItem)}
+                variant="outline"
+                className="w-full gap-2 rounded-[10px] border-[1.5px] border-[#e2e4f0] bg-white font-body font-semibold text-[#0d0d0d] transition-all duration-200 ease hover:border-[#3a5afe] hover:bg-[#f8f9ff]"
+              >
+                <ExternalLink className="h-4 w-4 text-[#3a5afe]" />
+                View Talent Profile
+              </Button>
             )}
             {/* ── Pending interest (not yet a proposal) ── */}
             {selectedItem.status === "pending" && activeTab === "received" && (
               <div className="space-y-3 border-t border-[#e2e4f0] pt-4">
-                <Label className="font-body text-base font-semibold text-[#0d0d0d]">Reply</Label>
-                <Textarea
-                  value={responseMessage}
-                  onChange={(e) => setResponseMessage(e.target.value)}
-                  placeholder="Write your response..."
-                  rows={3}
-                  disabled={isSending}
-                  className="rounded-[10px] border-[1.5px] border-[#e2e4f0] bg-white font-body text-[#0d0d0d] placeholder:text-[#a0a0b0] transition-all duration-200 ease focus-visible:border-[#3a5afe] focus-visible:ring-[0_0_0_3px_rgba(58,90,254,0.10)]"
-                />
                 {isTalentInboxUser ? (
                   <div className="space-y-2">
                     <Button
-                      onClick={() => handleSendMessage(selectedItem)}
+                      onClick={() => openChatForItem(selectedItem)}
                       className="w-full"
                       variant="outline"
                       disabled={isSending}
                     >
-                      {isSending ? (
-                        <>
-                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                          Sending...
-                        </>
-                      ) : (
-                        <>
-                          <Send className="w-4 h-4 mr-2" />
-                          Send Message
-                        </>
-                      )}
+                      <MessageCircle className="w-4 h-4 mr-2" />
+                      Open Chat
                     </Button>
                     {isInvitation(selectedItem) && (
                       <div className="flex gap-2">
@@ -1619,22 +1671,9 @@ export default function Inbox({ user, onBack, initialTab = "received", onNavigat
                     )}
                   </div>
                 ) : (
-                  /* Founder sees pending interest — reply or propose team membership */
+                  /* Founder sees pending interest — continue in chat or propose team membership */
                   <div className="space-y-2">
                     <div className="flex gap-2">
-                      <Button
-                        onClick={() => handleSendMessage(selectedItem)}
-                        className="flex-1 rounded-[10px] border-[1.5px] border-[#e2e4f0] bg-white font-body font-semibold text-[#0d0d0d] transition-all duration-200 ease hover:border-[#3a5afe] hover:bg-[#f4f5ff]"
-                        variant="outline"
-                        disabled={isSending}
-                      >
-                        {isSending ? (
-                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                        ) : (
-                          <Send className="mr-2 h-4 w-4 text-[#3a5afe]" />
-                        )}
-                        Send Reply
-                      </Button>
                       {onNavigate && (
                         <Button
                           variant="outline"
@@ -1643,7 +1682,7 @@ export default function Inbox({ user, onBack, initialTab = "received", onNavigat
                           onClick={() => {
                             const talentId = String(selectedItem.talentId?._id || selectedItem.talentId || "");
                             setSelectedItem(null);
-                            onNavigate("startup-office", { messageUserId: talentId });
+                            onNavigate("founder-chat", { messageUserId: talentId });
                           }}
                         >
                           <MessageCircle className="h-4 w-4 text-[#7c4dff]" />
@@ -1687,29 +1726,6 @@ export default function Inbox({ user, onBack, initialTab = "received", onNavigat
             {/* ── Talent viewing their sent interest: propose themselves ── */}
             {selectedItem.status === "pending" && activeTab === "sent" && isTalentInboxUser && !isInvitation(selectedItem) && (
               <div className="space-y-3 pt-4 border-t">
-                <Label>Continue Conversation</Label>
-                <Textarea
-                  value={responseMessage}
-                  onChange={(e) => setResponseMessage(e.target.value)}
-                  placeholder="Write a follow-up message..."
-                  rows={3}
-                  disabled={isSending}
-                />
-                <div className="flex gap-2">
-                  <Button
-                    onClick={() => handleSendMessage(selectedItem)}
-                    className="flex-1"
-                    variant="outline"
-                    disabled={isSending}
-                  >
-                    {isSending ? (
-                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    ) : (
-                      <Send className="w-4 h-4 mr-2" />
-                    )}
-                    Send Message
-                  </Button>
-                </div>
                 <div className="p-3 bg-purple-50 dark:bg-purple-950/20 rounded-lg border border-purple-200 dark:border-purple-800">
                   <p className="text-xs text-purple-700 dark:text-purple-300 mb-2 font-medium">
                     Confident this is the right fit?
@@ -1884,29 +1900,13 @@ export default function Inbox({ user, onBack, initialTab = "received", onNavigat
             {(selectedItem.status === "accepted" || selectedItem.status === "declined") && (
               <div className="space-y-3 pt-4 border-t">
                 <Label>Continue Conversation</Label>
-                <Textarea
-                  value={responseMessage}
-                  onChange={(e) => setResponseMessage(e.target.value)}
-                  placeholder="Write a message..."
-                  rows={3}
-                  disabled={isSending}
-                />
                 <Button
-                  onClick={() => handleSendMessage(selectedItem)}
+                  onClick={() => openChatForItem(selectedItem)}
                   className="w-full"
                   disabled={isSending}
                 >
-                  {isSending ? (
-                    <>
-                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      Sending...
-                    </>
-                  ) : (
-                    <>
-                      <Send className="w-4 h-4 mr-2" />
-                      Send Message
-                    </>
-                  )}
+                  <MessageCircle className="w-4 h-4 mr-2" />
+                  Open Chat
                 </Button>
               </div>
             )}

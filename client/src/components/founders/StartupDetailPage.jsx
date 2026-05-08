@@ -41,7 +41,14 @@ const SALARY_APPROACHES = {
   competitive: "Competitive (Market rate)",
 };
 
-export function StartupDetailPage({ user, onNavigate, startup: startupProp, startupId = "" }) {
+export function StartupDetailPage({
+  user,
+  onNavigate,
+  startup: startupProp,
+  startupId = "",
+  previewMode = false,
+  onPreviewBack,
+}) {
   const [startup, setStartup] = useState(startupProp || null);
   const [loading, setLoading] = useState(Boolean(!startupProp && startupId));
   const [isFavorite, setIsFavorite] = useState(false);
@@ -182,18 +189,43 @@ export function StartupDetailPage({ user, onNavigate, startup: startupProp, star
     );
   }
 
-  const isOwnStartup = user?.id === startup.founderId || user?._id === startup.founderId;
+  const isOwnStartup =
+    !previewMode &&
+    (user?.id === startup.founderId || user?._id === startup.founderId);
   const isTalent = user?.role === "talent";
+  const showInterestChrome = previewMode || (!isOwnStartup && isTalent);
+
+  const handleBack = () => {
+    if (previewMode && onPreviewBack) {
+      onPreviewBack();
+      return;
+    }
+    onNavigate?.("browse-startups");
+  };
+
+  const previewToast = () => {
+    toast.message("Preview", {
+      description: "Talent can use this after your post is published.",
+    });
+  };
 
   return (
     <div className="min-h-screen bg-surface-page">
-      <div className="max-w-5xl mx-auto px-6 py-8">
+      <div className="max-w-5xl mx-auto px-6 py-8 pb-28">
         {/* Navigation */}
-        <Button variant="ghost" onClick={() => onNavigate?.("browse-startups")} className="mb-6">
+        <Button variant="ghost" onClick={handleBack} className="mb-6">
           <ArrowLeft className="w-4 h-4 mr-2" />
-          Back to Startups
+          {previewMode ? "Back to Edit" : "Back to Startups"}
         </Button>
 
+        {previewMode && (
+          <div className="mb-6 rounded-xl border border-dashed border-primary/40 bg-primary/5 px-4 py-3 text-sm text-text-body">
+            <span className="font-semibold text-text-heading">Talent preview</span>
+            {" — "}
+            This is the full listing page talent sees when browsing startups. Save or publish when you are
+            ready.
+          </div>
+        )}
         {/* Header Card */}
         <Card className="surface-card border-surface-border mb-6">
           <CardContent className="p-6">
@@ -215,10 +247,18 @@ export function StartupDetailPage({ user, onNavigate, startup: startupProp, star
                     </p>
                   </div>
                   <div className="flex items-center gap-2">
-                    <Button variant="outline" size="icon" onClick={toggleFavorite}>
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      onClick={() => (previewMode ? previewToast() : toggleFavorite())}
+                    >
                       <Heart className={`w-5 h-5 ${isFavorite ? "fill-red-500 text-red-500" : ""}`} />
                     </Button>
-                    <Button variant="outline" size="icon" onClick={shareStartup}>
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      onClick={shareStartup}
+                    >
                       <Share2 className="w-5 h-5" />
                     </Button>
                   </div>
@@ -331,14 +371,19 @@ export function StartupDetailPage({ user, onNavigate, startup: startupProp, star
           {/* Right Column - Sidebar */}
           <div className="space-y-6">
             {/* Action Card */}
-            {!isOwnStartup && isTalent && !interestSent && (
+            {!isOwnStartup && showInterestChrome && !interestSent && (
               <Card className="surface-card border-surface-border bg-primary/5 border-primary/20">
                 <CardContent className="p-6">
                   <h3 className="font-semibold text-text-heading mb-2">Interested?</h3>
                   <p className="text-sm text-text-body mb-4">
                     Send a message to {startup.founder} expressing your interest in joining this startup.
                   </p>
-                  {!showInterestForm ? (
+                  {previewMode ? (
+                    <Button disabled className="w-full opacity-80" variant="secondary">
+                      <MessageSquare className="w-4 h-4 mr-2" />
+                      Express Interest
+                    </Button>
+                  ) : !showInterestForm ? (
                     <Button
                       onClick={() => setShowInterestForm(true)}
                       className="w-full bg-primary hover:bg-primary-hover"
@@ -372,6 +417,12 @@ export function StartupDetailPage({ user, onNavigate, startup: startupProp, star
                         </Button>
                       </div>
                     </div>
+                  )}
+                  {previewMode && (
+                    <p className="text-xs text-text-muted mt-3">
+                      In preview this button is inactive. After you publish, talent can send you a real
+                      message from here.
+                    </p>
                   )}
                 </CardContent>
               </Card>

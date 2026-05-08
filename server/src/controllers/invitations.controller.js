@@ -6,6 +6,7 @@ import Cohort from "../models/Cohort.js";
 import Interest from "../models/Interest.js";
 import CohortMembership from "../models/CohortMembership.js";
 import Startup from "../models/Startup.js";
+import StartupPost from "../models/StartupPost.js";
 import Organization from "../models/Organization.js";
 import OrganizationAdmin from "../models/OrganizationAdmin.js";
 import User from "../models/User.js";
@@ -54,6 +55,30 @@ async function loadStartupsMap(startupIds) {
   return new Map(startups.map((startup) => [String(startup._id), startup]));
 }
 
+async function loadFounderStartupPostTitlesMap(founderIds) {
+  const ids = [...new Set(founderIds.map(toIdString).filter(Boolean))];
+  if (!ids.length) return new Map();
+  const posts = await StartupPost.find(
+    { founderId: { $in: ids } },
+    { founderId: 1, title: 1, createdAt: 1 },
+  )
+    .sort({ createdAt: -1 })
+    .lean();
+  const titlesByFounderId = new Map();
+  for (const post of posts) {
+    const founderId = toIdString(post.founderId);
+    if (!founderId || titlesByFounderId.has(founderId)) continue;
+    const title = String(post.title || "").trim();
+    if (title) titlesByFounderId.set(founderId, title);
+  }
+  return titlesByFounderId;
+}
+
+function isGenericStartupLabel(value) {
+  const normalized = String(value || "").trim().toLowerCase();
+  return !normalized || normalized === "my startup";
+}
+
 async function loadTalentProfilesMap(userIds) {
   const ids = [...new Set(userIds.map(toIdString).filter(Boolean))];
   if (!ids.length) return new Map();
@@ -91,7 +116,15 @@ function serializeFounderTalentInvitation(invitation, context) {
   const founder = context.usersById.get(founderId);
   const talent = context.usersById.get(talentId);
   const startup = context.startupsById.get(startupId);
+  const founderStartupPostTitle = context.founderStartupPostTitlesByFounderId?.get(founderId) || "";
   const messages = mapConversationMessages(invitation.metadata?.messages, context.usersById);
+  const metadataStartupTitle = String(invitation.metadata?.startupTitle || "").trim();
+  const startupModelName = String(startup?.name || "").trim();
+  const resolvedStartupTitle = !isGenericStartupLabel(metadataStartupTitle)
+    ? metadataStartupTitle
+    : !isGenericStartupLabel(startupModelName)
+      ? startupModelName
+      : founderStartupPostTitle;
 
   return {
     ...invitation,
@@ -102,8 +135,8 @@ function serializeFounderTalentInvitation(invitation, context) {
     startupId,
     founderName: invitation.metadata?.founderName || founder?.name || "Founder",
     talentName: invitation.metadata?.talentName || talent?.name || "Talent",
-    companyName: invitation.metadata?.startupTitle || startup?.name || "",
-    startupTitle: invitation.metadata?.startupTitle || startup?.name || "",
+    companyName: resolvedStartupTitle,
+    startupTitle: resolvedStartupTitle,
     role: invitation.metadata?.role || talent?.profile?.professionalTitle || "",
     message: invitation.message || "",
     messages,
@@ -452,10 +485,65 @@ export const sendFounderTalentInvitation = async (req, res) => {
   if (!resolvedTalentId && !body.email) {
     return apiError(res, "talentId or email is required.", 400);
   }
+  if (resolvedTalentId) {
+    const existingInvitation = await FounderTalentInvitation.findOne({
+      founderId,
+      talentId: resolvedTalentId,
+      kind: "founder-talent",
+    }).lean();
+    if (existingInvitation) {
+      return apiError(
+        res,
+        "Invitation already sent to this talent. You can continue in chat instead of sending another invite.",
+        409,
+      );
+    }
+  } else if (body.email) {
+    const normalizedEmail = String(body.email).toLowerCase().trim();
+    if (normalizedEmail) {
+      const existingEmailInvitation = await FounderTalentInvitation.findOne({
+        founderId,
+        email: normalizedEmail,
+        kind: "founder-talent",
+      }).lean();
+      if (existingEmailInvitation) {
+        return apiError(
+          res,
+          "Invitation already sent to this email. Duplicate invites are blocked.",
+          409,
+        );
+      }
+    }
+  }
+  const founderPosts = await StartupPost.find({ founderId })
+    .sort({ createdAt: -1 })
+    .limit(1)
+    .lean();
+  const founderStartupPost = founderPosts[0] || null;
+  if (!founderStartupPost) {
+    return apiError(
+      res,
+      "Founders must launch a startup before browsing talent or sending invitations.",
+      400,
+    );
+  }
+  const resolvedStartupTitle = String(
+    founderStartupPost.title ||
+      body.startupTitle ||
+      "",
+  ).trim();
+  if (!resolvedStartupTitle) {
+    return apiError(res, "Startup title is required before sending invitations.", 400);
+  }
+  const resolvedStartupId =
+    body.startupId ||
+    founderStartupPost.startupId ||
+    null;
+
   const invitation = await FounderTalentInvitation.create({
     founderId,
     talentId: resolvedTalentId,
-    startupId: body.startupId || null,
+    startupId: resolvedStartupId,
     email: body.email || "",
     message: body.message || "",
     token: crypto.randomUUID(),
@@ -464,12 +552,47 @@ export const sendFounderTalentInvitation = async (req, res) => {
     metadata: {
       founderName: body.founderName || "",
       talentName: body.talentName || "",
-      startupTitle: body.startupTitle || "",
+      startupTitle: resolvedStartupTitle,
       role: body.role || "",
     },
   });
 
   if (invitation.talentId) {
+    // Seed the direct chat thread with the founder's invitation message so
+    // both founder and talent immediately see the same conversation in Chat.
+    try {
+      const founderName = String(body.founderName || req.user?.name || "Founder").trim();
+      const chatBody = body.message
+        ? String(body.message)
+        : `${founderName} invited you to discuss ${resolvedStartupTitle}.`;
+      const dm = await Message.create({
+        startupId: null,
+        fromUserId: founderId,
+        toUserId: invitation.talentId,
+        body: chatBody,
+        attachments: [],
+        metadata: {
+          type: "invitation",
+          invitationId: String(invitation._id),
+          startupTitle: resolvedStartupTitle,
+        },
+      });
+      const dmDto = {
+        id: String(dm._id),
+        fromUserId: String(dm.fromUserId),
+        toUserId: String(dm.toUserId),
+        body: dm.body,
+        metadata: dm.metadata,
+        createdAt: dm.createdAt,
+      };
+      emitRealtime(SOCKET_EVENTS.MESSAGE_CREATED, dmDto, [
+        userRoom(founderId),
+        userRoom(invitation.talentId),
+      ]);
+    } catch (dmErr) {
+      console.error("[sendFounderTalentInvitation] Failed to seed DM:", dmErr.message);
+    }
+
     await createNotification({
       userId: invitation.talentId,
       type: "talent-invitation-received",
@@ -511,16 +634,19 @@ export const getSentFounderTalentInvitations = async (req, res) => {
   })
     .sort({ createdAt: -1 })
     .lean();
-  const usersById = await loadUsersMap(
-    invitations.flatMap((invitation) => [invitation.founderId, invitation.talentId]),
-  );
-  const startupsById = await loadStartupsMap(
-    invitations.map((invitation) => invitation.startupId),
-  );
+  const [usersById, startupsById, founderStartupPostTitlesByFounderId] = await Promise.all([
+    loadUsersMap(invitations.flatMap((invitation) => [invitation.founderId, invitation.talentId])),
+    loadStartupsMap(invitations.map((invitation) => invitation.startupId)),
+    loadFounderStartupPostTitlesMap(invitations.map((invitation) => invitation.founderId)),
+  ]);
   return apiSuccess(
     res,
     invitations.map((invitation) =>
-      serializeFounderTalentInvitation(invitation, { usersById, startupsById }),
+      serializeFounderTalentInvitation(invitation, {
+        usersById,
+        startupsById,
+        founderStartupPostTitlesByFounderId,
+      }),
     ),
   );
 };
@@ -535,16 +661,19 @@ export const getReceivedFounderTalentInvitations = async (req, res) => {
   })
     .sort({ createdAt: -1 })
     .lean();
-  const usersById = await loadUsersMap(
-    invitations.flatMap((invitation) => [invitation.founderId, invitation.talentId]),
-  );
-  const startupsById = await loadStartupsMap(
-    invitations.map((invitation) => invitation.startupId),
-  );
+  const [usersById, startupsById, founderStartupPostTitlesByFounderId] = await Promise.all([
+    loadUsersMap(invitations.flatMap((invitation) => [invitation.founderId, invitation.talentId])),
+    loadStartupsMap(invitations.map((invitation) => invitation.startupId)),
+    loadFounderStartupPostTitlesMap(invitations.map((invitation) => invitation.founderId)),
+  ]);
   return apiSuccess(
     res,
     invitations.map((invitation) =>
-      serializeFounderTalentInvitation(invitation, { usersById, startupsById }),
+      serializeFounderTalentInvitation(invitation, {
+        usersById,
+        startupsById,
+        founderStartupPostTitlesByFounderId,
+      }),
     ),
   );
 };
@@ -662,13 +791,18 @@ export const addMessageToFounderTalentInvitation = async (req, res) => {
   };
 
   await invitation.save();
-  const [usersById, startupsById] = await Promise.all([
+  const [usersById, startupsById, founderStartupPostTitlesByFounderId] = await Promise.all([
     loadUsersMap([invitation.founderId, invitation.talentId]),
     loadStartupsMap([invitation.startupId]),
+    loadFounderStartupPostTitlesMap([invitation.founderId]),
   ]);
   return apiSuccess(
     res,
-    serializeFounderTalentInvitation(invitation.toObject(), { usersById, startupsById }),
+    serializeFounderTalentInvitation(invitation.toObject(), {
+      usersById,
+      startupsById,
+      founderStartupPostTitlesByFounderId,
+    }),
   );
 };
 
@@ -680,6 +814,17 @@ export const createInterest = async (req, res) => {
   }
   if (!body.founderId) {
     return apiError(res, "founderId is required.", 400);
+  }
+  const existingInterest = await Interest.findOne({
+    talentId,
+    founderId: body.founderId,
+  }).lean();
+  if (existingInterest) {
+    return apiError(
+      res,
+      "Interest already sent to this founder. Duplicate interests are blocked.",
+      409,
+    );
   }
   const interest = await Interest.create({
     talentId,

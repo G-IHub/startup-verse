@@ -48,7 +48,7 @@ export default function VerticalSidebar({
       id: user.role === "talent" ? "browse" : "browse",
       icon: Users,
       label: user.role === "talent" ? "Browse" : "Browse",
-      page: user.role === "talent" ? "team-matching" : "startup-office",
+      page: user.role === "talent" ? "browse-startups" : "startup-office",
       view: user.role === "talent" ? undefined : "matching",
       badge: null,
       roles: ["founder", "talent"],
@@ -112,7 +112,7 @@ export default function VerticalSidebar({
 
   const isActive = (item) => {
     if (user.role === "talent" && item.id === "browse") {
-      return currentPage === "team-matching";
+      return currentPage === "browse-startups";
     }
     if (user.role === "talent" && item.id === "dashboard") {
       return currentPage === "dashboard";
