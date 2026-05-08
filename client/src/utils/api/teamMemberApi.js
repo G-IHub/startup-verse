@@ -16,7 +16,7 @@ async function apiRequest(endpoint, options = {}) {
     // Silently fail in development mode (expected when backend isn't running)
     if (import.meta.env.DEV) {
       console.debug(
-        `Backend API [${endpoint}] not available, using localStorage data`,
+        `Backend API [${endpoint}] not available, request aborted`,
       );
     } else {
       console.error(`API Error [${endpoint}]:`, error);

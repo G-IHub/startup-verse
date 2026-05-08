@@ -37,7 +37,10 @@ export default function AdaptiveVirtualOffice({
           />
         )}
         {view === "journey" && (
-          <JourneyRoadmap onNavigateToStage={(stage) => onNavigate(stage)} />
+          <JourneyRoadmap
+            user={user}
+            onNavigateToStage={(stage) => onNavigate(stage)}
+          />
         )}
         {view === "matching" && (
           user?.role === "talent" ? (

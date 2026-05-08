@@ -39,6 +39,7 @@ import {
 import { Building2, CheckCircle2 } from "lucide-react";
 
 import { createOrganization } from "../../utils/organizationHelpersBackend";
+import { loadCurrentUser } from "../../app/session";
 
 
 
@@ -74,11 +75,7 @@ export default function CreateOrganizationModal({
 
     try {
 
-      // Get current user data from localStorage for email and name
-
-      const currentUserData = localStorage.getItem("startupverse_current_user");
-
-      const currentUser = currentUserData ? JSON.parse(currentUserData) : null;
+      const sessionUser = loadCurrentUser();
 
       const org = await createOrganization(
 
@@ -88,9 +85,9 @@ export default function CreateOrganizationModal({
 
         userId,
 
-        currentUser?.email || "admin@example.com",
+        sessionUser?.email || "admin@example.com",
 
-        currentUser?.name || "Admin",
+        sessionUser?.name || "Admin",
 
         description.trim() || undefined,
 

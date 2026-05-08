@@ -6,6 +6,77 @@ import { assertFounderInMentorOrganization } from "../utils/mentorFounderAssignm
 import { error as apiError, success as apiSuccess } from "../utils/apiResponse.js";
 import { createNotification } from "../services/notificationService.js";
 
+const isProduction = process.env.NODE_ENV === "production";
+
+const MENTOR_COOKIE = "mentor_token";
+
+async function mentorPayloadFromToken(token) {
+  const trimmed = String(token || "").trim();
+  if (!trimmed) return null;
+  const mentor = await MentorProfile.findOne({ token: trimmed });
+  if (!mentor) return null;
+  const user = await User.findById(mentor.userId).select("name email avatarUrl").lean();
+  const organization = mentor.organizationId
+    ? await Organization.findById(mentor.organizationId).select("name").lean()
+    : null;
+  return {
+    id: String(mentor._id),
+    name: user?.name || "",
+    email: user?.email || "",
+    avatarUrl: user?.avatarUrl || "",
+    organizationId: mentor.organizationId ? String(mentor.organizationId) : null,
+    organizationName: organization?.name || "",
+    expertise: mentor.expertise || [],
+  };
+}
+
+export function setMentorSessionCookie(res, token) {
+  res.cookie(MENTOR_COOKIE, token, {
+    httpOnly: true,
+    secure: isProduction,
+    sameSite: isProduction ? "strict" : "lax",
+    maxAge: 30 * 24 * 60 * 60 * 1000,
+    path: "/",
+  });
+}
+
+export function clearMentorSessionCookie(res) {
+  res.clearCookie(MENTOR_COOKIE, {
+    httpOnly: true,
+    secure: isProduction,
+    sameSite: isProduction ? "strict" : "lax",
+    path: "/",
+  });
+}
+
+export const createMentorSession = async (req, res) => {
+  const token = String(req.body?.token || "").trim();
+  const mentor = await mentorPayloadFromToken(token);
+  if (!mentor) {
+    return apiError(res, "Invalid or expired mentor token.", 401);
+  }
+  setMentorSessionCookie(res, token);
+  return apiSuccess(res, { mentor });
+};
+
+export const getMentorSessionMe = async (req, res) => {
+  const token = String(req.cookies?.[MENTOR_COOKIE] || "").trim();
+  if (!token) {
+    return apiSuccess(res, { mentor: null });
+  }
+  const mentor = await mentorPayloadFromToken(token);
+  if (!mentor) {
+    clearMentorSessionCookie(res);
+    return apiSuccess(res, { mentor: null });
+  }
+  return apiSuccess(res, { mentor });
+};
+
+export const logoutMentorSession = async (req, res) => {
+  clearMentorSessionCookie(res);
+  return apiSuccess(res, { ok: true });
+};
+
 // Phase D2: real mentor magic-link verification.
 export const verifyMentorToken = async (req, res) => {
   const token = String(req.params.token || "").trim();
@@ -16,22 +87,11 @@ export const verifyMentorToken = async (req, res) => {
   if (!mentor) {
     return apiSuccess(res, { verified: false, token });
   }
-  const user = await User.findById(mentor.userId).select("name email avatarUrl").lean();
-  const organization = mentor.organizationId
-    ? await Organization.findById(mentor.organizationId).select("name").lean()
-    : null;
+  const mentorDto = await mentorPayloadFromToken(token);
   return apiSuccess(res, {
     verified: true,
     token,
-    mentor: {
-      id: String(mentor._id),
-      name: user?.name || "",
-      email: user?.email || "",
-      avatarUrl: user?.avatarUrl || "",
-      organizationId: mentor.organizationId ? String(mentor.organizationId) : null,
-      organizationName: organization?.name || "",
-      expertise: mentor.expertise || [],
-    },
+    mentor: mentorDto,
   });
 };
 

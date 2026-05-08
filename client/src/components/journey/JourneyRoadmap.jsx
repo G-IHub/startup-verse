@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect } from "react";
 import { Button } from "../ui/button";
 import { Badge } from "../ui/badge";
 import {
@@ -12,14 +12,70 @@ import {
   Lock,
   ArrowRight,
 } from "lucide-react";
-export default function JourneyRoadmap({ onNavigateToStage }) {
-  const [hoveredStage, setHoveredStage] = useState(null);
-  const [showCelebration, setShowCelebration] = useState(false);
+import { useJourneyStore } from "../../state/useJourneyStore";
+import { getStageStatus } from "../../utils/journeyProgress";
 
-  // Load journey progress from localStorage
-  const savedProgress = JSON.parse(
-    localStorage.getItem("founder_journey_progress") || "{}",
-  );
+function roadmapStage(
+  jp,
+  stageNum,
+  fallbackStatus,
+  fallbackProgress,
+  fallbackTasksCompleted,
+  fallbackAchievements,
+) {
+  if (!jp) {
+    return {
+      status: fallbackStatus,
+      progress: fallbackProgress,
+      tasksCompleted: fallbackTasksCompleted,
+      achievements: fallbackAchievements,
+    };
+  }
+  const server = getStageStatus(stageNum);
+  const status =
+    server === "completed"
+      ? "completed"
+      : server === "current"
+        ? "in-progress"
+        : server === "upcoming"
+          ? "available"
+          : "locked";
+  const sd = jp.stageData?.[stageNum];
+  const progress =
+    typeof sd?.completionPercentage === "number"
+      ? sd.completionPercentage
+      : status === "completed"
+        ? 100
+        : fallbackProgress;
+  const tasksCompleted = Array.isArray(sd?.milestonesCompleted)
+    ? sd.milestonesCompleted.length
+    : fallbackTasksCompleted;
+  return {
+    status,
+    progress,
+    tasksCompleted,
+    achievements: fallbackAchievements,
+  };
+}
+
+export default function JourneyRoadmap({ user, onNavigateToStage }) {
+  useEffect(() => {
+    const uid = user?._id ?? user?.id;
+    if (uid) void useJourneyStore.getState().hydrate(String(uid));
+  }, [user?._id, user?.id]);
+
+  const jp = useJourneyStore((s) => s.progress);
+
+  const r1 = roadmapStage(jp, 1, "in-progress", 35, 3, [
+    "First Idea Created",
+    "Market Research Started",
+  ]);
+  const r2 = roadmapStage(jp, 2, "available", 0, 0, []);
+  const r3 = roadmapStage(jp, 3, "available", 0, 0, []);
+  const r4 = roadmapStage(jp, 4, "available", 0, 0, []);
+  const r5 = roadmapStage(jp, 5, "available", 0, 0, []);
+  const r6 = roadmapStage(jp, 6, "available", 0, 0, []);
+
   const stages = [
     {
       id: "ideation",
@@ -30,14 +86,11 @@ export default function JourneyRoadmap({ onNavigateToStage }) {
       icon: Lightbulb,
       color: "from-yellow-500 to-orange-500",
       estimatedWeeks: "1-4 weeks",
-      status: savedProgress.ideation?.status || "in-progress",
-      progress: savedProgress.ideation?.progress || 35,
-      tasksCompleted: savedProgress.ideation?.tasksCompleted || 3,
+      status: r1.status,
+      progress: r1.progress,
+      tasksCompleted: r1.tasksCompleted,
       totalTasks: 8,
-      achievements: savedProgress.ideation?.achievements || [
-        "First Idea Created",
-        "Market Research Started",
-      ],
+      achievements: r1.achievements,
     },
     {
       id: "formation",
@@ -48,11 +101,11 @@ export default function JourneyRoadmap({ onNavigateToStage }) {
       icon: FileText,
       color: "from-blue-500 to-cyan-500",
       estimatedWeeks: "1-2 weeks",
-      status: savedProgress.formation?.status || "available",
-      progress: savedProgress.formation?.progress || 0,
-      tasksCompleted: 0,
+      status: r2.status,
+      progress: r2.progress,
+      tasksCompleted: r2.tasksCompleted,
       totalTasks: 6,
-      achievements: [],
+      achievements: r2.achievements,
     },
     {
       id: "team-building",
@@ -63,11 +116,11 @@ export default function JourneyRoadmap({ onNavigateToStage }) {
       icon: Users,
       color: "from-purple-500 to-pink-500",
       estimatedWeeks: "2-8 weeks",
-      status: savedProgress["team-building"]?.status || "available",
-      progress: savedProgress["team-building"]?.progress || 0,
-      tasksCompleted: 0,
+      status: r3.status,
+      progress: r3.progress,
+      tasksCompleted: r3.tasksCompleted,
       totalTasks: 7,
-      achievements: [],
+      achievements: r3.achievements,
     },
     {
       id: "product-dev",
@@ -78,11 +131,11 @@ export default function JourneyRoadmap({ onNavigateToStage }) {
       icon: Rocket,
       color: "from-green-500 to-emerald-500",
       estimatedWeeks: "4-12 weeks",
-      status: savedProgress["product-dev"]?.status || "available",
-      progress: savedProgress["product-dev"]?.progress || 0,
-      tasksCompleted: 0,
+      status: r4.status,
+      progress: r4.progress,
+      tasksCompleted: r4.tasksCompleted,
       totalTasks: 9,
-      achievements: [],
+      achievements: r4.achievements,
     },
     {
       id: "go-to-market",
@@ -93,11 +146,11 @@ export default function JourneyRoadmap({ onNavigateToStage }) {
       icon: TrendingUp,
       color: "from-red-500 to-rose-500",
       estimatedWeeks: "2-6 weeks",
-      status: savedProgress["go-to-market"]?.status || "available",
-      progress: savedProgress["go-to-market"]?.progress || 0,
-      tasksCompleted: 0,
+      status: r5.status,
+      progress: r5.progress,
+      tasksCompleted: r5.tasksCompleted,
       totalTasks: 8,
-      achievements: [],
+      achievements: r5.achievements,
     },
     {
       id: "operations",
@@ -108,21 +161,14 @@ export default function JourneyRoadmap({ onNavigateToStage }) {
       icon: Target,
       color: "from-indigo-500 to-violet-500",
       estimatedWeeks: "Ongoing",
-      status: savedProgress.operations?.status || "available",
-      progress: savedProgress.operations?.progress || 0,
-      tasksCompleted: 0,
+      status: r6.status,
+      progress: r6.progress,
+      tasksCompleted: r6.tasksCompleted,
       totalTasks: 10,
-      achievements: [],
+      achievements: r6.achievements,
     },
   ];
 
-  // Calculate overall journey progress
-  const overallProgress = Math.round(
-    stages.reduce((sum, stage) => sum + stage.progress, 0) / stages.length,
-  );
-  const currentStage =
-    stages.find((s) => s.status === "in-progress") || stages[0];
-  const completedStages = stages.filter((s) => s.status === "completed").length;
   return (
     <div className="h-full overflow-auto bg-gradient-to-br from-background via-background to-primary/5">
       <div className="max-w-7xl mx-auto px-6 py-8 space-y-8">

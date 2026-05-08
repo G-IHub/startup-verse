@@ -1,10 +1,14 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "../ui/card";
 import { Button } from "../ui/button";
 import { Textarea } from "../ui/textarea";
 import { Label } from "../ui/label";
 import { Rocket, ArrowLeft, ArrowRight } from "lucide-react";
 import { toast } from "sonner";
+import {
+  useHydrateStageDraft,
+  persistStageDraft,
+} from "../../hooks/useStageDraftFromJourney";
 export default function ProductDevelopment({ user, onBack }) {
   const [productPlan, setProductPlan] = useState({
     mvpFeatures: "",
@@ -12,17 +16,14 @@ export default function ProductDevelopment({ user, onBack }) {
     timeline: "",
   });
 
-  // Load saved data
-  useEffect(() => {
-    const savedData = localStorage.getItem("product_plan");
-    if (savedData) {
-      setProductPlan(JSON.parse(savedData));
-    }
-  }, []);
+  useHydrateStageDraft(user, "product_plan", (raw) => {
+    if (!raw || typeof raw !== "object") return;
+    setProductPlan((prev) => ({ ...prev, ...raw }));
+  });
 
   // Save and continue to next stage
   const saveAndContinue = () => {
-    localStorage.setItem("product_plan", JSON.stringify(productPlan));
+    persistStageDraft("product_plan", productPlan);
     toast.success("Progress saved! Moving to next stage...");
     setTimeout(() => onBack(), 500);
   };

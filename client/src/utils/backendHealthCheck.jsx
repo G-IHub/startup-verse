@@ -168,8 +168,8 @@ The backend API is not responding. This could mean:
 
 ## Working in Offline Mode
 
-While the backend is unavailable, StartupVerse will use localStorage for data persistence.
-All features work normally, but data won't sync across devices.
+While the backend is unavailable, StartupVerse runs in a limited offline mode.
+Previously cached data is not guaranteed; reconnect for full functionality.
 
 ## Need Help?
 

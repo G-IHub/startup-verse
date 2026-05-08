@@ -9,7 +9,7 @@ export async function getUserById(userId) {
   } catch (error) {
     // Silently fail in development mode (expected when backend isn't running)
     if (process.env.NODE_ENV === "development") {
-      console.debug("Backend API not available, using localStorage data");
+      console.debug("Backend API not available; using in-memory session only");
     } else {
       console.error("Error fetching user:", error);
     }
@@ -17,7 +17,7 @@ export async function getUserById(userId) {
   }
 }
 
-// Refresh current user from backend and update localStorage
+// Refresh current user from backend and sync session
 export async function refreshCurrentUser(userId) {
   try {
     const result = await getUserById(userId);
@@ -29,9 +29,9 @@ export async function refreshCurrentUser(userId) {
 
     return null;
   } catch (error) {
-    // Silently fail - the app will use cached localStorage data
+    // Silently fail — keep last known in-memory profile if refresh fails
     if (process.env.NODE_ENV === "development") {
-      console.debug("Using cached user data from localStorage");
+      console.debug("Using last known user from session after refresh error");
     } else {
       console.error("Error refreshing user:", error);
     }

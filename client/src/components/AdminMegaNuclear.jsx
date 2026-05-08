@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { API_BASE_URL } from "../config/apiBase.js";
+import { clearAllBrowserKV } from "../utils/clearLegacyClientStorage.js";
 
 // Default fetch options for cookie-based auth
 
@@ -37,9 +38,8 @@ export function AdminMegaNuclear() {
       console.log("💀 [MEGA NUCLEAR] Response:", resetData);
       setResult(resetData);
 
-      // Clear ALL localStorage (keep nothing)
-      console.log("🧹 [MEGA NUCLEAR] Clearing ALL localStorage...");
-      localStorage.clear();
+      console.log("🧹 [MEGA NUCLEAR] Clearing persistent browser storage...");
+      clearAllBrowserKV();
       alert(
         `💀 MEGA NUCLEAR COMPLETE!\n\n` +
           `DELETED:\n` +
@@ -51,7 +51,7 @@ export function AdminMegaNuclear() {
           `  • Remaining auth mappings: ${resetData.verification?.remainingAuth || 0}\n` +
           `  • Database empty: ${resetData.verification?.isEmpty ? "YES ✅" : "NO ❌"}\n\n` +
           `✅ Database completely wiped!\n` +
-          `✅ localStorage cleared!\n\n` +
+          `✅ Persistent browser storage cleared!\n\n` +
           `Page will reload in 2 seconds...`,
       );
       setTimeout(() => {

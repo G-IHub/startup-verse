@@ -9,6 +9,9 @@ const mentorsRouter = Router();
 
 mentorsRouter.get("/mentors/public/verify/:token", asyncHandler(mentorsController.verifyMentorToken));
 mentorsRouter.post("/mentors/public/request-link", asyncHandler(mentorsController.requestMentorLink));
+mentorsRouter.post("/mentors/public/session", asyncHandler(mentorsController.createMentorSession));
+mentorsRouter.get("/mentors/public/session/me", asyncHandler(mentorsController.getMentorSessionMe));
+mentorsRouter.post("/mentors/public/session/logout", asyncHandler(mentorsController.logoutMentorSession));
 
 mentorsRouter.get(
   "/mentors/:mentorId/assigned-founders",

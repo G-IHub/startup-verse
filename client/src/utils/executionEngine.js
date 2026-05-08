@@ -1,11 +1,36 @@
 import * as founderApi from "./api/founderApi";
 
-// Storage keys (fallback for localStorage)
 const EXECUTION_DATA_KEY = "startupverse_execution_data";
 const CURRENT_OUTCOME_KEY = "startupverse_current_outcome";
 const STREAK_DATA_KEY = "startupverse_streak_data";
 const TASKS_KEY = "startupverse_tasks";
 
+/** In-memory caches for the SPA session only; API + founderApi remain source of truth. */
+const executionDataMemory = new Map();
+const tasksMemory = new Map();
+const archivedOutcomesMemory = new Map();
+
+function dispatchTasksUpdated(userId) {
+  try {
+    window.dispatchEvent(
+      new CustomEvent("sv-tasks-updated", { detail: { userId: String(userId) } }),
+    );
+  } catch {
+    /* ignore */
+  }
+}
+
+function dispatchExecutionUpdated(userId) {
+  try {
+    window.dispatchEvent(
+      new CustomEvent("sv-execution-updated", {
+        detail: { userId: String(userId) },
+      }),
+    );
+  } catch {
+    /* ignore */
+  }
+}
 // Outcome templates per stage
 export const OUTCOME_TEMPLATES = {
   1: [
@@ -1260,46 +1285,38 @@ export const OUTCOME_TEMPLATES = {
 
 // Get execution data for user (synchronous, with background backend sync)
 export const getExecutionData = (userId) => {
-  // Load from backend in background to sync latest data
+  const uid = String(userId || "");
+
   founderApi
-    .getWeeklyOutcomes(userId)
+    .getWeeklyOutcomes(uid)
     .then((response) => {
       if (
         response.success &&
         response.outcomes &&
         response.outcomes.length > 0
       ) {
-        // Find the most recent active outcome
         const activeOutcome = response.outcomes.find(
           (o) => o.status === "active",
         );
 
         if (activeOutcome) {
-          // Update localStorage cache with backend data
-          const stored = localStorage.getItem(
-            `${EXECUTION_DATA_KEY}_${userId}`,
-          );
-          const currentData = stored
-            ? JSON.parse(stored)
-            : {
-                userId,
-                streak: 0,
-                hasPartialWeeks: false,
-                weekHistory: [],
-                lastUpdated: new Date().toISOString(),
-              };
-
-          currentData.currentOutcome = activeOutcome;
-          localStorage.setItem(
-            `${EXECUTION_DATA_KEY}_${userId}`,
-            JSON.stringify(currentData),
-          );
+          const prev =
+            executionDataMemory.get(uid) ||
+            ({
+              userId: uid,
+              streak: 0,
+              hasPartialWeeks: false,
+              weekHistory: [],
+              lastUpdated: new Date().toISOString(),
+            });
+          prev.currentOutcome = activeOutcome;
+          prev.lastUpdated = new Date().toISOString();
+          executionDataMemory.set(uid, prev);
+          dispatchExecutionUpdated(uid);
         }
       }
     })
     .catch((error) => {
-      // Silently fail - backend sync is optional, localStorage is source of truth
-      // Only log in development
       if (process.env.NODE_ENV === "development") {
         console.debug(
           "Background execution data sync from backend failed (expected in demo mode):",
@@ -1308,42 +1325,36 @@ export const getExecutionData = (userId) => {
       }
     });
 
-  // Return localStorage immediately for instant UI
-  const stored = localStorage.getItem(`${EXECUTION_DATA_KEY}_${userId}`);
-  if (stored) {
-    return JSON.parse(stored);
+  if (executionDataMemory.has(uid)) {
+    return executionDataMemory.get(uid);
   }
 
-  // Initialize new execution data
-  return {
-    userId,
+  const initial = {
+    userId: uid,
     currentOutcome: null,
     streak: 0,
     hasPartialWeeks: false,
     weekHistory: [],
     lastUpdated: new Date().toISOString(),
   };
+  executionDataMemory.set(uid, initial);
+  return initial;
 };
 
 // Save execution data (synchronous with background backend save)
 export const saveExecutionData = (data) => {
   data.lastUpdated = new Date().toISOString();
+  const uid = String(data.userId || "");
+  executionDataMemory.set(uid, { ...data });
+  dispatchExecutionUpdated(uid);
 
-  // Save to localStorage immediately for instant UI
-  localStorage.setItem(
-    `${EXECUTION_DATA_KEY}_${data.userId}`,
-    JSON.stringify(data),
-  );
-
-  // If there's a current outcome, save it to backend in background
   if (data.currentOutcome) {
     founderApi
-      .saveWeeklyOutcome(data.userId, data.currentOutcome)
+      .saveWeeklyOutcome(uid, data.currentOutcome)
       .then(() => {
         console.log("✅ Weekly outcome synced to backend");
       })
       .catch((error) => {
-        // Silently fail - localStorage is primary storage
         if (process.env.NODE_ENV === "development") {
           console.debug(
             "Failed to sync weekly outcome to backend (expected in demo mode):",
@@ -1542,7 +1553,7 @@ export const completeWeeklyReview = (userId, outcomeId, completionData) => {
       console.log("✅ Completed weekly outcome saved to backend");
     })
     .catch((error) => {
-      // Silently fail - localStorage is primary storage
+      // Silently fail — persistence is server-backed
       if (process.env.NODE_ENV === "development") {
         console.debug(
           "Failed to save completed outcome to backend (expected in demo mode):",
@@ -1556,18 +1567,14 @@ export const completeWeeklyReview = (userId, outcomeId, completionData) => {
 
 // Get archived outcomes
 export const getArchivedOutcomes = (userId) => {
-  const stored = localStorage.getItem(
-    `startupverse_archived_outcomes_${userId}`,
-  );
-  return stored ? JSON.parse(stored) : [];
+  const uid = String(userId || "");
+  return archivedOutcomesMemory.get(uid) || [];
 };
 
 // Save archived outcomes
 export const saveArchivedOutcomes = (userId, outcomes) => {
-  localStorage.setItem(
-    `startupverse_archived_outcomes_${userId}`,
-    JSON.stringify(outcomes),
-  );
+  const uid = String(userId || "");
+  archivedOutcomesMemory.set(uid, Array.isArray(outcomes) ? outcomes : []);
 };
 
 // Get streak statistics
@@ -1712,35 +1719,22 @@ export const getActionButtonForTask = (taskTitle) => {
   return undefined;
 };
 
-// Get tasks for user (synchronous, loads from localStorage, background sync from backend)
+// Get tasks for user (session memory + background sync from backend)
 export const getTasks = (userId) => {
-  // Load from backend in background to sync latest data
+  const uid = String(userId || "");
+
   founderApi
-    .getTasks(userId)
+    .getTasks(uid)
     .then((response) => {
       if (response.success && response.tasks) {
-        // Update localStorage cache with backend data
-        localStorage.setItem(
-          `${TASKS_KEY}_${userId}`,
-          JSON.stringify(response.tasks),
-        );
+        tasksMemory.set(uid, response.tasks);
+        dispatchTasksUpdated(uid);
         console.log(
-          `✅ [TASK SYNC] Updated ${response.tasks.length} tasks from backend for founder ${userId}`,
-        );
-
-        // Trigger storage event for cross-tab/component sync
-        window.dispatchEvent(
-          new StorageEvent("storage", {
-            key: `${TASKS_KEY}_${userId}`,
-            newValue: JSON.stringify(response.tasks),
-            storageArea: localStorage,
-          }),
+          `✅ [TASK SYNC] Updated ${response.tasks.length} tasks from backend for founder ${uid}`,
         );
       }
     })
     .catch((error) => {
-      // Silently fail - backend sync is optional, localStorage is source of truth
-      // Only log in development
       if (process.env.NODE_ENV === "development") {
         console.debug(
           "Background task sync from backend failed (expected in demo mode):",
@@ -1749,35 +1743,22 @@ export const getTasks = (userId) => {
       }
     });
 
-  // Return localStorage immediately for instant UI
-  const stored = localStorage.getItem(`${TASKS_KEY}_${userId}`);
-  return stored ? JSON.parse(stored) : [];
+  return tasksMemory.get(uid) || [];
 };
 
 // Force refresh tasks from backend (async version)
 export const refreshTasksFromBackend = async (userId) => {
+  const uid = String(userId || "");
   try {
     console.log(
-      `🔄 [TASK SYNC] Force refreshing tasks from backend for ${userId}`,
+      `🔄 [TASK SYNC] Force refreshing tasks from backend for ${uid}`,
     );
-    const response = await founderApi.getTasks(userId, {}, true); // bustCache = true
+    const response = await founderApi.getTasks(uid, {}, true);
     if (response.success && response.tasks) {
-      // Update localStorage with fresh backend data
-      localStorage.setItem(
-        `${TASKS_KEY}_${userId}`,
-        JSON.stringify(response.tasks),
-      );
+      tasksMemory.set(uid, response.tasks);
+      dispatchTasksUpdated(uid);
       console.log(
         `✅ [TASK SYNC] Force refresh complete - ${response.tasks.length} tasks synced`,
-      );
-
-      // Trigger storage event
-      window.dispatchEvent(
-        new StorageEvent("storage", {
-          key: `${TASKS_KEY}_${userId}`,
-          newValue: JSON.stringify(response.tasks),
-          storageArea: localStorage,
-        }),
       );
 
       return response.tasks;
@@ -1786,23 +1767,21 @@ export const refreshTasksFromBackend = async (userId) => {
     console.error("❌ [TASK SYNC] Force refresh failed:", error);
   }
 
-  // Fallback to localStorage
-  const stored = localStorage.getItem(`${TASKS_KEY}_${userId}`);
-  return stored ? JSON.parse(stored) : [];
+  return tasksMemory.get(uid) || [];
 };
 
-// Save tasks for user (synchronous with background backend save)
+// Save tasks for user (memory + background backend save)
 export const saveTasks = (userId, tasks) => {
-  // Save to localStorage immediately for instant UI update
-  localStorage.setItem(`${TASKS_KEY}_${userId}`, JSON.stringify(tasks));
+  const uid = String(userId || "");
+  const list = Array.isArray(tasks) ? tasks : [];
+  tasksMemory.set(uid, list);
+  dispatchTasksUpdated(uid);
 
-  // Save each task to backend in background (don't await)
-  Promise.all(tasks.map((task) => founderApi.saveTask(userId, task)))
+  Promise.all(list.map((task) => founderApi.saveTask(uid, task)))
     .then(() => {
       console.log("✅ Tasks synced to backend");
     })
     .catch((error) => {
-      // Silently fail - localStorage is primary storage
       if (process.env.NODE_ENV === "development") {
         console.debug(
           "Failed to sync tasks to backend (expected in demo mode):",
@@ -1863,10 +1842,7 @@ export const syncTasksToMilestones = (userId) => {
 
     // Save updated execution data
     const updatedData = { ...executionData, currentOutcome: outcome };
-    localStorage.setItem(
-      `${EXECUTION_DATA_KEY}_${userId}`,
-      JSON.stringify(updatedData),
-    );
+    saveExecutionData(updatedData);
 
     // Sync to backend in background
     founderApi.saveWeeklyOutcome(userId, outcome).catch((error) => {

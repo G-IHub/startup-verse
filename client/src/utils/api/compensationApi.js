@@ -35,16 +35,7 @@ export async function createCompensationContract(
       throw new Error(data.error || "Failed to create compensation contract");
     }
 
-    // ✅ BACKEND-FIRST: Cache the created contract
-    localStorage.setItem(
-      `compensation_contract_${teamMemberId}`,
-      JSON.stringify({
-        data,
-        cachedAt: new Date().toISOString(),
-      }),
-    );
-
-    console.log("✅ Compensation contract created and cached");
+    console.log("✅ Compensation contract created");
     return data;
   } catch (error) {
     console.error("❌ Error creating compensation contract:", error);
@@ -72,36 +63,13 @@ export async function getCompensationContract(teamMemberId) {
       throw new Error(data.error || "Failed to fetch compensation contract");
     }
 
-    // ✅ BACKEND-FIRST: Cache successful response
-    localStorage.setItem(
-      `compensation_contract_${teamMemberId}`,
-      JSON.stringify({
-        data,
-        cachedAt: new Date().toISOString(),
-      }),
-    );
-
     return data;
   } catch (error) {
     console.error(
       "❌ Backend compensation contract fetch failed:",
       error.message,
     );
-
-    // ⚠️ FALLBACK: Try to load from localStorage cache
-    const cached = localStorage.getItem(
-      `compensation_contract_${teamMemberId}`,
-    );
-    if (cached) {
-      const { data } = JSON.parse(cached);
-      console.warn(
-        "⚠️ Using cached compensation contract (backend unavailable)",
-      );
-      return data;
-    }
-
-    // ℹ️ NO CACHE: Return empty contract instead of throwing error
-    console.log("ℹ️ No compensation contract available (no backend, no cache)");
+    console.log("ℹ️ No compensation contract available");
     return { success: true, contract: null };
   }
 }
@@ -126,33 +94,13 @@ export async function getCompensationStatus(teamMemberId) {
       throw new Error(data.error || "Failed to fetch compensation status");
     }
 
-    // ✅ BACKEND-FIRST: Cache successful response
-    localStorage.setItem(
-      `compensation_status_${teamMemberId}`,
-      JSON.stringify({
-        data,
-        cachedAt: new Date().toISOString(),
-      }),
-    );
-
     return data;
   } catch (error) {
     console.error(
       "❌ Backend compensation status fetch failed:",
       error.message,
     );
-
-    // ⚠️ FALLBACK: Try to load from localStorage cache
-    const cached = localStorage.getItem(`compensation_status_${teamMemberId}`);
-    if (cached) {
-      const { data } = JSON.parse(cached);
-      console.warn("⚠️ Using cached compensation status (backend unavailable)");
-      return data;
-    }
-
-    // ℹ️ NO CACHE: Return empty status instead of throwing error
-    // This allows the UI to render gracefully without compensation data
-    console.log("ℹ️ No compensation status available (no backend, no cache)");
+    console.log("ℹ️ No compensation status available");
     return { success: true, status: null, contract: null };
   }
 }
@@ -176,35 +124,14 @@ export async function getStartupCompensationContracts(startupId) {
       );
     }
 
-    // ✅ BACKEND-FIRST: Cache successful response
-    localStorage.setItem(
-      `compensation_startup_${startupId}`,
-      JSON.stringify({
-        data,
-        cachedAt: new Date().toISOString(),
-      }),
-    );
-
     return data;
   } catch (error) {
     console.error(
       "❌ Backend startup compensation fetch failed:",
       error.message,
     );
-
-    // ⚠️ FALLBACK: Try to load from localStorage cache
-    const cached = localStorage.getItem(`compensation_startup_${startupId}`);
-    if (cached) {
-      const { data } = JSON.parse(cached);
-      console.warn(
-        "⚠️ Using cached startup compensation contracts (backend unavailable)",
-      );
-      return data;
-    }
-
-    // ℹ️ NO CACHE: Return empty array instead of throwing error
     console.log(
-      "ℹ️ No startup compensation contracts available (no backend, no cache)",
+      "ℹ️ No startup compensation contracts available",
     );
     return { success: true, contracts: [] };
   }
@@ -272,29 +199,10 @@ export async function getPendingTeamMembers(startupId) {
       throw new Error(data.error || "Failed to fetch pending team members");
     }
 
-    // ✅ BACKEND-FIRST: Cache successful response
-    localStorage.setItem(
-      `pending_members_${startupId}`,
-      JSON.stringify({
-        data,
-        cachedAt: new Date().toISOString(),
-      }),
-    );
-
     return data;
   } catch (error) {
     console.error("❌ Backend pending members fetch failed:", error.message);
-
-    // ⚠️ FALLBACK: Try to load from localStorage cache
-    const cached = localStorage.getItem(`pending_members_${startupId}`);
-    if (cached) {
-      const { data } = JSON.parse(cached);
-      console.warn("⚠️ Using cached pending members (backend unavailable)");
-      return data;
-    }
-
-    // ℹ️ NO CACHE: Return empty array instead of throwing error
-    console.log("ℹ️ No pending members available (no backend, no cache)");
+    console.log("ℹ️ No pending members available");
     return { success: true, pendingMembers: [], total: 0 };
   }
 }

@@ -27,6 +27,10 @@ import {
   flattenTalentUserForCompletion,
   getTalentProfileCompletionPercent,
 } from "../utils/talentProfileCompletion";
+import {
+  fetchClientPreferences,
+  mergeClientPreferencesPatch,
+} from "../utils/api/clientPreferencesApi";
 
 const COMPLETION_THRESHOLD = 80; // Profile must be 80% complete to permanently dismiss
 
@@ -133,48 +137,52 @@ export default function ProfileCompletionReminder({
   // Check if profile completion is below threshold
   const shouldShowReminder = completion.percentage < COMPLETION_THRESHOLD;
 
-  // Initialize popup state on mount
+  const userId = user?._id ?? user?.id;
+
+  // Initialize popup state from server-backed preferences
   useEffect(() => {
-    if (shouldShowReminder) {
-      // Check if user manually minimized (stored separately from auto-show)
-      const isManuallyMinimized =
-        localStorage.getItem("profileReminder_minimized") === "true";
-      if (isManuallyMinimized) {
-        // User clicked minimize - keep it minimized
-        setIsMinimized(true);
-      } else {
-        // Check if we should auto-show popup
-        const lastShown = localStorage.getItem("profileReminder_lastShown");
+    if (!shouldShowReminder || !userId) return;
+    let cancelled = false;
+    fetchClientPreferences(String(userId))
+      .then((prefs) => {
+        if (cancelled) return;
+        const isManuallyMinimized = prefs.profileReminder_minimized === true;
+        if (isManuallyMinimized) {
+          setIsMinimized(true);
+          setShowPopup(false);
+          return;
+        }
+        const lastShown = prefs.profileReminder_lastShown;
         if (lastShown) {
           const lastShownTime = new Date(lastShown);
           const hoursSinceShown =
-            (new Date().getTime() - lastShownTime.getTime()) / (1000 * 60 * 60);
+            (new Date().getTime() - lastShownTime.getTime()) /
+            (1000 * 60 * 60);
 
-          // Show popup again if more than 2 hours has passed
           if (hoursSinceShown >= 2) {
             setShowPopup(true);
             setIsMinimized(false);
-            localStorage.setItem(
-              "profileReminder_lastShown",
-              new Date().toISOString(),
-            );
-            localStorage.removeItem("profileReminder_minimized");
+            mergeClientPreferencesPatch(String(userId), {
+              profileReminder_lastShown: new Date().toISOString(),
+              profileReminder_minimized: null,
+            }).catch(() => {});
           } else {
-            // If shown recently, start minimized
             setIsMinimized(true);
+            setShowPopup(false);
           }
         } else {
-          // First time - show the popup
           setShowPopup(true);
           setIsMinimized(false);
-          localStorage.setItem(
-            "profileReminder_lastShown",
-            new Date().toISOString(),
-          );
+          mergeClientPreferencesPatch(String(userId), {
+            profileReminder_lastShown: new Date().toISOString(),
+          }).catch(() => {});
         }
-      }
-    }
-  }, [shouldShowReminder]);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [shouldShowReminder, userId]);
 
   // Don't render anything if profile is above threshold
   if (!shouldShowReminder) {
@@ -183,21 +191,30 @@ export default function ProfileCompletionReminder({
   const handleMinimize = () => {
     setShowPopup(false);
     setIsMinimized(true);
-    // Mark as manually minimized so it stays minimized
-    localStorage.setItem("profileReminder_minimized", "true");
+    if (userId) {
+      mergeClientPreferencesPatch(String(userId), {
+        profileReminder_minimized: true,
+      }).catch(() => {});
+    }
   };
   const handleMaximize = () => {
     setIsMinimized(false);
     setShowPopup(true);
-    // Clear the minimized flag when user manually expands
-    localStorage.removeItem("profileReminder_minimized");
-    localStorage.setItem("profileReminder_lastShown", new Date().toISOString());
+    if (userId) {
+      mergeClientPreferencesPatch(String(userId), {
+        profileReminder_minimized: null,
+        profileReminder_lastShown: new Date().toISOString(),
+      }).catch(() => {});
+    }
   };
   const handleCompleteProfile = () => {
     setShowPopup(false);
     setIsMinimized(false);
-    // Clear all reminder state when navigating to profile
-    localStorage.removeItem("profileReminder_minimized");
+    if (userId) {
+      mergeClientPreferencesPatch(String(userId), {
+        profileReminder_minimized: null,
+      }).catch(() => {});
+    }
     onNavigateToProfile();
   };
 

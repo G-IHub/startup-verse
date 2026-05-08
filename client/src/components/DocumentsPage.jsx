@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect } from "react";
 import {
   Card,
   CardContent,
@@ -17,9 +17,23 @@ import {
   TrendingUp,
   Clock,
 } from "lucide-react";
+import { useJourneyStore } from "../state/useJourneyStore";
+
 export default function DocumentsPage({ user, onNavigate }) {
-  // Check if pitch deck exists
-  const hasPitchDeck = localStorage.getItem(`pitch_deck_${user.id}`);
+  const hydrate = useJourneyStore((s) => s.hydrate);
+  const pitchDraft = useJourneyStore((s) => s.homeUi?.stageDrafts?.pitch_deck);
+
+  useEffect(() => {
+    if (user?.id) hydrate(user.id);
+  }, [user?.id, hydrate]);
+
+  const hasPitchDeck =
+    pitchDraft != null &&
+    pitchDraft !== "" &&
+    (typeof pitchDraft !== "object" ||
+      Object.keys(pitchDraft).length > 0 ||
+      (Array.isArray(pitchDraft?.slides) && pitchDraft.slides.length > 0));
+
   const documents = [
     {
       id: "pitch-deck",

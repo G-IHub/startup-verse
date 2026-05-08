@@ -61,6 +61,20 @@ usersRouter.put(
   asyncHandler(usersController.updateNotificationPreferences)
 );
 
+usersRouter.get(
+  "/users/:userId/client-preferences",
+  requireAuth,
+  requireSelfOrAdmin("userId"),
+  asyncHandler(usersController.getClientPreferences)
+);
+
+usersRouter.put(
+  "/users/:userId/client-preferences",
+  requireAuth,
+  requireSelfOrAdmin("userId"),
+  asyncHandler(usersController.updateClientPreferences)
+);
+
 usersRouter.post(
   "/users/upload-avatar",
   requireAuth,

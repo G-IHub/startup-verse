@@ -59,6 +59,11 @@ import {
   getAllUsers,
   searchUsers,
 } from "../../utils/adminAnalytics";
+import {
+  getBrowserKVStats,
+  snapshotBrowserKV,
+  clearAllBrowserKV,
+} from "../../utils/clearLegacyClientStorage";
 const COLORS = [
   "#3A5AFE",
   "#2ECC71",
@@ -82,6 +87,7 @@ export default function AdminDashboardRealTime() {
   const [topPerformers, setTopPerformers] = useState([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [isLoading, setIsLoading] = useState(true);
+  const kvStats = getBrowserKVStats();
 
   // Load analytics data
   const loadAnalytics = async () => {
@@ -773,7 +779,7 @@ export default function AdminDashboardRealTime() {
                   Database Inspector
                 </CardTitle>
                 <CardDescription>
-                  View and manage localStorage data
+                  Legacy browser key/value snapshot (app data is server-backed).
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
@@ -781,31 +787,30 @@ export default function AdminDashboardRealTime() {
                   <Button
                     variant="outline"
                     onClick={() => {
-                      const keys = Object.keys(localStorage);
-                      console.log("LocalStorage Keys:", keys);
-                      console.log("Total Items:", keys.length);
-                      keys.forEach((key) => {
-                        console.log(`${key}:`, localStorage.getItem(key));
-                      });
+                      console.log("KV snapshot:", snapshotBrowserKV());
                     }}
                   >
-                    Log All Data
+                    Log KV Snapshot
                   </Button>
                   <Button
                     variant="outline"
                     onClick={() => {
-                      const dataStr = JSON.stringify(localStorage, null, 2);
+                      const dataStr = JSON.stringify(
+                        snapshotBrowserKV(),
+                        null,
+                        2,
+                      );
                       const blob = new Blob([dataStr], {
                         type: "application/json",
                       });
                       const url = URL.createObjectURL(blob);
                       const a = document.createElement("a");
                       a.href = url;
-                      a.download = `startupverse-backup-${Date.now()}.json`;
+                      a.download = `startupverse-kv-backup-${Date.now()}.json`;
                       a.click();
                     }}
                   >
-                    Export Backup
+                    Export KV Snapshot
                   </Button>
                   <Button variant="outline" onClick={loadAnalytics}>
                     Refresh Analytics
@@ -815,16 +820,16 @@ export default function AdminDashboardRealTime() {
                     onClick={() => {
                       if (
                         confirm(
-                          "Clear ALL localStorage data? This cannot be undone!",
+                          "Clear ALL remaining browser KV entries? This cannot be undone!",
                         )
                       ) {
-                        localStorage.clear();
-                        alert("All data cleared. Page will reload.");
+                        clearAllBrowserKV();
+                        alert("Browser KV cleared. Page will reload.");
                         window.location.reload();
                       }
                     }}
                   >
-                    Clear All Data
+                    Clear Browser KV
                   </Button>
                 </div>
                 <Separator />
@@ -835,18 +840,14 @@ export default function AdminDashboardRealTime() {
                       <div className="text-xs text-muted-foreground">
                         Total Keys
                       </div>
-                      <div className="font-semibold">
-                        {Object.keys(localStorage).length}
-                      </div>
+                      <div className="font-semibold">{kvStats.keyCount}</div>
                     </div>
                     <div className="p-2 bg-muted rounded">
                       <div className="text-xs text-muted-foreground">
                         Storage Used
                       </div>
                       <div className="font-semibold">
-                        {(JSON.stringify(localStorage).length / 1024).toFixed(
-                          2,
-                        )}
+                        {kvStats.approxKb}
                         {" KB"}
                       </div>
                     </div>

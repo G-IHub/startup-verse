@@ -1,5 +1,5 @@
 /**
- * Legacy automatic stage progression (was driven by localStorage heuristics).
+ * Legacy automatic stage progression (deprecated client heuristics).
  * Journey stage is now persisted on the server via GET/PUT /founders/:id/journey.
  */
 

@@ -1,11 +1,10 @@
 /**
  * Admin Analytics Utilities - FIXED VERSION
  *
- * Prefers server snapshot (MongoDB) when the admin is authenticated; falls
- * back to legacy localStorage aggregation.
+ * Prefers server snapshot (MongoDB) when the admin is authenticated; legacy
+ * browser aggregation has been removed.
  */
 
-import { STORAGE_KEYS } from "../app/session";
 import { API_BASE_URL } from "../config/apiBase.js";
 
 let serverSnapshotPromise = null;
@@ -124,7 +123,7 @@ function normalizeRole(role) {
 }
 
 /**
- * Get all users from ALL localStorage sources
+ * Get all users from the admin analytics snapshot (server).
  */
 export async function getAllUsers() {
   const snap = await getServerSnapshot();
@@ -135,268 +134,8 @@ export async function getAllUsers() {
     }));
   }
 
-  console.log("🔍 [Analytics] Starting comprehensive user fetch...");
-
-  const userMap = new Map();
-
-  // PHASE 1: Get primary user data (SOURCE OF TRUTH for current roles)
-  // These have the most up-to-date role information
-
-  // Source 1: registered_users (PRIMARY SOURCE - most current data)
-  try {
-    const registeredUsers = JSON.parse(
-      localStorage.getItem(STORAGE_KEYS.registeredUsers) || "[]",
-    );
-    console.log(
-      "📊 [Analytics] Found registered_users:",
-      registeredUsers.length,
-    );
-    registeredUsers.forEach((user) => {
-      if (user.id && user.email) {
-        userMap.set(user.id, {
-          ...user,
-          role: normalizeRole(user.role),
-          lastActive: user.createdAt,
-          totalOutcomes: 0,
-          completedOutcomes: 0,
-          totalTasks: 0,
-          completedTasks: 0,
-        });
-        console.log(`   ✓ User: ${user.email} → Role: ${user.role}`);
-      }
-    });
-  } catch (error) {
-    console.error("❌ [Analytics] Error reading registered_users:", error);
-  }
-
-  // Source 2: startupverse_users (legacy/compatibility)
-  try {
-    const allUsers = JSON.parse(
-      localStorage.getItem(STORAGE_KEYS.teamMembers) || "[]",
-    );
-    console.log("📊 [Analytics] Found startupverse_users:", allUsers.length);
-    allUsers.forEach((user) => {
-      if (user.id && user.email) {
-        // Only add if not already in map, OR update if this has more recent data
-        const existing = userMap.get(user.id);
-        if (!existing) {
-          userMap.set(user.id, {
-            ...user,
-            role: normalizeRole(user.role),
-            lastActive: user.createdAt,
-            totalOutcomes: 0,
-            completedOutcomes: 0,
-            totalTasks: 0,
-            completedTasks: 0,
-          });
-          console.log(`   ✓ User: ${user.email} → Role: ${user.role}`);
-        } else {
-          // Keep the current role from registered_users (it's more current)
-          console.log(
-            `   ↻ User ${user.email} already exists with role: ${existing.role}`,
-          );
-        }
-      }
-    });
-  } catch (error) {
-    console.error("❌ [Analytics] Error reading startupverse_users:", error);
-  }
-
-  // Source 3: Current user
-  try {
-    const currentUser = JSON.parse(
-      localStorage.getItem(STORAGE_KEYS.currentUser) || "null",
-    );
-    if (currentUser && currentUser.id && currentUser.email) {
-      const existing = userMap.get(currentUser.id);
-      if (!existing) {
-        console.log("📊 [Analytics] Found current user:", currentUser.email);
-        userMap.set(currentUser.id, {
-          ...currentUser,
-          role: normalizeRole(currentUser.role),
-          lastActive: new Date().toISOString(),
-          totalOutcomes: 0,
-          completedOutcomes: 0,
-          totalTasks: 0,
-          completedTasks: 0,
-        });
-        console.log(
-          `   ✓ Current user: ${currentUser.email} → Role: ${currentUser.role}`,
-        );
-      } else {
-        // Update last active for current user
-        existing.lastActive = new Date().toISOString();
-        console.log(
-          `   ↻ Current user ${currentUser.email} role: ${existing.role}`,
-        );
-      }
-    }
-  } catch (error) {
-    console.error("❌ [Analytics] Error reading current user:", error);
-  }
-
-  // PHASE 2: Enrich with profile data (DO NOT OVERWRITE ROLES)
-  // Profiles might have old role data, so we only use them for enrichment
-
-  // Source 4: Founder profiles (enrich founder data, add missing founders)
-  try {
-    const founderProfiles = JSON.parse(
-      localStorage.getItem("startupverse_founder_profiles") || "[]",
-    );
-    console.log(
-      "📊 [Analytics] Found founder profiles:",
-      founderProfiles.length,
-    );
-    founderProfiles.forEach((profile) => {
-      if (profile.founderId && profile.founderEmail) {
-        const existing = userMap.get(profile.founderId);
-        if (existing) {
-          // User exists - just enrich with startup data, DON'T change role
-          if (!existing.startupName) {
-            existing.startupName = profile.startupName || profile.companyName;
-          }
-          console.log(
-            `   ↻ Enriching ${existing.email} with startup: ${existing.startupName}`,
-          );
-        } else {
-          // New founder not in main list - add them
-          userMap.set(profile.founderId, {
-            id: profile.founderId,
-            name: profile.founderName || "Founder",
-            email: profile.founderEmail,
-            role: "founder",
-            createdAt: profile.createdAt || new Date().toISOString(),
-            onboardingComplete: true,
-            profile: profile,
-            lastActive: profile.createdAt || new Date().toISOString(),
-            totalOutcomes: 0,
-            completedOutcomes: 0,
-            totalTasks: 0,
-            completedTasks: 0,
-            startupName: profile.startupName || profile.companyName,
-          });
-          console.log(`   ✓ New founder from profile: ${profile.founderEmail}`);
-        }
-      }
-    });
-  } catch (error) {
-    console.error("❌ [Analytics] Error reading founder profiles:", error);
-  }
-
-  // Source 5: Talent profiles (enrich talent data, but DON'T overwrite if they became team members)
-  try {
-    const talentProfiles = JSON.parse(
-      localStorage.getItem("startupverse_talent_profiles") || "[]",
-    );
-    console.log("📊 [Analytics] Found talent profiles:", talentProfiles.length);
-    talentProfiles.forEach((profile) => {
-      if (profile.id && profile.email) {
-        const existing = userMap.get(profile.id);
-        if (existing) {
-          // User exists - they might have transitioned from talent to team member
-          if (existing.role === "talent") {
-            // Still talent, safe to enrich
-            console.log(`   ↻ Enriching talent: ${existing.email}`);
-          } else {
-            // Role changed! They were talent but are now something else (likely team member)
-            console.log(
-              `   🔄 ROLE TRANSITION: ${existing.email} was talent, now ${existing.role}`,
-            );
-            // Keep current role, don't overwrite
-          }
-          // Add talent profile data for reference
-          if (!existing.profile) {
-            existing.profile = profile;
-          }
-        } else {
-          // New talent not in main list - add them as talent
-          userMap.set(profile.id, {
-            id: profile.id,
-            name: profile.name || "Talent",
-            email: profile.email,
-            role: "talent",
-            createdAt: profile.createdAt || new Date().toISOString(),
-            onboardingComplete: true,
-            profile: profile,
-            lastActive: profile.createdAt || new Date().toISOString(),
-            totalOutcomes: 0,
-            completedOutcomes: 0,
-            totalTasks: 0,
-            completedTasks: 0,
-          });
-          console.log(`   ✓ New talent from profile: ${profile.email}`);
-        }
-      }
-    });
-  } catch (error) {
-    console.error("❌ [Analytics] Error reading talent profiles:", error);
-  }
-
-  // Enrich with activity metrics
-  userMap.forEach((user, userId) => {
-    try {
-      // Get outcomes
-      const outcomeKey = `weeklyOutcomes_${userId}`;
-      const outcomes = JSON.parse(localStorage.getItem(outcomeKey) || "[]");
-      user.totalOutcomes = outcomes.length;
-      user.completedOutcomes = outcomes.filter(
-        (o) => o.status === "completed",
-      ).length;
-
-      // Get tasks
-      const taskKey = `tasks_${userId}`;
-      const tasks = JSON.parse(localStorage.getItem(taskKey) || "[]");
-      user.totalTasks = tasks.length;
-      user.completedTasks = tasks.filter(
-        (t) => t.status === "completed",
-      ).length;
-
-      // Update last active if they have recent activity
-      if (outcomes.length > 0 || tasks.length > 0) {
-        user.lastActive = new Date().toISOString();
-      }
-
-      // Get startup info if founder
-      if (user.role === "founder" && !user.startupName) {
-        const founderProfiles = JSON.parse(
-          localStorage.getItem("startupverse_founder_profiles") || "[]",
-        );
-        const profile = founderProfiles.find((p) => p.founderId === userId);
-        if (profile) {
-          user.startupName =
-            profile.startupName || profile.companyName || "Unnamed Startup";
-        } else if (user.profile) {
-          user.startupName =
-            user.profile.startupName ||
-            user.profile.companyName ||
-            "Unnamed Startup";
-        }
-      }
-    } catch (error) {
-      console.error(`❌ [Analytics] Error enriching user ${userId}:`, error);
-    }
-  });
-
-  const users = Array.from(userMap.values());
-
-  // Debug: Log user breakdown
-  console.log("✅ [Analytics] Total users found:", users.length);
-  console.log("📊 [Analytics] User breakdown:");
-  console.log(
-    "   - Founders:",
-    users.filter((u) => u.role === "founder").length,
-  );
-  console.log(
-    "   - Team Members:",
-    users.filter((u) => isTeamMemberRole(u.role)).length,
-  );
-  console.log("   - Talent:", users.filter((u) => u.role === "talent").length);
-  console.log(
-    "📋 [Analytics] All users:",
-    users.map((u) => ({ name: u.name, email: u.email, role: u.role })),
-  );
-
-  return users;
+  console.warn("[Analytics] No server snapshot; legacy browser aggregation removed.");
+  return [];
 }
 
 /**
@@ -444,10 +183,8 @@ export async function getPlatformAnalytics() {
     userAnalytics.byRegion[region] = (userAnalytics.byRegion[region] || 0) + 1;
   });
 
-  // Startup analytics - count unique startups from founders
-  const founderProfiles = JSON.parse(
-    localStorage.getItem("startupverse_founder_profiles") || "[]",
-  );
+  // Startup analytics — browser-local founder profiles removed; rely on user rows only
+  const founderProfiles = [];
   console.log("📊 [Analytics] Founder profiles:", founderProfiles.length);
 
   // Each founder represents a startup
@@ -503,20 +240,7 @@ export async function getPlatformAnalytics() {
 
   console.log("✅ [Analytics] Startup analytics:", startupAnalytics);
 
-  // Outcome analytics
   let allOutcomes = [];
-  users.forEach((user) => {
-    const outcomeKey = `weeklyOutcomes_${user.id}`;
-    try {
-      const outcomes = JSON.parse(localStorage.getItem(outcomeKey) || "[]");
-      allOutcomes = allOutcomes.concat(outcomes);
-    } catch (error) {
-      console.error(
-        `❌ [Analytics] Error reading outcomes for ${user.id}:`,
-        error,
-      );
-    }
-  });
 
   const outcomeAnalytics = {
     total: allOutcomes.length,
@@ -541,20 +265,7 @@ export async function getPlatformAnalytics() {
 
   console.log("✅ [Analytics] Outcome analytics:", outcomeAnalytics);
 
-  // Task analytics
   let allTasks = [];
-  users.forEach((user) => {
-    const taskKey = `tasks_${user.id}`;
-    try {
-      const tasks = JSON.parse(localStorage.getItem(taskKey) || "[]");
-      allTasks = allTasks.concat(tasks);
-    } catch (error) {
-      console.error(
-        `❌ [Analytics] Error reading tasks for ${user.id}:`,
-        error,
-      );
-    }
-  });
 
   const taskAnalytics = {
     total: allTasks.length,
@@ -682,9 +393,8 @@ export async function getOutcomeCompletionTrend() {
     let completedOutcomes = 0;
 
     users.forEach((user) => {
-      const outcomeKey = `weeklyOutcomes_${user.id}`;
       try {
-        const outcomes = JSON.parse(localStorage.getItem(outcomeKey) || "[]");
+        const outcomes = [];
 
         outcomes.forEach((outcome) => {
           try {

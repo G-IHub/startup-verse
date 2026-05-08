@@ -27,10 +27,12 @@ import usersRouter from "./users.routes.js";
 import meetingsRouter from "./meetings.routes.js";
 import performanceRouter from "./performance.routes.js";
 import membershipsRouter from "./memberships.routes.js";
+import publicRouter from "./public.routes.js";
 
 const apiRouter = Router();
 
 apiRouter.use(healthRouter);
+apiRouter.use(publicRouter);
 apiRouter.use(activityRouter);
 apiRouter.use(authRouter);
 apiRouter.use(usersRouter);

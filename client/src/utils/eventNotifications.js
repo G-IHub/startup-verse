@@ -13,6 +13,8 @@ const defaultOptions = {
   },
 };
 
+const upcomingEventReminderSent = new Set();
+
 /**
  * Send notification when a new event is created.
  */
@@ -291,15 +293,12 @@ export async function checkAndSendEventReminders() {
 
     let totalSent = 0;
     for (const event of events) {
-      const reminderKey = `event-reminder-${event.id}`;
-      const reminderSent = localStorage.getItem(reminderKey);
-
-      if (!reminderSent) {
-        const result = await sendEventReminder(event);
-        if (result.success) {
-          totalSent += result.count || 0;
-          localStorage.setItem(reminderKey, new Date().toISOString());
-        }
+      const id = String(event?.id || "");
+      if (!id || upcomingEventReminderSent.has(id)) continue;
+      const result = await sendEventReminder(event);
+      if (result.success) {
+        upcomingEventReminderSent.add(id);
+        totalSent += result.count || 0;
       }
     }
 

@@ -104,15 +104,7 @@ export function NotificationProvider({ children }) {
     if (!backendOnline) {
       setBackendAvailable(false);
       setError(null);
-
-      const cached = localStorage.getItem(`notifications_${user.id}`);
-      if (cached) {
-        try {
-          setNotifications(mapNotificationList(JSON.parse(cached)));
-        } catch (parseError) {
-          console.error("Failed to parse cached notifications:", parseError);
-        }
-      }
+      setNotifications([]);
 
       setLoading(false);
       return;
@@ -149,11 +141,6 @@ export function NotificationProvider({ children }) {
       setError(null);
       setBackendAvailable(true);
       setLoading(false);
-
-      localStorage.setItem(
-        `notifications_${user.id}`,
-        JSON.stringify(mappedNotifications),
-      );
     } catch (fetchError) {
       if (
         fetchError.name !== "AbortError" &&
@@ -166,15 +153,7 @@ export function NotificationProvider({ children }) {
       setBackendAvailable(false);
       setError(null);
       setLoading(false);
-
-      const cached = localStorage.getItem(`notifications_${user.id}`);
-      if (cached) {
-        try {
-          setNotifications(mapNotificationList(JSON.parse(cached)));
-        } catch (parseError) {
-          console.error("Failed to parse cached notifications:", parseError);
-        }
-      }
+      setNotifications([]);
     }
   }, [user?.id]);
 

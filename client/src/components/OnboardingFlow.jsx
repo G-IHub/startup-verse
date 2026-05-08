@@ -96,8 +96,6 @@ export default function OnboardingFlow({ role, onComplete, onBack }) {
       onboardingComplete: true,
     };
 
-    // Save founder profile
-    localStorage.setItem("founder_profile", JSON.stringify(data));
     toast.success("🎉 Profile setup complete! Welcome to StartupVerse!", {
       description: `Based on your startup's current state, you're in: ${getStageName(algorithmicStageId)}`,
     });

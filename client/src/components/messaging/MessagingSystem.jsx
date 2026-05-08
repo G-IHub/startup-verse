@@ -24,6 +24,12 @@ import {
   formatMessageTime,
 } from "../../utils/messaging";
 import { getStartupId } from "../../utils/startupId";
+import {
+  fetchClientPreferences,
+  mergeClientPreferencesPatch,
+} from "../../utils/api/clientPreferencesApi";
+
+const STARRED_PREF_KEY = "messaging_starred_conversations";
 export default function MessagingSystem({
   user,
   teamMembers = [],
@@ -41,27 +47,42 @@ export default function MessagingSystem({
   // Get user's startup ID using centralized utility
   const startupId = getStartupId(user);
 
-  // Load starred conversations from localStorage
   useEffect(() => {
-    const stored = localStorage.getItem("startupverse_starred_conversations");
-    if (stored) {
-      setStarredConversations(new Set(JSON.parse(stored)));
-    }
-  }, []);
+    const uid = user?._id ?? user?.id;
+    if (!uid) return;
+    let cancelled = false;
+    fetchClientPreferences(String(uid))
+      .then((prefs) => {
+        if (cancelled) return;
+        const arr = prefs[STARRED_PREF_KEY];
+        if (Array.isArray(arr)) {
+          setStarredConversations(new Set(arr.map(String)));
+        }
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [user?._id, user?.id]);
 
-  // Save starred conversations
-  const toggleStar = (userId) => {
+  const toggleStar = async (targetUserId) => {
     const newStarred = new Set(starredConversations);
-    if (newStarred.has(userId)) {
-      newStarred.delete(userId);
+    if (newStarred.has(targetUserId)) {
+      newStarred.delete(targetUserId);
     } else {
-      newStarred.add(userId);
+      newStarred.add(targetUserId);
     }
     setStarredConversations(newStarred);
-    localStorage.setItem(
-      "startupverse_starred_conversations",
-      JSON.stringify(Array.from(newStarred)),
-    );
+    const uid = user?._id ?? user?.id;
+    if (uid) {
+      try {
+        await mergeClientPreferencesPatch(String(uid), {
+          [STARRED_PREF_KEY]: Array.from(newStarred),
+        });
+      } catch {
+        /* ignore */
+      }
+    }
   };
 
   // Load conversations

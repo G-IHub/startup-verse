@@ -170,7 +170,7 @@ export async function getFounderCalendarEvents(founderId) {
       }
     }
 
-    // 4. Weekly outcomes (server — no localStorage)
+    // 4. Weekly outcomes (server-backed)
     const woResponse = await fetch(
       `${API_BASE}/founders/${founderId}/weekly-outcomes`,
       { ...defaultOptions },

@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { API_BASE_URL } from "../../config/apiBase.js";
-import { loadCurrentUser, persistCurrentUser } from "../../app/session";
+import { persistCurrentUser } from "../../app/session";
 import { Button } from "../ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "../ui/avatar";
 import { toast } from "sonner";
@@ -27,7 +27,12 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "../ui/dropdown-menu";
-import { getSentInterests } from "../../utils/api/inboxApi";
+import {
+  getSentInterests,
+  getReceivedInterests,
+  getSentInvitations,
+  getReceivedInvitations,
+} from "../../utils/api/inboxApi";
 
 // Default fetch options for cookie-based auth
 
@@ -122,6 +127,7 @@ export default function AppLayoutHybrid({
 }) {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [unreadMessagesCount, setUnreadMessagesCount] = useState(0);
+  const [sidebarMixCount, setSidebarMixCount] = useState(0);
   const [hasSentInterest, setHasSentInterest] = useState(false);
   const pageMeta = resolvePageMeta(currentPage, user.role);
   const normalizedPage = String(currentPage || "dashboard").split(":")[0];
@@ -212,6 +218,51 @@ export default function AppLayoutHybrid({
   }, [user.id, user.role]);
 
   useEffect(() => {
+    let cancelled = false;
+    const uid = String(user._id ?? user.id ?? "");
+    (async () => {
+      if (!uid || (user.role !== "talent" && user.role !== "founder")) {
+        if (!cancelled) setSidebarMixCount(0);
+        return;
+      }
+      try {
+        if (user.role === "talent") {
+          const [recvInv, sentInt] = await Promise.all([
+            getReceivedInvitations(uid),
+            getSentInterests(uid),
+          ]);
+          if (cancelled) return;
+          const pendInv =
+            recvInv.filter((i) => String(i?.status || "") === "pending")
+              .length || 0;
+          const respondedInt =
+            sentInt.filter((i) => String(i?.status || "") !== "pending")
+              .length || 0;
+          setSidebarMixCount(pendInv + respondedInt);
+          return;
+        }
+        const [recvInt, sentInv] = await Promise.all([
+          getReceivedInterests(uid),
+          getSentInvitations(uid),
+        ]);
+        if (cancelled) return;
+        const pendInt =
+          recvInt.filter((i) => String(i?.status || "") === "pending").length ||
+          0;
+        const respondedInv =
+          sentInv.filter((i) => String(i?.status || "") !== "pending").length ||
+          0;
+        setSidebarMixCount(pendInt + respondedInv);
+      } catch {
+        if (!cancelled) setSidebarMixCount(0);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [user.id, user.role, user._id]);
+
+  useEffect(() => {
     if (user.role !== "talent") return;
     const talentId = String(user._id ?? user.id ?? "");
     if (!talentId) return;
@@ -222,63 +273,17 @@ export default function AppLayoutHybrid({
       .catch(() => {});
   }, [user.id, user.role]);
 
-  const getNotificationCount = () => {
-    if (user.role === "talent") {
-      const invitations = JSON.parse(
-        localStorage.getItem("startupverse_sent_invitations") || "[]",
-      );
-      const myInvitations = invitations.filter(
-        (inv) =>
-          (inv.talentId === user.id || inv.talentName === user.name) &&
-          inv.status === "pending",
-      );
-
-      const interests = JSON.parse(
-        localStorage.getItem("startupverse_sent_interests") || "[]",
-      );
-      const myResponses = interests.filter(
-        (item) => item.sentById === user.id && item.status !== "pending",
-      );
-      return myInvitations.length + myResponses.length;
-    }
-
-    if (user.role === "founder") {
-      const interests = JSON.parse(
-        localStorage.getItem("startupverse_sent_interests") || "[]",
-      );
-      const myInterests = interests.filter(
-        (item) => item.founderName === user.name && item.status === "pending",
-      );
-
-      const invitations = JSON.parse(
-        localStorage.getItem("startupverse_sent_invitations") || "[]",
-      );
-      const myResponses = invitations.filter(
-        (inv) =>
-          (inv.sentBy === user.name || inv.sentBy === user.id) &&
-          inv.status !== "pending",
-      );
-      return myInterests.length + myResponses.length;
-    }
-
-    return 0;
-  };
-
-  const notificationCount = getNotificationCount();
-
   const switchRole = (newRole) => {
-    const parsedUser = loadCurrentUser();
-    if (!parsedUser) {
+    if (!user) {
       toast.error("User data not found");
       return;
     }
 
-    const updatedUser = {
-      ...parsedUser,
+    persistCurrentUser({
+      ...user,
       role: newRole,
       onboardingComplete: true,
-    };
-    persistCurrentUser(updatedUser);
+    });
 
     const roleName = {
       founder: "Founder",
@@ -316,7 +321,7 @@ export default function AppLayoutHybrid({
           onPageChange={onPageChange}
           onVirtualOfficeViewChange={onVirtualOfficeViewChange}
           unreadCount={unreadMessagesCount}
-          notificationCount={notificationCount}
+          notificationCount={sidebarMixCount}
           talentDashboardMode={talentDashboardMode}
           hasSentInterest={hasSentInterest}
           isOpen={isMobileMenuOpen}

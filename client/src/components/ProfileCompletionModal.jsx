@@ -532,17 +532,6 @@ export default function ProfileCompletionModal({
     }
     setLoading(true);
     const mockData = getMockProfileData();
-    const journeyProgress = JSON.parse(
-      localStorage.getItem("founder_journey_progress") || "{}",
-    );
-    journeyProgress.profileSetup = {
-      status: "completed",
-      completedAt: new Date().toISOString(),
-    };
-    localStorage.setItem(
-      "founder_journey_progress",
-      JSON.stringify(journeyProgress),
-    );
     setTimeout(() => {
       if (user && onUpdateUser) {
         const updatedUser = {

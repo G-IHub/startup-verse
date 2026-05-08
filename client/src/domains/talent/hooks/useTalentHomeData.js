@@ -2,49 +2,6 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { request } from "../../../utils/backendClient";
 import { mapTalentHomeViewModel } from "../mappers/talentViewModel";
 
-function readJson(key, fallback = []) {
-  try {
-    const value = JSON.parse(localStorage.getItem(key) || "[]");
-    return Array.isArray(value) ? value : fallback;
-  } catch {
-    return fallback;
-  }
-}
-
-function cacheJson(key, rows) {
-  try {
-    localStorage.setItem(key, JSON.stringify(rows || []));
-  } catch {
-    // Ignore cache failures in private mode / restricted storage.
-  }
-}
-
-function getSavedCacheKey(talentId) {
-  return `startupverse_talent_saved_${talentId}`;
-}
-
-function readFallbackOpportunities() {
-  return readJson("startupverse_startup_posts", []);
-}
-
-function readFallbackSaved(talentId) {
-  return readJson(getSavedCacheKey(talentId), []);
-}
-
-function readFallbackSentInterests(talentId) {
-  return readJson("startupverse_sent_interests", []).filter((row) => {
-    const rowTalentId = String(row?.talentId || row?.sentById || "");
-    return rowTalentId && rowTalentId === String(talentId || "");
-  });
-}
-
-function readFallbackInvitations(talentId) {
-  return readJson("startupverse_sent_invitations", []).filter((row) => {
-    const rowTalentId = String(row?.talentId || "");
-    return rowTalentId && rowTalentId === String(talentId || "");
-  });
-}
-
 function normalizePostsResponse(payload) {
   if (Array.isArray(payload)) return payload;
   if (payload && Array.isArray(payload.posts)) return payload.posts;
@@ -84,14 +41,6 @@ function resolveFounderId(opportunity) {
       opportunity?.createdBy ||
       "",
   ).trim();
-}
-
-function appendLocalInterest(talentId, newInterest) {
-  const key = "startupverse_sent_interests";
-  const existing = readJson(key, []);
-  const next = [newInterest, ...existing];
-  cacheJson(key, next);
-  return next.filter((row) => String(row?.talentId || row?.sentById || "") === String(talentId));
 }
 
 export function useTalentHomeData({ user }) {
@@ -142,19 +91,19 @@ export function useTalentHomeData({ user }) {
     const opportunities =
       opportunitiesResult.status === "fulfilled"
         ? normalizePostsResponse(opportunitiesResult.value.data)
-        : readFallbackOpportunities();
+        : [];
     const savedItems =
       savedResult.status === "fulfilled"
         ? normalizeSavedResponse(savedResult.value.data)
-        : readFallbackSaved(talentId);
+        : [];
     const sentInterests =
       sentResult.status === "fulfilled"
         ? normalizeInterestResponse(sentResult.value.data)
-        : readFallbackSentInterests(talentId);
+        : [];
     const invitations =
       invitationResult.status === "fulfilled"
         ? normalizeInvitationResponse(invitationResult.value.data)
-        : readFallbackInvitations(talentId);
+        : [];
     const applications =
       applicationsResult.status === "fulfilled"
         ? Array.isArray(applicationsResult.value.data)
@@ -162,25 +111,12 @@ export function useTalentHomeData({ user }) {
           : []
         : [];
 
-    if (opportunitiesResult.status === "fulfilled") {
-      cacheJson("startupverse_startup_posts", opportunities);
-    }
-    if (savedResult.status === "fulfilled") {
-      cacheJson(getSavedCacheKey(talentId), savedItems);
-    }
-    if (sentResult.status === "fulfilled") {
-      cacheJson(
-        "startupverse_sent_interests",
-        normalizeInterestResponse(sentResult.value.data),
-      );
-    }
-
     if (opportunitiesResult.status === "rejected") {
       setError(
-        "Could not load opportunities from backend. Showing fallback data until sync recovers.",
+        "Could not load opportunities from backend. Try again when the server is available.",
       );
     } else if (fallbackUsed) {
-      setError("Some sections are in fallback mode while backend sync recovers.");
+      setError("Some sections failed to load. Refresh to retry.");
     }
 
     setRawData({
@@ -245,7 +181,6 @@ export function useTalentHomeData({ user }) {
               ).trim();
               return rowId !== startupId && rowId !== opportunityId;
             });
-            cacheJson(getSavedCacheKey(talentId), nextRows);
             return { ...prev, savedItems: nextRows };
           });
           return { success: true, saved: false };
@@ -273,7 +208,6 @@ export function useTalentHomeData({ user }) {
               };
         setRawData((prev) => {
           const nextRows = [createdRow, ...prev.savedItems];
-          cacheJson(getSavedCacheKey(talentId), nextRows);
           return { ...prev, savedItems: nextRows };
         });
         return { success: true, saved: true };
@@ -334,12 +268,6 @@ export function useTalentHomeData({ user }) {
           ...prev,
           sentInterests: [interestRow, ...prev.sentInterests],
         }));
-
-        appendLocalInterest(talentId, {
-          ...interestRow,
-          sentById: talentId,
-          sentAt: new Date().toISOString(),
-        });
 
         return { success: true, interest: interestRow };
       } catch (err) {

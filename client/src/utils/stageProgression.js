@@ -293,19 +293,22 @@ export function getCompletionMessage(stageId, outcomes) {
   return `🎉 ${stage.name} Complete! You've achieved ${stageOutcomes.length} key outcome${stageOutcomes.length !== 1 ? "s" : ""} in this stage.${nextStageName ? ` ${nextStageName} is now unlocked!` : " Amazing progress!"}`;
 }
 
+/** In-memory hybrid journey map (string stage ids); server-backed numeric journey is canonical elsewhere. */
+let founderHybridProgress = {};
+
 /**
- * 📋 Load journey progress from localStorage
+ * 📋 Load journey progress (session memory only)
  */
 export function loadJourneyProgress() {
-  const saved = localStorage.getItem("founder_journey_progress");
-  return saved ? JSON.parse(saved) : {};
+  return founderHybridProgress;
 }
 
 /**
- * 💾 Save journey progress to localStorage
+ * 💾 Save journey progress (session memory only)
  */
 export function saveJourneyProgress(progress) {
-  localStorage.setItem("founder_journey_progress", JSON.stringify(progress));
+  founderHybridProgress =
+    progress && typeof progress === "object" ? progress : {};
 }
 
 /**

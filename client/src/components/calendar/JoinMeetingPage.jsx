@@ -8,9 +8,10 @@ import { Card } from "../ui/card";
 import { Button } from "../ui/button";
 import { Video, Loader2, AlertCircle, CheckCircle2 } from "lucide-react";
 import { GoogleMeetCall } from "../office/GoogleMeetCall";
-import { STORAGE_KEYS } from "../../app/session";
+import { useAuth } from "../../contexts/AuthContext";
 
 export default function JoinMeetingPage({ roomName }) {
+  const { user } = useAuth();
   const [isLoading, setIsLoading] = useState(true);
   const [meeting, setMeeting] = useState(null);
   const [error, setError] = useState(null);
@@ -18,8 +19,8 @@ export default function JoinMeetingPage({ roomName }) {
   const [userName, setUserName] = useState("");
   useEffect(() => {
     loadMeetingDetails();
-    loadUserName();
-  }, [roomName]);
+    setUserName(user?.name?.trim() || "Guest");
+  }, [roomName, user?.name]);
   const loadMeetingDetails = async () => {
     try {
       // Try to find meeting by room name
@@ -33,15 +34,6 @@ export default function JoinMeetingPage({ roomName }) {
       console.error("Failed to load meeting:", error);
       setError("Failed to load meeting details");
       setIsLoading(false);
-    }
-  };
-  const loadUserName = () => {
-    const user = localStorage.getItem(STORAGE_KEYS.currentUser);
-    if (user) {
-      const userData = JSON.parse(user);
-      setUserName(userData.name || "Guest");
-    } else {
-      setUserName("Guest");
     }
   };
   const handleJoinMeeting = () => {

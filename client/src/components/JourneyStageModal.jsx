@@ -33,7 +33,10 @@ import {
 import {
   completeMilestone,
   completeCurrentStage,
+  updateJourneyProgress,
 } from "../utils/journeyProgress";
+import { useJourneyStore } from "../state/useJourneyStore";
+import { persistStageDraft } from "../hooks/useStageDraftFromJourney";
 export function JourneyStageModal({
   isOpen,
   onClose,
@@ -80,12 +83,14 @@ export function JourneyStageModal({
         },
       };
       setLocalProgress(updatedProgress);
-      localStorage.setItem("journey_progress", JSON.stringify(updatedProgress));
+      updateJourneyProgress(updatedProgress);
+      void useJourneyStore.getState().syncJourneyToServerNow();
       onProgressUpdate(updatedProgress);
     } else {
       // Add milestone
       const updatedProgress = completeMilestone(stage.id, milestone);
       setLocalProgress(updatedProgress);
+      void useJourneyStore.getState().syncJourneyToServerNow();
       onProgressUpdate(updatedProgress);
     }
   };
@@ -119,7 +124,8 @@ export function JourneyStageModal({
         },
       };
       setLocalProgress(updatedProgress);
-      localStorage.setItem("journey_progress", JSON.stringify(updatedProgress));
+      updateJourneyProgress(updatedProgress);
+      void useJourneyStore.getState().syncJourneyToServerNow();
       onProgressUpdate(updatedProgress);
     } else {
       // Add criteria
@@ -143,7 +149,8 @@ export function JourneyStageModal({
         },
       };
       setLocalProgress(updatedProgress);
-      localStorage.setItem("journey_progress", JSON.stringify(updatedProgress));
+      updateJourneyProgress(updatedProgress);
+      void useJourneyStore.getState().syncJourneyToServerNow();
       onProgressUpdate(updatedProgress);
     }
   };
@@ -193,10 +200,6 @@ export function JourneyStageModal({
       return;
     }
 
-    // Save to localStorage
-    const existingMembers = JSON.parse(
-      localStorage.getItem("team_members") || "[]",
-    );
     const newMembers = validInvites.map((inv, idx) => ({
       id: `invited_${Date.now()}_${idx}`,
       name: inv.name,
@@ -205,10 +208,12 @@ export function JourneyStageModal({
       status: "invited",
       invitedAt: new Date().toISOString(),
     }));
-    localStorage.setItem(
-      "team_members",
-      JSON.stringify([...existingMembers, ...newMembers]),
-    );
+
+    const prevDraft =
+      useJourneyStore.getState().homeUi?.stageDrafts
+        ?.journey_modal_team_invites || [];
+    const mergedMembers = [...(Array.isArray(prevDraft) ? prevDraft : []), ...newMembers];
+    persistStageDraft("journey_modal_team_invites", mergedMembers);
 
     // Update progress
     const criteriaKey = "criteria_1"; // "Recruit co-founders or early team members"
@@ -232,7 +237,8 @@ export function JourneyStageModal({
       },
     };
     setLocalProgress(updatedProgress);
-    localStorage.setItem("journey_progress", JSON.stringify(updatedProgress));
+    updateJourneyProgress(updatedProgress);
+    void useJourneyStore.getState().syncJourneyToServerNow();
     onProgressUpdate(updatedProgress);
     toast.success(
       `Successfully sent ${validInvites.length} team invitation${validInvites.length > 1 ? "s" : ""}!`,

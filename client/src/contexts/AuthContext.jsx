@@ -34,7 +34,7 @@ export function AuthProvider({ children }) {
 
   const login = ({ user: nextUser }) => {
     // Token is now stored in HttpOnly cookie by the server
-    // No need to store it in localStorage
+    // Auth user is kept in memory / cookie session only
     updateUser(nextUser);
   };
 

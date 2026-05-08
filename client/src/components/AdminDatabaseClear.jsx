@@ -18,6 +18,7 @@ import {
   DialogTitle,
 } from "./ui/dialog";
 import { toast } from "sonner";
+import { clearAllBrowserKV } from "../utils/clearLegacyClientStorage.js";
 
 // Default fetch options for cookie-based auth
 
@@ -73,11 +74,7 @@ export function AdminDatabaseClear() {
         console.log("✅ Database cleared:", data);
         toast.success(`Database cleared! Deleted ${data.deletedKeys} records.`);
 
-        // 🔥 MEGA NUCLEAR WIPE - Clear ALL localStorage including current session
-        console.log(
-          "🔥 Clearing ALL localStorage (including current session)...",
-        );
-        localStorage.clear();
+        clearAllBrowserKV();
         console.log("🔥 Logging out and redirecting to home...");
 
         // Force complete logout and redirect to home page
@@ -200,7 +197,7 @@ export function AdminDatabaseClear() {
                   <li>All messages and notifications</li>
                   <li>All activities and presence data</li>
                   <li>All organizations and cohorts</li>
-                  <li>🔥 ALL localStorage data (complete reset)</li>
+                  <li>🔥 All persistent browser key/value data (complete reset)</li>
                 </ul>
                 <p className="mt-2 font-semibold text-status-error">
                   ⚠️ MEGA NUCLEAR WIPE - This cannot be undone!

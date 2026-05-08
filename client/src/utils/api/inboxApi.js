@@ -92,11 +92,11 @@ export async function getReceivedInterests(founderId, params = {}) {
     // Debug log only - backend is optional in demo mode
     if (import.meta.env.DEV) {
       console.debug(
-        "Backend getReceivedInterests failed (using localStorage fallback):",
+        "Backend getReceivedInterests failed (empty list fallback):",
         error.message,
       );
     }
-    // Return empty array - caller will use localStorage fallback
+    // Return empty array when the API is unavailable
     return [];
   }
 }

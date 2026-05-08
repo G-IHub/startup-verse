@@ -30,7 +30,6 @@ import {
   buildTalentProfile,
   resolveDashboardIntent,
   resolveInitialView,
-  upsertStoredRecord,
   getAccessToken,
 } from "./app/session";
 import {
@@ -711,14 +710,22 @@ function AppContent() {
 // Root
 // ---------------------------------------------------------------------------
 
+function AppProvidersInner() {
+  const { user, isLoading } = useAuth();
+  const userId = user ? String(user._id ?? user.id ?? "") : null;
+  return (
+    <ThemeProvider userId={userId} authReady={!isLoading}>
+      <NotificationProvider>
+        <AppContent />
+      </NotificationProvider>
+    </ThemeProvider>
+  );
+}
+
 export default function App() {
   return (
-    <ThemeProvider>
-      <AuthProvider>
-        <NotificationProvider>
-          <AppContent />
-        </NotificationProvider>
-      </AuthProvider>
-    </ThemeProvider>
+    <AuthProvider>
+      <AppProvidersInner />
+    </AuthProvider>
   );
 }

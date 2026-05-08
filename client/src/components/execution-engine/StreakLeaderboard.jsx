@@ -20,157 +20,134 @@ import {
   Target,
   Crown,
 } from "lucide-react";
-import { STORAGE_KEYS } from "../../app/session";
+import { getExecutionData } from "../../utils/api/coreEngineApi";
+import { getStartupTeamMembers } from "../../utils/api/teamMemberApi";
+import {
+  fetchClientPreferences,
+  mergeClientPreferencesPatch,
+} from "../../utils/api/clientPreferencesApi";
 
 export function StreakLeaderboard({ currentUser, onClose }) {
   const [globalLeaders, setGlobalLeaders] = useState([]);
   const [teamLeaders, setTeamLeaders] = useState([]);
   const [personalBest, setPersonalBest] = useState(0);
   const [currentStreak, setCurrentStreak] = useState(0);
-  useEffect(() => {
-    loadLeaderboardData();
-  }, [currentUser.id]);
-  const loadLeaderboardData = () => {
-    // Load current user's streak data
-    const executionData = JSON.parse(
-      localStorage.getItem(`execution_data_${currentUser.id}`) || "{}",
-    );
-    setCurrentStreak(executionData.streak || 0);
 
-    // Load personal best
-    const personalBestStored = parseInt(
-      localStorage.getItem(`personal_best_streak_${currentUser.id}`) || "0",
-    );
-    setPersonalBest(Math.max(personalBestStored, executionData.streak || 0));
-
-    // Update personal best if current streak is higher
-    if ((executionData.streak || 0) > personalBestStored) {
-      localStorage.setItem(
-        `personal_best_streak_${currentUser.id}`,
-        executionData.streak.toString(),
-      );
-    }
-
-    // Load all users for global leaderboard
-    const allUsers = JSON.parse(
-      localStorage.getItem(STORAGE_KEYS.teamMembers) || "[]",
-    );
-    const registeredUsers = JSON.parse(
-      localStorage.getItem(STORAGE_KEYS.registeredUsers) || "[]",
-    );
-    const combinedUsers = [...allUsers, ...registeredUsers];
-
-    // Build global leaderboard
-    const globalEntries = combinedUsers
-      .map((user) => {
-        const userData = JSON.parse(
-          localStorage.getItem(`execution_data_${user.id}`) || "{}",
-        );
-        const currentOutcome = userData.currentOutcome;
-        const weekProgress = currentOutcome
-          ? calculateWeekProgress(currentOutcome)
-          : 0;
-        return {
-          userId: user.id,
-          userName: user.name || "Unknown",
-          streak: userData.streak || 0,
-          currentWeekProgress: weekProgress,
-          role: user.role,
-          companyName: user.companyName || user.profile?.companyName,
-          avatar: user.avatar,
-        };
-      })
-      .filter((entry) => entry.streak > 0)
-      .sort((a, b) => {
-        // Sort by streak, then by current week progress
-        if (b.streak !== a.streak) return b.streak - a.streak;
-        return b.currentWeekProgress - a.currentWeekProgress;
-      })
-      .slice(0, 50); // Top 50
-
-    setGlobalLeaders(globalEntries);
-
-    // Build team leaderboard (if user is founder or team member)
-    let teamEntries = [];
-    if (currentUser.role === "founder") {
-      // Get team members
-      // 🔒 SECURITY FIX: Use startupId/founderId ONLY, removed companyId matching
-      teamEntries = combinedUsers
-        .filter(
-          (user) =>
-            user.startupId === currentUser.id ||
-            user.founderId === currentUser.id,
-        )
-        .map((user) => {
-          const userData = JSON.parse(
-            localStorage.getItem(`execution_data_${user.id}`) || "{}",
-          );
-          const currentOutcome = userData.currentOutcome;
-          const weekProgress = currentOutcome
-            ? calculateWeekProgress(currentOutcome)
-            : 0;
-          return {
-            userId: user.id,
-            userName: user.name || "Unknown",
-            streak: userData.streak || 0,
-            currentWeekProgress: weekProgress,
-            role: user.role,
-            companyName: user.companyName,
-            avatar: user.avatar,
-          };
-        })
-        .filter((entry) => entry.streak > 0)
-        .sort((a, b) => {
-          if (b.streak !== a.streak) return b.streak - a.streak;
-          return b.currentWeekProgress - a.currentWeekProgress;
-        });
-    } else if (currentUser.role === "team-member" && currentUser.startupId) {
-      // Get founder and other team members
-      teamEntries = combinedUsers
-        // 🔒 SECURITY FIX: Use startupId ONLY, removed companyId matching
-        .filter(
-          (user) =>
-            user.id === currentUser.startupId ||
-            user.startupId === currentUser.startupId,
-        )
-        .map((user) => {
-          const userData = JSON.parse(
-            localStorage.getItem(`execution_data_${user.id}`) || "{}",
-          );
-          const currentOutcome = userData.currentOutcome;
-          const weekProgress = currentOutcome
-            ? calculateWeekProgress(currentOutcome)
-            : 0;
-          return {
-            userId: user.id,
-            userName: user.name || "Unknown",
-            streak: userData.streak || 0,
-            currentWeekProgress: weekProgress,
-            role: user.role,
-            companyName: user.companyName,
-            avatar: user.avatar,
-          };
-        })
-        .filter((entry) => entry.streak > 0)
-        .sort((a, b) => {
-          if (b.streak !== a.streak) return b.streak - a.streak;
-          return b.currentWeekProgress - a.currentWeekProgress;
-        });
-    }
-    setTeamLeaders(teamEntries);
-  };
   const calculateWeekProgress = (outcome) => {
     if (!outcome || !outcome.milestones) return 0;
     const totalTasks = outcome.milestones.reduce(
-      (sum, m) => sum + m.totalTasks,
+      (sum, m) => sum + (m.totalTasks || 0),
       0,
     );
     const completedTasks = outcome.milestones.reduce(
-      (sum, m) => sum + m.tasksCompleted,
+      (sum, m) => sum + (m.tasksCompleted || 0),
       0,
     );
     return totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
   };
+
+  useEffect(() => {
+    let cancelled = false;
+    const uid = String(currentUser?.id ?? currentUser?._id ?? "");
+
+    const loadLeaderboardData = async () => {
+      if (!uid) return;
+      try {
+        const exec = await getExecutionData(uid);
+        if (cancelled) return;
+        const streak = exec.streak || 0;
+        setCurrentStreak(streak);
+
+        let prefs = {};
+        try {
+          prefs = await fetchClientPreferences(uid);
+        } catch {
+          prefs = {};
+        }
+        const storedPb = Number(prefs.personal_best_streak || 0);
+        const pb = Math.max(storedPb, streak);
+        setPersonalBest(pb);
+        if (pb > storedPb) {
+          try {
+            await mergeClientPreferencesPatch(uid, {
+              personal_best_streak: pb,
+            });
+          } catch {
+            /* ignore */
+          }
+        }
+
+        const scopeId =
+          currentUser.role === "founder"
+            ? uid
+            : currentUser.startupId || currentUser.founderId || "";
+
+        let memberRows = [];
+        if (scopeId) {
+          try {
+            const members = await getStartupTeamMembers(scopeId);
+            const ids = [
+              ...new Set([
+                uid,
+                ...members.map((m) => String(m.id || m.userId || "")),
+              ]),
+            ].filter(Boolean);
+
+            const entries = await Promise.all(
+              ids.map(async (id) => {
+                try {
+                  const ed = await getExecutionData(id);
+                  const memberMeta = members.find((m) => String(m.id) === id);
+                  const currentOutcome = ed.currentOutcome;
+                  const weekProgress = currentOutcome
+                    ? calculateWeekProgress(currentOutcome)
+                    : 0;
+                  return {
+                    userId: id,
+                    userName:
+                      id === uid
+                        ? currentUser.name || "You"
+                        : memberMeta?.name || "Unknown",
+                    streak: ed.streak || 0,
+                    currentWeekProgress: weekProgress,
+                    role: memberMeta?.role || "",
+                    companyName: memberMeta?.companyName,
+                    avatar: memberMeta?.avatar,
+                  };
+                } catch {
+                  return null;
+                }
+              }),
+            );
+            memberRows = entries
+              .filter(Boolean)
+              .filter((e) => e.streak > 0)
+              .sort((a, b) => {
+                if (b.streak !== a.streak) return b.streak - a.streak;
+                return b.currentWeekProgress - a.currentWeekProgress;
+              });
+          } catch {
+            memberRows = [];
+          }
+        }
+
+        setTeamLeaders(memberRows);
+        setGlobalLeaders([]);
+      } catch {
+        if (!cancelled) {
+          setCurrentStreak(0);
+          setPersonalBest(0);
+          setTeamLeaders([]);
+          setGlobalLeaders([]);
+        }
+      }
+    };
+
+    loadLeaderboardData();
+    return () => {
+      cancelled = true;
+    };
+  }, [currentUser]);
   const getRankIcon = (rank) => {
     if (rank === 1) return <Crown className="w-5 h-5 text-yellow-500" />;
     if (rank === 2) return <Medal className="w-5 h-5 text-gray-400" />;

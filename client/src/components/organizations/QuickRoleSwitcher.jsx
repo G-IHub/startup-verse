@@ -1,14 +1,11 @@
 import React, { useState } from "react";
-import { STORAGE_KEYS } from "../../app/session";
 import { Card, CardContent } from "../ui/card";
 import { Button } from "../ui/button";
 import { Badge } from "../ui/badge";
 import { Users, Building2, Briefcase, Sparkles } from "lucide-react";
 export default function QuickRoleSwitcher({ currentUserId, onSwitchUser }) {
   const [isOpen, setIsOpen] = useState(false);
-  const allUsers = JSON.parse(
-    localStorage.getItem(STORAGE_KEYS.teamMembers) || "[]",
-  );
+  const allUsers = [];
   const getRoleIcon = (role) => {
     switch (role) {
       case "founder":

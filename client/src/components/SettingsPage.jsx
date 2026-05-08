@@ -41,6 +41,11 @@ import {
 import { toast } from "sonner";
 import { useOfficeSettings } from "../hooks/useOfficeSettings";
 import * as authApi from "../utils/api/authApi";
+import {
+  fetchClientPreferences,
+  mergeClientPreferencesPatch,
+} from "../utils/api/clientPreferencesApi";
+import { wipeLegacyStartupVerseStorage } from "../utils/clearLegacyClientStorage";
 import { leaveStartup } from "../utils/api/teamMemberApi";
 import { AdminDatabaseClear } from "./AdminDatabaseClear";
 import ProfilePage from "./ProfilePage";
@@ -55,7 +60,7 @@ export default function SettingsPage({
   const [isDeleting, setIsDeleting] = useState(false);
   const [showLeaveConfirm, setShowLeaveConfirm] = useState(false);
   const [isLeaving, setIsLeaving] = useState(false);
-  const officeSettings = useOfficeSettings();
+  const officeSettings = useOfficeSettings(user?._id ?? user?.id);
 
   const isTeamMember = user?.role === "team-member";
 
@@ -88,49 +93,23 @@ export default function SettingsPage({
     (user.role === "founder" ||
       user.role === "team-member" ||
       user.role === "team");
-  const getAllStorageData = () => {
-    const keys = [
-      "founder_journey_progress",
-      "ideation_canvas",
-      "ideation_competitors",
-      "ideation_interviews",
-      "company_entity",
-      "company_founders",
-      "company_documents",
-      "company_ip",
-      "product_milestones",
-      "product_sprints",
-      "product_tech_stack",
-      "product_launch_checklist",
-      "gtm_contacts",
-      "gtm_deals",
-      "gtm_campaigns",
-      "gtm_feedback",
-      "ops_financials",
-      "ops_budget",
-      "ops_invoices",
-      "ops_okrs",
-      "startupverse_office_settings",
-    ];
+  const exportUserId = user?._id ?? user?.id;
+
+  const exportData = async () => {
+    let prefs = {};
+    if (exportUserId) {
+      try {
+        prefs = await fetchClientPreferences(String(exportUserId));
+      } catch {
+        /* ignore */
+      }
+    }
     const data = {
       exportDate: new Date().toISOString(),
-      version: "1.0",
+      version: "2.0",
       appName: "StartupVerse",
+      clientPreferences: prefs,
     };
-    keys.forEach((key) => {
-      const value = localStorage.getItem(key);
-      if (value) {
-        try {
-          data[key] = JSON.parse(value);
-        } catch (e) {
-          data[key] = value;
-        }
-      }
-    });
-    return data;
-  };
-  const exportData = () => {
-    const data = getAllStorageData();
     const blob = new Blob([JSON.stringify(data, null, 2)], {
       type: "application/json",
     });
@@ -142,37 +121,39 @@ export default function SettingsPage({
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
-    toast.success("Data exported successfully!");
+    toast.success("Preferences exported.");
   };
   const importData = (event) => {
     const file = event.target.files?.[0];
     if (!file) return;
     const reader = new FileReader();
-    reader.onload = (e) => {
+    reader.onload = async (e) => {
       try {
         const data = JSON.parse(e.target?.result);
-
-        // Restore all data except metadata
-        Object.keys(data).forEach((key) => {
-          if (key !== "exportDate" && key !== "version" && key !== "appName") {
-            localStorage.setItem(key, JSON.stringify(data[key]));
-          }
-        });
-        toast.success(
-          "Data imported successfully! Refresh the page to see changes.",
+        const uid = user?._id ?? user?.id;
+        if (
+          uid &&
+          data.clientPreferences &&
+          typeof data.clientPreferences === "object"
+        ) {
+          await mergeClientPreferencesPatch(String(uid), data.clientPreferences);
+          toast.success("Preferences imported from file.");
+          return;
+        }
+        toast.error(
+          "Invalid backup. Export again from Settings — file must include clientPreferences.",
         );
-      } catch (error) {
+      } catch {
         toast.error("Failed to import data. Invalid file format.");
       }
     };
     reader.readAsText(file);
   };
   const clearData = () => {
-    // Clear all localStorage
-    localStorage.clear();
+    wipeLegacyStartupVerseStorage();
     setShowConfirmClear(false);
-    toast.success("All data cleared successfully!");
-    setTimeout(() => window.location.reload(), 1000);
+    toast.success("Legacy browser keys cleared.");
+    setTimeout(() => window.location.reload(), 800);
   };
   const loadSample = () => {
     toast.info("Sample data feature is temporarily disabled");
@@ -193,12 +174,8 @@ export default function SettingsPage({
       console.log("🗑️ [SettingsPage] Delete account result:", result);
       if (result.success) {
         console.log(
-          "✅ [SettingsPage] Account deleted successfully, clearing data...",
+          "✅ [SettingsPage] Account deleted successfully",
         );
-
-        // Clear local storage
-        localStorage.clear();
-        console.log("✅ [SettingsPage] Local data cleared");
 
         // Update parent component to clear user state immediately
         if (onUpdateUser) {

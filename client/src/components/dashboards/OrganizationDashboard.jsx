@@ -567,6 +567,8 @@ export default function OrganizationDashboard({
           organizationId={selectedOrg.id}
           organizationName={selectedOrg.name}
           userId={dashboardUserId}
+          creatorEmail={user?.email}
+          creatorName={user?.name}
           onSuccess={() => {
             loadCohorts(selectedOrg.id);
             setShowCreateCohortModal(false);

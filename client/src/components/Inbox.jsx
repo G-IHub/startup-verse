@@ -36,6 +36,7 @@ import {
 import { toast } from "sonner";
 import { Label } from "./ui/label";
 import * as inboxApi from "../utils/api/inboxApi";
+import * as organizationApi from "../utils/api/organizationApi";
 import { subscribeToInterests, subscribeToInvitations } from "../utils/socketIoRealtime.js";
 import CompensationSetupWizard from "./compensation/CompensationSetupWizard";
 import { getStartupId } from "../utils/startupId";
@@ -102,14 +103,10 @@ const normalizeItems = (arr) => (Array.isArray(arr) ? arr.map(normalizeItem) : [
 const isFounderTalentInvitation = (item) => item?.itemType === "invitation";
 const isOrganizationInvitation = (item) => item?.itemType === "organization-invitation";
 
-// Track read messages with timestamps in localStorage
-const READ_MESSAGES_KEY = "startupverse_read_messages_timestamps";
+// Session-only read tracking (no persistent client cache)
+const inboxReadTimestamps = {};
 const markAsRead = (messageId) => {
-  const readTimestamps = JSON.parse(
-    localStorage.getItem(READ_MESSAGES_KEY) || "{}",
-  );
-  readTimestamps[messageId] = new Date().toISOString();
-  localStorage.setItem(READ_MESSAGES_KEY, JSON.stringify(readTimestamps));
+  inboxReadTimestamps[messageId] = new Date().toISOString();
 };
 const hasNewActivity = (
   messageId,
@@ -118,10 +115,7 @@ const hasNewActivity = (
   item,
   currentUserId,
 ) => {
-  const readTimestamps = JSON.parse(
-    localStorage.getItem(READ_MESSAGES_KEY) || "{}",
-  );
-  const lastReadAt = readTimestamps[messageId];
+  const lastReadAt = inboxReadTimestamps[messageId];
 
   // If no lastActivityAt, it's an old message from before this feature → not new
   if (!lastActivityAt) return false;
@@ -352,20 +346,24 @@ export default function Inbox({ user, onBack, initialTab = "received", onNavigat
           console.error("Error loading organization messages:", error);
         }
 
-        // Load founder cohorts for message composer
+        // Load founder cohorts for message composer (server memberships)
         try {
-          const cohortsKey = `founder:${userId}:cohorts`;
-          const cohortIds = JSON.parse(
-            localStorage.getItem(cohortsKey) || "[]",
-          );
+          const { memberships } =
+            await organizationApi.getFounderMemberships(userId);
+          const seen = new Set();
           const cohortsWithDetails = [];
-          for (const cohortId of cohortIds) {
-            const cohortData = JSON.parse(
-              localStorage.getItem(`cohort:${cohortId}`) || "null",
-            );
-            if (cohortData) {
-              cohortsWithDetails.push(cohortData);
-            }
+          for (const m of memberships || []) {
+            const c = m.cohort;
+            if (!c) continue;
+            const cid = String(c._id ?? c.id ?? "");
+            if (!cid || seen.has(cid)) continue;
+            seen.add(cid);
+            cohortsWithDetails.push({
+              id: cid,
+              name: c.name || "",
+              organizationId: String(c.organizationId ?? ""),
+              organizationName: c.name || "",
+            });
           }
           setFounderCohorts(cohortsWithDetails);
           console.log(
@@ -374,6 +372,7 @@ export default function Inbox({ user, onBack, initialTab = "received", onNavigat
           );
         } catch (error) {
           console.error("Error loading founder cohorts:", error);
+          setFounderCohorts([]);
         }
         console.log("✅ [Inbox] Loaded founder inbox data:", {
           receivedInterests: interests.length,

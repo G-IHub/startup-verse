@@ -206,6 +206,8 @@ export const checkDeadlines = (tasks) => {
   return notifications;
 };
 
+let lastWeeklyReviewReminderSentAt = null;
+
 // Check if weekly review is needed (e.g., Friday evening or end of week)
 export const checkWeeklyReview = (currentOutcome) => {
   if (!currentOutcome) return null;
@@ -215,8 +217,7 @@ export const checkWeeklyReview = (currentOutcome) => {
 
   // Send reminder on Friday (5) or Sunday (0)
   if (dayOfWeek === 5 || dayOfWeek === 0) {
-    // Check if we've already sent a reminder this week
-    const lastReminder = localStorage.getItem("last_weekly_review_reminder");
+    const lastReminder = lastWeeklyReviewReminderSentAt;
     if (lastReminder) {
       const lastReminderDate = new Date(lastReminder);
       const diffDays = Math.floor(
@@ -225,7 +226,7 @@ export const checkWeeklyReview = (currentOutcome) => {
       if (diffDays < 5) return null; // Don't spam
     }
 
-    localStorage.setItem("last_weekly_review_reminder", now.toISOString());
+    lastWeeklyReviewReminderSentAt = now.toISOString();
     return createWeeklyReviewReminderNotification(currentOutcome.title);
   }
 

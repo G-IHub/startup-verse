@@ -19,6 +19,37 @@ import { unwrapData } from "../utils/apiEnvelope";
 
 const API_BASE = API_BASE_URL;
 
+async function fetchMentorSessionMe() {
+  const response = await fetch(`${API_BASE}/mentors/public/session/me`, {
+    credentials: "include",
+  });
+  if (!response.ok) return null;
+  const inner = unwrapData(await response.json());
+  return inner?.mentor || null;
+}
+
+async function establishMentorSession(token) {
+  const response = await fetch(`${API_BASE}/mentors/public/session`, {
+    method: "POST",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ token }),
+  });
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({}));
+    throw new Error(err.message || err.error || "Invalid or expired token");
+  }
+  const inner = unwrapData(await response.json());
+  return inner?.mentor || null;
+}
+
+async function logoutMentorSession() {
+  await fetch(`${API_BASE}/mentors/public/session/logout`, {
+    method: "POST",
+    credentials: "include",
+  });
+}
+
 export default function MentorLogin() {
   const [verifying, setVerifying] = useState(false);
   const [mentor, setMentor] = useState(null);
@@ -27,46 +58,33 @@ export default function MentorLogin() {
   const [requesting, setRequesting] = useState(false);
   const [initialized, setInitialized] = useState(false);
   useEffect(() => {
-    // Prevent multiple initializations
     if (initialized) return;
     setInitialized(true);
 
-    // Check for existing session first
-    const storedSession = localStorage.getItem("mentor_session");
-    if (storedSession) {
+    const run = async () => {
       try {
-        const mentorData = JSON.parse(storedSession);
-        setMentor(mentorData);
-        return; // Don't check URL token if we have a session
-      } catch (error) {
-        localStorage.removeItem("mentor_session");
+        const existing = await fetchMentorSessionMe();
+        if (existing) {
+          setMentor(existing);
+          return;
+        }
+      } catch {
+        /* ignore */
       }
-    }
-
-    // Get token from URL query params
-    const urlParams = new URLSearchParams(window.location.search);
-    const token = urlParams.get("token");
-    if (token) {
-      verifyToken(token);
-    }
+      const urlParams = new URLSearchParams(window.location.search);
+      const token = urlParams.get("token");
+      if (token) {
+        verifyToken(token);
+      }
+    };
+    run();
   }, [initialized]);
   const verifyToken = async (token) => {
     try {
       setVerifying(true);
-      const response = await fetch(
-        `${API_BASE}/mentors/public/verify/${encodeURIComponent(token)}`,
-      );
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || error.error || "Invalid or expired token");
-      }
-      const inner = unwrapData(await response.json());
-      const mentor = inner.mentor;
-      setMentor(mentor);
-
-      // Store mentor session
-      localStorage.setItem("mentor_session", JSON.stringify(mentor));
-      toast.success(`Welcome back, ${mentor.name}!`);
+      const mentorDto = await establishMentorSession(token);
+      setMentor(mentorDto);
+      toast.success(`Welcome back, ${mentorDto.name}!`);
     } catch (error) {
       console.error("Error verifying token:", error);
       toast.error(error.message || "Failed to verify login link");
@@ -105,8 +123,12 @@ export default function MentorLogin() {
       setRequesting(false);
     }
   };
-  const handleLogout = () => {
-    localStorage.removeItem("mentor_session");
+  const handleLogout = async () => {
+    try {
+      await logoutMentorSession();
+    } catch {
+      /* ignore */
+    }
     setMentor(null);
     toast.success("Logged out successfully");
   };

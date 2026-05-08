@@ -4,6 +4,7 @@
  */
 
 import { API_BASE_URL } from "../config/apiBase.js";
+import { clearAllBrowserKV } from "./clearLegacyClientStorage.js";
 
 // Default fetch options for cookie-based auth
 const defaultOptions = {
@@ -13,7 +14,7 @@ const defaultOptions = {
   },
 };
 
-export async function executeNuclearWipe() {
+export async function executeNuclearWipe(options = {}) {
   console.log("🔥🔥🔥 STARTING MEGA NUCLEAR WIPE 🔥🔥🔥");
 
   let success = true;
@@ -43,46 +44,13 @@ export async function executeNuclearWipe() {
     success = false;
   }
 
-  // Step 2: Clear ALL localStorage
-  console.log("🔥 Step 2: Clearing ALL localStorage...");
+  // Step 2: Clear persistent browser key/value store (legacy wipe helper)
+  console.log("🔥 Step 2: Clearing persistent browser storage...");
   try {
-    // List all keys before clearing
-    const keys = Object.keys(localStorage);
-    console.log(`📋 Found ${keys.length} localStorage keys:`, keys);
-
-    // List all the StartupVerse keys for verification
-    const startupVerseKeys = keys.filter(
-      (k) =>
-        k.includes("startupverse") ||
-        k.includes("user") ||
-        k.includes("talent") ||
-        k.includes("founder") ||
-        k.includes("auth") ||
-        k.includes("organization") ||
-        k.includes("cohort"),
-    );
-    console.log(
-      `📋 StartupVerse keys to delete: ${startupVerseKeys.length}`,
-      startupVerseKeys,
-    );
-
-    // Clear everything
-    localStorage.clear();
-
-    // Verify it's actually cleared
-    const remainingKeys = Object.keys(localStorage);
-    console.log(
-      `✅ localStorage cleared. Remaining keys: ${remainingKeys.length}`,
-    );
-
-    if (remainingKeys.length > 0) {
-      console.warn(
-        `⚠️ Warning: ${remainingKeys.length} keys still remain:`,
-        remainingKeys,
-      );
-    }
+    clearAllBrowserKV();
+    console.log("✅ Persistent browser storage cleared.");
   } catch (error) {
-    console.error("❌ Error clearing localStorage:", error);
+    console.error("❌ Error clearing persistent browser storage:", error);
     success = false;
   }
 
@@ -166,8 +134,8 @@ export async function executeNuclearWipe() {
 /**
  * Execute nuclear wipe and redirect to home
  */
-export async function nuclearWipeAndRestart() {
-  const success = await executeNuclearWipe();
+export async function nuclearWipeAndRestart(options = {}) {
+  const success = await executeNuclearWipe(options);
 
   // Always redirect, even if partial success
   console.log("🔄 Redirecting to home page in 1 second...");

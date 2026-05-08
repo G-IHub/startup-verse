@@ -60,7 +60,6 @@ import {
 import * as teamMemberApi from "../../utils/api/teamMemberApi";
 import * as taskApi from "../../utils/api/taskApi";
 import { subscribeToTasks } from "../../utils/socketIoRealtime";
-import { STORAGE_KEYS } from "../../app/session";
 import { useWeeklyLoopStore } from "../../state/useWeeklyLoopStore";
 
 export function TaskManagementPanel({
@@ -155,10 +154,6 @@ export function TaskManagementPanel({
     const loadData = async () => {
       setLoading(true);
 
-      const allUsers = strictMode
-        ? []
-        : JSON.parse(localStorage.getItem(STORAGE_KEYS.teamMembers) || "[]");
-
       // Determine the founder ID (we don't need the full founder object)
       let founderIdValue = "";
       if (founderIdOverride) {
@@ -240,7 +235,7 @@ export function TaskManagementPanel({
         }
       }
 
-      // Load team members (for task assignment) - FROM BACKEND
+      // Load team members (for task assignment) from backend only
       try {
         const resolvedStartupId = startupId || founderIdValue;
         console.log(
@@ -248,45 +243,28 @@ export function TaskManagementPanel({
           resolvedStartupId,
         );
 
-        // Load from localStorage first
-        // 🔒 SECURITY FIX: Use startupId/founderId ONLY, removed companyId matching
-        const localTeam = allUsers.filter(
-          (u) =>
-            (u.startupId === founderIdValue ||
-              u.founderId === founderIdValue) &&
-            (u.role === "team-member" || u.role === "team"),
-        );
-        setTeamMembers(localTeam);
-        console.log(
-          "📊 [TaskPanel] Team members from localStorage:",
-          localTeam.length,
-        );
-
-        // Then fetch from backend
+        setTeamMembers([]);
         const backendTeamMembers =
           await teamMemberApi.getStartupTeamMembers(resolvedStartupId);
-        if (backendTeamMembers && backendTeamMembers.length > 0) {
-          // Map backend data to consistent format
-          const mappedMembers = backendTeamMembers
-            .filter((m) => m.id !== founderIdValue && m.role !== "founder") // Exclude founder
-            .map((member) => ({
-              id: member.id,
-              name: member.name || member.talentName || "Unknown User",
-              role: member.role || member.talentArea || "Team Member",
-              email: member.email,
-              avatar: member.avatar,
-              title:
-                member.title || member.talentArea || member.professionalTitle,
-              skills: member.skills || member.talentSkills || [],
-            }));
-          setTeamMembers(mappedMembers);
-          console.log(
-            "✅ [TaskPanel] Team members updated from backend:",
-            mappedMembers.length,
-          );
-        }
+        const mappedMembers = (backendTeamMembers || [])
+          .filter((m) => m.id !== founderIdValue && m.role !== "founder")
+          .map((member) => ({
+            id: member.id,
+            name: member.name || member.talentName || "Unknown User",
+            role: member.role || member.talentArea || "Team Member",
+            email: member.email,
+            avatar: member.avatar,
+            title:
+              member.title || member.talentArea || member.professionalTitle,
+            skills: member.skills || member.talentSkills || [],
+          }));
+        setTeamMembers(mappedMembers);
+        console.log(
+          "✅ [TaskPanel] Team members from backend:",
+          mappedMembers.length,
+        );
       } catch (error) {
-        // Silently fail - localStorage data is already displayed
+        setTeamMembers([]);
         if (process.env.NODE_ENV === "development") {
           console.debug(
             "Failed to load team members from backend:",

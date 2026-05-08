@@ -13,7 +13,7 @@ import {
 } from "../utils/journeyProgress.js";
 
 /**
- * Journey store: in-memory + GET/PUT /founders/:id/journey (no localStorage).
+ * Journey store: in-memory + GET/PUT /founders/:id/journey (server-backed).
  */
 
 const initialState = {
@@ -111,9 +111,33 @@ export const useJourneyStore = create((set, get) => ({
     set({ homeUi: { ...get().homeUi, ...homeUi } });
   },
 
+  patchStageDraft(draftKey, draftValue) {
+    const userId = get().userId;
+    if (!userId || !draftKey) return;
+    const prev = get().homeUi || {};
+    const stageDrafts = {
+      ...(prev.stageDrafts && typeof prev.stageDrafts === "object" ? prev.stageDrafts : {}),
+      [draftKey]: draftValue,
+    };
+    get().scheduleHomeUiPersist({ stageDrafts });
+  },
+
   refresh() {
     set(deriveProgress());
     return get().progress;
+  },
+
+  async syncJourneyToServerNow() {
+    const userId = get().userId;
+    if (!userId) return;
+    configureJourneyUser(userId);
+    try {
+      const journey = getJourneyProgress();
+      await apiPut(`/founders/${userId}/journey`, { journey });
+      set(deriveProgress());
+    } catch (e) {
+      console.warn("Journey server sync skipped:", e?.message || e);
+    }
   },
 
   setStageCompletion(stageId, percentage) {

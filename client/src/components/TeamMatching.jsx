@@ -44,6 +44,8 @@ import { Checkbox } from "./ui/checkbox";
 import { toast } from "sonner";
 import * as founderApi from "../utils/api/founderApi";
 import * as inboxApi from "../utils/api/inboxApi";
+import * as compensationApi from "../utils/api/compensationApi";
+import { buildFounderProfile } from "../app/session.js";
 import { broadcastMessageUpdate } from "../utils/realtimeSubscriptions";
 import OfferDisplay from "./OfferDisplay";
 import {
@@ -156,14 +158,15 @@ export default function TeamMatching({ user, onNavigate }) {
     customPerks: "",
   });
 
-  // Load data from localStorage on mount
   React.useEffect(() => {
     loadStartupIdeas();
+    loadTalentProfiles();
     if (user.role === "founder") {
       loadPendingOnboarding();
+    } else {
+      setPendingOnboarding([]);
     }
-    loadTalentProfiles();
-  }, [user.role]);
+  }, [user.role, user.id]);
 
   // Generate smart recommendations for founders
   React.useEffect(() => {
@@ -187,28 +190,6 @@ export default function TeamMatching({ user, onNavigate }) {
   }, [user.role, user.profile, user.onboardingComplete, availableTalent]);
   const loadStartupIdeas = () => {
     console.log("🔄 [TeamMatching-Founder] Loading startup ideas...");
-
-    // Load from localStorage immediately for instant UI
-    const cachedIdeas = JSON.parse(
-      localStorage.getItem("startupverse_startup_posts") || "[]",
-    );
-    if (cachedIdeas.length > 0) {
-      console.log(
-        "📦 [TeamMatching-Founder] Loaded from cache:",
-        cachedIdeas.length,
-        "posts",
-      );
-      setStartupIdeas(
-        cachedIdeas.map((idea) => ({
-          ...idea,
-          postedDate: new Date(idea.postedDate),
-        })),
-      );
-    } else {
-      console.log("⚠️ [TeamMatching-Founder] No cached posts found");
-    }
-
-    // Load from backend to sync latest data
     console.log("🌐 [TeamMatching-Founder] Fetching from backend...");
     founderApi
       .getAllPosts()
@@ -220,12 +201,6 @@ export default function TeamMatching({ user, onNavigate }) {
             response.posts.length,
             "posts from backend",
           );
-          // Update localStorage cache
-          localStorage.setItem(
-            "startupverse_startup_posts",
-            JSON.stringify(response.posts),
-          );
-          // Update UI with backend data (source of truth)
           setStartupIdeas(
             response.posts.map((idea) => ({
               ...idea,
@@ -234,6 +209,7 @@ export default function TeamMatching({ user, onNavigate }) {
           );
         } else {
           console.log("⚠️ [TeamMatching-Founder] Backend returned no posts");
+          setStartupIdeas([]);
         }
       })
       .catch((error) => {
@@ -242,100 +218,48 @@ export default function TeamMatching({ user, onNavigate }) {
           message: error.message,
           stack: error.stack,
         });
-        // Use cached data if backend fails
-        if (cachedIdeas.length === 0) {
-          console.warn(
-            "⚠️ [TeamMatching-Founder] No cached data available and backend failed",
-          );
-        }
+        setStartupIdeas([]);
       });
   };
+
+  function founderProfileForTalentMatching(u) {
+    if (!u?.profile) return null;
+    const fp = buildFounderProfile(u);
+    const raw =
+      fp.neededRoles ||
+      fp.rolesNeeded ||
+      (Array.isArray(fp.lookingFor) ? fp.lookingFor : []);
+    const neededRoles = Array.isArray(raw)
+      ? raw
+      : typeof raw === "string"
+        ? raw.split(/[,;]/).map((s) => s.trim()).filter(Boolean)
+        : [];
+    return { ...fp, neededRoles };
+  }
+
   const loadTalentProfiles = () => {
     console.log("🔍 [TeamMatching] Loading talent profiles...");
-
-    // Load from localStorage first (for immediate display)
-    const cachedProfiles = JSON.parse(
-      localStorage.getItem("startupverse_talent_profiles") || "[]",
-    );
-    console.log(
-      "📦 [TeamMatching] Cached talent profiles:",
-      cachedProfiles.length,
-    );
-
-    const normalizedCached = cachedProfiles.map(normalizeTalentProfile).filter(Boolean);
-
-    // If user is founder, sort by match score
-    if (user.role === "founder") {
-      const founderProfiles = JSON.parse(
-        localStorage.getItem("startupverse_founder_profiles") || "[]",
-      );
-      const myProfile = founderProfiles.find((p) => p.founderId === String(user._id ?? user.id ?? ""));
-      if (myProfile) {
-        // Calculate match scores and sort
-        const scoredProfiles = normalizedCached.map((talent) => ({
-          ...talent,
-          matchScore: calculateTalentMatchScore(talent, myProfile),
-        }));
-        scoredProfiles.sort((a, b) => b.matchScore - a.matchScore);
-        console.log("✅ [TeamMatching] Profiles sorted by match score");
-        setAvailableTalent(scoredProfiles);
-      } else {
-        console.log(
-          "⚠️ [TeamMatching] No founder profile found for user:",
-          user.id,
-        );
-        setAvailableTalent(normalizedCached);
-      }
-    } else {
-      setAvailableTalent(normalizedCached);
-    }
-
-    // **NEW: Fetch fresh data from backend**
     console.log("🌐 [TeamMatching] Fetching talent profiles from backend...");
-    fetch(
-      `${API_BASE_URL}/talent/profiles`,
-      defaultOptions,
-    )
+    fetch(`${API_BASE_URL}/talent/profiles`, defaultOptions)
       .then((res) => res.json())
       .then((data) => {
         console.log("✅ [TeamMatching] Backend talent response:", data);
         const rawProfiles = data.data || data.profiles || [];
-        if (data.success && Array.isArray(rawProfiles) && rawProfiles.length > 0) {
-          console.log(
-            "📊 [TeamMatching] Received",
-            rawProfiles.length,
-            "profiles from backend",
-          );
-
-          const normalized = rawProfiles.map(normalizeTalentProfile).filter(Boolean);
-
-          // Save to localStorage for caching
-          localStorage.setItem(
-            "startupverse_talent_profiles",
-            JSON.stringify(normalized),
-          );
-
-          // Sort and display
-          if (user.role === "founder") {
-            const founderProfiles = JSON.parse(
-              localStorage.getItem("startupverse_founder_profiles") || "[]",
-            );
-            const myProfile = founderProfiles.find(
-              (p) => p.founderId === user.id,
-            );
-            if (myProfile) {
-              const scoredProfiles = normalized.map((talent) => ({
-                ...talent,
-                matchScore: calculateTalentMatchScore(talent, myProfile),
-              }));
-              scoredProfiles.sort((a, b) => b.matchScore - a.matchScore);
-              setAvailableTalent(scoredProfiles);
-            } else {
-              setAvailableTalent(normalized);
-            }
-          } else {
-            setAvailableTalent(normalized);
-          }
+        if (!data.success || !Array.isArray(rawProfiles)) {
+          setAvailableTalent([]);
+          return;
+        }
+        const normalized = rawProfiles.map(normalizeTalentProfile).filter(Boolean);
+        const matchSource = founderProfileForTalentMatching(user);
+        if (user.role === "founder" && matchSource) {
+          const scoredProfiles = normalized.map((talent) => ({
+            ...talent,
+            matchScore: calculateTalentMatchScore(talent, matchSource),
+          }));
+          scoredProfiles.sort((a, b) => b.matchScore - a.matchScore);
+          setAvailableTalent(scoredProfiles);
+        } else {
+          setAvailableTalent(normalized);
         }
       })
       .catch((error) => {
@@ -343,21 +267,59 @@ export default function TeamMatching({ user, onNavigate }) {
           "❌ [TeamMatching] Failed to fetch talent profiles from backend:",
           error,
         );
-        // Keep using cached data if backend fails
+        setAvailableTalent([]);
       });
   };
-  const loadPendingOnboarding = () => {
-    // Load accepted invitations that haven't been onboarded yet
-    const invitations = JSON.parse(
-      localStorage.getItem("startupverse_sent_invitations") || "[]",
-    );
-    const pending = invitations.filter(
-      (inv) =>
-        (inv.sentById === user.id || inv.sentBy === user.name) &&
-        inv.status === "accepted" &&
-        !inv.onboarded,
-    );
-    setPendingOnboarding(pending);
+
+  const loadPendingOnboarding = async () => {
+    const founderKey = user.id ?? user._id;
+    if (!founderKey || user.role !== "founder") {
+      setPendingOnboarding([]);
+      return;
+    }
+    try {
+      const [receivedInterests, sentInvitations] = await Promise.all([
+        inboxApi.getReceivedInterests(founderKey),
+        inboxApi.getSentInvitations(founderKey),
+      ]);
+      const pending = [];
+
+      for (const i of receivedInterests) {
+        if (i.status === "accepted" && !i.onboarded) {
+          pending.push({
+            id: `interest-${i.id}`,
+            talentId: String(i.talentId),
+            talentName: i.talentName || "Talent",
+            respondedAt: i.respondedAt || i.updatedAt || i.sentAt,
+            response: i.response || i.responseMessage || "",
+            interestId: String(i.id),
+            startupId: String(i.startupId || user.startupId || founderKey),
+          });
+        }
+      }
+
+      const interestTalentIds = new Set(pending.map((p) => p.talentId));
+
+      for (const inv of sentInvitations) {
+        if (inv.status !== "accepted") continue;
+        const tid = String(inv.talentId || "");
+        if (!tid || interestTalentIds.has(tid)) continue;
+        pending.push({
+          id: `invitation-${inv.id}`,
+          talentId: tid,
+          talentName: inv.talentName || "Talent",
+          respondedAt: inv.updatedAt || inv.sentAt,
+          response: inv.response || "",
+          invitationId: String(inv.id),
+          startupId: String(inv.startupId || user.startupId || founderKey),
+        });
+      }
+
+      setPendingOnboarding(pending);
+    } catch (e) {
+      console.error("[TeamMatching] loadPendingOnboarding failed:", e);
+      setPendingOnboarding([]);
+    }
   };
 
   // Calculate how well a talent matches founder's needs
@@ -655,51 +617,50 @@ export default function TeamMatching({ user, onNavigate }) {
     setSelectedOnboardingTalent(talent);
     setShowCompensationWizard(true);
   };
-  const handleCompleteOnboarding = (compensationConfig) => {
+  const handleCompleteOnboarding = async (compensationConfig) => {
     if (!selectedOnboardingTalent) return;
 
-    // Mark the invitation as onboarded
-    const invitations = JSON.parse(
-      localStorage.getItem("startupverse_sent_invitations") || "[]",
-    );
-    const updated = invitations.map((inv) =>
-      inv.id === selectedOnboardingTalent.id
-        ? {
-            ...inv,
-            onboarded: true,
-            compensationConfig,
-            onboardedAt: new Date().toISOString(),
-          }
-        : inv,
-    );
-    localStorage.setItem(
-      "startupverse_sent_invitations",
-      JSON.stringify(updated),
-    );
+    const founderId = user.id ?? user._id;
+    const startupId =
+      selectedOnboardingTalent.startupId ||
+      user.startupId ||
+      founderId;
 
-    // Create team member record
-    const teamMembers = JSON.parse(
-      localStorage.getItem("startupverse_team_members") || "[]",
-    );
-    teamMembers.push({
-      id: Date.now().toString(),
-      founderId: user.id,
-      talentId: selectedOnboardingTalent.talentId,
-      talentName: selectedOnboardingTalent.talentName,
-      compensationConfig,
-      joinedAt: new Date().toISOString(),
-      status: "active",
-    });
-    localStorage.setItem(
-      "startupverse_team_members",
-      JSON.stringify(teamMembers),
-    );
-    toast.success(
-      `🎉 ${selectedOnboardingTalent.talentName} has been onboarded successfully!`,
-    );
-    setShowCompensationWizard(false);
-    setSelectedOnboardingTalent(null);
-    loadPendingOnboarding();
+    try {
+      if (selectedOnboardingTalent.interestId) {
+        await compensationApi.convertTalentToTeamMember(
+          selectedOnboardingTalent.talentId,
+          founderId,
+          startupId,
+          compensationConfig,
+          selectedOnboardingTalent.interestId,
+        );
+      } else if (selectedOnboardingTalent.invitationId) {
+        await compensationApi.createCompensationContract(
+          founderId,
+          selectedOnboardingTalent.talentId,
+          startupId,
+          compensationConfig,
+        );
+      } else {
+        toast.error(
+          "Could not complete onboarding — refresh the page and try again.",
+        );
+        return;
+      }
+
+      toast.success(
+        `🎉 ${selectedOnboardingTalent.talentName} has been onboarded successfully!`,
+      );
+      setShowCompensationWizard(false);
+      setSelectedOnboardingTalent(null);
+      await loadPendingOnboarding();
+    } catch (err) {
+      console.error("[TeamMatching] handleCompleteOnboarding failed:", err);
+      toast.error(
+        err?.message || "Failed to complete onboarding. Please try again.",
+      );
+    }
   };
   const viewTalentProfile = (member) => {
     if (!member) return;

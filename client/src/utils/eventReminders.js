@@ -4,6 +4,10 @@
  */
 
 import { API_BASE_URL } from "../config/apiBase.js";
+import {
+  fetchClientPreferences,
+  mergeClientPreferencesPatch,
+} from "./api/clientPreferencesApi.js";
 
 // Default fetch options for cookie-based auth
 const defaultOptions = {
@@ -13,13 +17,24 @@ const defaultOptions = {
   },
 };
 
+const THROTTLE_PREF_KEY = "eventReminderThrottle";
+
 /**
  * Check if an event needs a reminder and send it.
  */
 export async function checkAndSendEventReminders(founderId) {
   try {
-    if (typeof window === "undefined" || typeof localStorage === "undefined") {
-      return;
+    if (typeof window === "undefined" || !founderId) return;
+
+    let throttle = {};
+    try {
+      const prefs = await fetchClientPreferences(String(founderId));
+      const raw = prefs[THROTTLE_PREF_KEY];
+      if (raw && typeof raw === "object" && !Array.isArray(raw)) {
+        throttle = { ...raw };
+      }
+    } catch {
+      /* ignore */
     }
 
     const response = await fetch(`${API_BASE_URL}/founder/${founderId}/events`, {
@@ -34,6 +49,8 @@ export async function checkAndSendEventReminders(founderId) {
     const reminderWindowStart = new Date(now.getTime() + 50 * 60 * 1000);
     const reminderWindowEnd = new Date(now.getTime() + 70 * 60 * 1000);
 
+    let dirty = false;
+
     for (const event of events) {
       const eventStartTime = new Date(event.startTime);
 
@@ -42,17 +59,31 @@ export async function checkAndSendEventReminders(founderId) {
         eventStartTime <= reminderWindowEnd
       ) {
         const reminderKey = `event-reminder-sent-${event.id}-${founderId}`;
-        const reminderSent = localStorage.getItem(reminderKey);
+        const reminderSent = throttle[reminderKey];
 
         if (!reminderSent) {
           await sendEventReminder(founderId, event);
-          localStorage.setItem(reminderKey, new Date().toISOString());
+          throttle[reminderKey] = new Date().toISOString();
+          dirty = true;
         }
       }
 
       if (eventStartTime < now) {
         const reminderKey = `event-reminder-sent-${event.id}-${founderId}`;
-        localStorage.removeItem(reminderKey);
+        if (throttle[reminderKey]) {
+          delete throttle[reminderKey];
+          dirty = true;
+        }
+      }
+    }
+
+    if (dirty) {
+      try {
+        await mergeClientPreferencesPatch(String(founderId), {
+          [THROTTLE_PREF_KEY]: throttle,
+        });
+      } catch {
+        /* ignore */
       }
     }
   } catch (error) {

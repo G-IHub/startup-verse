@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import { Button } from "./ui/button";
 import { Badge } from "./ui/badge";
@@ -13,56 +13,74 @@ import {
   ArrowRight,
   Sparkles,
 } from "lucide-react";
-export default function GettingStartedWidget({ onDismiss, onNavigate }) {
-  const [isDismissed, setIsDismissed] = useState(() => {
-    return localStorage.getItem("getting_started_dismissed") === "true";
-  });
-  const handleDismiss = () => {
-    localStorage.setItem("getting_started_dismissed", "true");
+import { useAuth } from "../contexts/AuthContext";
+import { useJourneyStore } from "../state/useJourneyStore";
+import {
+  fetchClientPreferences,
+  mergeClientPreferencesPatch,
+} from "../utils/api/clientPreferencesApi";
+
+export default function GettingStartedWidget({ user: userProp, onDismiss, onNavigate }) {
+  const { user: authUser } = useAuth();
+  const user = userProp || authUser;
+  const uid = user?._id ?? user?.id;
+  const uidStr = uid ? String(uid) : "";
+
+  const [isDismissed, setIsDismissed] = useState(false);
+
+  const homeUi = useJourneyStore((s) => s.homeUi);
+  const progress = useJourneyStore((s) => s.progress);
+
+  useEffect(() => {
+    if (!uidStr) return;
+    let cancelled = false;
+    fetchClientPreferences(uidStr)
+      .then((p) => {
+        if (cancelled) return;
+        if (p.getting_started_dismissed === true) setIsDismissed(true);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [uidStr]);
+
+  useEffect(() => {
+    if (!uidStr) return;
+    void useJourneyStore.getState().hydrate(uidStr);
+  }, [uidStr]);
+
+  const handleDismiss = async () => {
     setIsDismissed(true);
+    if (uidStr) {
+      try {
+        await mergeClientPreferencesPatch(uidStr, {
+          getting_started_dismissed: true,
+        });
+      } catch {
+        /* ignore */
+      }
+    }
     onDismiss?.();
   };
-  const handleStartIdeation = () => {
-    // Mark ideation as started
-    const journeyProgress = JSON.parse(
-      localStorage.getItem("founder_journey_progress") || "{}",
-    );
-    journeyProgress.ideation = {
-      status: "in-progress",
-      startedAt: new Date().toISOString(),
-    };
-    localStorage.setItem(
-      "founder_journey_progress",
-      JSON.stringify(journeyProgress),
-    );
 
-    // Navigate to Startup Journey
-    if (onNavigate) {
-      onNavigate("journey");
-    }
+  const handleStartIdeation = () => {
+    onNavigate?.("journey");
   };
+
   const handleAddMembers = () => {
-    // Navigate to Virtual Office where team features are accessible
     onNavigate?.("startup-office");
   };
 
-  // Check completion status
-  const journeyProgress = JSON.parse(
-    localStorage.getItem("founder_journey_progress") || "{}",
-  );
-  const isProfileComplete =
-    journeyProgress.profileSetup?.status === "completed";
+  const overlay = homeUi?.founderJourneyProgressOverlay || {};
+  const isProfileComplete = overlay.profileSetup?.status === "completed";
   const hasStartedIdeation =
-    journeyProgress.ideation?.status === "in-progress" ||
-    journeyProgress.ideation?.status === "completed";
+    (progress?.currentStage ?? 1) > 1 ||
+    (progress?.stageData?.[1]?.completionPercentage ?? 0) > 0 ||
+    (progress?.completedStages || []).includes(1);
 
-  // Member task is complete if user has sent an invitation OR visited the find talent feature
-  const hasInvitations =
-    JSON.parse(localStorage.getItem("startupverse_invitations") || "[]")
-      .length > 0;
-  const hasVisitedFindTalent =
-    localStorage.getItem("has_visited_find_talent") === "true";
-  const hasAddedMembers = hasInvitations || hasVisitedFindTalent;
+  const hasAddedMembers = Boolean(user?.startupId);
+
   const steps = [
     {
       icon: User,
@@ -90,14 +108,10 @@ export default function GettingStartedWidget({ onDismiss, onNavigate }) {
     },
   ];
 
-  // Check if all steps are completed
   const allStepsCompleted = steps.every((step) => step.completed);
 
-  // Auto-dismiss if all steps are completed
-  if (allStepsCompleted && !isDismissed) {
-    handleDismiss();
-  }
-  if (isDismissed) return null;
+  if (!uidStr || isDismissed) return null;
+
   return (
     <Card className="border-primary/30 relative overflow-hidden">
       <CardHeader className="pb-3">
@@ -114,7 +128,7 @@ export default function GettingStartedWidget({ onDismiss, onNavigate }) {
           <Button
             variant="ghost"
             size="sm"
-            onClick={handleDismiss}
+            onClick={() => void handleDismiss()}
             className="flex-shrink-0"
           >
             <X className="w-4 h-4" />

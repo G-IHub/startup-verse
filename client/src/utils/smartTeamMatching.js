@@ -556,7 +556,7 @@ export function generateSmartTeamRecommendations(profile) {
 
   // 🆕 FILTER OUT ROLES ALREADY FILLED BY TEAM MEMBERS
   // Check actual team members who have joined (from invitations)
-  const teamMembers = JSON.parse(localStorage.getItem("team_members") || "[]");
+  const teamMembers = [];
   teamMembers.forEach((member) => {
     if (member.role) {
       existingRoles.add(member.role);

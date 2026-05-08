@@ -1,51 +1,53 @@
 import { useState, useEffect, useCallback } from "react";
+import {
+  fetchClientPreferences,
+  mergeClientPreferencesPatch,
+} from "../utils/api/clientPreferencesApi";
 
-/**
- * Hook for managing Virtual Office collaboration and privacy settings
- *
- * Provides founder-level controls for:
- * - Activity feed
- * - Presence bar visibility
- * - Notifications
- *
- * Settings are persisted to localStorage and can be controlled by founders
- */
+const defaultSettings = {
+  showActivityFeed: true,
+  showPresenceBar: true,
+  activityNotifications: true,
+  teamJoinLeaveAlerts: true,
+};
 
-export function useOfficeSettings() {
-  const [settings, setSettings] = useState(() => {
-    const saved = localStorage.getItem("startupverse_office_settings");
-    const defaultSettings = {
-      showActivityFeed: true,
-      showPresenceBar: true,
-      activityNotifications: true,
-      teamJoinLeaveAlerts: true,
-    };
+const PREF_KEY = "startupverse_office_settings";
 
-    if (saved) {
-      return { ...defaultSettings, ...JSON.parse(saved) };
-    }
-
-    return defaultSettings;
-  });
+export function useOfficeSettings(userId) {
+  const [settings, setSettings] = useState(defaultSettings);
 
   useEffect(() => {
-    localStorage.setItem(
-      "startupverse_office_settings",
-      JSON.stringify(settings),
-    );
-  }, [settings]);
+    if (!userId) return;
+    let cancelled = false;
+    fetchClientPreferences(String(userId))
+      .then((prefs) => {
+        if (cancelled) return;
+        const raw = prefs[PREF_KEY];
+        if (raw && typeof raw === "object") {
+          setSettings({ ...defaultSettings, ...raw });
+        }
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [userId]);
+
+  useEffect(() => {
+    if (!userId) return;
+    const t = setTimeout(() => {
+      mergeClientPreferencesPatch(String(userId), {
+        [PREF_KEY]: settings,
+      }).catch(() => {});
+    }, 450);
+    return () => clearTimeout(t);
+  }, [settings, userId]);
 
   const updateSettings = useCallback((updates) => {
     setSettings((prev) => ({ ...prev, ...updates }));
   }, []);
 
   const resetToDefaults = useCallback(() => {
-    const defaultSettings = {
-      showActivityFeed: true,
-      showPresenceBar: true,
-      activityNotifications: true,
-      teamJoinLeaveAlerts: true,
-    };
     setSettings(defaultSettings);
   }, []);
 

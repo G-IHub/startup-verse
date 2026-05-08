@@ -27,6 +27,10 @@ import CompensationSetupWizard from "../compensation/CompensationSetupWizard";
 import { createCompensationContract } from "../../utils/api/compensationApi";
 import CompensationDemoPage from "../compensation/CompensationDemoPage";
 import { DollarSign } from "lucide-react";
+import {
+  useHydrateStageDraft,
+  persistStageDraft,
+} from "../../hooks/useStageDraftFromJourney";
 export default function TeamBuilding({ user, onBack }) {
   const [teamNeeds, setTeamNeeds] = useState({
     rolesNeeded: "",
@@ -91,13 +95,15 @@ export default function TeamBuilding({ user, onBack }) {
     (app) => !acceptedApplicationIds.includes(app.id),
   );
 
-  // Load saved data
-  useEffect(() => {
-    const savedData = localStorage.getItem("team_needs");
-    if (savedData) {
-      setTeamNeeds(JSON.parse(savedData));
-    }
-  }, []);
+  useHydrateStageDraft(user, "team_needs", (raw) => {
+    if (!raw || typeof raw !== "object") return;
+    setTeamNeeds((prev) => ({
+      ...prev,
+      rolesNeeded: raw.rolesNeeded ?? prev.rolesNeeded,
+      skillsRequired: raw.skillsRequired ?? prev.skillsRequired,
+      timeline: raw.timeline ?? prev.timeline,
+    }));
+  });
 
   // Generate team recommendations based on user profile
   useEffect(() => {
@@ -121,7 +127,7 @@ export default function TeamBuilding({ user, onBack }) {
 
   // Save and continue to next stage
   const saveAndContinue = () => {
-    localStorage.setItem("team_needs", JSON.stringify(teamNeeds));
+    persistStageDraft("team_needs", teamNeeds);
     toast.success("Progress saved! Moving to next stage...");
     setTimeout(() => onBack(), 500);
   };
@@ -133,7 +139,7 @@ export default function TeamBuilding({ user, onBack }) {
       skipReason:
         "Already completed independently or proceeding with current team",
     };
-    localStorage.setItem("team_needs", JSON.stringify(skipData));
+    persistStageDraft("team_needs", skipData);
     toast.success(
       "Phase skipped - You can come back anytime to find team members",
     );

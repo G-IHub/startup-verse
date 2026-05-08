@@ -3,16 +3,10 @@ import * as teamMemberApi from "../../../utils/api/teamMemberApi";
 import * as agendaApi from "../../../utils/api/agendaApi";
 import * as presenceApi from "../../../utils/presenceApi";
 import { getTasks } from "../../../utils/executionEngine";
-import { STORAGE_KEYS } from "../../../app/session";
 import { mapTeamMemberHomeViewModel } from "../mappers/teamMemberViewModel";
 
 function readFallbackUsers() {
-  try {
-    const rows = JSON.parse(localStorage.getItem(STORAGE_KEYS.teamMembers) || "[]");
-    return Array.isArray(rows) ? rows : [];
-  } catch {
-    return [];
-  }
+  return [];
 }
 
 function readFallbackTasks(user) {

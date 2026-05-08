@@ -25,7 +25,11 @@ import {
   CheckCircle2,
   ArrowLeft,
 } from "lucide-react";
-import { STORAGE_KEYS } from "../../app/session";
+import {
+  getBrowserKVStats,
+  snapshotBrowserKV,
+  clearAllBrowserKV,
+} from "../../utils/clearLegacyClientStorage";
 import { OutcomeDebugPanel } from "../debug/OutcomeDebugPanel";
 import NotificationDebugPanel from "../NotificationDebugPanel";
 import { Alert, AlertDescription, AlertTitle } from "../ui/alert";
@@ -39,6 +43,7 @@ import { Alert, AlertDescription, AlertTitle } from "../ui/alert";
 export default function AdminDashboard() {
   const { user } = useAuth();
   const [activeTab, setActiveTab] = useState("overview");
+  const kvStats = getBrowserKVStats();
 
   // Redirect if not admin
   if (!user?.isAdmin) {
@@ -232,19 +237,9 @@ export default function AdminDashboard() {
                 <Button
                   variant="outline"
                   className="justify-start gap-2"
-                  onClick={() =>
-                    window.open("/test-admin-system.html", "_blank")
-                  }
-                >
-                  <FileText className="w-4 h-4" />
-                  Test Admin System
-                </Button>
-                <Button
-                  variant="outline"
-                  className="justify-start gap-2"
                   onClick={() => {
                     console.log("Current user:", user);
-                    console.log("LocalStorage:", localStorage);
+                    console.log("KV snapshot:", snapshotBrowserKV());
                   }}
                 >
                   <Activity className="w-4 h-4" />
@@ -338,7 +333,7 @@ export default function AdminDashboard() {
                   Database Inspector
                 </CardTitle>
                 <CardDescription>
-                  View and manage localStorage data
+                  Legacy browser key/value snapshot (app data is server-backed).
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
@@ -346,68 +341,46 @@ export default function AdminDashboard() {
                   <Button
                     variant="outline"
                     onClick={() => {
-                      const keys = Object.keys(localStorage);
-                      console.log("LocalStorage Keys:", keys);
-                      console.log("Total Items:", keys.length);
-                      keys.forEach((key) => {
-                        console.log(`${key}:`, localStorage.getItem(key));
-                      });
+                      console.log("KV snapshot:", snapshotBrowserKV());
                     }}
                   >
-                    Log All Data
+                    Log KV Snapshot
                   </Button>
                   <Button
                     variant="outline"
                     onClick={() => {
-                      const data = {
-                        user: localStorage.getItem(STORAGE_KEYS.currentUser),
-                        tasks: Object.keys(localStorage).filter((k) =>
-                          k.startsWith("tasks_"),
-                        ),
-                        outcomes: Object.keys(localStorage).filter(
-                          (k) =>
-                            k.startsWith("outcomes_") || k.includes("Outcome"),
-                        ),
-                        notifications: Object.keys(localStorage).filter((k) =>
-                          k.includes("notification"),
-                        ),
-                      };
-                      console.log("Organized Data:", data);
-                    }}
-                  >
-                    Log Organized Data
-                  </Button>
-                  <Button
-                    variant="outline"
-                    onClick={() => {
-                      const dataStr = JSON.stringify(localStorage, null, 2);
+                      const dataStr = JSON.stringify(
+                        snapshotBrowserKV(),
+                        null,
+                        2,
+                      );
                       const blob = new Blob([dataStr], {
                         type: "application/json",
                       });
                       const url = URL.createObjectURL(blob);
                       const a = document.createElement("a");
                       a.href = url;
-                      a.download = `startupverse-backup-${Date.now()}.json`;
+                      a.download = `startupverse-kv-backup-${Date.now()}.json`;
                       a.click();
                     }}
                   >
-                    Export Backup
+                    Export KV Snapshot
                   </Button>
                   <Button
                     variant="destructive"
                     onClick={() => {
                       if (
                         confirm(
-                          "Clear ALL localStorage data? This cannot be undone!",
+                          "Clear ALL remaining browser KV entries? This cannot be undone!",
                         )
                       ) {
-                        localStorage.clear();
-                        alert("All data cleared. Page will reload.");
+                        clearAllBrowserKV();
+                        alert("Browser KV cleared. Page will reload.");
                         window.location.reload();
                       }
                     }}
                   >
-                    Clear All Data
+                    Clear Browser KV
                   </Button>
                 </div>
                 <Separator />
@@ -418,18 +391,14 @@ export default function AdminDashboard() {
                       <div className="text-xs text-muted-foreground">
                         Total Keys
                       </div>
-                      <div className="font-semibold">
-                        {Object.keys(localStorage).length}
-                      </div>
+                      <div className="font-semibold">{kvStats.keyCount}</div>
                     </div>
                     <div className="p-2 bg-muted rounded">
                       <div className="text-xs text-muted-foreground">
                         Storage Used
                       </div>
                       <div className="font-semibold">
-                        {(JSON.stringify(localStorage).length / 1024).toFixed(
-                          2,
-                        )}
+                        {kvStats.approxKb}
                         {" KB"}
                       </div>
                     </div>
@@ -574,10 +543,6 @@ export default function AdminDashboard() {
                       <li>
                         <code>/ADMIN_IMPLEMENTATION_CHECKLIST.md</code>
                         {" - Checklist"}
-                      </li>
-                      <li>
-                        <code>/test-admin-system.html</code>
-                        {" - Test page"}
                       </li>
                     </ul>
                   </AlertDescription>

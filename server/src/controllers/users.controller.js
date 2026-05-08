@@ -4,6 +4,60 @@ import { error as apiError, success as apiSuccess } from "../utils/apiResponse.j
 import { sanitizeUser } from "../utils/sanitize.js";
 import { USER_ROLES } from "../utils/enums.js";
 
+const MAX_CLIENT_PREF_KEYS = 80;
+const MAX_CLIENT_PREF_JSON_BYTES = 120_000;
+
+function clampClientPreferenceValue(value, depth = 0) {
+  if (depth > 4) return undefined;
+  if (value === null) return null;
+  const t = typeof value;
+  if (t === "string") return value.slice(0, 50_000);
+  if (t === "number" && Number.isFinite(value)) return value;
+  if (t === "boolean") return value;
+  if (Array.isArray(value)) {
+    return value.slice(0, 500).map((item) => clampClientPreferenceValue(item, depth + 1)).filter((x) => x !== undefined);
+  }
+  if (t === "object") {
+    const out = {};
+    const entries = Object.entries(value).slice(0, 80);
+    for (const [k, v] of entries) {
+      if (typeof k !== "string" || k.length > 128) continue;
+      const next = clampClientPreferenceValue(v, depth + 1);
+      if (next !== undefined) out[k] = next;
+    }
+    return out;
+  }
+  return undefined;
+}
+
+/** Merge validated patch into existing clientPreferences; omit keys set to null. */
+export function mergeClientPreferences(existing, patch) {
+  const base =
+    existing && typeof existing === "object" && !Array.isArray(existing) ? { ...existing } : {};
+  if (!patch || typeof patch !== "object" || Array.isArray(patch)) return base;
+  const keys = Object.keys(patch);
+  if (keys.length > MAX_CLIENT_PREF_KEYS) {
+    return null;
+  }
+  for (const key of keys) {
+    if (typeof key !== "string" || key.length > 128) continue;
+    const v = patch[key];
+    if (v === null) {
+      delete base[key];
+      continue;
+    }
+    const clamped = clampClientPreferenceValue(v);
+    if (clamped !== undefined) base[key] = clamped;
+  }
+  try {
+    const json = JSON.stringify(base);
+    if (json.length > MAX_CLIENT_PREF_JSON_BYTES) return null;
+  } catch {
+    return null;
+  }
+  return base;
+}
+
 // - Get user by ID
 export const getUserById = async (req, res) => {
   const user = await User.findById(req.params.userId);
@@ -104,6 +158,35 @@ export const updateNotificationPreferences = async (req, res) => {
   }
 
   return apiSuccess(res, user.notificationPreferences || {});
+};
+
+export const getClientPreferences = async (req, res) => {
+  const user = await User.findById(req.params.userId);
+  if (!user) {
+    return apiError(res, "User not found.", 404);
+  }
+  const prefs =
+    user.clientPreferences && typeof user.clientPreferences === "object"
+      ? user.clientPreferences
+      : {};
+  return apiSuccess(res, prefs);
+};
+
+export const updateClientPreferences = async (req, res) => {
+  const user = await User.findById(req.params.userId);
+  if (!user) {
+    return apiError(res, "User not found.", 404);
+  }
+  const merged = mergeClientPreferences(user.clientPreferences || {}, req.body || {});
+  if (!merged) {
+    return apiError(res, "Invalid or oversized client preferences.", 400);
+  }
+  const updated = await User.findByIdAndUpdate(
+    req.params.userId,
+    { clientPreferences: merged },
+    { new: true, runValidators: true },
+  );
+  return apiSuccess(res, updated.clientPreferences || {});
 };
 
 // - Upload Avatar (Compatibility & Canonical)
