@@ -2,18 +2,57 @@
  * Organization API client
  * All organization-related API calls
  */
-import { getAccessToken } from "../../app/session";
 import { API_BASE_URL } from "../../config/apiBase.js";
+
+// Default fetch options for cookie-based auth
+const defaultOptions = {
+  credentials: "include",
+  headers: {
+    "Content-Type": "application/json",
+  },
+};
+
+/** Responses from server/src/utils/apiResponse.js use `{ success, data }`. */
+function unwrapData(result) {
+  if (
+    result &&
+    typeof result === "object" &&
+    result.success === true &&
+    Object.prototype.hasOwnProperty.call(result, "data")
+  ) {
+    return result.data;
+  }
+  return result;
+}
+
+/** Ensure frontend consumers get stable `id` and org `type` from settings. */
+function mapEntity(entity) {
+  if (!entity || typeof entity !== "object") return entity;
+  const out = { ...entity };
+  if (out._id != null && out.id == null) {
+    out.id = String(out._id);
+  }
+  const ot = out.settings?.organizationType;
+  if (ot != null && out.type == null) {
+    out.type = String(ot);
+  }
+  return out;
+}
+
+function mapList(list) {
+  if (!Array.isArray(list)) return [];
+  return list.map(mapEntity);
+}
 
 async function apiCall(endpoint, options = {}, silent404 = false) {
   const url = `${API_BASE_URL}${endpoint}`;
 
   try {
     const response = await fetch(url, {
+      ...defaultOptions,
       ...options,
       headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${getAccessToken()}`,
+        ...defaultOptions.headers,
         ...options.headers,
       },
     });
@@ -61,27 +100,40 @@ export async function createOrganization(data) {
     body: JSON.stringify(data),
   });
 
-  return result.organization;
+  return mapEntity(unwrapData(result));
 }
 
 export async function getOrganization(orgId) {
   const result = await apiCall(`/organizations/${orgId}`);
-  return result.organization;
+  return mapEntity(unwrapData(result));
 }
 
 export async function getUserOrganizations(userId) {
   const result = await apiCall(`/organizations/user/${userId}`);
-  return result.organizations;
+  return mapList(unwrapData(result));
 }
 
 export async function isOrganizationAdmin(orgId, userId) {
-  const result = await apiCall(`/organizations/${orgId}/is-admin/${userId}`);
-  return result.isAdmin;
+  try {
+    const result = await apiCall(`/organizations/${orgId}/is-admin/${userId}`);
+    const data = unwrapData(result) ?? result;
+    return Boolean(data?.isAdmin);
+  } catch {
+    return false;
+  }
 }
 
 export async function checkAdminStatus(orgId, userId) {
-  const result = await apiCall(`/organizations/${orgId}/is-admin/${userId}`);
-  return { isAdmin: result.isAdmin, isCreator: result.isCreator || false };
+  try {
+    const result = await apiCall(`/organizations/${orgId}/is-admin/${userId}`);
+    const data = unwrapData(result) ?? result;
+    return {
+      isAdmin: Boolean(data?.isAdmin),
+      isCreator: Boolean(data?.isCreator),
+    };
+  } catch {
+    return { isAdmin: false, isCreator: false };
+  }
 }
 
 // ==========================================
@@ -94,17 +146,17 @@ export async function createCohort(data) {
     body: JSON.stringify(data),
   });
 
-  return result.cohort;
+  return mapEntity(unwrapData(result));
 }
 
 export async function getCohort(cohortId) {
   const result = await apiCall(`/cohorts/${cohortId}`, {}, true); // Silent 404 for deleted cohorts
-  return result.cohort;
+  return mapEntity(unwrapData(result));
 }
 
 export async function getOrganizationCohorts(orgId) {
   const result = await apiCall(`/cohorts/organization/${orgId}`);
-  return result.cohorts;
+  return mapList(unwrapData(result));
 }
 
 export async function deleteCohort(cohortId, userId) {
@@ -132,12 +184,12 @@ export async function createInvitation(data) {
 
   console.log("✅ [organizationApi.createInvitation] Received result:", result);
 
-  return result.invitation;
+  return mapEntity(unwrapData(result));
 }
 
 export async function getFounderInvitations(founderId) {
   const result = await apiCall(`/invitations/founder/${founderId}`);
-  return result.invitations;
+  return mapList(unwrapData(result));
 }
 
 export async function respondToInvitation(invitationId, founderId, status) {
@@ -146,7 +198,7 @@ export async function respondToInvitation(invitationId, founderId, status) {
     body: JSON.stringify({ status, founderId }),
   });
 
-  return result.invitation;
+  return mapEntity(unwrapData(result));
 }
 
 // ==========================================
@@ -155,17 +207,19 @@ export async function respondToInvitation(invitationId, founderId, status) {
 
 export async function getCohortMembers(cohortId) {
   const result = await apiCall(`/cohorts/${cohortId}/members`);
-  return result.members;
+  return mapList(unwrapData(result));
 }
 
 export async function getFounderMemberships(founderId) {
   const result = await apiCall(`/memberships/founder/${founderId}`);
-  return result;
+  const data = unwrapData(result);
+  const items = Array.isArray(data) ? data : [];
+  return { success: true, memberships: mapList(items) };
 }
 
 export async function getStartupSnapshot(founderId) {
   const result = await apiCall(`/startups/${founderId}/snapshot`);
-  return result.snapshot;
+  return unwrapData(result);
 }
 
 // ==========================================
@@ -178,5 +232,7 @@ export async function searchUserByEmail(email) {
     body: JSON.stringify({ email }),
   });
 
-  return result.user;
+  const data = unwrapData(result);
+  const user = data?.user ?? null;
+  return user ? mapEntity(user) : null;
 }

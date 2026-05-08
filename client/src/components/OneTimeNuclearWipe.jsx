@@ -2,39 +2,39 @@ import { useEffect, useState } from "react";
 import { nuclearWipeAndRestart } from "../utils/nuclearWipe";
 import { Loader2 } from "lucide-react";
 
+const SESSION_DONE_KEY = "sv_one_time_nuclear_done";
+
 /**
  * 🔥 ONE-TIME NUCLEAR WIPE COMPONENT
- * This component will execute once and wipe everything
- * After execution, remove this component from App.tsx
+ * Runs once per browser tab session (marker kept in session-scoped storage while wipe skips clearing it).
  */
 export function OneTimeNuclearWipe() {
   const [status, setStatus] = useState("Starting nuclear wipe...");
   const [progress, setProgress] = useState(0);
   const [shouldRender, setShouldRender] = useState(true);
+
   useEffect(() => {
-    // Check if wipe has already been executed using a persistent marker
-    // We check localStorage BEFORE clearing it
-    const wipeCompleted = localStorage.getItem("nuclear_wipe_in_progress");
-    if (wipeCompleted === "done") {
-      console.log("✅ Nuclear wipe already completed, hiding component...");
+    if (sessionStorage.getItem(SESSION_DONE_KEY) === "1") {
+      console.log(
+        "✅ Nuclear wipe already completed in this tab, hiding component...",
+      );
       setShouldRender(false);
       return;
     }
+
     const executeWipe = async () => {
       console.log("🔥🔥🔥 ONE-TIME NUCLEAR WIPE INITIATED 🔥🔥🔥");
 
-      // Mark as in progress
-      localStorage.setItem("nuclear_wipe_in_progress", "started");
+      sessionStorage.setItem(SESSION_DONE_KEY, "1");
 
-      // Show progress
       setProgress(10);
       setStatus("Clearing database...");
       await new Promise((resolve) => setTimeout(resolve, 500));
       setProgress(30);
-      setStatus("Clearing localStorage...");
+      setStatus("Clearing persistent browser storage...");
       await new Promise((resolve) => setTimeout(resolve, 500));
       setProgress(50);
-      setStatus("Clearing sessionStorage...");
+      setStatus("Preserving session marker...");
       await new Promise((resolve) => setTimeout(resolve, 500));
       setProgress(70);
       setStatus("Clearing cookies and cache...");
@@ -42,21 +42,18 @@ export function OneTimeNuclearWipe() {
       setProgress(90);
       setStatus("Finalizing...");
 
-      // Mark as done BEFORE clearing
-      localStorage.setItem("nuclear_wipe_in_progress", "done");
-
-      // Execute the actual nuclear wipe
-      await nuclearWipeAndRestart();
+      await nuclearWipeAndRestart({ preserveSessionStorage: true });
       setProgress(100);
       setStatus("Complete! Redirecting...");
     };
-    executeWipe();
-  }, []); // Run once on mount
 
-  // Don't render if already completed
+    executeWipe();
+  }, []);
+
   if (!shouldRender) {
     return null;
   }
+
   return (
     <div className="fixed inset-0 z-[9999] bg-black flex items-center justify-center">
       <div className="text-center space-y-6 max-w-md px-8">
@@ -78,10 +75,8 @@ export function OneTimeNuclearWipe() {
         </div>
         <div className="text-xs text-gray-500 pt-4 border-t border-gray-800">
           <p>• Deleting all database records</p>
-          <p>• Clearing all localStorage</p>
-          <p>• Clearing all sessionStorage</p>
-          <p>• Deleting all cookies</p>
-          <p>• Clearing all caches</p>
+          <p>• Clearing persistent browser storage</p>
+          <p>• Clearing cookies and caches</p>
           <p>• Logging out all users</p>
         </div>
       </div>

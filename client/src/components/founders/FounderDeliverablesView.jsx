@@ -22,10 +22,17 @@ import {
   Upload,
   ExternalLink,
 } from "lucide-react";
-import { getAccessToken } from "../../app/session";
 import { unwrapData } from "../../utils/apiEnvelope";
 
 const API_BASE = API_BASE_URL;
+
+// Default fetch options for cookie-based auth
+const defaultOptions = {
+  credentials: "include",
+  headers: {
+    "Content-Type": "application/json",
+  },
+};
 
 export default function FounderDeliverablesView({ founderId, onBack }) {
   const [deliverables, setDeliverables] = useState([]);
@@ -41,11 +48,8 @@ export default function FounderDeliverablesView({ founderId, onBack }) {
   const loadDeliverables = async () => {
     try {
       setLoading(true);
-      const token = getAccessToken();
       const response = await fetch(`${API_BASE}/deliverables/founder/${founderId}`, {
-        headers: {
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
+        ...defaultOptions,
       });
       if (!response.ok) throw new Error("Failed to fetch deliverables");
       const raw = unwrapData(await response.json());
@@ -61,7 +65,6 @@ export default function FounderDeliverablesView({ founderId, onBack }) {
   };
   const handleSubmit = async (deliverableId) => {
     try {
-      const token = getAccessToken();
       const links = submissionData.submissionUrl
         ? [submissionData.submissionUrl]
         : [];
@@ -71,11 +74,8 @@ export default function FounderDeliverablesView({ founderId, onBack }) {
       const response = await fetch(
         `${API_BASE}/deliverables/${deliverableId}/submit`,
         {
+          ...defaultOptions,
           method: "POST",
-          headers: {
-            ...(token ? { Authorization: `Bearer ${token}` } : {}),
-            "Content-Type": "application/json",
-          },
           body: JSON.stringify({
             founderId,
             content,
@@ -103,8 +103,11 @@ export default function FounderDeliverablesView({ founderId, onBack }) {
     switch (status) {
       case "approved":
         return "bg-green-500/10 text-green-700 dark:text-green-400 border-green-500/20";
+      case "revision_requested":
       case "needs-revision":
         return "bg-yellow-500/10 text-yellow-700 dark:text-yellow-400 border-yellow-500/20";
+      case "rejected":
+        return "bg-red-500/10 text-red-700 dark:text-red-400 border-red-500/20";
       case "reviewed":
         return "bg-blue-500/10 text-blue-700 dark:text-blue-400 border-blue-500/20";
       case "submitted":
@@ -233,7 +236,8 @@ export default function FounderDeliverablesView({ founderId, onBack }) {
                         {deliverable.description}
                       </p>
                     )}
-                    {deliverable.requirements.length > 0 && (
+                    {Array.isArray(deliverable.requirements) &&
+                      deliverable.requirements.length > 0 && (
                       <div>
                         <p className="text-[8px] text-muted-foreground font-medium mb-1">
                           Requirements:

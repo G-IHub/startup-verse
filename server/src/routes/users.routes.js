@@ -6,6 +6,13 @@ import * as usersController from "../controllers/users.controller.js";
 
 const usersRouter = Router();
 
+// Blueprint §14: POST /api/v1/users/ — admin-only create user
+usersRouter.post(
+  "/users",
+  requireAuth,
+  asyncHandler(usersController.createUser)
+);
+
 usersRouter.get(
   "/users/:userId",
   requireAuth,
@@ -52,6 +59,20 @@ usersRouter.put(
   requireAuth,
   requireSelfOrAdmin("userId"),
   asyncHandler(usersController.updateNotificationPreferences)
+);
+
+usersRouter.get(
+  "/users/:userId/client-preferences",
+  requireAuth,
+  requireSelfOrAdmin("userId"),
+  asyncHandler(usersController.getClientPreferences)
+);
+
+usersRouter.put(
+  "/users/:userId/client-preferences",
+  requireAuth,
+  requireSelfOrAdmin("userId"),
+  asyncHandler(usersController.updateClientPreferences)
 );
 
 usersRouter.post(

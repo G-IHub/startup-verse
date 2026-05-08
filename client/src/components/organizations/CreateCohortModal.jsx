@@ -18,6 +18,8 @@ export default function CreateCohortModal({
   organizationId,
   organizationName,
   userId,
+  creatorEmail,
+  creatorName,
   onSuccess,
 }) {
   const [name, setName] = useState("");
@@ -30,15 +32,12 @@ export default function CreateCohortModal({
     if (!name.trim()) return;
     setIsSubmitting(true);
     try {
-      // Get current user data from localStorage for email and name
-      const currentUserData = localStorage.getItem("startupverse_current_user");
-      const currentUser = currentUserData ? JSON.parse(currentUserData) : null;
       const cohort = await createCohort(
         name.trim(),
         organizationId,
         userId,
-        currentUser?.email || "admin@example.com",
-        currentUser?.name || "Admin",
+        (creatorEmail && creatorEmail.trim()) || "admin@example.com",
+        (creatorName && creatorName.trim()) || "Admin",
         description.trim() || undefined,
         startDate || undefined,
         endDate || undefined,

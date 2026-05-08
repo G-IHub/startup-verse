@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+
 import AppLayout from "./layout/AppLayout";
 import MessagingSystem from "./messaging/MessagingSystem";
 import VideoCallSystem from "./video/VideoCallSystem";
@@ -15,9 +16,7 @@ import GoToMarket from "./stages/GoToMarket";
 import Operations from "./stages/Operations";
 import ProfileSetup from "./stages/ProfileSetup";
 import PitchDeck from "./PitchDeck";
-import ProfileCompletionModal from "./ProfileCompletionModal";
-import DataBackup from "./DataBackup";
-import { toast } from "sonner";
+import SettingsPage from "./SettingsPage";
 
 // Import updated dashboard components
 import FounderDashboard from "./dashboards/FounderDashboard";
@@ -26,9 +25,15 @@ import TalentDashboard from "./dashboards/TalentDashboard";
 import MentorDashboard from "./dashboards/MentorDashboard";
 import InvestorDashboard from "./dashboards/InvestorDashboard";
 import FreelancerDashboard from "./dashboards/FreelancerDashboard";
+
 export default function Dashboard({ user, onLogout, onUpdateUser }) {
   const [currentPage, setCurrentPage] = useState("startup-office");
-  const [showProfileCompletion, setShowProfileCompletion] = useState(false);
+  const [initialProfileEditing, setInitialProfileEditing] = useState(false);
+
+  const handleNavigate = (page, options) => {
+    setInitialProfileEditing(page === "settings" && options?.editProfile === true);
+    setCurrentPage(page);
+  };
 
   // Check URL hash for pagination test page (disabled for now)
   useEffect(() => {
@@ -43,26 +48,6 @@ export default function Dashboard({ user, onLogout, onUpdateUser }) {
     return () => window.removeEventListener("hashchange", checkHash);
   }, []);
 
-  // Check if user needs to complete profile
-  useEffect(() => {
-    if (!user.onboardingComplete) {
-      setShowProfileCompletion(true);
-    }
-  }, [user.onboardingComplete]);
-
-  const handleProfileComplete = (profileData) => {
-    const updatedUser = {
-      ...user,
-      profile: {
-        ...user.profile,
-        ...profileData,
-      },
-      onboardingComplete: true,
-    };
-    onUpdateUser(updatedUser);
-    setShowProfileCompletion(false);
-    toast.success("Profile completed successfully!");
-  };
   const renderPageContent = () => {
     // Global pages available to all users
     switch (currentPage) {
@@ -96,11 +81,19 @@ export default function Dashboard({ user, onLogout, onUpdateUser }) {
       case "video-call":
         return <VideoCallSystem user={user} />;
       case "settings":
-        return <DataBackup />;
+        return (
+          <SettingsPage
+            user={user}
+            onUpdateUser={onUpdateUser}
+            initialProfileEditing={initialProfileEditing}
+          />
+        );
+
       default:
         return renderRoleSpecificContent();
     }
   };
+
   const renderRoleSpecificContent = () => {
     switch (user.role) {
       case "founder":
@@ -119,6 +112,7 @@ export default function Dashboard({ user, onLogout, onUpdateUser }) {
         return <div>Unknown user role</div>;
     }
   };
+
   const renderFounderContent = () => {
     switch (currentPage) {
       case "dashboard":
@@ -227,6 +221,7 @@ export default function Dashboard({ user, onLogout, onUpdateUser }) {
         );
     }
   };
+
   const renderTeamMemberContent = () => {
     switch (currentPage) {
       case "dashboard":
@@ -257,6 +252,7 @@ export default function Dashboard({ user, onLogout, onUpdateUser }) {
         );
     }
   };
+
   const renderTalentContent = () => {
     switch (currentPage) {
       case "dashboard":
@@ -265,20 +261,23 @@ export default function Dashboard({ user, onLogout, onUpdateUser }) {
             user={user}
             onLogout={onLogout}
             onUpdateUser={onUpdateUser}
+            onNavigate={handleNavigate}
           />
         );
       case "team-matching":
-        return <TeamMatching user={user} onNavigate={setCurrentPage} />;
+        return <TeamMatching user={user} onNavigate={handleNavigate} />;
       default:
         return (
           <TalentDashboard
             user={user}
             onLogout={onLogout}
             onUpdateUser={onUpdateUser}
+            onNavigate={handleNavigate}
           />
         );
     }
   };
+
   const renderMentorContent = () => {
     switch (currentPage) {
       case "dashboard":
@@ -299,6 +298,7 @@ export default function Dashboard({ user, onLogout, onUpdateUser }) {
         );
     }
   };
+
   const renderInvestorContent = () => {
     switch (currentPage) {
       case "dashboard":
@@ -319,6 +319,7 @@ export default function Dashboard({ user, onLogout, onUpdateUser }) {
         );
     }
   };
+
   const renderFreelancerContent = () => {
     switch (currentPage) {
       case "dashboard":
@@ -339,23 +340,17 @@ export default function Dashboard({ user, onLogout, onUpdateUser }) {
         );
     }
   };
+
   return (
     <>
       <AppLayout
         user={user}
         onLogout={onLogout}
         currentPage={currentPage}
-        onPageChange={setCurrentPage}
+        onPageChange={handleNavigate}
       >
         {renderPageContent()}
       </AppLayout>
-      {showProfileCompletion && (
-        <ProfileCompletionModal
-          role={user.role}
-          onComplete={handleProfileComplete}
-          onClose={() => {}}
-        />
-      )}
     </>
   );
 }

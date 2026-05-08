@@ -6,6 +6,7 @@ const interestSchema = new mongoose.Schema(
     talentId: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true, index: true },
     founderId: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true, index: true },
     startupId: { type: mongoose.Schema.Types.ObjectId, ref: "Startup", index: true },
+    postId: { type: mongoose.Schema.Types.ObjectId, ref: "StartupPost", index: true },
     message: { 
       type: String, 
       default: "",

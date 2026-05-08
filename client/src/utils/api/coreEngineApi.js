@@ -26,38 +26,10 @@ export async function getWeeklyOutcomes(founderId) {
     const data = await apiRequest(`/founders/${founderId}/weekly-outcomes`, {
       method: "GET",
     });
-    const outcomes = Array.isArray(data) ? data : asList(data?.outcomes);
-
-    // ✅ BACKEND-FIRST: Cache in localStorage for offline access
-    if (outcomes.length > 0) {
-      localStorage.setItem(
-        `weekly_outcomes_${founderId}`,
-        JSON.stringify(outcomes),
-      );
-    }
-
-    return outcomes;
+    return Array.isArray(data) ? data : asList(data?.outcomes);
   } catch (error) {
-    // Silent fallback - don't spam console in production
-    const errorMessage = error.message;
-
-    // ⚠️ FALLBACK: Try to load from localStorage cache if backend unavailable
-    const cached = localStorage.getItem(`weekly_outcomes_${founderId}`);
-    if (cached) {
-      // Only log warning once per session to avoid spam
-      if (!sessionStorage.getItem("warned_backend_outcomes")) {
-        console.warn("⚠️ Using cached weekly outcomes (backend unavailable)");
-        sessionStorage.setItem("warned_backend_outcomes", "true");
-      }
-      return JSON.parse(cached);
-    }
-
-    // Return empty array instead of throwing - graceful degradation
-    if (!sessionStorage.getItem("warned_backend_outcomes_empty")) {
-      console.warn(
-        "⚠️ Backend unavailable and no cache found - returning empty outcomes",
-      );
-      sessionStorage.setItem("warned_backend_outcomes_empty", "true");
+    if (import.meta.env.DEV) {
+      console.warn("getWeeklyOutcomes failed:", error?.message || error);
     }
     return [];
   }
@@ -75,63 +47,10 @@ export async function getCurrentWeeklyOutcome(founderId) {
  * Save/create a weekly outcome (REAL BACKEND SAVE)
  */
 export async function saveWeeklyOutcome(founderId, outcome) {
-  try {
-    await apiRequest(`/founders/${founderId}/weekly-outcomes`, {
-      method: "POST",
-      body: JSON.stringify({ outcome }),
-    });
-
-    console.log("✅ Weekly outcome saved to backend");
-
-    // ✅ BACKEND-FIRST: Update cache after successful save
-    const cached = localStorage.getItem(`weekly_outcomes_${founderId}`);
-    const outcomes = cached ? JSON.parse(cached) : [];
-    const existingIndex = outcomes.findIndex(
-      (o) => o.id === outcome.id || o.weekId === outcome.weekId,
-    );
-
-    if (existingIndex >= 0) {
-      outcomes[existingIndex] = outcome;
-    } else {
-      outcomes.push(outcome);
-    }
-
-    localStorage.setItem(
-      `weekly_outcomes_${founderId}`,
-      JSON.stringify(outcomes),
-    );
-    console.log("✅ Cache updated after backend save");
-  } catch (error) {
-    // 🔄 GRACEFUL FALLBACK: Save to cache if backend unavailable
-    if (error instanceof TypeError && error.message === "Failed to fetch") {
-      console.warn(
-        "⚠️ Backend unavailable - saving weekly outcome to cache only",
-      );
-
-      const cached = localStorage.getItem(`weekly_outcomes_${founderId}`);
-      const outcomes = cached ? JSON.parse(cached) : [];
-      const existingIndex = outcomes.findIndex(
-        (o) => o.id === outcome.id || o.weekId === outcome.weekId,
-      );
-
-      if (existingIndex >= 0) {
-        outcomes[existingIndex] = outcome;
-      } else {
-        outcomes.push(outcome);
-      }
-
-      localStorage.setItem(
-        `weekly_outcomes_${founderId}`,
-        JSON.stringify(outcomes),
-      );
-      console.log("✅ Weekly outcome saved to cache (offline mode)");
-      // Don't throw - allow operation to succeed with cache
-      return;
-    }
-
-    console.error("❌ Error saving weekly outcome to backend:", error);
-    throw error;
-  }
+  await apiRequest(`/founders/${founderId}/weekly-outcomes`, {
+    method: "POST",
+    body: JSON.stringify({ outcome }),
+  });
 }
 
 /**
@@ -176,35 +95,10 @@ export async function getTasks(founderId) {
     const data = await apiRequest(`/founders/${founderId}/tasks`, {
       method: "GET",
     });
-    const tasks = Array.isArray(data) ? data : asList(data?.tasks);
-
-    // ✅ BACKEND-FIRST: Cache in localStorage for offline access
-    if (tasks.length > 0) {
-      localStorage.setItem(`tasks_${founderId}`, JSON.stringify(tasks));
-    }
-
-    return tasks;
+    return Array.isArray(data) ? data : asList(data?.tasks);
   } catch (error) {
-    // Silent fallback - don't spam console in production
-    const errorMessage = error.message;
-
-    // ⚠️ FALLBACK: Try to load from localStorage cache if backend unavailable
-    const cached = localStorage.getItem(`tasks_${founderId}`);
-    if (cached) {
-      // Only log warning once per session to avoid spam
-      if (!sessionStorage.getItem("warned_backend_tasks")) {
-        console.warn("⚠️ Using cached tasks (backend unavailable)");
-        sessionStorage.setItem("warned_backend_tasks", "true");
-      }
-      return JSON.parse(cached);
-    }
-
-    // Return empty array instead of throwing - graceful degradation
-    if (!sessionStorage.getItem("warned_backend_tasks_empty")) {
-      console.warn(
-        "⚠️ Backend unavailable and no cache found - returning empty tasks",
-      );
-      sessionStorage.setItem("warned_backend_tasks_empty", "true");
+    if (import.meta.env.DEV) {
+      console.warn("getTasks failed:", error?.message || error);
     }
     return [];
   }
@@ -214,51 +108,10 @@ export async function getTasks(founderId) {
  * Save a single task (REAL BACKEND SAVE)
  */
 export async function saveTask(founderId, task) {
-  try {
-    await apiRequest(`/founders/${founderId}/tasks`, {
-      method: "POST",
-      body: JSON.stringify({ task }),
-    });
-
-    console.log(`✅ Task ${task.id} saved to backend`);
-
-    // ✅ BACKEND-FIRST: Update cache after successful save
-    const cached = localStorage.getItem(`tasks_${founderId}`);
-    const tasks = cached ? JSON.parse(cached) : [];
-    const existingIndex = tasks.findIndex((t) => t.id === task.id);
-
-    if (existingIndex >= 0) {
-      tasks[existingIndex] = task;
-    } else {
-      tasks.push(task);
-    }
-
-    localStorage.setItem(`tasks_${founderId}`, JSON.stringify(tasks));
-    console.log("✅ Task cache updated after backend save");
-  } catch (error) {
-    // 🔄 GRACEFUL FALLBACK: Save to cache if backend unavailable
-    if (error instanceof TypeError && error.message === "Failed to fetch") {
-      console.warn("⚠️ Backend unavailable - saving task to cache only");
-
-      const cached = localStorage.getItem(`tasks_${founderId}`);
-      const tasks = cached ? JSON.parse(cached) : [];
-      const existingIndex = tasks.findIndex((t) => t.id === task.id);
-
-      if (existingIndex >= 0) {
-        tasks[existingIndex] = task;
-      } else {
-        tasks.push(task);
-      }
-
-      localStorage.setItem(`tasks_${founderId}`, JSON.stringify(tasks));
-      console.log("✅ Task saved to cache (offline mode)");
-      // Don't throw - allow operation to succeed with cache
-      return;
-    }
-
-    console.error("❌ Error saving task to backend:", error);
-    throw error;
-  }
+  await apiRequest(`/founders/${founderId}/tasks`, {
+    method: "POST",
+    body: JSON.stringify({ task }),
+  });
 }
 
 /**
@@ -556,42 +409,30 @@ export async function saveMilestone(founderId, milestone) {
 }
 
 // ==========================================
-// EXECUTION DATA HELPER (with caching)
+// EXECUTION DATA (server-only)
 // ==========================================
 
 /**
- * Get execution data with backend loading and localStorage caching
+ * Get execution data from backend (no client persistence).
  */
 export async function getExecutionData(founderId) {
   try {
-    // 🎯 PRIORITY 1: Try to load execution data directly from backend
-    // This includes currentOutcome set by organizations via auto-population
     try {
       const data = await apiRequest(`/founders/${founderId}/execution-data`, {
         method: "GET",
       });
       if (data.executionData) {
-          console.log(
-            "✅ Loaded execution data directly from backend (includes org milestones):",
-            data.executionData,
-          );
-
-          // Cache to localStorage
-          localStorage.setItem(
-            `execution_data_${founderId}`,
-            JSON.stringify(data.executionData),
-          );
-
-          return data.executionData;
+        return data.executionData;
       }
     } catch (directFetchError) {
-      console.debug(
-        "Direct execution data fetch failed, falling back to reconstruction:",
-        directFetchError,
-      );
+      if (import.meta.env.DEV) {
+        console.debug(
+          "Direct execution data fetch failed, reconstructing:",
+          directFetchError?.message || directFetchError,
+        );
+      }
     }
 
-    // 🎯 FALLBACK: Reconstruct execution data from outcomes and tasks
     const [outcomes, tasks] = await Promise.all([
       getWeeklyOutcomes(founderId),
       getTasks(founderId),
@@ -605,11 +446,11 @@ export async function getExecutionData(founderId) {
         o.status === "missed",
     );
 
-    // Calculate streak from completed outcomes
     let streak = 0;
     const sortedOutcomes = [...completedOutcomes].sort(
       (a, b) =>
-        new Date(b.weekEnding).getTime() - new Date(a.weekEnding).getTime(),
+        new Date(b.weekEnding || 0).getTime() -
+        new Date(a.weekEnding || 0).getTime(),
     );
 
     for (const outcome of sortedOutcomes) {
@@ -620,7 +461,7 @@ export async function getExecutionData(founderId) {
       }
     }
 
-    const executionData = {
+    return {
       userId: founderId,
       currentOutcome,
       streak,
@@ -636,28 +477,8 @@ export async function getExecutionData(founderId) {
       })),
       lastUpdated: new Date().toISOString(),
     };
-
-    // Cache in localStorage for faster subsequent loads
-    localStorage.setItem(
-      `execution_cache_${founderId}`,
-      JSON.stringify({
-        data: executionData,
-        cachedAt: new Date().toISOString(),
-      }),
-    );
-
-    return executionData;
   } catch (error) {
     console.error("Error loading execution data from backend:", error);
-
-    // Fallback to cache if backend fails
-    const cached = localStorage.getItem(`execution_cache_${founderId}`);
-    if (cached) {
-      const { data } = JSON.parse(cached);
-      console.warn("Using cached execution data due to backend error");
-      return data;
-    }
-
     throw error;
   }
 }

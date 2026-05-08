@@ -78,6 +78,7 @@ export const updateProfile = async (req, res) => {
     "profile",
     "onboardingComplete",
     "avatarUrl",
+    "startupId",
   ];
   const updates = {};
 
@@ -140,4 +141,25 @@ export const deleteAccount = async (req, res) => {
   }
 
   return apiSuccess(res, { deleted: true, userId }, 200, "Account deleted.");
+};
+
+// - Get current authenticated user (from cookie)
+export const getMe = async (req, res) => {
+  const user = await User.findById(req.user.id);
+  if (!user) {
+    return apiError(res, "User not found.", 404);
+  }
+
+  return apiSuccess(res, sanitizeUser(user));
+};
+
+// - Logout (clear cookie)
+export const logout = async (req, res) => {
+  res.clearCookie("token", {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: process.env.NODE_ENV === "production" ? "strict" : "lax",
+  });
+
+  return apiSuccess(res, { loggedOut: true }, 200, "Logged out successfully.");
 };

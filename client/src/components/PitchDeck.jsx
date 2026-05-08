@@ -23,6 +23,10 @@ import {
   Zap,
 } from "lucide-react";
 import { toast } from "sonner";
+import {
+  useHydrateStageDraft,
+  persistStageDraft,
+} from "../hooks/useStageDraftFromJourney";
 const INITIAL_DATA = {
   companyName: "",
   tagline: "",
@@ -187,25 +191,26 @@ export default function PitchDeck({ user, onBack }) {
   const [editMode, setEditMode] = useState(true);
   const [presentationMode, setPresentationMode] = useState(false);
 
-  // Load saved data
+  useHydrateStageDraft(user, "pitch_deck", (raw) => {
+    if (!raw || typeof raw !== "object") return;
+    setData((prev) => ({ ...INITIAL_DATA, ...prev, ...raw }));
+  });
+
   useEffect(() => {
-    const saved = localStorage.getItem(`pitch_deck_${user.id}`);
-    if (saved) {
-      setData(JSON.parse(saved));
-    } else if (user.profile) {
-      // Pre-fill with profile data
-      setData((prev) => ({
-        ...prev,
-        companyName: user.profile.startupName || "",
-        founderName: user.name || "",
-        email: user.email || "",
-        problemDescription: user.profile.problemStatement || "",
-        solutionDescription: user.profile.solutionDescription || "",
-      }));
-    }
+    if (!user?.profile) return;
+    setData((prev) => ({
+      ...prev,
+      companyName: prev.companyName || user.profile.startupName || "",
+      founderName: prev.founderName || user.name || "",
+      email: prev.email || user.email || "",
+      problemDescription:
+        prev.problemDescription || user.profile.problemStatement || "",
+      solutionDescription:
+        prev.solutionDescription || user.profile.solutionDescription || "",
+    }));
   }, [user]);
   const saveData = () => {
-    localStorage.setItem(`pitch_deck_${user.id}`, JSON.stringify(data));
+    persistStageDraft("pitch_deck", data);
     toast.success("Pitch deck saved!");
   };
   const updateData = (field, value) => {

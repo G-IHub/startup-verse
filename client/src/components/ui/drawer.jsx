@@ -72,7 +72,7 @@ function DrawerOverlay({ className, ...props }) {
         {
           "data-slot": "drawer-overlay",
           className: cn(
-            "data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 fixed inset-0 z-50 bg-black/50",
+            "sv-modal-backdrop data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 fixed inset-0 z-50",
             className,
           ),
         },
@@ -90,18 +90,18 @@ function DrawerContent({ className, children, ...props }) {
           {
             "data-slot": "drawer-content",
             className: cn(
-              "group/drawer-content bg-background fixed z-50 flex h-auto flex-col",
-              "data-[vaul-drawer-direction=top]:inset-x-4 data-[vaul-drawer-direction=top]:top-4 data-[vaul-drawer-direction=top]:mb-24 data-[vaul-drawer-direction=top]:max-h-[80vh] data-[vaul-drawer-direction=top]:max-w-[calc(100%-2rem)] data-[vaul-drawer-direction=top]:mx-auto data-[vaul-drawer-direction=top]:rounded-b-lg data-[vaul-drawer-direction=top]:border-b sm:data-[vaul-drawer-direction=top]:inset-x-auto sm:data-[vaul-drawer-direction=top]:max-w-lg",
-              "data-[vaul-drawer-direction=bottom]:inset-x-4 data-[vaul-drawer-direction=bottom]:bottom-4 data-[vaul-drawer-direction=bottom]:mt-24 data-[vaul-drawer-direction=bottom]:max-h-[80vh] data-[vaul-drawer-direction=bottom]:max-w-[calc(100%-2rem)] data-[vaul-drawer-direction=bottom]:mx-auto data-[vaul-drawer-direction=bottom]:rounded-t-lg data-[vaul-drawer-direction=bottom]:border-t sm:data-[vaul-drawer-direction=bottom]:inset-x-auto sm:data-[vaul-drawer-direction=bottom]:max-w-lg",
-              "data-[vaul-drawer-direction=right]:inset-y-0 data-[vaul-drawer-direction=right]:right-0 data-[vaul-drawer-direction=right]:w-3/4 data-[vaul-drawer-direction=right]:border-l data-[vaul-drawer-direction=right]:sm:max-w-sm",
-              "data-[vaul-drawer-direction=left]:inset-y-0 data-[vaul-drawer-direction=left]:left-0 data-[vaul-drawer-direction=left]:w-3/4 data-[vaul-drawer-direction=left]:border-r data-[vaul-drawer-direction=left]:sm:max-w-sm",
+              "group/drawer-content fixed z-50 flex h-auto flex-col border-0 bg-surface-card font-body text-text-body shadow-modal",
+              "data-[vaul-drawer-direction=top]:inset-x-4 data-[vaul-drawer-direction=top]:top-4 data-[vaul-drawer-direction=top]:mb-24 data-[vaul-drawer-direction=top]:max-h-[80vh] data-[vaul-drawer-direction=top]:max-w-[calc(100%-2rem)] data-[vaul-drawer-direction=top]:mx-auto data-[vaul-drawer-direction=top]:rounded-b-[16px] sm:data-[vaul-drawer-direction=top]:inset-x-auto sm:data-[vaul-drawer-direction=top]:max-w-lg",
+              "data-[vaul-drawer-direction=bottom]:inset-x-4 data-[vaul-drawer-direction=bottom]:bottom-4 data-[vaul-drawer-direction=bottom]:mt-24 data-[vaul-drawer-direction=bottom]:max-h-[80vh] data-[vaul-drawer-direction=bottom]:max-w-[calc(100%-2rem)] data-[vaul-drawer-direction=bottom]:mx-auto data-[vaul-drawer-direction=bottom]:rounded-t-[16px] sm:data-[vaul-drawer-direction=bottom]:inset-x-auto sm:data-[vaul-drawer-direction=bottom]:max-w-lg",
+              "data-[vaul-drawer-direction=right]:inset-y-0 data-[vaul-drawer-direction=right]:right-0 data-[vaul-drawer-direction=right]:w-3/4 data-[vaul-drawer-direction=right]:rounded-l-[16px] data-[vaul-drawer-direction=right]:sm:max-w-sm",
+              "data-[vaul-drawer-direction=left]:inset-y-0 data-[vaul-drawer-direction=left]:left-0 data-[vaul-drawer-direction=left]:w-3/4 data-[vaul-drawer-direction=left]:rounded-r-[16px] data-[vaul-drawer-direction=left]:sm:max-w-sm",
               className,
             ),
           },
           props,
         )}
       >
-        <div className="bg-muted mx-auto mt-4 hidden h-2 w-[100px] shrink-0 rounded-full group-data-[vaul-drawer-direction=bottom]/drawer-content:block" />
+        <div className="mx-auto mt-4 hidden h-2 w-[100px] shrink-0 rounded-full bg-[#f4f5ff] group-data-[vaul-drawer-direction=bottom]/drawer-content:block" />
         {children}
       </DrawerPrimitive.Content>
     </DrawerPortal>
@@ -113,7 +113,10 @@ function DrawerHeader({ className, ...props }) {
       {..._extends(
         {
           "data-slot": "drawer-header",
-          className: cn("flex flex-col gap-1.5 p-4", className),
+          className: cn(
+            "flex flex-col gap-1.5 border-b border-[#e2e4f0] p-4 pb-4",
+            className,
+          ),
         },
         props,
       )}
@@ -139,7 +142,10 @@ function DrawerTitle({ className, ...props }) {
       {..._extends(
         {
           "data-slot": "drawer-title",
-          className: cn("text-foreground font-semibold", className),
+          className: cn(
+            "font-heading font-bold text-[#0d0d0d]",
+            className,
+          ),
         },
         props,
       )}
@@ -152,7 +158,10 @@ function DrawerDescription({ className, ...props }) {
       {..._extends(
         {
           "data-slot": "drawer-description",
-          className: cn("text-muted-foreground text-sm", className),
+          className: cn(
+            "font-body text-sm font-normal text-[#4a4a5a]",
+            className,
+          ),
         },
         props,
       )}

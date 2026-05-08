@@ -1,13 +1,16 @@
 import { Router } from "express";
 import asyncHandler from "../utils/asyncHandler.js";
 import requireAuth from "../middleware/requireAuth.js";
+import requireRole from "../middleware/requireRole.js";
 import { success as apiSuccess, error as apiError } from "../utils/apiResponse.js";
+import { runDailyDigestJobs } from "../services/schedulerJobs.js";
 import Event from "../models/Event.js";
 import Deliverable from "../models/Deliverable.js";
 import ProgramMilestone from "../models/ProgramMilestone.js";
 import CohortMembership from "../models/CohortMembership.js";
 import User from "../models/User.js";
 import Startup from "../models/Startup.js";
+import Meeting from "../models/Meeting.js";
 import {
   mapToTimelineItem,
   buildSortedTimeline,
@@ -116,12 +119,49 @@ function parseAgendaDateRange(req) {
   };
 }
 
+function mapMeetingToTimelineItem(m, now) {
+  const todayStart = new Date(now);
+  todayStart.setUTCHours(0, 0, 0, 0);
+  // Build a real Date from date string + startTime string
+  const atDate = m.date
+    ? new Date(`${m.date}T${m.startTime || "00:00"}:00`)
+    : null;
+  const endDate = m.date && m.endTime
+    ? new Date(`${m.date}T${m.endTime}:00`)
+    : null;
+  const isOverdue = Boolean(atDate && atDate.getTime() < todayStart.getTime());
+  return {
+    kind: "meeting",
+    id: String(m._id),
+    title: String(m.title || "Meeting"),
+    at: atDate ? atDate.toISOString() : null,
+    endAt: endDate ? endDate.toISOString() : null,
+    cohortId: null,
+    startupId: m.startupId ? String(m.startupId) : null,
+    status: m.status || "scheduled",
+    isOverdue,
+    agendaType: "meeting",
+    type: "meeting",
+    date: m.date || "",
+    dueDate: m.date || "",
+    startTime: m.startTime || null,
+    endTime: m.endTime || null,
+    color: "#7c3aed",
+    metadata: {
+      type: m.type || "meeting",
+      description: String(m.description || ""),
+      location: String(m.location || ""),
+      attendees: m.attendees || [],
+    },
+  };
+}
+
 async function loadCalendarDataForUser(userId, windowStart, windowEnd) {
   const cohortIds = await getCohortIdsForCalendarUser(userId);
   const cohortObjIds = cohortIds;
 
   const eventQueryBase = { startsAt: { $gte: windowStart, $lte: windowEnd } };
-  const [byFounder, byCohort, deliverables, programMilestones] = await Promise.all([
+  const [byFounder, byCohort, deliverables, programMilestones, userMeetings] = await Promise.all([
     Event.find({ founderId: userId, ...eventQueryBase }).sort({ startsAt: 1 }).lean(),
     cohortObjIds.length
       ? Event.find({
@@ -147,6 +187,14 @@ async function loadCalendarDataForUser(userId, windowStart, windowEnd) {
           .sort({ dueDate: 1 })
           .lean()
       : Promise.resolve([]),
+    Meeting.find({
+      $or: [{ organizerId: userId }, { attendees: userId }],
+      date: {
+        $gte: windowStart.toISOString().slice(0, 10),
+        $lte: windowEnd.toISOString().slice(0, 10),
+      },
+      status: { $ne: "cancelled" },
+    }).sort({ date: 1, startTime: 1 }).lean(),
   ]);
 
   const eventById = new Map();
@@ -168,9 +216,12 @@ async function loadCalendarDataForUser(userId, windowStart, windowEnd) {
   for (const m of programMilestones) {
     items.push(mapToTimelineItem(m, "programMilestone", now));
   }
+  for (const m of userMeetings) {
+    items.push(mapMeetingToTimelineItem(m, now));
+  }
 
   const timeline = buildSortedTimeline(items);
-  return { events, deliverables, programMilestones, timeline };
+  return { events, deliverables, programMilestones, meetings: userMeetings, timeline };
 }
 
 agendaRouter.get(
@@ -265,11 +316,16 @@ agendaRouter.get(
 agendaRouter.post(
   "/agenda/notifications/daily",
   requireAuth,
+  requireRole("admin"),
   asyncHandler(async (req, res) => {
+    const counts = await runDailyDigestJobs();
     return apiSuccess(res, {
       triggered: true,
       ranAt: new Date().toISOString(),
       startupId: req.body?.startupId || null,
+      ...counts,
+      eventCount: counts.eventReminders,
+      deliverableCount: counts.deliverableDueSoon,
     });
   }),
 );
@@ -310,7 +366,7 @@ agendaRouter.get(
 
     const userId = req.params.userId;
     const { start, end } = parseCalendarWindow(req);
-    const { events, deliverables, programMilestones, timeline } = await loadCalendarDataForUser(
+    const { events, deliverables, programMilestones, meetings, timeline } = await loadCalendarDataForUser(
       userId,
       start,
       end,
@@ -322,7 +378,7 @@ agendaRouter.get(
       events,
       deliverables,
       programMilestones,
-      meetings: [],
+      meetings,
       timeline: windowed,
       agenda: windowed,
       window: { start: start.toISOString(), end: end.toISOString() },

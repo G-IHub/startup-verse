@@ -34,6 +34,8 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "../ui/tooltip";
+import { useNotifications } from "../../contexts/NotificationContext";
+import { mergeClientPreferencesPatch } from "../../utils/api/clientPreferencesApi";
 export default function AppLayout({
   user,
   children,
@@ -41,12 +43,8 @@ export default function AppLayout({
   currentPage,
   onPageChange,
 }) {
-  // Load notification and message counts from localStorage
-  const notifications = JSON.parse(
-    localStorage.getItem("founder_notifications") || "[]",
-  );
-  const notificationCount = notifications.filter((n) => !n.read).length;
-  const messageCount = 3; // TODO: Implement actual message count from messaging system
+  const { unreadCount: notificationCount = 0 } = useNotifications();
+  const messageCount = 3; // TODO: wire to messaging unread count
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -238,8 +236,17 @@ export default function AppLayout({
                     variant="outline"
                     size="sm"
                     className="h-9 px-3 gap-2 hidden lg:flex border-accent/30 text-accent hover:bg-accent/10"
-                    onClick={() => {
-                      localStorage.setItem("startupverse_ui_mode", "hybrid");
+                    onClick={async () => {
+                      const uid = user?._id ?? user?.id;
+                      if (uid) {
+                        try {
+                          await mergeClientPreferencesPatch(String(uid), {
+                            startupverse_ui_mode: "hybrid",
+                          });
+                        } catch {
+                          /* ignore */
+                        }
+                      }
                       toast.success("Switching to Adaptive Workspace mode...");
                       setTimeout(() => window.location.reload(), 500);
                     }}

@@ -8,8 +8,8 @@ import React, {
 import { API_BASE_URL } from "../config/apiBase.js";
 import { toast } from "sonner";
 import { useAuth } from "./AuthContext";
-import { getAccessToken } from "../app/session";
 import { normalizeNotificationType } from "../utils/notificationType.js";
+import { subscribeToUnreadCount, subscribeToInterests, subscribeToInvitations } from "../utils/socketIoRealtime.js";
 
 const NotificationContext = createContext(undefined);
 
@@ -24,20 +24,21 @@ const DEFAULT_PREFERENCES = {
   teamUpdates: true,
 };
 
-function getAuthHeaders() {
-  return {
-    Authorization: `Bearer ${getAccessToken()}`,
+// Default fetch options for cookie-based auth
+const defaultOptions = {
+  credentials: "include",
+  headers: {
     "Content-Type": "application/json",
-  };
-}
+  },
+};
 
 async function checkBackendAvailability() {
   try {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 5000);
     const response = await fetch(`${API_BASE_URL}/health`, {
+      ...defaultOptions,
       method: "GET",
-      headers: getAuthHeaders(),
       signal: controller.signal,
     });
     clearTimeout(timeoutId);
@@ -103,15 +104,7 @@ export function NotificationProvider({ children }) {
     if (!backendOnline) {
       setBackendAvailable(false);
       setError(null);
-
-      const cached = localStorage.getItem(`notifications_${user.id}`);
-      if (cached) {
-        try {
-          setNotifications(mapNotificationList(JSON.parse(cached)));
-        } catch (parseError) {
-          console.error("Failed to parse cached notifications:", parseError);
-        }
-      }
+      setNotifications([]);
 
       setLoading(false);
       return;
@@ -123,7 +116,7 @@ export function NotificationProvider({ children }) {
 
       const response = await fetch(`${API_BASE_URL}/users/${user.id}/notifications`, {
         method: "GET",
-        headers: getAuthHeaders(),
+        ...defaultOptions,
         signal: controller.signal,
       });
       clearTimeout(timeoutId);
@@ -148,11 +141,6 @@ export function NotificationProvider({ children }) {
       setError(null);
       setBackendAvailable(true);
       setLoading(false);
-
-      localStorage.setItem(
-        `notifications_${user.id}`,
-        JSON.stringify(mappedNotifications),
-      );
     } catch (fetchError) {
       if (
         fetchError.name !== "AbortError" &&
@@ -165,15 +153,7 @@ export function NotificationProvider({ children }) {
       setBackendAvailable(false);
       setError(null);
       setLoading(false);
-
-      const cached = localStorage.getItem(`notifications_${user.id}`);
-      if (cached) {
-        try {
-          setNotifications(mapNotificationList(JSON.parse(cached)));
-        } catch (parseError) {
-          console.error("Failed to parse cached notifications:", parseError);
-        }
-      }
+      setNotifications([]);
     }
   }, [user?.id]);
 
@@ -188,7 +168,7 @@ export function NotificationProvider({ children }) {
         `${API_BASE_URL}/users/${user.id}/notification-preferences`,
         {
           method: "GET",
-          headers: getAuthHeaders(),
+          ...defaultOptions,
           signal: controller.signal,
         },
       );
@@ -214,14 +194,79 @@ export function NotificationProvider({ children }) {
     fetchNotifications();
     fetchPreferences();
 
+    // Fallback polling when sockets are down; realtime bumps come via
+    // `notification:created` on the user room (see subscription below).
     const interval = setInterval(() => {
       if (backendAvailable) {
         fetchNotifications();
       }
-    }, 30000);
+    }, 120000);
 
-    return () => clearInterval(interval);
-  }, [user?.id, backendAvailable, fetchNotifications, fetchPreferences]);
+    const unsubRealtime = subscribeToUnreadCount(null, user.id, () => {
+      fetchNotifications();
+    });
+
+    // Subscribe to interest events for real-time inbox updates
+    const unsubInterests = subscribeToInterests(user.id, (event) => {
+      if (event.action === "created") {
+        // Show toast notification for new interest received
+        if (user?.role === "founder") {
+          toast.info("New talent interest", {
+            description: "A talent expressed interest in your startup",
+            action: {
+              label: "View",
+              onClick: () => window.location.assign("/inbox"),
+            },
+          });
+        }
+        // Refresh notifications to update badge count
+        fetchNotifications();
+      } else if (event.action === "updated") {
+        // Interest status changed (accepted/declined)
+        const { interest } = event;
+        if (interest?.status === "accepted" && user?.role === "talent") {
+          toast.success("Interest accepted!", {
+            description: "A founder accepted your interest. You are now a team member!",
+          });
+        }
+        fetchNotifications();
+      }
+    });
+
+    // Subscribe to invitation events for real-time inbox updates
+    const unsubInvitations = subscribeToInvitations(user.id, (event) => {
+      if (event.action === "created") {
+        // Show toast notification for new invitation received
+        if (user?.role === "talent") {
+          toast.info("New invitation from founder", {
+            description: "A founder invited you to join their startup",
+            action: {
+              label: "View",
+              onClick: () => window.location.assign("/inbox"),
+            },
+          });
+        }
+        // Refresh notifications to update badge count
+        fetchNotifications();
+      } else if (event.action === "updated") {
+        // Invitation status changed (accepted/declined)
+        const { invitation } = event;
+        if (invitation?.status === "accepted" && user?.role === "founder") {
+          toast.success("Invitation accepted!", {
+            description: "A talent accepted your invitation. They are now a team member!",
+          });
+        }
+        fetchNotifications();
+      }
+    });
+
+    return () => {
+      clearInterval(interval);
+      unsubRealtime?.();
+      unsubInterests?.();
+      unsubInvitations?.();
+    };
+  }, [user?.id, user?.role, backendAvailable, fetchNotifications, fetchPreferences]);
 
   const addNotification = async (notification) => {
     if (!user?.id || !backendAvailable) {
@@ -255,12 +300,13 @@ export function NotificationProvider({ children }) {
 
       const response = await fetch(`${API_BASE_URL}/notifications`, {
         method: "POST",
-        headers: getAuthHeaders(),
+        ...defaultOptions,
         body: JSON.stringify({
           userId: user.id,
           title: notification?.title || "Notification",
           message: notification?.message || "",
           type: normalizedType,
+          actionUrl: notification?.actionUrl || metadata.actionUrl || "",
           metadata,
         }),
         signal: controller.signal,
@@ -297,7 +343,7 @@ export function NotificationProvider({ children }) {
 
       const response = await fetch(`${API_BASE_URL}/notifications/${id}/read`, {
         method: "PUT",
-        headers: getAuthHeaders(),
+        ...defaultOptions,
         signal: controller.signal,
       });
       clearTimeout(timeoutId);
@@ -329,7 +375,7 @@ export function NotificationProvider({ children }) {
         `${API_BASE_URL}/users/${user.id}/notifications/mark-all-read`,
         {
           method: "POST",
-          headers: getAuthHeaders(),
+          ...defaultOptions,
           signal: controller.signal,
         },
       );
@@ -357,7 +403,7 @@ export function NotificationProvider({ children }) {
 
       const response = await fetch(`${API_BASE_URL}/notifications/${id}`, {
         method: "DELETE",
-        headers: getAuthHeaders(),
+        ...defaultOptions,
         signal: controller.signal,
       });
       clearTimeout(timeoutId);
@@ -386,7 +432,7 @@ export function NotificationProvider({ children }) {
 
       const response = await fetch(`${API_BASE_URL}/users/${user.id}/notifications`, {
         method: "DELETE",
-        headers: getAuthHeaders(),
+        ...defaultOptions,
         signal: controller.signal,
       });
       clearTimeout(timeoutId);
@@ -417,7 +463,7 @@ export function NotificationProvider({ children }) {
         `${API_BASE_URL}/users/${user.id}/notification-preferences`,
         {
           method: "PUT",
-          headers: getAuthHeaders(),
+          ...defaultOptions,
           body: JSON.stringify(prefs),
           signal: controller.signal,
         },

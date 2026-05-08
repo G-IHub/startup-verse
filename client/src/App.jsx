@@ -2,6 +2,15 @@ import "./styles/globals.css";
 import "./utils/earlyErrorSuppression";
 
 import { useState, useEffect, lazy, Suspense } from "react";
+import {
+  Routes,
+  Route,
+  Navigate,
+  Outlet,
+  useNavigate,
+  useLocation,
+  useParams,
+} from "react-router-dom";
 import LoginPage from "./components/LoginPage";
 import ChooseYourPathPage from "./components/ChooseYourPathPage";
 import { Toaster } from "./components/ui/sonner";
@@ -17,20 +26,16 @@ import { authApi } from "./api/authApi";
 import { initializeErrorSuppression } from "./utils/errorSuppression";
 import {
   APP_VIEWS,
-  STORAGE_KEYS,
   buildFounderProfile,
   buildTalentProfile,
-  ensureSessionMigration,
-  getAccessToken,
-  loadCurrentUser,
+  resolveDashboardIntent,
   resolveInitialView,
-  safeParseJson,
-  upsertStoredRecord,
+  getAccessToken,
 } from "./app/session";
-
-ensureSessionMigration();
-
-// Lazy-loaded route components
+import {
+  dashboardIntentToPath,
+  DASHBOARD_ROUTE_PATHS,
+} from "./app/dashboardPaths";
 const DashboardHybrid = lazy(() => import("./components/DashboardHybrid"));
 const ProfileCompletionModal = lazy(
   () => import("./components/ProfileCompletionModal"),
@@ -39,6 +44,9 @@ const TeamMemberOnboarding = lazy(() =>
   import("./components/TeamMemberOnboarding").then((m) => ({
     default: m.TeamMemberOnboarding,
   })),
+);
+const InvitationAcceptance = lazy(() =>
+  import("./components/InvitationAcceptance"),
 );
 const AdminDashboardRealTime = lazy(
   () => import("./components/admin/AdminDashboardRealTime"),
@@ -72,11 +80,6 @@ const AcceleratorLandingPage = lazy(() =>
     default: m.AcceleratorLandingPage,
   })),
 );
-const NotificationCronTrigger = lazy(
-  () => import("./components/NotificationCronTrigger"),
-);
-const EventReminderCron = lazy(() => import("./components/EventReminderCron"));
-
 // Admin tools (development only)
 // Deferred module references (populated after first paint)
 let refreshCurrentUser;
@@ -117,14 +120,110 @@ const LoadingSpinner = () => (
   </div>
 );
 
+function BootstrapLegacyDashboardQuery() {
+  const { user, isLoading } = useAuth();
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  useEffect(() => {
+    if (isLoading || !user) return;
+    const params = new URLSearchParams(location.search || "");
+    const legacy =
+      params.has("dashboardPage") ||
+      params.has("officeView") ||
+      params.has("page") ||
+      params.get("view") === "virtual-office" ||
+      params.get("tab") === "inbox";
+    if (!legacy || location.pathname !== "/") return;
+    const intent = resolveDashboardIntent(location);
+    const path = dashboardIntentToPath(intent, user.role);
+    if (path) navigate(path, { replace: true });
+  }, [user, isLoading, location.pathname, location.search, navigate]);
+
+  return null;
+}
+
+function RequireDashboard() {
+  const { user, isLoading } = useAuth();
+  const [founderStartupOk, setFounderStartupOk] = useState(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function run() {
+      if (!user?.onboardingComplete) {
+        setFounderStartupOk(null);
+        return;
+      }
+      if (user.role !== "founder") {
+        setFounderStartupOk(true);
+        return;
+      }
+      const fid = String(user._id ?? user.id ?? "");
+      if (!fid) {
+        setFounderStartupOk(true);
+        return;
+      }
+      try {
+        const startup = await founderApi.getFounderStartupSafe(fid);
+        if (!cancelled) setFounderStartupOk(Boolean(startup));
+      } catch {
+        if (!cancelled) setFounderStartupOk(false);
+      }
+    }
+    run();
+    return () => {
+      cancelled = true;
+    };
+  }, [user]);
+
+  if (isLoading) return <LoadingSpinner />;
+  if (!user) return <Navigate to="/" replace />;
+  if (!user.onboardingComplete) return <Navigate to="/onboarding" replace />;
+
+  if (user.role === "founder" && user.onboardingComplete) {
+    if (founderStartupOk === null) return <LoadingSpinner />;
+    if (!founderStartupOk) return <Navigate to="/onboarding" replace />;
+  }
+
+  return <Outlet />;
+}
+
+function JoinMeetingRoute() {
+  const { roomName } = useParams();
+
+  return (
+    <Suspense fallback={<LoadingSpinner />}>
+      <JoinMeetingPage roomName={roomName || ""} />
+    </Suspense>
+  );
+}
+
+function UnknownPathFallback() {
+  const { isLoading: authLoading, user: u } = useAuth();
+  const nav = useNavigate();
+
+  useEffect(() => {
+    if (authLoading) return;
+    if (u && !u.onboardingComplete) nav("/onboarding", { replace: true });
+    else if (u?.onboardingComplete) nav("/home", { replace: true });
+    else nav("/", { replace: true });
+  }, [authLoading, u, nav]);
+
+  return <LoadingSpinner />;
+}
+
 // ---------------------------------------------------------------------------
 // Main app content
 // ---------------------------------------------------------------------------
 
 function AppContent() {
-  const { user, setUser, login, logout } = useAuth();
+  const { user, setUser, login, logout, isLoading: authLoading } = useAuth();
+  const navigate = useNavigate();
+  const location = useLocation();
   const [currentView, setCurrentView] = useState(APP_VIEWS.landing);
   const [invitationToken, setInvitationToken] = useState(null);
+  /** null = resolving, 'cohort' | 'talent' | 'error' */
+  const [invitationKind, setInvitationKind] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
 
   // Defer non-critical initialization until after first paint
@@ -136,15 +235,27 @@ function AppContent() {
     return () => window.clearTimeout(timer);
   }, []);
 
-  // Resolve initial view from URL or persisted session
+  // Resolve initial marketing / shell view (URL-based dashboard uses separate routes).
   useEffect(() => {
     const initializeApp = async () => {
-      const urlView = resolveInitialView();
+      if (authLoading) return;
+
+      const pathname = location.pathname || "/";
+
+      if (
+        pathname.startsWith("/join/") ||
+        pathname === "/mentor/login" ||
+        DASHBOARD_ROUTE_PATHS.includes(pathname) ||
+        pathname === "/onboarding"
+      ) {
+        setIsLoading(false);
+        return;
+      }
+
+      const urlView = resolveInitialView(location);
 
       if (urlView === APP_VIEWS.admin) {
-        const savedUser = loadCurrentUser();
-        if (savedUser) {
-          login({ user: savedUser, accessToken: getAccessToken() });
+        if (user) {
           setCurrentView(APP_VIEWS.admin);
         } else {
           setCurrentView(APP_VIEWS.landing);
@@ -154,7 +265,7 @@ function AppContent() {
       }
 
       if (urlView === APP_VIEWS.invitation) {
-        const token = new URLSearchParams(window.location.search).get(
+        const token = new URLSearchParams(location.search || "").get(
           "invitation",
         );
         setInvitationToken(token);
@@ -169,70 +280,83 @@ function AppContent() {
         return;
       }
 
-      // Run one-time auth migration (legacy accounts)
       if (
-        import.meta.env.VITE_ENABLE_AUTH_MIGRATION === "true" &&
-        !localStorage.getItem(STORAGE_KEYS.authMigrationCompleted)
+        user &&
+        (pathname === "/" || pathname === "") &&
+        !resolveInitialView(location)
       ) {
-        import("./utils/backendHealthCheck").then(
-          ({ runAuthMappingMigration }) => {
-            runAuthMappingMigration(true)
-              .then((result) => {
-                if (result?.success) {
-                  localStorage.setItem(
-                    STORAGE_KEYS.authMigrationCompleted,
-                    "true",
-                  );
-                }
-              })
-              .catch(() => {});
-          },
-        );
+        let nextPath = "/home";
+        if (!user.onboardingComplete) {
+          nextPath = "/onboarding";
+        } else if (user.role === "founder") {
+          const fid = String(user._id ?? user.id);
+          if (fid) {
+            const startup = await founderApi.getFounderStartupSafe(fid);
+            if (!startup) nextPath = "/onboarding";
+          }
+        }
+        navigate(nextPath, { replace: true });
+        setIsLoading(false);
+        return;
       }
 
-      // Restore existing session
-      const savedUser = loadCurrentUser();
-      if (savedUser) {
-        login({ user: savedUser, accessToken: getAccessToken() });
-
-        // Non-blocking backend refresh
-        if (refreshCurrentUser) {
-          refreshCurrentUser(savedUser.id)
-            .then((freshUser) => {
-              if (!freshUser) return;
-              setUser(freshUser);
-              if (freshUser.role !== savedUser.role) {
-                toast.success(
-                  `Your role has been updated to ${freshUser.role}!`,
-                );
-              }
-            })
-            .catch(() => {});
-        }
-
-        setCurrentView(
-          savedUser.onboardingComplete
-            ? APP_VIEWS.dashboard
-            : APP_VIEWS.profileSetup,
-        );
+      if (!user) {
+        setCurrentView(APP_VIEWS.landing);
       }
 
       setIsLoading(false);
     };
 
     initializeApp();
-  }, []);
+  }, [user, authLoading, navigate, location]);
 
-  // Guard: sync view with onboarding state
   useEffect(() => {
-    if (!user) return;
-    if (!user.onboardingComplete && currentView === APP_VIEWS.dashboard) {
-      setCurrentView(APP_VIEWS.profileSetup);
+    if (currentView !== APP_VIEWS.invitation || !invitationToken) {
+      setInvitationKind(null);
+      return;
     }
-    if (user.onboardingComplete && currentView === APP_VIEWS.profileSetup) {
-      setCurrentView(APP_VIEWS.dashboard);
+    setInvitationKind(null);
+    let cancelled = false;
+    (async () => {
+      try {
+        const { API_BASE_URL } = await import("./config/apiBase.js");
+        const r = await fetch(
+          `${API_BASE_URL}/invitations/token/${encodeURIComponent(invitationToken)}`,
+          { credentials: "include" },
+        );
+        const j = await r.json().catch(() => ({}));
+        if (cancelled) return;
+        if (!r.ok || !j?.success || !j?.data?.invitation) {
+          setInvitationKind("error");
+          return;
+        }
+        const kind = j.data.kind === "cohort" ? "cohort" : "talent";
+        setInvitationKind(kind);
+      } catch {
+        if (!cancelled) setInvitationKind("error");
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [currentView, invitationToken]);
+
+  const clearInvitationQuery = () => {
+    window.history.replaceState({}, document.title, window.location.pathname);
+    setInvitationToken(null);
+    setInvitationKind(null);
+  };
+
+  const handleCohortInvitationResolved = async () => {
+    clearInvitationQuery();
+    try {
+      const refreshed = await authApi.me();
+      login({ user: refreshed });
+    } catch {
+      /* session unchanged */
     }
-  }, [user, currentView]);
+    navigate("/home", { replace: true });
+  };
 
   // ---------------------------------------------------------------------------
   // Auth handlers
@@ -249,13 +373,22 @@ function AppContent() {
       const currentUser = signupData.backendUser;
       login({
         user: currentUser,
-        accessToken: signupData.backendToken || getAccessToken(),
       });
       if (currentUser.onboardingComplete) {
         toast.success(`Welcome back, ${currentUser.name}!`);
-        setCurrentView(APP_VIEWS.dashboard);
+        if (
+          currentUser.role === "founder" &&
+          (currentUser._id || currentUser.id)
+        ) {
+          const fid = String(currentUser._id ?? currentUser.id);
+          founderApi.getFounderStartupSafe(fid).then((startup) => {
+            navigate(startup ? "/home" : "/onboarding", { replace: true });
+          });
+        } else {
+          navigate("/home", { replace: true });
+        }
       } else {
-        setCurrentView(APP_VIEWS.profileSetup);
+        navigate("/onboarding", { replace: true });
       }
       return;
     }
@@ -266,10 +399,7 @@ function AppContent() {
     const completedUser = { ...userData, onboardingComplete: true };
     login({
       user: completedUser,
-      accessToken: userData?.backendToken || getAccessToken(),
     });
-    upsertStoredRecord(STORAGE_KEYS.registeredUsers, completedUser);
-    upsertStoredRecord(STORAGE_KEYS.teamMembers, completedUser);
 
     if (userData.role === "team-member" || userData.role === "team") {
       teamMemberApi
@@ -278,59 +408,72 @@ function AppContent() {
     }
 
     window.history.replaceState({}, document.title, window.location.pathname);
-    setCurrentView(APP_VIEWS.dashboard);
+    navigate("/home", { replace: true });
   };
 
   const handleLogout = () => {
     logout();
     setCurrentView(APP_VIEWS.landing);
+    navigate("/", { replace: true });
   };
 
   const handleUpdateUser = async (updatedUser) => {
     if (!updatedUser) {
       logout();
       setCurrentView(APP_VIEWS.landing);
+      navigate("/", { replace: true });
       return;
     }
 
     setUser(updatedUser);
-    upsertStoredRecord(STORAGE_KEYS.registeredUsers, updatedUser);
 
-    authApi.updateProfile(updatedUser.id, updatedUser).catch(() => {});
+    authApi
+      .updateProfile(String(updatedUser._id ?? updatedUser.id), updatedUser)
+      .catch((err) => {
+        console.error("[handleUpdateUser] Profile sync failed:", err);
+        toast.error(
+          err?.message || "Could not save profile to the server. Please try again.",
+        );
+      });
 
     const { role } = updatedUser;
 
     if (role === "founder") {
-      upsertStoredRecord(
-        STORAGE_KEYS.founderProfiles,
-        buildFounderProfile(updatedUser),
-      );
-      founderApi
-        .saveFounderProfile(updatedUser.id, updatedUser)
-        .catch(() => {});
+      if (updatedUser.startupId) {
+        founderApi
+          .saveFounderProfile({
+            userId: String(updatedUser._id ?? updatedUser.id),
+            startupId: updatedUser.startupId,
+            bio: updatedUser.bio || updatedUser.profile?.bio || "",
+            background: "",
+            links: {},
+          })
+          .catch(() => {});
+      }
     } else if (role === "team-member") {
       teamMemberApi
         .saveTeamMemberProfile(updatedUser.id, updatedUser)
         .catch(() => {});
     } else if (role === "talent") {
-      upsertStoredRecord(
-        STORAGE_KEYS.talentProfiles,
-        buildTalentProfile(updatedUser),
-      );
       talentApi.saveTalentProfile(updatedUser.id, updatedUser).catch(() => {});
     }
   };
 
-  // ---------------------------------------------------------------------------
-  // Render
-  // ---------------------------------------------------------------------------
+  const dashboardHybridElement =
+    user ? (
+      <Suspense fallback={<LoadingSpinner />}>
+        <DashboardHybrid
+          user={user}
+          onLogout={handleLogout}
+          onUpdateUser={handleUpdateUser}
+        />
+      </Suspense>
+    ) : (
+      <LoadingSpinner />
+    );
 
-  if (isLoading) {
-    return <LoadingSpinner />;
-  }
-
-  return (
-    <div className="min-h-screen bg-background">
+  const marketingTree = (
+    <>
       {currentView === APP_VIEWS.home && (
         <Suspense fallback={<LoadingSpinner />}>
           <DualPathHomePage
@@ -369,12 +512,23 @@ function AppContent() {
       {currentView === APP_VIEWS.choosePath && (
         <ChooseYourPathPage
           onBack={() => setCurrentView(APP_VIEWS.landing)}
-          onComplete={(_role, completedUser, accessToken) => {
+          onPersistUser={handleUpdateUser}
+          onComplete={async (_role, completedUser, accessToken) => {
             login({
               user: completedUser,
               accessToken: accessToken || getAccessToken(),
             });
-            setCurrentView(APP_VIEWS.dashboard);
+            let nextPath = "/home";
+            if (!completedUser.onboardingComplete) {
+              nextPath = "/onboarding";
+            } else if (completedUser.role === "founder") {
+              const fid = String(completedUser._id ?? completedUser.id);
+              if (fid) {
+                const startup = await founderApi.getFounderStartupSafe(fid);
+                if (!startup) nextPath = "/onboarding";
+              }
+            }
+            navigate(nextPath, { replace: true });
           }}
         />
       )}
@@ -395,7 +549,7 @@ function AppContent() {
         <Suspense fallback={<LoadingSpinner />}>
           <TalentWaitlistPage
             onBack={() =>
-              setCurrentView(user ? APP_VIEWS.dashboard : APP_VIEWS.landing)
+              navigate(user ? "/home" : "/", { replace: true })
             }
           />
         </Suspense>
@@ -409,14 +563,60 @@ function AppContent() {
         </Suspense>
       )}
 
-      {currentView === APP_VIEWS.invitation && invitationToken && (
-        <Suspense fallback={<LoadingSpinner />}>
-          <TeamMemberOnboarding
-            invitationToken={invitationToken}
-            onComplete={handleInvitationAccepted}
-          />
-        </Suspense>
-      )}
+      {currentView === APP_VIEWS.invitation &&
+        invitationToken &&
+        invitationKind === null && <LoadingSpinner />}
+
+      {currentView === APP_VIEWS.invitation &&
+        invitationToken &&
+        invitationKind === "error" && (
+          <div className="min-h-screen bg-background flex items-center justify-center p-6">
+            <div className="text-center space-y-4 max-w-md">
+              <p className="text-lg font-medium">Invalid or expired invitation</p>
+              <p className="text-muted-foreground text-sm">
+                This link may have expired, already been used, or is incorrect.
+              </p>
+              <button
+                type="button"
+                className="text-primary underline"
+                onClick={() => {
+                  clearInvitationQuery();
+                  setCurrentView(APP_VIEWS.landing);
+                }}
+              >
+                Go to home
+              </button>
+            </div>
+          </div>
+        )}
+
+      {currentView === APP_VIEWS.invitation &&
+        invitationToken &&
+        invitationKind === "cohort" && (
+          <Suspense fallback={<LoadingSpinner />}>
+            <InvitationAcceptance
+              token={invitationToken}
+              onAccept={handleInvitationAccepted}
+              onCohortResolved={handleCohortInvitationResolved}
+              onCancel={() => {
+                clearInvitationQuery();
+                if (user) navigate("/home", { replace: true });
+                else setCurrentView(APP_VIEWS.landing);
+              }}
+            />
+          </Suspense>
+        )}
+
+      {currentView === APP_VIEWS.invitation &&
+        invitationToken &&
+        invitationKind === "talent" && (
+          <Suspense fallback={<LoadingSpinner />}>
+            <TeamMemberOnboarding
+              invitationToken={invitationToken}
+              onComplete={handleInvitationAccepted}
+            />
+          </Suspense>
+        )}
 
       {currentView === APP_VIEWS.invitation && !invitationToken && (
         <div className="min-h-screen bg-background flex items-center justify-center">
@@ -425,36 +625,6 @@ function AppContent() {
             <p className="text-muted-foreground">Loading invitation...</p>
           </div>
         </div>
-      )}
-
-      {currentView === APP_VIEWS.dashboard && user && (
-        <Suspense fallback={<LoadingSpinner />}>
-          <DashboardHybrid
-            user={user}
-            onLogout={handleLogout}
-            onUpdateUser={handleUpdateUser}
-          />
-        </Suspense>
-      )}
-
-      {currentView === APP_VIEWS.profileSetup && user && (
-        <Suspense fallback={<LoadingSpinner />}>
-          <ProfileCompletionModal
-            role={user.role}
-            user={user}
-            onUpdateUser={handleUpdateUser}
-            onComplete={() => setCurrentView(APP_VIEWS.dashboard)}
-            onClose={() => setCurrentView(APP_VIEWS.dashboard)}
-          />
-        </Suspense>
-      )}
-
-      {currentView === APP_VIEWS.joinMeeting && (
-        <Suspense fallback={<LoadingSpinner />}>
-          <JoinMeetingPage
-            roomName={window.location.pathname.split("/join/")[1] || ""}
-          />
-        </Suspense>
       )}
 
       {currentView === APP_VIEWS.admin && user && (
@@ -468,7 +638,69 @@ function AppContent() {
           <MentorLogin />
         </Suspense>
       )}
+    </>
+  );
 
+  const onboardingRouteElement =
+    user ? (
+      <Suspense fallback={<LoadingSpinner />}>
+        <ProfileCompletionModal
+          variant="page"
+          role={user.role}
+          user={user}
+          onUpdateUser={handleUpdateUser}
+          onComplete={() => navigate("/home", { replace: true })}
+          onClose={async () => {
+            if (user?.role === "founder") {
+              const fid = String(user._id ?? user.id);
+              if (fid) {
+                const startup = await founderApi.getFounderStartupSafe(fid);
+                if (!startup) {
+                  toast.error(
+                    "Complete startup profile (including startup name and type) before continuing.",
+                  );
+                  return;
+                }
+              }
+            }
+            navigate("/home", { replace: true });
+          }}
+        />
+      </Suspense>
+    ) : (
+      <Navigate to="/" replace />
+    );
+
+  // ---------------------------------------------------------------------------
+  // Render
+  // ---------------------------------------------------------------------------
+
+  if (isLoading || authLoading) {
+    return <LoadingSpinner />;
+  }
+
+  return (
+    <div className="min-h-screen bg-background">
+      <BootstrapLegacyDashboardQuery />
+      <Routes>
+        <Route path="/join/:roomName" element={<JoinMeetingRoute />} />
+        <Route
+          path="/mentor/login"
+          element={
+            <Suspense fallback={<LoadingSpinner />}>
+              <MentorLogin />
+            </Suspense>
+          }
+        />
+        <Route path="/onboarding" element={onboardingRouteElement} />
+        <Route element={<RequireDashboard />}>
+          {DASHBOARD_ROUTE_PATHS.map((p) => (
+            <Route key={p} path={p} element={dashboardHybridElement} />
+          ))}
+        </Route>
+        <Route path="/" element={marketingTree} />
+        <Route path="*" element={<UnknownPathFallback />} />
+      </Routes>
       <Toaster />
     </div>
   );
@@ -478,20 +710,22 @@ function AppContent() {
 // Root
 // ---------------------------------------------------------------------------
 
+function AppProvidersInner() {
+  const { user, isLoading } = useAuth();
+  const userId = user ? String(user._id ?? user.id ?? "") : null;
+  return (
+    <ThemeProvider userId={userId} authReady={!isLoading}>
+      <NotificationProvider>
+        <AppContent />
+      </NotificationProvider>
+    </ThemeProvider>
+  );
+}
+
 export default function App() {
   return (
-    <ThemeProvider>
-      <AuthProvider>
-        <NotificationProvider>
-          <Suspense fallback={null}>
-            <NotificationCronTrigger />
-          </Suspense>
-          <Suspense fallback={null}>
-            <EventReminderCron />
-          </Suspense>
-          <AppContent />
-        </NotificationProvider>
-      </AuthProvider>
-    </ThemeProvider>
+    <AuthProvider>
+      <AppProvidersInner />
+    </AuthProvider>
   );
 }

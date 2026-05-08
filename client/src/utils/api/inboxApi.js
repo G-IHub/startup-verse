@@ -1,4 +1,4 @@
-import { request } from "../backendClient";
+import { request, API_BASE_URL } from "../backendClient";
 
 // Pagination types
 
@@ -39,7 +39,7 @@ export async function getOrganizationInvitations(founderId) {
   );
   console.log(
     "🔍 [InboxAPI] URL:",
-    `${BASE_URL}/invitations/founder/${founderId}`,
+    `${API_BASE_URL}/invitations/founder/${founderId}`,
   );
 
   const result = await apiRequest(`/invitations/founder/${founderId}`);
@@ -86,27 +86,36 @@ export async function getReceivedInterests(founderId, params = {}) {
       `/interests/received/${founderId}${queryString}`,
       { method: "GET" },
     );
+    if (Array.isArray(data)) return data;
     return data.interests || data.items || [];
   } catch (error) {
     // Debug log only - backend is optional in demo mode
     if (import.meta.env.DEV) {
       console.debug(
-        "Backend getReceivedInterests failed (using localStorage fallback):",
+        "Backend getReceivedInterests failed (empty list fallback):",
         error.message,
       );
     }
-    // Return empty array - caller will use localStorage fallback
+    // Return empty array when the API is unavailable
     return [];
   }
 }
 
 // Get interests sent by a talent
 export async function getSentInterests(talentId, params = {}) {
-  const queryString = buildQueryString(params);
-  const data = await apiRequest(`/interests/sent/${talentId}${queryString}`, {
-    method: "GET",
-  });
-  return data.interests || data.items || [];
+  try {
+    const queryString = buildQueryString(params);
+    const data = await apiRequest(`/interests/sent/${talentId}${queryString}`, {
+      method: "GET",
+    });
+    if (Array.isArray(data)) return data;
+    return data.interests || data.items || [];
+  } catch (error) {
+    if (import.meta.env.DEV) {
+      console.debug("Backend getSentInterests failed:", error.message);
+    }
+    return [];
+  }
 }
 
 // Update interest status (accept/reject)
@@ -134,6 +143,30 @@ export async function markInterestAsOnboarded(interestId) {
   });
 }
 
+// Propose team membership (either party can propose; direction = "founder" | "talent")
+export async function proposeTeamMembership(interestId, direction) {
+  const status = direction === "founder" ? "proposed-by-founder" : "proposed-by-talent";
+  const data = await apiRequest(`/interests/${interestId}/status`, {
+    method: "PUT",
+    body: JSON.stringify({ status }),
+  });
+  return data?.interest ?? data;
+}
+
+// Accept a team membership proposal (the receiving party calls this)
+export async function acceptTeamMembershipProposal(interestId) {
+  return markInterestAsOnboarded(interestId);
+}
+
+// Decline a team membership proposal
+export async function declineTeamMembershipProposal(interestId) {
+  const data = await apiRequest(`/interests/${interestId}/status`, {
+    method: "PUT",
+    body: JSON.stringify({ status: "declined" }),
+  });
+  return data?.interest ?? data;
+}
+
 // ==========================================
 // INVITATIONS (Founder -> Talent)
 // ==========================================
@@ -148,23 +181,39 @@ export async function sendInvitation(invitation) {
 
 // Get invitations sent by a founder
 export async function getSentInvitations(founderId, params = {}) {
-  const queryString = buildQueryString(params);
-  const data = await apiRequest(`/invitations/sent/${founderId}${queryString}`, {
-    method: "GET",
-  });
-  return data.invitations || data.items || [];
+  try {
+    const queryString = buildQueryString(params);
+    const data = await apiRequest(`/invitations/sent/${founderId}${queryString}`, {
+      method: "GET",
+    });
+    if (Array.isArray(data)) return data;
+    return data.invitations || data.items || [];
+  } catch (error) {
+    if (import.meta.env.DEV) {
+      console.debug("Backend getSentInvitations failed:", error.message);
+    }
+    return [];
+  }
 }
 
 // Get invitations received by a talent
 export async function getReceivedInvitations(talentId, params = {}) {
-  const queryString = buildQueryString(params);
-  const data = await apiRequest(
-    `/invitations/received/${talentId}${queryString}`,
-    {
-      method: "GET",
-    },
-  );
-  return data.invitations || data.items || [];
+  try {
+    const queryString = buildQueryString(params);
+    const data = await apiRequest(
+      `/invitations/received/${talentId}${queryString}`,
+      {
+        method: "GET",
+      },
+    );
+    if (Array.isArray(data)) return data;
+    return data.invitations || data.items || [];
+  } catch (error) {
+    if (import.meta.env.DEV) {
+      console.debug("Backend getReceivedInvitations failed:", error.message);
+    }
+    return [];
+  }
 }
 
 // Update invitation status (accept/reject)

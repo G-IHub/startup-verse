@@ -3,11 +3,14 @@ import mongoose from "mongoose";
 const savedItemSchema = new mongoose.Schema(
   {
     talentId: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true, index: true },
-    itemType: { 
-      type: String, 
-      required: [true, "Item type is required"], 
+    itemType: {
+      type: String,
+      required: [true, "Item type is required"],
       index: true,
-      maxlength: [50, "ItemType cannot exceed 50 characters"]
+      enum: {
+        values: ["job", "startup"],
+        message: "{VALUE} is not a valid saved item type (allowed: job, startup)",
+      },
     },
     itemId: { type: mongoose.Schema.Types.ObjectId, required: true, index: true },
     metadata: { type: mongoose.Schema.Types.Mixed, default: {} },

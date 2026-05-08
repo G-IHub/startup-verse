@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "../ui/card";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
@@ -26,44 +26,42 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { HelpTooltip } from "../ui/help-tooltip";
+import { useAuth } from "../../contexts/AuthContext";
+import {
+  useHydrateStageDraft,
+  persistStageDraft,
+} from "../../hooks/useStageDraftFromJourney";
+import { useJourneyStore } from "../../state/useJourneyStore";
 export default function ProfileSetup() {
+  const { user } = useAuth();
   const [profileData, setProfileData] = useState({});
   const [activeTab, setActiveTab] = useState("startup");
-  useEffect(() => {
-    const saved = localStorage.getItem("founder_profile");
-    if (saved) {
-      setProfileData(JSON.parse(saved));
-    }
-  }, []);
+  useHydrateStageDraft(user, "founder_profile", (raw) => {
+    if (!raw || typeof raw !== "object") return;
+    setProfileData(raw);
+  });
   const handleSave = () => {
-    localStorage.setItem("founder_profile", JSON.stringify(profileData));
+    persistStageDraft("founder_profile", profileData);
 
     // Check if profile is complete
     const completion = getCompletionPercentage();
 
-    // Update journey progress
-    const journeyProgress = JSON.parse(
-      localStorage.getItem("founder_journey_progress") || "{}",
-    );
-    journeyProgress.profileSetup = {
-      status: completion === 100 ? "completed" : "in-progress",
-      progress: completion,
-      lastSaved: new Date().toISOString(),
+    const journeyProgress = {
+      profileSetup: {
+        status: completion === 100 ? "completed" : "in-progress",
+        progress: completion,
+        lastSaved: new Date().toISOString(),
+        ...(completion === 100 ? { completedAt: new Date().toISOString() } : {}),
+      },
     };
-    if (
-      completion === 100 &&
-      journeyProgress.profileSetup.status === "completed" &&
-      !journeyProgress.profileSetup.completedAt
-    ) {
-      journeyProgress.profileSetup.completedAt = new Date().toISOString();
+    useJourneyStore.getState().scheduleHomeUiPersist({
+      founderJourneyProgressOverlay: journeyProgress,
+    });
+    if (completion === 100) {
       toast.success("🎉 Profile setup complete! Stage 0 finished.");
     } else {
       toast.success("Profile saved successfully!");
     }
-    localStorage.setItem(
-      "founder_journey_progress",
-      JSON.stringify(journeyProgress),
-    );
   };
   const handleChange = (field, value) => {
     setProfileData((prev) => ({

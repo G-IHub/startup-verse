@@ -19,7 +19,14 @@ import {
 } from "../ui/card";
 import { Bell, Calendar, Send } from "lucide-react";
 import { toast } from "sonner";
-import { getAccessToken } from "../../app/session";
+
+// Default fetch options for cookie-based auth
+
+const defaultOptions = {
+  credentials: "include",
+  headers: { "Content-Type": "application/json" },
+};
+
 export default function AgendaNotificationTrigger({ startupId }) {
   const [loading, setLoading] = useState(false);
   const [summary, setSummary] = useState(null);
@@ -29,21 +36,23 @@ export default function AgendaNotificationTrigger({ startupId }) {
       const response = await fetch(
         `${API_BASE_URL}/agenda/notifications/daily`,
         {
+          ...defaultOptions,
           method: "POST",
-          headers: {
-            Authorization: `Bearer ${getAccessToken()}`,
-            "Content-Type": "application/json",
-          },
         },
       );
       const data = await response.json();
       if (data.success) {
-        toast.success("Daily notifications sent!", {
-          description: `Processed ${data.results?.length || 0} startups`,
+        const d = data.data || {};
+        const total =
+          (d.deliverableDueSoon || 0) +
+          (d.eventReminders || 0) +
+          (d.invitationExpiry || 0);
+        toast.success("Daily digest jobs ran", {
+          description: `Deliverables: ${d.deliverableDueSoon ?? 0}, events: ${d.eventReminders ?? 0}, invites: ${d.invitationExpiry ?? 0} (${total} notifications)`,
         });
-        console.log("Notification results:", data.results);
+        console.log("Daily digest:", d);
       } else {
-        toast.error("Failed to send notifications");
+        toast.error("Failed to run daily digest (admin only)");
       }
     } catch (error) {
       console.error("Error sending notifications:", error);
@@ -58,18 +67,24 @@ export default function AgendaNotificationTrigger({ startupId }) {
       const response = await fetch(
         `${API_BASE_URL}/agenda/${startupId}/weekly-summary`,
         {
-          headers: {
-            Authorization: `Bearer ${getAccessToken()}`,
-          },
+          ...defaultOptions,
         },
       );
       const data = await response.json();
       if (data.success) {
-        setSummary(data.summary);
-        toast.success("Weekly summary generated!", {
-          description: `${data.summary.totalItems} items this week`,
+        const s = data.data || {};
+        const totalItems = (s.eventCount || 0) + (s.deliverableCount || 0);
+        setSummary({
+          totalItems,
+          meetingsCount: s.eventCount ?? 0,
+          tasksCount: 0,
+          milestonesCount: s.deliverableCount ?? 0,
+          overdueCount: 0,
         });
-        console.log("Weekly summary:", data.summary);
+        toast.success("Weekly summary generated!", {
+          description: `${totalItems} cohort items (events + deliverables)`,
+        });
+        console.log("Weekly summary:", s);
       } else {
         toast.error("Failed to get summary");
       }

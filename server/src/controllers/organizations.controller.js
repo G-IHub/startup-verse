@@ -6,12 +6,19 @@ import ProgramMilestone from "../models/ProgramMilestone.js";
 import { error as apiError, success as apiSuccess } from "../utils/apiResponse.js";
 
 export const createOrganization = async (req, res) => {
+  const rawType = req.body?.type;
+  const organizationType =
+    rawType != null && String(rawType).trim() !== ""
+      ? String(rawType).trim().toLowerCase()
+      : null;
+
   const organization = await Organization.create({
     name: req.body?.name || "Organization",
     description: req.body?.description || "",
     logo: req.body?.logo || "",
     website: req.body?.website || "",
     createdBy: req.body?.createdBy || req.user.id,
+    settings: organizationType ? { organizationType } : {},
   });
 
   await OrganizationAdmin.findOneAndUpdate(
@@ -61,6 +68,23 @@ export const updateOrganization = async (req, res) => {
 export const getOrganizationAdmins = async (req, res) => {
   const admins = await OrganizationAdmin.find({ organizationId: req.params.orgId });
   return apiSuccess(res, admins);
+};
+
+export const getOrganizationAdminStatus = async (req, res) => {
+  const { orgId, userId } = req.params;
+  const [organization, membership] = await Promise.all([
+    Organization.findById(orgId).select("createdBy").lean(),
+    OrganizationAdmin.findOne({ organizationId: orgId, userId }).lean(),
+  ]);
+
+  if (!organization) {
+    return apiError(res, "Organization not found.", 404);
+  }
+
+  const isCreator = String(organization.createdBy) === String(userId);
+  const isAdmin = isCreator || Boolean(membership);
+
+  return apiSuccess(res, { isAdmin, isCreator });
 };
 
 export const addOrganizationAdmin = async (req, res) => {

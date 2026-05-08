@@ -2,16 +2,18 @@
  * Event notification system.
  */
 
-import { getAccessToken } from "../app/session";
 import { API_BASE_URL } from "../config/apiBase.js";
 import { get as backendGet } from "./backendClient.js";
 
-function getAuthHeaders() {
-  return {
-    Authorization: `Bearer ${getAccessToken()}`,
+// Default fetch options for cookie-based auth
+const defaultOptions = {
+  credentials: "include",
+  headers: {
     "Content-Type": "application/json",
-  };
-}
+  },
+};
+
+const upcomingEventReminderSent = new Set();
 
 /**
  * Send notification when a new event is created.
@@ -19,7 +21,7 @@ function getAuthHeaders() {
 export async function notifyEventCreated(cohortId, organizationId, eventData) {
   try {
     const response = await fetch(`${API_BASE_URL}/cohorts/${cohortId}/members`, {
-      headers: getAuthHeaders(),
+      ...defaultOptions,
     });
 
     if (!response.ok) {
@@ -47,7 +49,7 @@ export async function notifyEventCreated(cohortId, organizationId, eventData) {
 
     const notificationResponse = await fetch(`${API_BASE_URL}/notifications/batch`, {
       method: "POST",
-      headers: getAuthHeaders(),
+      ...defaultOptions,
       body: JSON.stringify({ notifications }),
     });
 
@@ -89,7 +91,7 @@ export async function notifyEventUpdated(cohortId, eventData) {
 
     const notificationResponse = await fetch(`${API_BASE_URL}/notifications/batch`, {
       method: "POST",
-      headers: getAuthHeaders(),
+      ...defaultOptions,
       body: JSON.stringify({ notifications }),
     });
 
@@ -131,7 +133,7 @@ export async function notifyEventCancelled(eventData) {
 
     const notificationResponse = await fetch(`${API_BASE_URL}/notifications/batch`, {
       method: "POST",
-      headers: getAuthHeaders(),
+      ...defaultOptions,
       body: JSON.stringify({ notifications }),
     });
 
@@ -183,7 +185,7 @@ export async function sendEventReminder(eventData) {
 
     const notificationResponse = await fetch(`${API_BASE_URL}/notifications/batch`, {
       method: "POST",
-      headers: getAuthHeaders(),
+      ...defaultOptions,
       body: JSON.stringify({ notifications }),
     });
 
@@ -213,7 +215,7 @@ export async function notifyOrganizationRSVP(
     const response = await fetch(
       `${API_BASE_URL}/organizations/${organizationId}/admins`,
       {
-        headers: getAuthHeaders(),
+        ...defaultOptions,
       },
     );
 
@@ -249,7 +251,7 @@ export async function notifyOrganizationRSVP(
 
     const notificationResponse = await fetch(`${API_BASE_URL}/notifications/batch`, {
       method: "POST",
-      headers: getAuthHeaders(),
+      ...defaultOptions,
       body: JSON.stringify({ notifications }),
     });
 
@@ -291,15 +293,12 @@ export async function checkAndSendEventReminders() {
 
     let totalSent = 0;
     for (const event of events) {
-      const reminderKey = `event-reminder-${event.id}`;
-      const reminderSent = localStorage.getItem(reminderKey);
-
-      if (!reminderSent) {
-        const result = await sendEventReminder(event);
-        if (result.success) {
-          totalSent += result.count || 0;
-          localStorage.setItem(reminderKey, new Date().toISOString());
-        }
+      const id = String(event?.id || "");
+      if (!id || upcomingEventReminderSent.has(id)) continue;
+      const result = await sendEventReminder(event);
+      if (result.success) {
+        upcomingEventReminderSent.add(id);
+        totalSent += result.count || 0;
       }
     }
 

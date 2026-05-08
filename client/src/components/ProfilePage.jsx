@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Button } from "./ui/button";
 import {
   Card,
@@ -14,6 +14,28 @@ import { Badge } from "./ui/badge";
 import { Progress } from "./ui/progress";
 import { toast } from "sonner";
 import { getTalentProfileCompletionPercent } from "../utils/talentProfileCompletion";
+import * as founderApi from "../utils/api/founderApi";
+import * as talentApi from "../utils/api/talentApi";
+import {
+  FOUNDER_INDUSTRY_OPTIONS,
+  FOUNDER_TARGET_AUDIENCE_OPTIONS,
+  FOUNDER_ROLES_NEEDED_OPTIONS,
+  FOUNDER_TEAM_SIZE_OPTIONS,
+  FOUNDER_STAGE_OPTIONS,
+  FOUNDER_VALIDATED_IDEA_OPTIONS,
+  FOUNDER_MVP_OPTIONS,
+  FOUNDER_CUSTOMERS_OPTIONS,
+  getFounderEditableFields,
+  resolveIndustryForPersistence,
+  validateFounderStartupFields,
+} from "../domains/founder/founderProfileConfig";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "./ui/select";
 import {
   UserCircle,
   Briefcase,
@@ -39,8 +61,40 @@ import {
   ExternalLink,
   Trash2,
 } from "lucide-react";
-export default function ProfilePage({ user, onUpdateUser }) {
-  const [isEditing, setIsEditing] = useState(false);
+import { cn } from "./ui/utils";
+import { Checkbox } from "./ui/checkbox";
+
+const SP_LABEL =
+  "font-body text-[13px] font-medium uppercase tracking-[0.06em] text-text-muted";
+const SP_SUBLABEL =
+  "font-body text-[13px] font-medium normal-case tracking-normal text-text-body";
+const SP_INPUT =
+  "rounded-input border-[1.5px] border-surface-border bg-surface-card font-body text-sm text-text-heading placeholder:text-text-muted transition-all duration-200 ease-in-out focus-visible:border-primary focus-visible:outline-none focus-visible:shadow-focus";
+const SP_TEXTAREA =
+  "min-h-16 resize-none rounded-input border-[1.5px] border-surface-border bg-surface-card font-body text-sm text-text-heading placeholder:text-text-muted transition-all duration-200 ease-in-out focus-visible:border-primary focus-visible:outline-none focus-visible:shadow-focus";
+const SP_SELECT_TRIGGER =
+  "w-full rounded-input border-[1.5px] border-surface-border bg-surface-card font-body text-sm text-text-heading transition-all duration-200 ease-in-out focus-visible:border-primary focus-visible:outline-none focus-visible:shadow-focus [&_svg]:text-text-body";
+const SP_VALUE = "font-body text-sm font-normal text-text-heading";
+const SP_EMPTY = "font-body text-sm italic text-text-muted";
+const SP_CARD = "border-0 bg-surface-card shadow-soft rounded-card";
+const SP_CARD_TITLE =
+  "flex items-center gap-2 font-heading text-base font-semibold text-text-heading [&_svg]:text-primary";
+const SP_PRIMARY_BTN =
+  "rounded-input bg-primary font-body font-semibold text-white shadow-[0_4px_16px_rgba(58,90,254,0.20)] transition-colors duration-200 ease-in-out hover:bg-primary-hover [&_svg]:text-white";
+const SP_CANCEL_BTN =
+  "rounded-input border border-surface-border bg-surface-card font-body font-semibold text-text-body transition-colors duration-200 ease-in-out hover:border-status-error hover:text-status-error";
+const SP_PREVIEW_BTN =
+  "rounded-input border border-surface-border bg-surface-card font-body font-semibold text-text-body shadow-none transition-colors duration-200 ease-in-out hover:border-primary hover:text-primary [&_svg]:text-text-body hover:[&_svg]:text-primary";
+const SP_CHECK_WRAP =
+  "flex flex-wrap gap-2 rounded-input border-0 bg-surface-page p-3";
+const SP_CHECK_BOX =
+  "border-[1.5px] border-surface-border bg-surface-card data-[state=checked]:border-primary data-[state=checked]:bg-primary data-[state=checked]:text-white";
+const SP_CHECK_LABEL_BASE =
+  "flex cursor-pointer items-center gap-2 font-body text-sm text-text-heading";
+const SP_CHECK_LABEL_ON = "font-medium text-primary";
+
+export default function ProfilePage({ user, onUpdateUser, initialEditing = false }) {
+  const [isEditing, setIsEditing] = useState(initialEditing);
   const [showPreview, setShowPreview] = useState(false);
 
   // Initialize all fields from user
@@ -67,13 +121,57 @@ export default function ProfilePage({ user, onUpdateUser }) {
     interests: user.interests || [],
     professionalGoals: user.professionalGoals || "",
     industryPreferences: user.industryPreferences || [],
-    // Founder fields
-    startupName: user.startupName || "",
-    startupStage: user.startupStage || "",
-    industry: user.industry || "",
-    teamSize: user.teamSize || 1,
+    // Founder fields (aligned with onboarding via getFounderEditableFields)
+    ...(user.role === "founder"
+      ? getFounderEditableFields(user)
+      : {
+          startupName: user.startupName || "",
+          startupStage: user.startupStage || "",
+          industry: user.industry || "",
+          teamSize: user.teamSize || 1,
+        }),
   });
   const [newSkill, setNewSkill] = useState("");
+
+  // Fetch talent profile from backend on mount to ensure data is current
+  useEffect(() => {
+    if (user?.role === "talent" && user?._id) {
+      const userId = String(user._id ?? user.id);
+      talentApi.getTalentProfile(userId)
+        .then((response) => {
+          if (response?.success && response?.data) {
+            const profile = response.data;
+            setEditedProfile((prev) => ({
+              ...prev,
+              fullName: profile.fullName || profile.name || prev.name,
+              professionalTitle: profile.professionalTitle || prev.professionalTitle,
+              headline: profile.headline || prev.headline,
+              location: profile.location || prev.location,
+              bio: profile.bio || prev.bio,
+              professionalGoals: profile.professionalGoals || prev.professionalGoals,
+              skills: profile.skills?.length ? profile.skills : prev.skills,
+              yearsOfExperience: profile.yearsOfExperience || prev.yearsOfExperience,
+              availability: profile.availability || prev.availability,
+              availabilityStatus: profile.availabilityStatus || prev.availabilityStatus,
+              preferredCommitment: profile.preferredCommitment || prev.preferredCommitment,
+              linkedin: profile.linkedinUrl || profile.linkedin || prev.linkedin,
+              github: profile.githubUrl || profile.github || prev.github,
+              website: profile.websiteUrl || profile.website || profile.portfolioWebsite || prev.website,
+              workExperience: profile.workExperiences?.length ? profile.workExperiences : profile.workExperience || prev.workExperience,
+              education: profile.educationList?.length ? profile.educationList : profile.education || prev.education,
+              certifications: profile.certifications?.length ? profile.certifications : prev.certifications,
+              portfolioItems: profile.portfolioItems?.length ? profile.portfolioItems : prev.portfolioItems,
+              preferredRoles: profile.preferredRoles?.length ? profile.preferredRoles : prev.preferredRoles,
+              industryPreferences: profile.industryPreferences?.length ? profile.industryPreferences : prev.industryPreferences,
+              interests: profile.interests?.length ? profile.interests : prev.interests,
+            }));
+          }
+        })
+        .catch((err) => {
+          console.warn("Failed to load talent profile:", err);
+        });
+    }
+  }, [user?._id, user?.id, user?.role]);
 
   const calculateProfileCompletion = () => {
     if (user.role !== "talent") return 100;
@@ -88,13 +186,100 @@ export default function ProfilePage({ user, onUpdateUser }) {
       return "Good progress! Add more details to attract founders.";
     return "Start building your profile to get discovered by startups.";
   };
-  const handleSave = () => {
-    if (onUpdateUser) {
-      onUpdateUser({
-        ...user,
-        ...editedProfile,
+  const handleSave = async () => {
+    if (!onUpdateUser) return;
+
+    if (user.role === "founder") {
+      const v = validateFounderStartupFields({
+        startupName: editedProfile.startupName,
+        startupDescription: editedProfile.startupDescription,
+        industryFocus: editedProfile.industryFocus,
+        otherIndustry: editedProfile.otherIndustry,
+        teamSize: editedProfile.teamSize,
+        targetAudience: editedProfile.targetAudience,
+        hasValidatedIdea: editedProfile.hasValidatedIdea,
+        hasMVP: editedProfile.hasMVP,
+        hasCustomers: editedProfile.hasCustomers,
       });
+      if (!v.ok) {
+        toast.error(v.errors[0]);
+        return;
+      }
+      const founderId = String(user._id ?? user.id);
+      const resolvedIndustry = resolveIndustryForPersistence(
+        editedProfile.industryFocus,
+        editedProfile.otherIndustry,
+      );
+      try {
+        const startup = await founderApi.upsertFounderStartup({
+          founderId,
+          name: String(editedProfile.startupName).trim(),
+          description: editedProfile.startupDescription || "",
+          industry: resolvedIndustry,
+          stage: editedProfile.startupStage || "",
+        });
+        const startupId = String(startup._id || startup.id);
+        await founderApi.saveFounderProfile({
+          userId: String(user._id ?? user.id),
+          startupId,
+          bio: editedProfile.bio || "",
+          background: "",
+          links: {},
+        });
+        const rolesResolved = editedProfile.rolesNeeded?.includes?.("Others")
+          ? [
+              ...editedProfile.rolesNeeded.filter((r) => r !== "Others"),
+              editedProfile.otherRole,
+            ].filter(Boolean)
+          : editedProfile.rolesNeeded || [];
+
+        onUpdateUser({
+          ...user,
+          ...editedProfile,
+          industry: resolvedIndustry,
+          rolesNeeded: rolesResolved,
+          startupId,
+          profile: {
+            ...user.profile,
+            startupName: editedProfile.startupName,
+            startupDescription: editedProfile.startupDescription,
+            industryFocus:
+              editedProfile.industryFocus === "Others"
+                ? editedProfile.otherIndustry
+                : editedProfile.industryFocus,
+            industry: resolvedIndustry,
+            startupStage: editedProfile.startupStage,
+            targetAudience: editedProfile.targetAudience,
+            rolesNeeded: rolesResolved,
+            teamSize: editedProfile.teamSize,
+            bio: editedProfile.bio,
+            hasValidatedIdea: editedProfile.hasValidatedIdea,
+            hasMVP: editedProfile.hasMVP,
+            hasCustomers: editedProfile.hasCustomers,
+            ...(editedProfile.industryFocus === "Others"
+              ? { otherIndustry: editedProfile.otherIndustry }
+              : {}),
+          },
+        });
+      } catch (err) {
+        toast.error(err?.message || "Failed to save startup profile");
+        return;
+      }
+    } else {
+      // Talent profile: save to backend API
+      const userId = String(user._id ?? user.id);
+      try {
+        await talentApi.saveTalentProfile(userId, editedProfile);
+        onUpdateUser({
+          ...user,
+          ...editedProfile,
+        });
+      } catch (err) {
+        toast.error(err?.message || "Failed to save talent profile");
+        return;
+      }
     }
+
     setIsEditing(false);
     toast.success("Profile updated successfully!");
   };
@@ -203,9 +388,18 @@ export default function ProfilePage({ user, onUpdateUser }) {
           issueYear: "",
           credentialId: "",
           credentialUrl: "",
+          certificateImage: "",
         },
       ],
     });
+  };
+  const updateCertificationImage = (id, file) => {
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      updateCertification(id, "certificateImage", reader.result || "");
+    };
+    reader.readAsDataURL(file);
   };
   const updateCertification = (id, field, value) => {
     setEditedProfile({
@@ -270,11 +464,13 @@ export default function ProfilePage({ user, onUpdateUser }) {
   // Render Talent Profile
   if (user.role === "talent") {
     return (
-      <div className="min-h-screen bg-background p-2 md:p-3 lg:p-4 space-y-3 md:space-y-4">
-        <div className="flex items-center justify-between flex-wrap gap-4">
+      <div className="min-h-full space-y-3 bg-transparent p-2 font-body md:space-y-4 md:p-3 lg:p-4">
+        <div className="flex flex-wrap items-center justify-between gap-4">
           <div>
-            <h1 className="text-3xl mb-2">Professional Profile</h1>
-            <p className="text-muted-foreground">
+            <h1 className="mb-2 font-heading text-3xl font-bold text-text-heading">
+              Professional Profile
+            </h1>
+            <p className="font-body text-text-body">
               This is what founders see when browsing talent
             </p>
           </div>
@@ -282,24 +478,29 @@ export default function ProfilePage({ user, onUpdateUser }) {
             {!isEditing && (
               <Button
                 variant="outline"
+                className={SP_PREVIEW_BTN}
                 onClick={() => setShowPreview(!showPreview)}
               >
-                <Eye className="w-4 h-4 mr-2" />
+                <Eye className="mr-2 h-4 w-4" />
                 {showPreview ? "Edit View" : "Preview"}
               </Button>
             )}
             {!isEditing ? (
-              <Button onClick={() => setIsEditing(true)}>
-                <Edit className="w-4 h-4 mr-2" />
+              <Button className={SP_PRIMARY_BTN} onClick={() => setIsEditing(true)}>
+                <Edit className="mr-2 h-4 w-4" />
                 Edit Profile
               </Button>
             ) : (
               <>
-                <Button variant="outline" onClick={() => setIsEditing(false)}>
+                <Button
+                  variant="outline"
+                  className={SP_CANCEL_BTN}
+                  onClick={() => setIsEditing(false)}
+                >
                   Cancel
                 </Button>
-                <Button onClick={handleSave}>
-                  <Save className="w-4 h-4 mr-2" />
+                <Button className={SP_PRIMARY_BTN} onClick={handleSave}>
+                  <Save className="mr-2 h-4 w-4" />
                   Save Changes
                 </Button>
               </>
@@ -307,7 +508,7 @@ export default function ProfilePage({ user, onUpdateUser }) {
           </div>
         </div>
         {!showPreview && profileCompletion < 100 && (
-          <Card className="border-2 border-primary/20">
+          <Card className={cn(SP_CARD, "ring-1 ring-primary/25")}>
             <CardContent className="pt-6 space-y-4">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
@@ -323,15 +524,15 @@ export default function ProfilePage({ user, onUpdateUser }) {
                 </span>
               </div>
               <Progress value={profileCompletion} className="h-3" />
-              <p className="text-sm text-muted-foreground">
+              <p className="font-body text-sm text-text-muted">
                 {getCompletionMessage(profileCompletion)}
               </p>
             </CardContent>
           </Card>
         )}
-        <Card>
+        <Card className={SP_CARD}>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
+            <CardTitle className={SP_CARD_TITLE}>
               <UserCircle className="w-5 h-5" />
               Professional Profile
             </CardTitle>
@@ -339,9 +540,9 @@ export default function ProfilePage({ user, onUpdateUser }) {
           <CardContent className="space-y-4">
             <div className="grid md:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="name">Full Name *</Label>
+                <Label className={SP_LABEL} htmlFor="name">Full Name *</Label>
                 {isEditing ? (
-                  <Input
+                  <Input className={cn(SP_INPUT)}
                     id="name"
                     value={editedProfile.name}
                     onChange={(e) =>
@@ -352,13 +553,13 @@ export default function ProfilePage({ user, onUpdateUser }) {
                     }
                   />
                 ) : (
-                  <p className="text-sm p-2 bg-muted rounded-md">{user.name}</p>
+                  <p className={SP_VALUE}>{user.name}</p>
                 )}
               </div>
               <div className="space-y-2">
-                <Label htmlFor="professionalTitle">Professional Title *</Label>
+                <Label className={SP_LABEL} htmlFor="professionalTitle">Professional Title *</Label>
                 {isEditing ? (
-                  <Input
+                  <Input className={cn(SP_INPUT)}
                     id="professionalTitle"
                     value={editedProfile.professionalTitle}
                     onChange={(e) =>
@@ -370,15 +571,15 @@ export default function ProfilePage({ user, onUpdateUser }) {
                     placeholder="e.g., Senior Full-Stack Developer"
                   />
                 ) : (
-                  <p className="text-sm p-2 bg-muted rounded-md">
+                  <p className={SP_VALUE}>
                     {user.professionalTitle || "Not specified"}
                   </p>
                 )}
               </div>
               <div className="space-y-2">
-                <Label htmlFor="location">Location *</Label>
+                <Label className={SP_LABEL} htmlFor="location">Location *</Label>
                 {isEditing ? (
-                  <Input
+                  <Input className={cn(SP_INPUT)}
                     id="location"
                     value={editedProfile.location}
                     onChange={(e) =>
@@ -390,16 +591,16 @@ export default function ProfilePage({ user, onUpdateUser }) {
                     placeholder="e.g., San Francisco, CA"
                   />
                 ) : (
-                  <p className="text-sm p-2 bg-muted rounded-md flex items-center gap-2">
-                    <MapPin className="w-4 h-4" />
+                  <p className={cn(SP_VALUE, "flex items-center gap-2")}>
+                    <MapPin className="h-4 w-4 shrink-0 text-text-muted" />
                     {user.location || "Not specified"}
                   </p>
                 )}
               </div>
               <div className="space-y-2">
-                <Label htmlFor="yearsOfExperience">Years of Experience *</Label>
+                <Label className={SP_LABEL} htmlFor="yearsOfExperience">Years of Experience *</Label>
                 {isEditing ? (
-                  <Input
+                  <Input className={cn(SP_INPUT)}
                     id="yearsOfExperience"
                     value={editedProfile.yearsOfExperience}
                     onChange={(e) =>
@@ -411,16 +612,16 @@ export default function ProfilePage({ user, onUpdateUser }) {
                     placeholder="e.g., 5"
                   />
                 ) : (
-                  <p className="text-sm p-2 bg-muted rounded-md">
+                  <p className={SP_VALUE}>
                     {user.yearsOfExperience || "Not specified"}
                   </p>
                 )}
               </div>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="bio">Professional Bio *</Label>
+              <Label className={SP_LABEL} htmlFor="bio">Professional Bio *</Label>
               {isEditing ? (
-                <Textarea
+                <Textarea className={cn(SP_TEXTAREA)}
                   id="bio"
                   value={editedProfile.bio}
                   onChange={(e) =>
@@ -433,7 +634,13 @@ export default function ProfilePage({ user, onUpdateUser }) {
                   rows={5}
                 />
               ) : (
-                <p className="text-sm p-4 bg-muted rounded-md whitespace-pre-wrap">
+                <p
+                  className={cn(
+                    SP_VALUE,
+                    "whitespace-pre-wrap",
+                    !user.bio && SP_EMPTY,
+                  )}
+                >
                   {user.bio || "No bio added yet"}
                 </p>
               )}
@@ -445,13 +652,13 @@ export default function ProfilePage({ user, onUpdateUser }) {
             </div>
           </CardContent>
         </Card>
-        <Card>
+        <Card className={SP_CARD}>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
+            <CardTitle className={SP_CARD_TITLE}>
               <Code className="w-5 h-5" />
               Skills & Expertise *
             </CardTitle>
-            <CardDescription>
+            <CardDescription className="font-body text-text-body">
               Add your key skills so founders can find you
             </CardDescription>
           </CardHeader>
@@ -482,7 +689,7 @@ export default function ProfilePage({ user, onUpdateUser }) {
             </div>
             {isEditing && (
               <div className="flex gap-2">
-                <Input
+                <Input className={cn(SP_INPUT)}
                   value={newSkill}
                   onChange={(e) => setNewSkill(e.target.value)}
                   onKeyPress={(e) => {
@@ -500,22 +707,22 @@ export default function ProfilePage({ user, onUpdateUser }) {
             )}
           </CardContent>
         </Card>
-        <Card>
+        <Card className={SP_CARD}>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
+            <CardTitle className={SP_CARD_TITLE}>
               <Globe className="w-5 h-5" />
               Professional Links
             </CardTitle>
-            <CardDescription>
+            <CardDescription className="font-body text-text-body">
               These links help validate your professional background
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="grid md:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="linkedin">LinkedIn *</Label>
+                <Label className={SP_LABEL} htmlFor="linkedin">LinkedIn *</Label>
                 {isEditing ? (
-                  <Input
+                  <Input className={cn(SP_INPUT)}
                     id="linkedin"
                     value={editedProfile.linkedin}
                     onChange={(e) =>
@@ -527,8 +734,8 @@ export default function ProfilePage({ user, onUpdateUser }) {
                     placeholder="https://linkedin.com/in/yourprofile"
                   />
                 ) : (
-                  <p className="text-sm p-2 bg-muted rounded-md flex items-center gap-2">
-                    <Linkedin className="w-4 h-4" />
+                  <p className={cn(SP_VALUE, "flex items-center gap-2")}>
+                    <Linkedin className="h-4 w-4 shrink-0 text-text-muted" />
                     {user.linkedin ? (
                       <a
                         href={user.linkedin}
@@ -546,9 +753,9 @@ export default function ProfilePage({ user, onUpdateUser }) {
                 )}
               </div>
               <div className="space-y-2">
-                <Label htmlFor="github">GitHub</Label>
+                <Label className={SP_LABEL} htmlFor="github">GitHub</Label>
                 {isEditing ? (
-                  <Input
+                  <Input className={cn(SP_INPUT)}
                     id="github"
                     value={editedProfile.github}
                     onChange={(e) =>
@@ -560,8 +767,8 @@ export default function ProfilePage({ user, onUpdateUser }) {
                     placeholder="https://github.com/yourusername"
                   />
                 ) : (
-                  <p className="text-sm p-2 bg-muted rounded-md flex items-center gap-2">
-                    <Github className="w-4 h-4" />
+                  <p className={cn(SP_VALUE, "flex items-center gap-2")}>
+                    <Github className="h-4 w-4 shrink-0 text-text-muted" />
                     {user.github ? (
                       <a
                         href={user.github}
@@ -579,9 +786,9 @@ export default function ProfilePage({ user, onUpdateUser }) {
                 )}
               </div>
               <div className="space-y-2 md:col-span-2">
-                <Label htmlFor="website">Portfolio Website</Label>
+                <Label className={SP_LABEL} htmlFor="website">Portfolio Website</Label>
                 {isEditing ? (
-                  <Input
+                  <Input className={cn(SP_INPUT)}
                     id="website"
                     value={editedProfile.website}
                     onChange={(e) =>
@@ -593,8 +800,8 @@ export default function ProfilePage({ user, onUpdateUser }) {
                     placeholder="https://yourportfolio.com"
                   />
                 ) : (
-                  <p className="text-sm p-2 bg-muted rounded-md flex items-center gap-2">
-                    <Globe className="w-4 h-4" />
+                  <p className={cn(SP_VALUE, "flex items-center gap-2")}>
+                    <Globe className="h-4 w-4 shrink-0 text-text-muted" />
                     {user.website ? (
                       <a
                         href={user.website}
@@ -614,15 +821,15 @@ export default function ProfilePage({ user, onUpdateUser }) {
             </div>
           </CardContent>
         </Card>
-        <Card>
+        <Card className={SP_CARD}>
           <CardHeader>
             <div className="flex items-center justify-between">
               <div>
-                <CardTitle className="flex items-center gap-2">
+                <CardTitle className={SP_CARD_TITLE}>
                   <Briefcase className="w-5 h-5" />
                   Work Experience *
                 </CardTitle>
-                <CardDescription>
+                <CardDescription className="font-body text-text-body">
                   Add your professional work history to validate your experience
                 </CardDescription>
               </div>
@@ -636,7 +843,7 @@ export default function ProfilePage({ user, onUpdateUser }) {
           </CardHeader>
           <CardContent className="space-y-4">
             {editedProfile.workExperience.length === 0 ? (
-              <div className="text-center py-8 bg-muted/50 rounded-lg">
+              <div className="rounded-input bg-surface-page py-8 text-center">
                 <Briefcase className="w-12 h-12 mx-auto text-muted-foreground mb-3" />
                 <p className="text-sm text-muted-foreground mb-2">
                   No work experience added yet
@@ -650,7 +857,7 @@ export default function ProfilePage({ user, onUpdateUser }) {
               </div>
             ) : (
               editedProfile.workExperience.map((exp, index) => (
-                <div key={exp.id} className="p-4 border rounded-lg space-y-3">
+                <div key={exp.id} className="space-y-3 rounded-input border-0 bg-surface-page p-4">
                   {isEditing ? (
                     <>
                       <div className="flex justify-between items-start">
@@ -667,7 +874,7 @@ export default function ProfilePage({ user, onUpdateUser }) {
                         </Button>
                       </div>
                       <div className="grid md:grid-cols-2 gap-3">
-                        <Input
+                        <Input className={cn(SP_INPUT)}
                           placeholder="Company"
                           value={exp.company}
                           onChange={(e) =>
@@ -678,7 +885,7 @@ export default function ProfilePage({ user, onUpdateUser }) {
                             )
                           }
                         />
-                        <Input
+                        <Input className={cn(SP_INPUT)}
                           placeholder="Position"
                           value={exp.position}
                           onChange={(e) =>
@@ -689,7 +896,8 @@ export default function ProfilePage({ user, onUpdateUser }) {
                             )
                           }
                         />
-                        <Input
+                        <Input className={cn(SP_INPUT)}
+                          type="month"
                           placeholder="Start Date"
                           value={exp.startDate}
                           onChange={(e) =>
@@ -700,7 +908,8 @@ export default function ProfilePage({ user, onUpdateUser }) {
                             )
                           }
                         />
-                        <Input
+                        <Input className={cn(SP_INPUT)}
+                          type="month"
                           placeholder="End Date"
                           value={exp.endDate}
                           onChange={(e) =>
@@ -726,12 +935,15 @@ export default function ProfilePage({ user, onUpdateUser }) {
                             }
                             className="w-4 h-4"
                           />
-                          <Label htmlFor={`current-${exp.id}`}>
+                          <Label
+                            className={cn(SP_LABEL, "normal-case tracking-normal")}
+                            htmlFor={`current-${exp.id}`}
+                          >
                             Currently working here
                           </Label>
                         </div>
                         <div className="md:col-span-2">
-                          <Textarea
+                          <Textarea className={cn(SP_TEXTAREA)}
                             placeholder="Description"
                             value={exp.description}
                             onChange={(e) =>
@@ -774,11 +986,11 @@ export default function ProfilePage({ user, onUpdateUser }) {
             )}
           </CardContent>
         </Card>
-        <Card>
+        <Card className={SP_CARD}>
           <CardHeader>
             <div className="flex items-center justify-between">
               <div>
-                <CardTitle className="flex items-center gap-2">
+                <CardTitle className={SP_CARD_TITLE}>
                   <GraduationCap className="w-5 h-5" />
                   Education
                 </CardTitle>
@@ -793,14 +1005,14 @@ export default function ProfilePage({ user, onUpdateUser }) {
           </CardHeader>
           <CardContent className="space-y-4">
             {editedProfile.education.length === 0 ? (
-              <div className="text-center py-6 bg-muted/50 rounded-lg">
+              <div className="rounded-input bg-surface-page py-6 text-center">
                 <p className="text-sm text-muted-foreground">
                   No education added yet
                 </p>
               </div>
             ) : (
               editedProfile.education.map((edu, index) => (
-                <div key={edu.id} className="p-4 border rounded-lg space-y-3">
+                <div key={edu.id} className="space-y-3 rounded-input border-0 bg-surface-page p-4">
                   {isEditing ? (
                     <>
                       <div className="flex justify-between items-start">
@@ -817,7 +1029,7 @@ export default function ProfilePage({ user, onUpdateUser }) {
                         </Button>
                       </div>
                       <div className="grid md:grid-cols-2 gap-3">
-                        <Input
+                        <Input className={cn(SP_INPUT)}
                           placeholder="Institution"
                           value={edu.institution}
                           onChange={(e) =>
@@ -828,21 +1040,21 @@ export default function ProfilePage({ user, onUpdateUser }) {
                             )
                           }
                         />
-                        <Input
+                        <Input className={cn(SP_INPUT)}
                           placeholder="Degree"
                           value={edu.degree}
                           onChange={(e) =>
                             updateEducation(edu.id, "degree", e.target.value)
                           }
                         />
-                        <Input
+                        <Input className={cn(SP_INPUT)}
                           placeholder="Field of Study"
                           value={edu.field}
                           onChange={(e) =>
                             updateEducation(edu.id, "field", e.target.value)
                           }
                         />
-                        <Input
+                        <Input className={cn(SP_INPUT)}
                           placeholder="Graduation Year"
                           value={edu.graduationYear}
                           onChange={(e) =>
@@ -878,15 +1090,15 @@ export default function ProfilePage({ user, onUpdateUser }) {
             )}
           </CardContent>
         </Card>
-        <Card>
+        <Card className={SP_CARD}>
           <CardHeader>
             <div className="flex items-center justify-between">
               <div>
-                <CardTitle className="flex items-center gap-2">
+                <CardTitle className={SP_CARD_TITLE}>
                   <Award className="w-5 h-5" />
                   Certifications & Credentials
                 </CardTitle>
-                <CardDescription>
+                <CardDescription className="font-body text-text-body">
                   Professional certifications help validate your expertise
                 </CardDescription>
               </div>
@@ -900,14 +1112,14 @@ export default function ProfilePage({ user, onUpdateUser }) {
           </CardHeader>
           <CardContent className="space-y-4">
             {editedProfile.certifications.length === 0 ? (
-              <div className="text-center py-6 bg-muted/50 rounded-lg">
+              <div className="rounded-input bg-surface-page py-6 text-center">
                 <p className="text-sm text-muted-foreground">
                   No certifications added yet
                 </p>
               </div>
             ) : (
               editedProfile.certifications.map((cert, index) => (
-                <div key={cert.id} className="p-4 border rounded-lg space-y-3">
+                <div key={cert.id} className="space-y-3 rounded-input border-0 bg-surface-page p-4">
                   {isEditing ? (
                     <>
                       <div className="flex justify-between items-start">
@@ -924,14 +1136,14 @@ export default function ProfilePage({ user, onUpdateUser }) {
                         </Button>
                       </div>
                       <div className="grid md:grid-cols-2 gap-3">
-                        <Input
+                        <Input className={cn(SP_INPUT)}
                           placeholder="Certification Name"
                           value={cert.name}
                           onChange={(e) =>
                             updateCertification(cert.id, "name", e.target.value)
                           }
                         />
-                        <Input
+                        <Input className={cn(SP_INPUT)}
                           placeholder="Issuing Organization"
                           value={cert.issuer}
                           onChange={(e) =>
@@ -942,7 +1154,7 @@ export default function ProfilePage({ user, onUpdateUser }) {
                             )
                           }
                         />
-                        <Input
+                        <Input className={cn(SP_INPUT)}
                           placeholder="Issue Year"
                           value={cert.issueYear}
                           onChange={(e) =>
@@ -953,9 +1165,9 @@ export default function ProfilePage({ user, onUpdateUser }) {
                             )
                           }
                         />
-                        <Input
-                          placeholder="Credential ID"
-                          value={cert.credentialId}
+                        <Input className={cn(SP_INPUT)}
+                          placeholder="Credential ID (Optional)"
+                          value={cert.credentialId || ""}
                           onChange={(e) =>
                             updateCertification(
                               cert.id,
@@ -965,9 +1177,9 @@ export default function ProfilePage({ user, onUpdateUser }) {
                           }
                         />
                         <div className="md:col-span-2">
-                          <Input
-                            placeholder="Credential URL"
-                            value={cert.credentialUrl}
+                          <Input className={cn(SP_INPUT)}
+                            placeholder="Credential URL (Optional)"
+                            value={cert.credentialUrl || ""}
                             onChange={(e) =>
                               updateCertification(
                                 cert.id,
@@ -976,6 +1188,42 @@ export default function ProfilePage({ user, onUpdateUser }) {
                               )
                             }
                           />
+                        </div>
+                        <div className="md:col-span-2 space-y-2">
+                          <Label className={SP_LABEL}>Certificate Image</Label>
+                          <Input className={cn(SP_INPUT)}
+                            type="file"
+                            accept="image/*"
+                            onChange={(e) =>
+                              updateCertificationImage(
+                                cert.id,
+                                e.target.files?.[0],
+                              )
+                            }
+                          />
+                          {cert.certificateImage && (
+                            <div className="flex items-center gap-3">
+                              <img
+                                src={cert.certificateImage}
+                                alt={cert.name || "Certificate"}
+                                className="h-20 w-28 rounded-md border object-cover"
+                              />
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="outline"
+                                onClick={() =>
+                                  updateCertification(
+                                    cert.id,
+                                    "certificateImage",
+                                    "",
+                                  )
+                                }
+                              >
+                                Remove Image
+                              </Button>
+                            </div>
+                          )}
                         </div>
                       </div>
                     </>
@@ -1007,15 +1255,15 @@ export default function ProfilePage({ user, onUpdateUser }) {
             )}
           </CardContent>
         </Card>
-        <Card>
+        <Card className={SP_CARD}>
           <CardHeader>
             <div className="flex items-center justify-between">
               <div>
-                <CardTitle className="flex items-center gap-2">
+                <CardTitle className={SP_CARD_TITLE}>
                   <FileText className="w-5 h-5" />
                   Portfolio & Projects
                 </CardTitle>
-                <CardDescription>
+                <CardDescription className="font-body text-text-body">
                   Showcase your best work to stand out to founders
                 </CardDescription>
               </div>
@@ -1029,14 +1277,14 @@ export default function ProfilePage({ user, onUpdateUser }) {
           </CardHeader>
           <CardContent className="space-y-4">
             {editedProfile.portfolioItems.length === 0 ? (
-              <div className="text-center py-6 bg-muted/50 rounded-lg">
+              <div className="rounded-input bg-surface-page py-6 text-center">
                 <p className="text-sm text-muted-foreground">
                   No portfolio items added yet
                 </p>
               </div>
             ) : (
               editedProfile.portfolioItems.map((item, index) => (
-                <div key={item.id} className="p-4 border rounded-lg space-y-3">
+                <div key={item.id} className="space-y-3 rounded-input border-0 bg-surface-page p-4">
                   {isEditing ? (
                     <>
                       <div className="flex justify-between items-start">
@@ -1053,7 +1301,7 @@ export default function ProfilePage({ user, onUpdateUser }) {
                         </Button>
                       </div>
                       <div className="space-y-3">
-                        <Input
+                        <Input className={cn(SP_INPUT)}
                           placeholder="Project Title"
                           value={item.title}
                           onChange={(e) =>
@@ -1064,14 +1312,14 @@ export default function ProfilePage({ user, onUpdateUser }) {
                             )
                           }
                         />
-                        <Input
+                        <Input className={cn(SP_INPUT)}
                           placeholder="Project Type (e.g., Web App, Mobile App)"
                           value={item.type}
                           onChange={(e) =>
                             updatePortfolioItem(item.id, "type", e.target.value)
                           }
                         />
-                        <Textarea
+                        <Textarea className={cn(SP_TEXTAREA)}
                           placeholder="Description"
                           value={item.description}
                           onChange={(e) =>
@@ -1083,7 +1331,7 @@ export default function ProfilePage({ user, onUpdateUser }) {
                           }
                           rows={3}
                         />
-                        <Input
+                        <Input className={cn(SP_INPUT)}
                           placeholder="Project URL"
                           value={item.url}
                           onChange={(e) =>
@@ -1121,9 +1369,9 @@ export default function ProfilePage({ user, onUpdateUser }) {
             )}
           </CardContent>
         </Card>
-        <Card>
+        <Card className={SP_CARD}>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
+            <CardTitle className={SP_CARD_TITLE}>
               <Calendar className="w-5 h-5" />
               Availability & Preferences
             </CardTitle>
@@ -1131,7 +1379,7 @@ export default function ProfilePage({ user, onUpdateUser }) {
           <CardContent className="space-y-4">
             <div className="grid md:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="experience">
+                <Label className={SP_LABEL} htmlFor="experience">
                   Years of Experience (For Display) *
                 </Label>
                 {isEditing ? (
@@ -1154,7 +1402,7 @@ export default function ProfilePage({ user, onUpdateUser }) {
                     <option value="10+ years">10+ years</option>
                   </select>
                 ) : (
-                  <p className="text-sm p-2 bg-muted rounded-md">
+                  <p className={SP_VALUE}>
                     {user.experience || "Not specified"}
                   </p>
                 )}
@@ -1163,7 +1411,7 @@ export default function ProfilePage({ user, onUpdateUser }) {
                 </p>
               </div>
               <div className="space-y-2">
-                <Label htmlFor="availability">When Can You Start? *</Label>
+                <Label className={SP_LABEL} htmlFor="availability">When Can You Start? *</Label>
                 {isEditing ? (
                   <select
                     id="availability"
@@ -1184,7 +1432,7 @@ export default function ProfilePage({ user, onUpdateUser }) {
                     <option value="Flexible">Flexible</option>
                   </select>
                 ) : (
-                  <p className="text-sm p-2 bg-muted rounded-md">
+                  <p className={SP_VALUE}>
                     {user.availability || "Not specified"}
                   </p>
                 )}
@@ -1195,7 +1443,7 @@ export default function ProfilePage({ user, onUpdateUser }) {
             </div>
             <div className="grid md:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="availabilityStatus">Current Status *</Label>
+                <Label className={SP_LABEL} htmlFor="availabilityStatus">Current Status *</Label>
                 {isEditing ? (
                   <select
                     id="availabilityStatus"
@@ -1217,13 +1465,13 @@ export default function ProfilePage({ user, onUpdateUser }) {
                     </option>
                   </select>
                 ) : (
-                  <p className="text-sm p-2 bg-muted rounded-md">
+                  <p className={SP_VALUE}>
                     {user.availabilityStatus || "Not specified"}
                   </p>
                 )}
               </div>
               <div className="space-y-2">
-                <Label htmlFor="preferredCommitment">
+                <Label className={SP_LABEL} htmlFor="preferredCommitment">
                   Preferred Commitment *
                 </Label>
                 {isEditing ? (
@@ -1245,7 +1493,7 @@ export default function ProfilePage({ user, onUpdateUser }) {
                     <option value="flexible">Flexible</option>
                   </select>
                 ) : (
-                  <p className="text-sm p-2 bg-muted rounded-md">
+                  <p className={SP_VALUE}>
                     {user.preferredCommitment || "Not specified"}
                   </p>
                 )}
@@ -1253,18 +1501,18 @@ export default function ProfilePage({ user, onUpdateUser }) {
             </div>
           </CardContent>
         </Card>
-        <Card>
+        <Card className={SP_CARD}>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
+            <CardTitle className={SP_CARD_TITLE}>
               <Target className="w-5 h-5" />
               Career Goals & Industry Preferences
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="professionalGoals">Professional Goals</Label>
+              <Label className={SP_LABEL} htmlFor="professionalGoals">Professional Goals</Label>
               {isEditing ? (
-                <Textarea
+                <Textarea className={cn(SP_TEXTAREA)}
                   id="professionalGoals"
                   value={editedProfile.professionalGoals}
                   onChange={(e) =>
@@ -1277,18 +1525,24 @@ export default function ProfilePage({ user, onUpdateUser }) {
                   rows={3}
                 />
               ) : (
-                <p className="text-sm p-4 bg-muted rounded-md whitespace-pre-wrap">
+                <p
+                  className={cn(
+                    SP_VALUE,
+                    "whitespace-pre-wrap",
+                    !user.professionalGoals && SP_EMPTY,
+                  )}
+                >
                   {user.professionalGoals || "Not specified"}
                 </p>
               )}
             </div>
             <div className="space-y-2">
-              <Label htmlFor="interests">
+              <Label className={SP_LABEL} htmlFor="interests">
                 Industry Interests (Displayed on Profile Card) *
               </Label>
               {isEditing ? (
                 <>
-                  <Input
+                  <Input className={cn(SP_INPUT)}
                     id="interests"
                     value={
                       Array.isArray(editedProfile.interests)
@@ -1312,7 +1566,7 @@ export default function ProfilePage({ user, onUpdateUser }) {
                   </p>
                 </>
               ) : (
-                <p className="text-sm p-2 bg-muted rounded-md">
+                <p className={SP_VALUE}>
                   {Array.isArray(user.interests) && user.interests.length > 0
                     ? user.interests.join(", ")
                     : "Not specified"}
@@ -1320,12 +1574,12 @@ export default function ProfilePage({ user, onUpdateUser }) {
               )}
             </div>
             <div className="space-y-2">
-              <Label htmlFor="industryPreferences">
+              <Label className={SP_LABEL} htmlFor="industryPreferences">
                 Other Industry Preferences (Optional)
               </Label>
               {isEditing ? (
                 <>
-                  <Input
+                  <Input className={cn(SP_INPUT)}
                     id="industryPreferences"
                     value={
                       Array.isArray(editedProfile.industryPreferences)
@@ -1349,7 +1603,7 @@ export default function ProfilePage({ user, onUpdateUser }) {
                   </p>
                 </>
               ) : (
-                <p className="text-sm p-2 bg-muted rounded-md">
+                <p className={SP_VALUE}>
                   {Array.isArray(user.industryPreferences) &&
                   user.industryPreferences.length > 0
                     ? user.industryPreferences.join(", ")
@@ -1365,34 +1619,40 @@ export default function ProfilePage({ user, onUpdateUser }) {
 
   // Render Founder/Team Member Profile
   return (
-    <div className="min-h-screen bg-background p-2 md:p-3 lg:p-4 space-y-3 md:space-y-4">
+    <div className="min-h-full space-y-3 bg-transparent p-2 font-body md:space-y-4 md:p-3 lg:p-4">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl mb-2">Founder Profile</h1>
-          <p className="text-muted-foreground">
+          <h1 className="mb-2 font-heading text-3xl font-bold text-text-heading">
+            Founder Profile
+          </h1>
+          <p className="font-body text-text-body">
             Manage your personal and startup information
           </p>
         </div>
         {!isEditing ? (
-          <Button onClick={() => setIsEditing(true)}>
-            <Edit className="w-4 h-4 mr-2" />
+          <Button className={SP_PRIMARY_BTN} onClick={() => setIsEditing(true)}>
+            <Edit className="mr-2 h-4 w-4" />
             Edit Profile
           </Button>
         ) : (
           <div className="flex gap-2">
-            <Button variant="outline" onClick={() => setIsEditing(false)}>
+            <Button
+              variant="outline"
+              className={SP_CANCEL_BTN}
+              onClick={() => setIsEditing(false)}
+            >
               Cancel
             </Button>
-            <Button onClick={handleSave}>
-              <Save className="w-4 h-4 mr-2" />
+            <Button className={SP_PRIMARY_BTN} onClick={handleSave}>
+              <Save className="mr-2 h-4 w-4" />
               Save Changes
             </Button>
           </div>
         )}
       </div>
-      <Card>
+      <Card className={SP_CARD}>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
+          <CardTitle className={SP_CARD_TITLE}>
             <UserCircle className="w-5 h-5" />
             Personal Information
           </CardTitle>
@@ -1400,9 +1660,9 @@ export default function ProfilePage({ user, onUpdateUser }) {
         <CardContent className="space-y-4">
           <div className="grid md:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="name">Full Name</Label>
+              <Label className={SP_LABEL} htmlFor="name">Full Name</Label>
               {isEditing ? (
-                <Input
+                <Input className={cn(SP_INPUT)}
                   id="name"
                   value={editedProfile.name}
                   onChange={(e) =>
@@ -1413,13 +1673,13 @@ export default function ProfilePage({ user, onUpdateUser }) {
                   }
                 />
               ) : (
-                <p className="text-sm p-2 bg-muted rounded-md">{user.name}</p>
+                <p className={SP_VALUE}>{user.name}</p>
               )}
             </div>
             <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
+              <Label className={SP_LABEL} htmlFor="email">Email</Label>
               {isEditing ? (
-                <Input
+                <Input className={cn(SP_INPUT)}
                   id="email"
                   type="email"
                   value={editedProfile.email}
@@ -1431,17 +1691,17 @@ export default function ProfilePage({ user, onUpdateUser }) {
                   }
                 />
               ) : (
-                <p className="text-sm p-2 bg-muted rounded-md flex items-center gap-2">
-                  <Mail className="w-4 h-4" />
+                <p className={cn(SP_VALUE, "flex items-center gap-2")}>
+                  <Mail className="h-4 w-4 shrink-0 text-text-muted" />
                   {user.email}
                 </p>
               )}
             </div>
           </div>
           <div className="space-y-2">
-            <Label htmlFor="bio">Bio</Label>
+            <Label className={SP_LABEL} htmlFor="bio">Bio</Label>
             {isEditing ? (
-              <Textarea
+              <Textarea className={cn(SP_TEXTAREA)}
                 id="bio"
                 value={editedProfile.bio}
                 onChange={(e) =>
@@ -1454,111 +1714,393 @@ export default function ProfilePage({ user, onUpdateUser }) {
                 rows={4}
               />
             ) : (
-              <p className="text-sm p-4 bg-muted rounded-md">
+              <p
+                className={cn(
+                  SP_VALUE,
+                  "whitespace-pre-wrap",
+                  !user.bio && SP_EMPTY,
+                )}
+              >
                 {user.bio || "No bio added yet"}
               </p>
             )}
           </div>
         </CardContent>
       </Card>
-      <Card>
+      {user.role === "founder" && (
+        <Card className={SP_CARD}>
+          <CardHeader>
+            <CardTitle className={SP_CARD_TITLE}>
+              <Building className="w-5 h-5" />
+              Startup Information
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid md:grid-cols-2 gap-4">
+              <div className="space-y-2 md:col-span-2">
+                <Label className={SP_LABEL} htmlFor="startupName">Startup name</Label>
+                {isEditing ? (
+                  <Input className={cn(SP_INPUT)}
+                    id="startupName"
+                    value={editedProfile.startupName}
+                    onChange={(e) =>
+                      setEditedProfile({
+                        ...editedProfile,
+                        startupName: e.target.value,
+                      })
+                    }
+                    placeholder="Your startup name"
+                  />
+                ) : (
+                  <p className={SP_VALUE}>
+                    {user.startupName ||
+                      user.profile?.startupName ||
+                      "Not specified"}
+                  </p>
+                )}
+              </div>
+              <div className="space-y-2 md:col-span-2">
+                <Label className={SP_LABEL} htmlFor="startupDescription">Startup description</Label>
+                {isEditing ? (
+                  <Textarea className={cn(SP_TEXTAREA)}
+                    id="startupDescription"
+                    value={editedProfile.startupDescription || ""}
+                    onChange={(e) =>
+                      setEditedProfile({
+                        ...editedProfile,
+                        startupDescription: e.target.value,
+                      })
+                    }
+                    rows={4}
+                    placeholder="What you do and the problem you solve"
+                  />
+                ) : (
+                  <p className={cn(SP_VALUE, "whitespace-pre-wrap")}>
+                    {user.profile?.startupDescription ||
+                      user.startupDescription ||
+                      "Not specified"}
+                  </p>
+                )}
+              </div>
+              <div className="space-y-2 md:col-span-2">
+                <Label className={SP_LABEL}>Startup type (industry)</Label>
+                {isEditing ? (
+                  <>
+                    <Select
+                      value={editedProfile.industryFocus || ""}
+                      onValueChange={(v) =>
+                        setEditedProfile({
+                          ...editedProfile,
+                          industryFocus: v,
+                        })
+                      }
+                    >
+                      <SelectTrigger className={cn(SP_SELECT_TRIGGER)}>
+                        <SelectValue placeholder="Select industry" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {FOUNDER_INDUSTRY_OPTIONS.map((opt) => (
+                          <SelectItem key={opt} value={opt}>
+                            {opt}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    {editedProfile.industryFocus === "Others" && (
+                      <Input
+                        className={cn(SP_INPUT, "mt-2")}
+                        value={editedProfile.otherIndustry || ""}
+                        onChange={(e) =>
+                          setEditedProfile({
+                            ...editedProfile,
+                            otherIndustry: e.target.value,
+                          })
+                        }
+                        placeholder="Specify your industry"
+                      />
+                    )}
+                  </>
+                ) : (
+                  <p className={SP_VALUE}>
+                    {user.industry ||
+                      user.profile?.industry ||
+                      user.profile?.industryFocus ||
+                      "Not specified"}
+                  </p>
+                )}
+              </div>
+              <div className="space-y-2 md:col-span-2">
+                <Label className={SP_LABEL}>Target audience</Label>
+                {isEditing ? (
+                  <div className={SP_CHECK_WRAP}>
+                    {FOUNDER_TARGET_AUDIENCE_OPTIONS.map((opt) => {
+                      const checked =
+                        editedProfile.targetAudience?.includes?.(opt);
+                      return (
+                        <label
+                          key={opt}
+                          className={cn(
+                            SP_CHECK_LABEL_BASE,
+                            checked && SP_CHECK_LABEL_ON,
+                          )}
+                        >
+                          <Checkbox
+                            className={SP_CHECK_BOX}
+                            checked={checked}
+                            onCheckedChange={() => {
+                              const cur = editedProfile.targetAudience || [];
+                              setEditedProfile({
+                                ...editedProfile,
+                                targetAudience: cur.includes(opt)
+                                  ? cur.filter((x) => x !== opt)
+                                  : [...cur, opt],
+                              });
+                            }}
+                          />
+                          {opt}
+                        </label>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <p className={SP_VALUE}>
+                    {Array.isArray(user.profile?.targetAudience)
+                      ? user.profile.targetAudience.join(", ")
+                      : Array.isArray(user.targetAudience)
+                        ? user.targetAudience.join(", ")
+                        : "Not specified"}
+                  </p>
+                )}
+              </div>
+              <div className="space-y-2 md:col-span-2">
+                <Label className={SP_LABEL}>Roles needed</Label>
+                {isEditing ? (
+                  <div className={cn(SP_CHECK_WRAP, "max-h-48 overflow-y-auto")}>
+                    {FOUNDER_ROLES_NEEDED_OPTIONS.map((opt) => {
+                      const checked = editedProfile.rolesNeeded?.includes?.(opt);
+                      return (
+                        <label
+                          key={opt}
+                          className={cn(
+                            SP_CHECK_LABEL_BASE,
+                            "text-xs",
+                            checked && SP_CHECK_LABEL_ON,
+                          )}
+                        >
+                          <Checkbox
+                            className={SP_CHECK_BOX}
+                            checked={checked}
+                            onCheckedChange={() => {
+                              const cur = editedProfile.rolesNeeded || [];
+                              setEditedProfile({
+                                ...editedProfile,
+                                rolesNeeded: cur.includes(opt)
+                                  ? cur.filter((x) => x !== opt)
+                                  : [...cur, opt],
+                              });
+                            }}
+                          />
+                          {opt}
+                        </label>
+                      );
+                    })}
+                    {editedProfile.rolesNeeded?.includes?.("Others") && (
+                      <Input
+                        className={cn(SP_INPUT, "mt-2 w-full")}
+                        placeholder="Specify role"
+                        value={editedProfile.otherRole || ""}
+                        onChange={(e) =>
+                          setEditedProfile({
+                            ...editedProfile,
+                            otherRole: e.target.value,
+                          })
+                        }
+                      />
+                    )}
+                  </div>
+                ) : (
+                  <p className={SP_VALUE}>
+                    {Array.isArray(user.profile?.rolesNeeded)
+                      ? user.profile.rolesNeeded.join(", ")
+                      : Array.isArray(user.rolesNeeded)
+                        ? user.rolesNeeded.join(", ")
+                        : "Not specified"}
+                  </p>
+                )}
+              </div>
+              <div className="space-y-2">
+                <Label className={SP_LABEL}>Team size</Label>
+                {isEditing ? (
+                  <Select
+                    value={editedProfile.teamSize || ""}
+                    onValueChange={(v) =>
+                      setEditedProfile({ ...editedProfile, teamSize: v })
+                    }
+                  >
+                    <SelectTrigger className={cn(SP_SELECT_TRIGGER)}>
+                      <SelectValue placeholder="Team size" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {FOUNDER_TEAM_SIZE_OPTIONS.map((opt) => (
+                        <SelectItem key={opt} value={opt}>
+                          {opt}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                ) : (
+                  <p
+                    className={cn(
+                      SP_VALUE,
+                      "flex items-center gap-2",
+                      !(user.profile?.teamSize || user.teamSize) && SP_EMPTY,
+                    )}
+                  >
+                    <Users className="h-4 w-4 shrink-0 text-text-muted" />
+                    {user.profile?.teamSize || user.teamSize || "Not specified"}
+                  </p>
+                )}
+              </div>
+              <div className="space-y-2">
+                <Label className={SP_LABEL}>Execution stage</Label>
+                {isEditing ? (
+                  <Select
+                    value={editedProfile.startupStage || ""}
+                    onValueChange={(v) =>
+                      setEditedProfile({ ...editedProfile, startupStage: v })
+                    }
+                  >
+                    <SelectTrigger className={cn(SP_SELECT_TRIGGER)}>
+                      <SelectValue placeholder="Stage" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {FOUNDER_STAGE_OPTIONS.map((opt) => (
+                        <SelectItem key={opt} value={opt}>
+                          {opt}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                ) : (
+                  <p
+                    className={cn(
+                      SP_VALUE,
+                      "flex items-center gap-2",
+                      !(user.startupStage || user.profile?.startupStage) &&
+                        SP_EMPTY,
+                    )}
+                  >
+                    <Target className="h-4 w-4 shrink-0 text-text-muted" />
+                    {user.startupStage ||
+                      user.profile?.startupStage ||
+                      "Not specified"}
+                  </p>
+                )}
+              </div>
+            </div>
+            <div
+              className={cn(
+                "grid gap-4 border-t border-surface-border pt-4 md:grid-cols-1",
+              )}
+            >
+              <p className="font-body text-sm font-semibold text-text-heading">
+                Where you are today
+              </p>
+              <div className="space-y-2">
+                <Label className={SP_SUBLABEL}>Validated problem / idea</Label>
+                {isEditing ? (
+                  <Select
+                    value={editedProfile.hasValidatedIdea || ""}
+                    onValueChange={(v) =>
+                      setEditedProfile({
+                        ...editedProfile,
+                        hasValidatedIdea: v,
+                      })
+                    }
+                  >
+                    <SelectTrigger className={cn(SP_SELECT_TRIGGER)}>
+                      <SelectValue placeholder="Select" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {FOUNDER_VALIDATED_IDEA_OPTIONS.map((opt) => (
+                        <SelectItem key={opt} value={opt}>
+                          {opt}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                ) : (
+                  <p className={SP_VALUE}>
+                    {user.profile?.hasValidatedIdea ||
+                      user.hasValidatedIdea ||
+                      "Not specified"}
+                  </p>
+                )}
+              </div>
+              <div className="space-y-2">
+                <Label className={SP_SUBLABEL}>MVP or prototype</Label>
+                {isEditing ? (
+                  <Select
+                    value={editedProfile.hasMVP || ""}
+                    onValueChange={(v) =>
+                      setEditedProfile({ ...editedProfile, hasMVP: v })
+                    }
+                  >
+                    <SelectTrigger className={cn(SP_SELECT_TRIGGER)}>
+                      <SelectValue placeholder="Select" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {FOUNDER_MVP_OPTIONS.map((opt) => (
+                        <SelectItem key={opt} value={opt}>
+                          {opt}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                ) : (
+                  <p className={SP_VALUE}>
+                    {user.profile?.hasMVP || user.hasMVP || "Not specified"}
+                  </p>
+                )}
+              </div>
+              <div className="space-y-2">
+                <Label className={SP_SUBLABEL}>Customers or users</Label>
+                {isEditing ? (
+                  <Select
+                    value={editedProfile.hasCustomers || ""}
+                    onValueChange={(v) =>
+                      setEditedProfile({
+                        ...editedProfile,
+                        hasCustomers: v,
+                      })
+                    }
+                  >
+                    <SelectTrigger className={cn(SP_SELECT_TRIGGER)}>
+                      <SelectValue placeholder="Select" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {FOUNDER_CUSTOMERS_OPTIONS.map((opt) => (
+                        <SelectItem key={opt} value={opt}>
+                          {opt}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                ) : (
+                  <p className={SP_VALUE}>
+                    {user.profile?.hasCustomers ||
+                      user.hasCustomers ||
+                      "Not specified"}
+                  </p>
+                )}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+      <Card className={SP_CARD}>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Building className="w-5 h-5" />
-            Startup Information
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid md:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="startupName">Startup Name</Label>
-              {isEditing ? (
-                <Input
-                  id="startupName"
-                  value={editedProfile.startupName}
-                  onChange={(e) =>
-                    setEditedProfile({
-                      ...editedProfile,
-                      startupName: e.target.value,
-                    })
-                  }
-                  placeholder="Your startup name"
-                />
-              ) : (
-                <p className="text-sm p-2 bg-muted rounded-md">
-                  {user.startupName || "Not specified"}
-                </p>
-              )}
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="industry">Industry</Label>
-              {isEditing ? (
-                <Input
-                  id="industry"
-                  value={editedProfile.industry}
-                  onChange={(e) =>
-                    setEditedProfile({
-                      ...editedProfile,
-                      industry: e.target.value,
-                    })
-                  }
-                  placeholder="e.g., FinTech, HealthTech"
-                />
-              ) : (
-                <p className="text-sm p-2 bg-muted rounded-md">
-                  {user.industry || "Not specified"}
-                </p>
-              )}
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="startupStage">Stage</Label>
-              {isEditing ? (
-                <Input
-                  id="startupStage"
-                  value={editedProfile.startupStage}
-                  onChange={(e) =>
-                    setEditedProfile({
-                      ...editedProfile,
-                      startupStage: e.target.value,
-                    })
-                  }
-                  placeholder="e.g., Ideation, MVP, Growth"
-                />
-              ) : (
-                <p className="text-sm p-2 bg-muted rounded-md flex items-center gap-2">
-                  <Target className="w-4 h-4" />
-                  {user.startupStage || "Not specified"}
-                </p>
-              )}
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="teamSize">Team Size</Label>
-              {isEditing ? (
-                <Input
-                  id="teamSize"
-                  type="number"
-                  value={editedProfile.teamSize}
-                  onChange={(e) =>
-                    setEditedProfile({
-                      ...editedProfile,
-                      teamSize: parseInt(e.target.value) || 1,
-                    })
-                  }
-                />
-              ) : (
-                <p className="text-sm p-2 bg-muted rounded-md flex items-center gap-2">
-                  <Users className="w-4 h-4" />
-                  {user.teamSize || 1}{" "}
-                  {user.teamSize === 1 ? "member" : "members"}
-                </p>
-              )}
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
+          <CardTitle className={SP_CARD_TITLE}>
             <Globe className="w-5 h-5" />
             Contact & Links
           </CardTitle>
@@ -1566,9 +2108,9 @@ export default function ProfilePage({ user, onUpdateUser }) {
         <CardContent className="space-y-4">
           <div className="grid md:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="website">Website</Label>
+              <Label className={SP_LABEL} htmlFor="website">Website</Label>
               {isEditing ? (
-                <Input
+                <Input className={cn(SP_INPUT)}
                   id="website"
                   value={editedProfile.website}
                   onChange={(e) =>
@@ -1580,16 +2122,22 @@ export default function ProfilePage({ user, onUpdateUser }) {
                   placeholder="https://yourstartup.com"
                 />
               ) : (
-                <p className="text-sm p-2 bg-muted rounded-md flex items-center gap-2">
-                  <Globe className="w-4 h-4" />
+                <p
+                  className={cn(
+                    SP_VALUE,
+                    "flex items-center gap-2",
+                    !user.website && SP_EMPTY,
+                  )}
+                >
+                  <Globe className="h-4 w-4 shrink-0 text-text-muted" />
                   {user.website || "Not specified"}
                 </p>
               )}
             </div>
             <div className="space-y-2">
-              <Label htmlFor="linkedin">LinkedIn</Label>
+              <Label className={SP_LABEL} htmlFor="linkedin">LinkedIn</Label>
               {isEditing ? (
-                <Input
+                <Input className={cn(SP_INPUT)}
                   id="linkedin"
                   value={editedProfile.linkedin}
                   onChange={(e) =>
@@ -1601,8 +2149,14 @@ export default function ProfilePage({ user, onUpdateUser }) {
                   placeholder="https://linkedin.com/in/yourname"
                 />
               ) : (
-                <p className="text-sm p-2 bg-muted rounded-md flex items-center gap-2">
-                  <Linkedin className="w-4 h-4" />
+                <p
+                  className={cn(
+                    SP_VALUE,
+                    "flex items-center gap-2",
+                    !user.linkedin && SP_EMPTY,
+                  )}
+                >
+                  <Linkedin className="h-4 w-4 shrink-0 text-text-muted" />
                   {user.linkedin || "Not specified"}
                 </p>
               )}

@@ -185,44 +185,20 @@ export const JOURNEY_STAGES = [
 
 let journeyUserId = null;
 
+/** In-memory journey per founder session (hydrated from GET /journey, persisted via PUT). */
+const progressByUserKey = new Map();
+
 export function configureJourneyUser(userId) {
   journeyUserId = userId || null;
 }
 
-function journeyStorageKey() {
-  return journeyUserId ? `journey_progress_${journeyUserId}` : "journey_progress";
+function journeyMemoryKey() {
+  return journeyUserId ? String(journeyUserId) : "_anonymous";
 }
 
-/**
- * Overwrite local journey state from server (Startup.data.journey).
- */
-export function applyServerJourneySnapshot(snapshot) {
-  if (!snapshot || typeof snapshot !== "object") return;
-  const stage = Number(snapshot.currentStage);
-  if (!Number.isFinite(stage) || stage < 1) return;
-  const key = journeyStorageKey();
-  localStorage.setItem(key, JSON.stringify(snapshot));
-}
-
-// Initialize journey progress for new users
-export function initializeJourneyProgress() {
-  const key = journeyStorageKey();
-  let existingProgress = localStorage.getItem(key);
-
-  if (!existingProgress && journeyUserId) {
-    const legacy = localStorage.getItem("journey_progress");
-    if (legacy) {
-      existingProgress = legacy;
-      localStorage.setItem(key, legacy);
-    }
-  }
-
-  if (existingProgress) {
-    return JSON.parse(existingProgress);
-  }
-
-  const initialProgress = {
-    currentStage: 1, // Always start at Idea & Validation
+export function createDefaultJourneyProgress() {
+  return {
+    currentStage: 1,
     completedStages: [],
     stageData: {
       1: {
@@ -232,9 +208,59 @@ export function initializeJourneyProgress() {
       },
     },
   };
+}
 
-  localStorage.setItem(key, JSON.stringify(initialProgress));
-  return initialProgress;
+function ensureStageShells(progress) {
+  const next = {
+    ...progress,
+    completedStages: Array.isArray(progress.completedStages) ? [...progress.completedStages] : [],
+    stageData: { ...(progress.stageData || {}) },
+  };
+  for (let i = 1; i <= JOURNEY_STAGES.length; i += 1) {
+    const fromKey = next.stageData[i] || next.stageData[String(i)];
+    if (!fromKey) {
+      next.stageData[i] = {
+        startedAt: new Date().toISOString(),
+        completionPercentage: 0,
+        milestonesCompleted: [],
+      };
+    } else {
+      next.stageData[i] = {
+        startedAt: String(fromKey.startedAt || new Date().toISOString()),
+        completionPercentage: Math.min(100, Math.max(0, Number(fromKey.completionPercentage) || 0)),
+        milestonesCompleted: Array.isArray(fromKey.milestonesCompleted)
+          ? [...fromKey.milestonesCompleted]
+          : [],
+        ...(fromKey.completedAt ? { completedAt: String(fromKey.completedAt) } : {}),
+      };
+    }
+    delete next.stageData[String(i)];
+  }
+  return next;
+}
+
+/**
+ * Overwrite in-memory journey from server (GET /journey or Startup.data.journey).
+ */
+export function applyServerJourneySnapshot(snapshot) {
+  if (!snapshot || typeof snapshot !== "object") return;
+  const stage = Number(snapshot.currentStage);
+  if (!Number.isFinite(stage) || stage < 1) return;
+  const normalized = ensureStageShells({
+    ...createDefaultJourneyProgress(),
+    ...snapshot,
+    currentStage: Math.min(JOURNEY_STAGES.length, Math.max(1, stage)),
+  });
+  progressByUserKey.set(journeyMemoryKey(), normalized);
+}
+
+// Initialize journey progress for current user (memory only).
+export function initializeJourneyProgress() {
+  const key = journeyMemoryKey();
+  if (!progressByUserKey.has(key)) {
+    progressByUserKey.set(key, createDefaultJourneyProgress());
+  }
+  return progressByUserKey.get(key);
 }
 
 // Get current journey progress
@@ -248,9 +274,9 @@ export function getCurrentStage() {
   return progress.currentStage;
 }
 
-// Update journey progress
+// Update journey progress (memory)
 export function updateJourneyProgress(progress) {
-  localStorage.setItem(journeyStorageKey(), JSON.stringify(progress));
+  progressByUserKey.set(journeyMemoryKey(), progress);
 }
 
 // Mark current stage as complete and move to next
@@ -384,49 +410,11 @@ export function getStageStatus(stageId) {
   return "locked";
 }
 
-// Auto-detect stage progression based on activity
-export function autoDetectStageProgression(userId) {
-  const progress = getJourneyProgress();
-  const currentStage = progress.currentStage;
-
-  // Stage 1: Idea & Validation - Auto-complete if profile is complete
-  if (currentStage === 1) {
-    const profileComplete = localStorage.getItem(
-      `user_${userId}_onboarding_complete`,
-    );
-    if (profileComplete === "true") {
-      updateStageProgress(1, 50); // Profile completion = 50% of stage 1
-    }
-  }
-
-  // Stage 3: Team Building - Auto-progress based on team size
-  if (currentStage === 3) {
-    const teamMembers = JSON.parse(
-      localStorage.getItem("team_members") || "[]",
-    );
-    const teamSize = teamMembers.length + 1;
-
-    if (teamSize >= 3) {
-      updateStageProgress(3, 100);
-      // Auto-complete if team is built
-      if (!progress.completedStages.includes(3)) {
-        completeCurrentStage();
-      }
-    } else if (teamSize === 2) {
-      updateStageProgress(3, 50);
-    }
-  }
-
-  // Stage 4: MVP Development - Check for tasks or product activity
-  if (currentStage === 4) {
-    const tasks = JSON.parse(localStorage.getItem("founder_tasks") || "[]");
-    const completedTasks = tasks.filter((t) => t.completed).length;
-
-    if (completedTasks > 0) {
-      const progressPercentage = Math.min(100, (completedTasks / 10) * 100); // 10 tasks = 100%
-      updateStageProgress(4, progressPercentage);
-    }
-  }
+/**
+ * Legacy hook: journey is server-backed; do not infer stage from browser storage.
+ */
+export function autoDetectStageProgression(_userId) {
+  /* intentionally empty */
 }
 
 // Get overall journey completion percentage
@@ -471,6 +459,6 @@ export function getTimeInCurrentStage() {
 
 // Reset journey progress (for testing or restart)
 export function resetJourneyProgress() {
-  localStorage.removeItem(journeyStorageKey());
+  progressByUserKey.delete(journeyMemoryKey());
   initializeJourneyProgress();
 }

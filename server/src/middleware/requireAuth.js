@@ -15,14 +15,16 @@ function extractBearerToken(authorizationHeader) {
 }
 
 export default function requireAuth(req, res, next) {
-  const token = extractBearerToken(req.get("authorization"));
+  // Try to get token from HttpOnly cookie first (preferred - XSS safe)
+  // Then fall back to Authorization header (for API clients, mobile apps)
+  const token = req.cookies?.token || extractBearerToken(req.get("authorization"));
 
   if (!token) {
     return apiError(
       res,
-      "Unauthorized. Provide a valid Bearer token.",
+      "Unauthorized. Authentication required.",
       401,
-      ["Missing or invalid Authorization header."],
+      ["Missing or invalid authentication token."],
     );
   }
 

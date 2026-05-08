@@ -3,16 +3,17 @@ import {
   Calendar,
   CalendarDays,
   ChevronDown,
+  ChevronRight,
   CheckCircle2,
   CircleDot,
   Command,
   Filter,
   HelpCircle,
-  MessageCircle,
   Plus,
   PhoneCall,
   Sparkles,
   Target,
+  X,
 } from "lucide-react";
 import { Button } from "../ui/button";
 import { Badge } from "../ui/badge";
@@ -26,8 +27,8 @@ import {
   DrawerTitle,
 } from "../ui/drawer";
 import { TaskManagementPanel } from "./TaskManagementPanel";
-import { SimpleTeamMessaging } from "./SimpleTeamMessaging";
 import { TeamHubPanel } from "./TeamHubPanel";
+import CalendarHubPanel from "./CalendarHubPanel";
 import MeetingScheduler from "../calendar/MeetingScheduler";
 import { useOfficePanels } from "../../domains/office/hooks/useOfficePanels";
 import { useOfficeWorkspaceData } from "../../domains/office/hooks/useOfficeWorkspaceData";
@@ -52,7 +53,6 @@ function getTaskBadgeVariant(status) {
 }
 
 function getPanelTitle(panelKey) {
-  if (panelKey === "chat") return "Team Chat";
   if (panelKey === "tasks") return "My Tasks";
   if (panelKey === "updates") return "Team Updates";
   if (panelKey === "calendar") return "Calendar";
@@ -60,7 +60,6 @@ function getPanelTitle(panelKey) {
 }
 
 function getPanelDescription(panelKey) {
-  if (panelKey === "chat") return "Message teammates without leaving the office.";
   if (panelKey === "tasks") return "Track assigned work and jump into task management.";
   if (panelKey === "updates") return "Announcements, wins, and team pulse in one place.";
   if (panelKey === "calendar") return "Upcoming timeline and meeting scheduling.";
@@ -101,30 +100,234 @@ function buildMonthGrid(date = new Date()) {
   return weeks;
 }
 
+const ACTIVITY_PRESETS = [
+  { key: "today", label: "Today" },
+  { key: "yesterday", label: "Yesterday" },
+  { key: "3days", label: "Last 3 days" },
+];
+
+function getPresetRange(key) {
+  const now = new Date();
+  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
+  const endOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
+  if (key === "today") return { from: startOfToday, to: endOfToday };
+  if (key === "yesterday") {
+    const yStart = new Date(startOfToday); yStart.setDate(yStart.getDate() - 1);
+    const yEnd = new Date(endOfToday); yEnd.setDate(yEnd.getDate() - 1);
+    return { from: yStart, to: yEnd };
+  }
+  if (key === "3days") {
+    const d3 = new Date(startOfToday); d3.setDate(d3.getDate() - 2);
+    return { from: d3, to: endOfToday };
+  }
+  return null;
+}
+
+function parseInputDate(str, isEnd = false) {
+  if (!str) return null;
+  const parts = str.split("-");
+  if (parts.length !== 3) return null;
+  const [y, m, d] = parts.map(Number);
+  if (!y || !m || !d || Number.isNaN(y) || Number.isNaN(m) || Number.isNaN(d)) return null;
+  const date = isEnd
+    ? new Date(y, m - 1, d, 23, 59, 59, 999)
+    : new Date(y, m - 1, d, 0, 0, 0, 0);
+  if (Number.isNaN(date.getTime())) return null;
+  return date;
+}
+
+function toInputValue(date) {
+  if (!date) return "";
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const d = String(date.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
+
+function ActivityDateFilter({ activities, children }) {
+  const [preset, setPreset] = useState(null);
+  const [showCustom, setShowCustom] = useState(false);
+  const [fromStr, setFromStr] = useState("");
+  const [toStr, setToStr] = useState("");
+  const [customError, setCustomError] = useState("");
+
+  const todayStr = toInputValue(new Date());
+
+  const handlePreset = (key) => {
+    setPreset((prev) => (prev === key ? null : key));
+    setShowCustom(false);
+    setFromStr("");
+    setToStr("");
+    setCustomError("");
+  };
+
+  const handleFromChange = (val) => {
+    setFromStr(val);
+    setPreset(null);
+    setCustomError("");
+  };
+
+  const handleToChange = (val) => {
+    setToStr(val);
+    setPreset(null);
+    setCustomError("");
+  };
+
+  const customRange = useMemo(() => {
+    if (!fromStr && !toStr) return null;
+    const from = parseInputDate(fromStr, false);
+    const to = parseInputDate(toStr, true);
+    const now = new Date();
+    const endOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
+
+    if (fromStr && !from) return { error: "Invalid 'From' date." };
+    if (toStr && !to) return { error: "Invalid 'To' date." };
+    if (from && from > endOfToday) return { error: "'From' date cannot be in the future." };
+    if (to && to > endOfToday) return { error: "'To' cannot be after today." };
+    if (from && to && from > to) return { error: "'From' must be before 'To'." };
+    if (!fromStr) return { error: "Set a 'From' date to use a custom range." };
+    return { from, to: to || endOfToday };
+  }, [fromStr, toStr]);
+
+  const filtered = useMemo(() => {
+    let range = null;
+    if (preset) range = getPresetRange(preset);
+    else if (customRange && !customRange.error) range = customRange;
+    if (!range) return activities;
+    return activities.filter((a) => {
+      const ts = a.timestamp instanceof Date ? a.timestamp : new Date(a.timestamp);
+      if (Number.isNaN(ts.getTime())) return false;
+      return ts >= range.from && ts <= range.to;
+    });
+  }, [activities, preset, customRange]);
+
+  const hasActiveFilter = Boolean(preset) || Boolean(fromStr);
+  const error = customRange?.error || "";
+
+  return (
+    <div className="flex flex-col gap-2.5">
+      {/* Filter controls row */}
+      <div className="flex items-center justify-between gap-2">
+        {/* Segmented preset control */}
+        <div className="flex items-center gap-1">
+          {ACTIVITY_PRESETS.map((p) => (
+            <button
+              key={p.key}
+              type="button"
+              onClick={() => handlePreset(p.key)}
+              className={cn(
+                "cursor-pointer rounded-pill px-2.5 py-1 text-[12px] font-medium transition-all duration-200 ease-in-out",
+                preset === p.key
+                  ? "bg-primary text-white"
+                  : "bg-surface-page text-text-body hover:text-primary",
+              )}
+            >
+              {p.label}
+            </button>
+          ))}
+        </div>
+
+        {/* Right side: Custom + Clear */}
+        <div className="flex items-center gap-1.5">
+          <button
+            type="button"
+            onClick={() => { setShowCustom((v) => !v); setPreset(null); }}
+            className={cn(
+              "flex cursor-pointer items-center gap-1 rounded-input border bg-surface-card px-2.5 py-1 text-[12px] font-medium text-text-body transition-all duration-200 ease-in-out hover:border-primary hover:text-primary",
+              showCustom ? "border-primary text-primary" : "border-surface-border",
+            )}
+          >
+            <Filter className="h-2.5 w-2.5" />
+            Custom
+            <ChevronRight className={cn("h-2.5 w-2.5 transition-transform duration-200", showCustom && "rotate-90")} />
+          </button>
+          {hasActiveFilter && (
+            <button
+              type="button"
+              onClick={() => { setPreset(null); setFromStr(""); setToStr(""); setCustomError(""); setShowCustom(false); }}
+              className="flex items-center gap-0.5 rounded-md px-1.5 py-[3px] text-[10px] font-medium text-text-muted transition-colors duration-200 ease-in-out hover:text-destructive"
+            >
+              <X className="h-2.5 w-2.5" />
+              Reset
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Custom date range panel */}
+      {showCustom && (
+        <div className="space-y-2 rounded-card border border-surface-border bg-primary-tint/40 px-3 pb-3 pt-2.5">
+          <div className="mb-1 flex items-center gap-1.5">
+            <Calendar className="h-3 w-3 text-text-muted" />
+            <span className="text-[10px] font-semibold uppercase tracking-widest text-text-muted">Custom range</span>
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <div className="flex flex-col gap-1">
+              <label className="text-[10px] font-medium text-text-muted">From</label>
+              <input
+                type="date"
+                value={fromStr}
+                max={todayStr}
+                onChange={(e) => handleFromChange(e.target.value)}
+                className="h-7 w-full rounded-input border border-surface-border bg-surface-card px-2 text-[11px] text-text-heading transition-all duration-200 ease-in-out focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/25"
+              />
+            </div>
+            <div className="flex flex-col gap-1">
+              <label className="text-[10px] font-medium text-text-muted">To</label>
+              <input
+                type="date"
+                value={toStr}
+                max={todayStr}
+                min={fromStr || undefined}
+                onChange={(e) => handleToChange(e.target.value)}
+                className="h-7 w-full rounded-input border border-surface-border bg-surface-card px-2 text-[11px] text-text-heading transition-all duration-200 ease-in-out focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/25"
+              />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Error banner */}
+      {error && (
+        <div className="flex items-center gap-1.5 rounded-lg border border-destructive/20 bg-destructive/5 px-2.5 py-1.5">
+          <span className="h-1.5 w-1.5 flex-shrink-0 rounded-full bg-destructive" />
+          <p className="text-[10px] text-destructive">{error}</p>
+        </div>
+      )}
+
+      {children(filtered, hasActiveFilter)}
+    </div>
+  );
+}
+
 function OfficePanelCard({ title, action, children, className = "" }) {
   return (
-    <Card className={cn("office-card office-animate-in shadow-none", className)}>
-      <CardHeader className="pb-2 pt-2.5 office-panel-header">
+    <Card
+      className={cn(
+        "office-animate-in rounded-card border border-surface-border bg-surface-card shadow-soft transition-shadow duration-200 ease-in-out hover:shadow-[0_2px_12px_rgba(0,0,0,0.06)]",
+        className,
+      )}
+    >
+      <CardHeader className="border-0 bg-surface-card px-5 pb-2 pt-4">
         <div className="flex items-center justify-between gap-3">
-          <CardTitle className="text-[12px] font-semibold tracking-tight text-foreground">
+          <CardTitle className="font-heading text-base font-semibold text-text-heading">
             {title}
           </CardTitle>
           {action}
         </div>
       </CardHeader>
-      <CardContent className="space-y-2.5 px-2.5 pb-2.5 sm:px-3 sm:pb-3">{children}</CardContent>
+      <CardContent className="space-y-2.5 px-5 pb-5">{children}</CardContent>
     </Card>
   );
 }
 
 export default function VirtualStartupOfficeWorkspaceV2({
   user,
+  onNavigate,
   taskToOpen,
   onTaskOpened,
   announcementToOpen,
   onAnnouncementOpened,
-  messageUserToOpen,
-  onMessageUserOpened,
   winToOpen,
   onWinOpened,
 }) {
@@ -135,7 +338,6 @@ export default function VirtualStartupOfficeWorkspaceV2({
   const announcements = useOfficeStore((s) => s.announcements);
   const wins = useOfficeStore((s) => s.wins);
   const panels = useOfficePanels();
-  const [selectedMessageUserId, setSelectedMessageUserId] = useState(null);
   const [mobileTaskManagerOpen, setMobileTaskManagerOpen] = useState(false);
   const [mobileMeetingSchedulerOpen, setMobileMeetingSchedulerOpen] = useState(false);
 
@@ -155,12 +357,6 @@ export default function VirtualStartupOfficeWorkspaceV2({
     onAnnouncementOpened?.();
   }, [announcementToOpen, onAnnouncementOpened, panels.openPanel]);
 
-  useEffect(() => {
-    if (!messageUserToOpen) return;
-    setSelectedMessageUserId(String(messageUserToOpen));
-    panels.openPanel("chat");
-    onMessageUserOpened?.();
-  }, [messageUserToOpen, onMessageUserOpened, panels.openPanel]);
 
   useEffect(() => {
     if (!winToOpen) return;
@@ -171,7 +367,6 @@ export default function VirtualStartupOfficeWorkspaceV2({
   const actionButtons = useMemo(
     () => [
       { key: "team-call", label: "Team Call", panel: "calendar", icon: PhoneCall },
-      { key: "chat", label: "Chat", panel: "chat", icon: MessageCircle },
       { key: "tasks", label: "Tasks", panel: "tasks", icon: Target },
       { key: "calendar", label: "Calendar", panel: "calendar", icon: CalendarDays },
       { key: "updates", label: "Updates", panel: "updates", icon: Sparkles },
@@ -179,10 +374,19 @@ export default function VirtualStartupOfficeWorkspaceV2({
     [],
   );
 
-  const recentActivities = office.activities.slice(0, 8);
+  const recentActivities = office.activities;
   const roster = office.teamRoster.slice(0, 10);
   const upcomingAgenda = office.agenda.slice(0, 8);
   const myTasks = office.myTasks.slice(0, 8);
+  const unassignedByMilestone = office.unassignedByMilestone || [];
+  const unassignedTotal = useMemo(
+    () =>
+      unassignedByMilestone.reduce(
+        (sum, row) => sum + (Number(row.count) || 0),
+        0,
+      ),
+    [unassignedByMilestone],
+  );
   const now = new Date();
   const monthLabel = now.toLocaleDateString([], { month: "short", year: "numeric" });
   const monthGrid = buildMonthGrid(now);
@@ -194,81 +398,68 @@ export default function VirtualStartupOfficeWorkspaceV2({
     : panels.isOpen("calendar");
 
   return (
-    <div className="space-y-2.5 bg-background p-2.5 md:p-3 lg:p-3.5 office-panel">
-      <section
-        className="relative overflow-hidden rounded-xl border px-3 py-3 text-white sm:px-4 sm:py-3.5"
-        style={{
-          background: "linear-gradient(120deg, #1f3dff 0%, #3a5afe 48%, #6f89ff 100%)",
-          borderColor: "#6f86ff",
-        }}
-      >
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_100%_0%,rgba(255,255,255,0.24),transparent_52%)]" />
-        <div className="absolute -left-8 -bottom-14 h-28 w-28 rounded-full bg-white/15 blur-2xl" />
-        <div className="absolute -right-8 -top-12 h-32 w-32 rounded-full bg-indigo-200/25 blur-2xl" />
-
-        <div className="relative flex flex-wrap items-center justify-between gap-3">
-          <div className="min-w-0 space-y-1.5">
-            <div className="flex flex-wrap items-center gap-2.5">
-              <p className="truncate text-[13px] font-bold sm:text-[15px]">
-                {getDayGreeting()}, {user?.name || "New User"}!
-              </p>
-              <Badge className="h-5 rounded-full border border-white/35 bg-white/20 px-2 text-[10px] font-semibold text-white hover:bg-white/20">
-                {office.teamEnergy.onlineCount} teammates online
-              </Badge>
-            </div>
-            <div className="flex flex-wrap items-center gap-2 text-[11px] text-white/90 sm:text-[12px]">
-              <span className="inline-flex items-center gap-1 rounded-full border border-white/30 bg-white/12 px-2 py-0.5">
-                <Sparkles className="h-3.5 w-3.5" />
-                Live startup workspace
-              </span>
-              <span>Keep up the great work!</span>
-            </div>
+    <div
+      className="office-panel flex flex-col gap-5 bg-surface-page px-6 py-5 font-body"
+    >
+      <section className="flex flex-wrap items-center justify-between gap-3 rounded-card border border-surface-border bg-surface-card px-5 py-4">
+        <div className="min-w-0 space-y-1.5">
+          <div className="flex flex-wrap items-center gap-2.5">
+            <p className="truncate font-heading text-lg font-bold text-text-heading">
+              {getDayGreeting()}, {user?.name || "New User"}!
+            </p>
+            <span className="inline-flex items-center rounded-pill bg-primary-tint px-3 py-[3px] font-body text-xs font-semibold text-primary">
+              {office.teamEnergy.onlineCount} teammates online
+            </span>
           </div>
-
-          <div className="flex items-center gap-2">
-            <span className="text-[10px] font-medium text-white/90 sm:text-[11px]">Status</span>
-            <button
-              type="button"
-              className="h-6 rounded-full border border-white/40 bg-white/14 px-2.5 text-[10px] font-semibold uppercase tracking-wide text-white backdrop-blur-sm"
-            >
-              available
-            </button>
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="inline-flex items-center gap-1 rounded-pill border border-surface-border bg-surface-page px-2.5 py-0.5 font-body text-[11px] font-medium text-text-body">
+              <Sparkles className="h-3 w-3 shrink-0 text-text-body" />
+              Live startup workspace
+            </span>
+            <span className="font-body text-[11px] text-text-body">Keep up the great work!</span>
           </div>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="font-body text-[11px] font-medium text-text-muted">Status</span>
+          <button
+            type="button"
+            className="rounded-pill bg-status-success px-3 py-[3px] font-body text-[11px] font-semibold uppercase tracking-[0.06em] text-white transition-colors duration-200 ease-in-out"
+          >
+            AVAILABLE
+          </button>
         </div>
       </section>
 
-      <div className="rounded-lg border border-border bg-card px-2 py-1.5 sm:px-3">
-        <div className="flex flex-wrap items-center gap-1">
-          {actionButtons.map((item) => {
-            const Icon = item.icon;
-            const active = panels.isOpen(item.panel);
-            return (
-              <Button
-                key={item.key}
-                type="button"
-                variant="ghost"
-                onClick={() => panels.openPanel(item.panel)}
-                className={cn(
-                  "h-6 gap-1.5 rounded-md px-2.5 text-[11px] font-medium text-muted-foreground hover:bg-muted hover:text-foreground",
-                  active && "bg-muted text-foreground",
-                )}
-              >
-                <Icon className="h-3.5 w-3.5" />
-                {item.label}
-              </Button>
-            );
-          })}
-          <div className="ml-auto flex items-center gap-1.5">
-            <Button
+      <div className="flex flex-wrap items-center gap-0 border-b border-surface-border bg-surface-card px-3">
+        {actionButtons.map((item) => {
+          const Icon = item.icon;
+          const active = panels.isOpen(item.panel);
+          return (
+            <button
+              key={item.key}
               type="button"
-              variant="ghost"
-              className="h-6 gap-1 rounded-md px-2 text-[11px]"
-              onClick={() => panels.openPanel("calendar")}
+              onClick={() => panels.openPanel(item.panel)}
+              className={cn(
+                "inline-flex h-10 cursor-pointer items-center gap-1.5 border-0 border-b-2 bg-transparent px-3 text-[13px] transition-colors duration-200 ease-in-out",
+                active
+                  ? "border-primary font-semibold text-primary"
+                  : "border-transparent font-medium text-text-body hover:text-primary",
+              )}
             >
-              <Command className="h-3.5 w-3.5" />
-              Shortcuts
-            </Button>
-          </div>
+              <Icon className="h-4 w-4 shrink-0" />
+              {item.label}
+            </button>
+          );
+        })}
+        <div className="ml-auto flex items-center gap-1.5 pl-2">
+          <button
+            type="button"
+            className="inline-flex h-10 cursor-pointer items-center gap-1 border-0 bg-transparent px-2 font-body text-[12px] font-medium text-text-body transition-colors duration-200 ease-in-out hover:text-primary"
+            onClick={() => panels.openPanel("calendar")}
+          >
+            <Command className="h-3.5 w-3.5 shrink-0" />
+            Shortcuts
+          </button>
         </div>
       </div>
 
@@ -280,167 +471,227 @@ export default function VirtualStartupOfficeWorkspaceV2({
         </Card>
       ) : null}
 
-      <div className="office-workspace-grid-top grid gap-2.5">
+      <div className="office-workspace-grid-top" style={{display: 'grid', gridTemplateColumns: '280px 1fr 300px', gap: 16, alignItems: 'start'}}>
+        <div style={{position: 'relative'}}>
         <OfficePanelCard
           title="Live Activity"
-          action={<span className="text-[10px] text-muted-foreground">Real-time</span>}
-          className="min-h-[232px] office-workspace-grid-top__activity"
+          action={
+            <span className="flex items-center gap-1.5">
+              <span className="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-status-success" />
+              <span className="font-body text-[11px] font-medium text-text-body">Real-time</span>
+            </span>
+          }
+          className="office-workspace-grid-top__activity"
         >
           {office.loading && recentActivities.length === 0 ? (
-            <div className="flex min-h-[145px] items-center justify-center text-[11px] text-muted-foreground">
+            <div className="flex min-h-[145px] items-center justify-center font-body text-[11px] text-text-muted">
               Loading activity...
             </div>
           ) : recentActivities.length === 0 ? (
-            <div className="flex min-h-[145px] flex-col items-center justify-center gap-1.5 text-center text-[11px] text-muted-foreground">
-              <CircleDot className="h-4 w-4 text-muted-foreground/70" />
-              <p>No activity yet</p>
-              <p>Team activity will appear here</p>
+            <div className="flex min-h-[145px] flex-col items-center justify-center gap-1.5 text-center">
+              <CircleDot className="h-4 w-4 text-surface-border" />
+              <p className="font-heading text-[11px] font-semibold text-text-heading">No activity yet</p>
+              <p className="font-body text-[11px] text-text-muted">Team activity will appear here</p>
             </div>
           ) : (
-            <div className="space-y-2">
-              {recentActivities.slice(0, 5).map((activity) => (
-                <div key={activity.id} className="rounded-md border border-border bg-card px-2.5 py-2">
-                  <p className="line-clamp-1 text-[11px]">
-                    <span className="font-medium">{activity.userName}</span>
-                    {" "}
-                    {activity.message}
-                  </p>
-                  <p className="mt-1 text-[10px] text-muted-foreground">
-                    {formatRelativeTime(activity.timestamp)}
-                  </p>
-                </div>
-              ))}
-            </div>
+            <ActivityDateFilter activities={recentActivities}>
+              {(filtered, hasActiveFilter) => (
+                <>
+                  <div className="mb-1 flex items-center justify-between">
+                    <span className="font-body text-[11px] text-text-body">
+                      {hasActiveFilter
+                        ? `${filtered.length} of ${recentActivities.length} activities`
+                        : `${recentActivities.length} activities`}
+                    </span>
+                  </div>
+                  {filtered.length === 0 ? (
+                    <div className="flex min-h-[80px] flex-col items-center justify-center gap-1 text-center">
+                      <CircleDot className="h-4 w-4 text-surface-border/80" />
+                      <p className="font-body text-[11px] text-text-muted">No activity in this period</p>
+                    </div>
+                  ) : (
+                    <div className="overflow-y-auto" style={{ maxHeight: 280 }}>
+                      {filtered.map((activity, idx) => (
+                        <div
+                          key={activity.id}
+                          className={cn(
+                            "py-2.5",
+                            idx < filtered.length - 1 && "border-b border-surface-border/80",
+                          )}
+                        >
+                          <p className="line-clamp-2 font-body text-[13px] text-text-heading">
+                            <span className="font-medium">{activity.userName}</span>
+                            {" "}
+                            {activity.message}
+                          </p>
+                          <p className="mt-0.5 font-body text-[11px] text-text-muted">
+                            {formatRelativeTime(activity.timestamp)}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </>
+              )}
+            </ActivityDateFilter>
           )}
         </OfficePanelCard>
+        </div>
 
+        <div style={{position: 'relative'}}>
         <OfficePanelCard
           title="Team Grid View"
           action={
-            <Button
+            <button
               type="button"
-              variant="outline"
-              className="h-6 rounded-md border-[#D1D5DB] px-2 text-[10px] hover:border-indigo-500"
+              className="inline-flex h-7 cursor-pointer items-center rounded-input border border-surface-border bg-surface-page px-2.5 font-body text-[12px] font-semibold text-primary transition-colors duration-200 ease-in-out hover:border-primary hover:bg-primary-tint"
               onClick={() => panels.openPanel("chat")}
             >
               + Invite Team
-            </Button>
+            </button>
           }
           className="min-h-[232px] office-workspace-grid-top__team"
         >
           {roster.length === 0 ? (
-            <div className="flex min-h-[145px] items-center justify-center text-[11px] text-muted-foreground">
+            <div className="flex min-h-[145px] items-center justify-center font-body text-[11px] text-text-muted">
               No team members yet.
             </div>
           ) : (
-            <div className="grid h-[164px] grid-cols-1">
-              {roster.slice(0, 1).map((member) => (
-                <div key={member.id} className="h-fit w-[195px] rounded-md border border-border bg-muted/20 p-2.5">
-                  <div className="mb-2 flex items-center gap-2">
-                    <div className="relative flex h-8 w-8 items-center justify-center rounded-md bg-slate-100 text-[12px] font-medium text-slate-700">
+            <div className="grid grid-cols-1 gap-3">
+              {roster.map((member) => (
+                <div
+                  key={member.id}
+                  className="h-fit rounded-[12px] border border-surface-border bg-surface-page p-4"
+                >
+                  <div className="mb-2 flex items-center gap-2.5">
+                    <div className="relative flex h-[38px] w-[38px] flex-shrink-0 items-center justify-center rounded-[10px] bg-primary font-heading text-[13px] font-bold text-white">
                       {getInitials(member.name)}
                       {member.isOnline && (
-                        <span className="absolute -right-0.5 -bottom-0.5 h-2.5 w-2.5 rounded-full border border-white bg-emerald-500" />
+                        <span className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border-2 border-surface-card bg-status-success" />
                       )}
                     </div>
                     <div className="min-w-0">
-                      <p className="truncate text-[11px] font-medium">{member.name}</p>
-                      <p className="truncate text-[10px] text-muted-foreground">
+                      <p className="truncate font-heading text-sm font-semibold text-text-heading">{member.name}</p>
+                      <p className="truncate font-body text-xs text-text-body">
                         {member.title || member.role}
                       </p>
                     </div>
                   </div>
-                  <p className="truncate text-[10px] text-muted-foreground">
-                    {member.statusText || "available"}
-                  </p>
+                  <div className="flex items-center gap-1.5">
+                    <span className="inline-block h-1.5 w-1.5 rounded-full bg-status-success" />
+                    <p className="truncate font-body text-[11px] font-medium text-text-body">
+                      {member.statusText || "In workspace"}
+                    </p>
+                  </div>
                 </div>
               ))}
             </div>
           )}
         </OfficePanelCard>
+        </div>
 
+        <div style={{position: 'relative'}}>
         <OfficePanelCard
           title="Team Energy & Pulse"
           className="min-h-[232px] office-workspace-grid-top__energy"
         >
-          <div className="space-y-2.5">
-            <div className="space-y-0.5 text-center">
-              <p className="text-[20px] leading-none">{"\u{1F973}"}</p>
-              <p className="text-[13px] font-medium">
+          <div className="flex flex-col gap-3">
+            <div className="py-4 text-center">
+              <p className="font-heading text-[22px] font-extrabold leading-none text-primary">
                 {office.teamEnergy.percentage >= 70
-                  ? "High"
+                  ? "HIGH"
                   : office.teamEnergy.percentage >= 40
-                    ? "Moderate"
-                    : "Low"}
+                    ? "MODERATE"
+                    : "LOW"}
               </p>
-              <p className="text-[10px] text-muted-foreground">Team is winding down</p>
+              <p className="mt-1 font-body text-xs text-text-body">Team is winding down</p>
             </div>
-            <div className="border-t border-border pt-2">
-              <p className="text-[10px] text-muted-foreground">Live Stats</p>
-              <div className="mt-1.5 grid grid-cols-4 gap-1.5">
-                <div className="rounded-md border border-border bg-muted/20 p-1.5 text-center">
-                  <p className="text-[11px] font-medium">{office.teamEnergy.totalCount}</p>
-                  <p className="text-[9px] text-muted-foreground">People</p>
+            <div className="border-t border-surface-border pt-3">
+              <p className="mb-2 font-body text-[11px] font-semibold uppercase tracking-[0.08em] text-text-muted">
+                Live Stats
+              </p>
+              <div className="grid grid-cols-2 gap-2">
+                <div className="rounded-[12px] border border-surface-border bg-surface-page p-3 text-center">
+                  <p className="font-heading text-lg font-extrabold text-primary">{office.teamEnergy.totalCount}</p>
+                  <p className="mt-0.5 font-body text-[10px] font-medium uppercase tracking-[0.06em] text-text-muted">
+                    People
+                  </p>
                 </div>
-                <div className="rounded-md border border-border bg-muted/20 p-1.5 text-center">
-                  <p className="text-[11px] font-medium">{office.teamEnergy.workingCount}</p>
-                  <p className="text-[9px] text-muted-foreground">Working</p>
+                <div className="rounded-[12px] border border-surface-border bg-surface-page p-3 text-center">
+                  <p className="font-heading text-lg font-extrabold text-primary">{office.teamEnergy.workingCount}</p>
+                  <p className="mt-0.5 font-body text-[10px] font-medium uppercase tracking-[0.06em] text-text-muted">
+                    Working
+                  </p>
                 </div>
-                <div className="rounded-md border border-border bg-muted/20 p-1.5 text-center">
-                  <p className="text-[11px] font-medium">{office.teamEnergy.inCallCount}</p>
-                  <p className="text-[9px] text-muted-foreground">In Calls</p>
+                <div className="rounded-[12px] border border-surface-border bg-surface-page p-3 text-center">
+                  <p className="font-heading text-lg font-extrabold text-primary">{office.teamEnergy.inCallCount}</p>
+                  <p className="mt-0.5 font-body text-[10px] font-medium uppercase tracking-[0.06em] text-text-muted">
+                    In Calls
+                  </p>
                 </div>
-                <div className="rounded-md border border-border bg-muted/20 p-1.5 text-center">
-                  <p className="text-[11px] font-medium">{office.realtimeOnline ? "On" : "Off"}</p>
-                  <p className="text-[9px] text-muted-foreground">Live</p>
+                <div className="rounded-[12px] border border-surface-border bg-surface-page p-3 text-center">
+                  <p
+                    className={cn(
+                      "font-heading text-lg font-extrabold",
+                      office.realtimeOnline ? "text-status-success" : "text-text-muted",
+                    )}
+                  >
+                    {office.realtimeOnline ? "On" : "Off"}
+                  </p>
+                  <p className="mt-0.5 font-body text-[10px] font-medium uppercase tracking-[0.06em] text-text-muted">
+                    Live
+                  </p>
                 </div>
               </div>
             </div>
-            <div className="space-y-1 border-t border-border pt-2">
-              <div className="flex items-center justify-between text-[10px]">
-                <span className="text-muted-foreground">Energy level</span>
-                <span>{office.teamEnergy.percentage}%</span>
+            <div className="flex flex-col gap-1.5 border-t border-surface-border pt-3">
+              <div className="flex items-center justify-between">
+                <span className="font-body text-xs font-medium text-text-body">Energy level</span>
+                <span className="font-body text-xs font-semibold text-primary">{office.teamEnergy.percentage}%</span>
               </div>
-              <div className="h-1 rounded-full bg-muted">
+              <div className="h-1.5 rounded-pill bg-surface-border">
                 <div
-                  className="h-1 rounded-full bg-foreground/80"
+                  className="h-1.5 rounded-pill bg-gradient-to-r from-primary to-accent transition-[width] duration-200 ease-out"
                   style={{ width: `${office.teamEnergy.percentage}%` }}
                 />
               </div>
-              <div className="flex items-center justify-between text-[9px] text-muted-foreground">
+              <div className="flex justify-between font-body text-xs text-text-muted">
                 <span>{office.teamEnergy.onlineCount} online</span>
                 <span>{Math.max(0, office.teamEnergy.totalCount - office.teamEnergy.onlineCount)} away</span>
               </div>
             </div>
           </div>
         </OfficePanelCard>
+        </div>
       </div>
 
-      <div className="office-workspace-grid-bottom grid gap-2.5">
+      <div className="office-workspace-grid-bottom" style={{display: 'grid', gridTemplateColumns: '1fr 300px', gap: 16, marginTop: 0}}>
         <OfficePanelCard
           title="Team Calendar"
           action={
-            <Button
+            <button
               type="button"
-              variant="ghost"
-              className="h-6 gap-1 rounded-md px-2 text-[10px]"
+              className="inline-flex h-7 cursor-pointer items-center gap-1 rounded-input border border-surface-border bg-surface-page px-2.5 font-body text-[12px] font-semibold text-primary transition-colors duration-200 ease-in-out hover:border-primary hover:bg-primary-tint"
               onClick={() => panels.openPanel("calendar")}
             >
-              <Plus className="h-3.5 w-3.5" />
+              <Plus className="h-3.5 w-3.5 shrink-0" />
               Schedule
-            </Button>
+            </button>
           }
-          className="min-h-[208px] office-workspace-grid-bottom__calendar"
+          className="min-h-[248px] office-workspace-grid-bottom__calendar sm:min-h-[268px]"
         >
-          <div className="office-calendar-split grid gap-2.5">
-            <div className="rounded-md border border-border p-2.5 office-calendar-split__month">
-              <div className="mb-2 flex items-center justify-between">
-                <p className="text-[10px] font-medium text-muted-foreground">{monthLabel}</p>
-                <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
+          <div className="office-calendar-split grid gap-4 md:gap-5">
+            <div className="office-calendar-split__month rounded-card border border-surface-border bg-surface-card p-4 md:p-5">
+              <div className="mb-4 flex items-center justify-between gap-2">
+                <p className="font-heading text-base font-semibold tracking-tight text-text-heading">{monthLabel}</p>
+                <ChevronDown className="h-[18px] w-[18px] shrink-0 text-text-body" />
               </div>
-              <div className="grid grid-cols-7 gap-0.5 text-center">
+              <div className="grid grid-cols-7 gap-x-1 gap-y-2 text-center sm:gap-x-1.5 sm:gap-y-2.5">
                 {["S", "M", "T", "W", "T", "F", "S"].map((day, index) => (
-                  <span key={`${day}-${index}`} className="text-[9px] text-muted-foreground">
+                  <span
+                    key={`${day}-${index}`}
+                    className="pb-1 font-body text-[13px] font-medium text-text-muted sm:text-sm"
+                  >
                     {day}
                   </span>
                 ))}
@@ -448,11 +699,13 @@ export default function VirtualStartupOfficeWorkspaceV2({
                   <span
                     key={`${day || "blank"}-${index}`}
                     className={cn(
-                      "rounded text-[10px] leading-5",
-                      day === todayDate
-                        ? "bg-indigo-600 text-white"
-                        : "text-foreground",
-                      day == null && "text-transparent",
+                      "mx-auto flex min-h-[34px] min-w-[34px] items-center justify-center rounded-full font-body text-sm leading-none sm:min-h-[38px] sm:min-w-[38px] sm:text-[15px]",
+                      day == null && "pointer-events-none text-transparent",
+                      day !== null &&
+                        day !== todayDate &&
+                        "cursor-default text-text-heading transition-colors duration-200 ease-in-out hover:bg-primary-tint hover:text-primary",
+                      day === todayDate &&
+                        "bg-primary font-semibold text-white shadow-sm",
                     )}
                   >
                     {day || "."}
@@ -460,31 +713,40 @@ export default function VirtualStartupOfficeWorkspaceV2({
                 ))}
               </div>
             </div>
-            <div className="rounded-md border border-border p-2.5 office-calendar-split__agenda">
-              <div className="mb-2 flex items-center justify-between">
-                <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
-                  <Calendar className="h-3.5 w-3.5" />
+            <div className="office-calendar-split__agenda rounded-card border border-surface-border bg-surface-card p-4 md:p-5">
+              <div className="mb-3 flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2 font-body text-sm font-semibold text-text-body">
+                  <Calendar className="h-4 w-4 shrink-0 text-text-body" />
                   Agenda
                 </div>
-                <Button type="button" variant="ghost" className="h-6 gap-1 px-2 text-[10px]">
-                  <Filter className="h-3.5 w-3.5" />
+                <button
+                  type="button"
+                  className="group inline-flex cursor-pointer items-center gap-1 rounded-input border-0 bg-transparent px-1.5 py-0.5 font-body text-[11px] font-medium text-text-body transition-colors duration-200 ease-in-out hover:text-primary"
+                >
+                  <Filter className="h-3 w-3 shrink-0 text-text-body transition-colors duration-200 group-hover:text-primary" />
                   Filter
-                </Button>
+                </button>
               </div>
               {upcomingAgenda.length === 0 ? (
-                <div className="flex min-h-[126px] flex-col items-center justify-center text-center">
-                  <CalendarDays className="h-4 w-4 text-muted-foreground" />
-                  <p className="mt-1.5 text-[11px] text-muted-foreground">No agenda items</p>
-                  <p className="text-[10px] text-muted-foreground">
+                <div className="flex min-h-[140px] flex-col items-center justify-center px-2 text-center sm:min-h-[152px]">
+                  <CalendarDays className="h-5 w-5 text-surface-border" />
+                  <p className="mt-1.5 font-heading text-[11px] font-semibold text-text-heading">No agenda items</p>
+                  <p className="font-body text-[10px] text-text-muted">
                     Nothing scheduled for this period
                   </p>
                 </div>
               ) : (
-                <div className="space-y-1.5">
-                  {upcomingAgenda.slice(0, 4).map((item) => (
-                    <div key={item.id} className="rounded-md border border-border px-2 py-1.5">
-                      <p className="truncate text-[11px] font-medium">{item.title}</p>
-                      <p className="text-[10px] text-muted-foreground">
+                <div>
+                  {upcomingAgenda.slice(0, 4).map((item, idx) => (
+                    <div
+                      key={item.id}
+                      className={cn(
+                        "py-2",
+                        idx < Math.min(upcomingAgenda.length, 4) - 1 && "border-b border-surface-border/80",
+                      )}
+                    >
+                      <p className="truncate font-body text-[13px] font-medium text-text-heading">{item.title}</p>
+                      <p className="font-body text-[11px] text-text-body">
                         {item.date.toLocaleDateString()}
                         {" "}
                         {item.date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
@@ -499,69 +761,116 @@ export default function VirtualStartupOfficeWorkspaceV2({
 
         <OfficePanelCard
           title="Your Tasks"
-          className="min-h-[208px] office-workspace-grid-bottom__tasks"
+          action={
+            user?.role === "founder" && unassignedTotal > 0 ? (
+              <span
+                className="inline-flex shrink-0 items-center gap-1 rounded-full border border-primary/18 bg-primary/[0.06] px-2.5 py-1 font-body text-[11px] font-semibold tabular-nums text-primary"
+                title="Unassigned tasks waiting for an owner"
+              >
+                {unassignedTotal}
+                {" unassigned"}
+              </span>
+            ) : null
+          }
+          className="min-h-[208px] office-workspace-grid-bottom__tasks border-primary/18"
         >
           {myTasks.length === 0 ? (
             <div className="flex min-h-[126px] flex-col items-center justify-center text-center">
-              <CheckCircle2 className="h-4 w-4 text-muted-foreground" />
-              <p className="mt-1.5 text-[11px] text-muted-foreground">No tasks yet</p>
-              <p className="text-[10px] text-muted-foreground">Create your first task to get started</p>
+              <CheckCircle2 className="h-4 w-4 text-surface-border" />
+              <p className="mt-1.5 font-heading text-[11px] font-semibold text-text-heading">
+                {user?.role === "founder" && unassignedTotal > 0
+                  ? "Nothing assigned to you yet"
+                  : "No tasks yet"}
+              </p>
+              <p className="font-body text-[10px] text-text-muted">
+                {user?.role === "founder"
+                  ? unassignedTotal > 0
+                    ? "Unassigned work is listed below by milestone — assign it from the dashboard or task panel."
+                    : "Tasks assigned to you from milestones will appear here."
+                  : "No tasks assigned to you yet"}
+              </p>
             </div>
           ) : (
-            <div className="space-y-1.5">
-              {myTasks.slice(0, 4).map((task) => (
-                <div key={task.id} className="rounded-md border border-border px-2.5 py-2">
-                  <div className="flex items-start justify-between gap-2">
-                    <p className="line-clamp-1 text-[11px] font-medium">{task.title}</p>
-                    <Badge variant={getTaskBadgeVariant(task.status)} className="text-[9px]">
-                      {task.status}
-                    </Badge>
+            <div>
+              {myTasks.slice(0, 4).map((task, idx) => (
+                <div
+                  key={task.id}
+                  className={cn(
+                    "flex items-start justify-between gap-2 py-3",
+                    idx < Math.min(myTasks.length, 4) - 1 && "border-b border-surface-border/80",
+                  )}
+                >
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate font-body text-[13px] font-medium text-text-heading">{task.title}</p>
+                    <p className="mt-0.5 font-body text-[11px] text-text-muted">
+                      {task.dueDate ? `Due ${task.dueDate.toLocaleDateString()}` : "No due date"}
+                    </p>
                   </div>
-                  <p className="mt-1 text-[10px] text-muted-foreground">
-                    {task.dueDate ? `Due ${task.dueDate.toLocaleDateString()}` : "No due date"}
-                  </p>
+                  <span
+                    className={cn(
+                      "flex-shrink-0 rounded-pill px-2.5 py-0.5 font-body text-[11px] font-medium",
+                      task.status === "completed" && "bg-status-success/15 text-status-success",
+                      task.status === "in-progress" && "bg-status-warning/15 text-text-heading",
+                      task.status !== "completed" &&
+                        task.status !== "in-progress" &&
+                        "bg-primary-tint text-text-body",
+                    )}
+                  >
+                    {task.status}
+                  </span>
                 </div>
               ))}
             </div>
           )}
-          <Button
+          {user?.role === "founder" &&
+            unassignedByMilestone.length > 0 && (
+              <div className="mt-3 rounded-xl border border-primary/15 bg-[#fafbff] px-3 py-3">
+                <p className="font-heading text-[11px] font-semibold tracking-wide text-[#0d0d0d]">
+                  Needs assignment
+                </p>
+                <p className="mt-0.5 font-body text-[10px] leading-snug text-[#4a4a5a]">
+                  Unassigned tasks by milestone — open Task manager or founder dashboard to assign owners.
+                </p>
+                <div className="mt-2.5 flex flex-wrap gap-1.5">
+                  {unassignedByMilestone.map((row) => (
+                    <span
+                      key={row.milestoneId || row.milestoneName || "none"}
+                      className="inline-flex max-w-full items-center gap-1.5 rounded-full border border-primary/18 bg-white px-2.5 py-1 font-body text-[11px] shadow-[0_1px_2px_rgba(58,90,254,0.06)]"
+                    >
+                      <span className="truncate text-[#4a4a5a]" title={row.milestoneName}>
+                        {row.milestoneName}
+                      </span>
+                      <span className="shrink-0 rounded-full bg-primary/12 px-1.5 py-0.5 text-[10px] font-bold tabular-nums text-[#1a237e]">
+                        {row.count}
+                      </span>
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+          <button
             type="button"
-            variant="ghost"
-            className="h-6 w-full gap-1 rounded-md border border-border text-[11px]"
+            className="group mt-1 flex h-9 w-full cursor-pointer items-center justify-center gap-1.5 rounded-input border-0 bg-transparent font-body text-[13px] font-semibold text-primary transition-colors duration-200 ease-in-out hover:text-accent"
             onClick={() => panels.openPanel("tasks")}
           >
-            <Plus className="h-3.5 w-3.5" />
-            Add Task
-          </Button>
+            <Target className="h-3.5 w-3.5 shrink-0 text-primary transition-colors duration-200 group-hover:text-accent" />
+            View All Tasks
+          </button>
         </OfficePanelCard>
       </div>
 
       <button
         type="button"
-        className="fixed bottom-4 right-4 z-40 flex h-11 w-11 items-center justify-center rounded-full bg-violet-600 text-white shadow-md hover:bg-violet-500 md:bottom-5 md:right-5"
+        className="fixed bottom-4 right-4 z-40 flex h-11 w-11 items-center justify-center rounded-full bg-primary text-white shadow-[0_4px_16px_rgba(58,90,254,0.30)] transition-colors duration-200 ease-in-out hover:bg-primary-hover md:bottom-5 md:right-5"
         aria-label="Open office help"
       >
-        <HelpCircle className="h-4.5 w-4.5" />
+        <HelpCircle className="h-5 w-5" />
       </button>
-
-      {!panels.isMobile && panels.isOpen("chat") && (
-        <SimpleTeamMessaging
-          onClose={() => panels.closePanel("chat")}
-          onStartCall={() => panels.openPanel("calendar")}
-          currentUserId={user.id}
-          currentUserName={user.name}
-          currentUserRole={user.role}
-          startupId={office.startupId}
-          teamMembers={office.teamRoster}
-          initialSelectedUserId={selectedMessageUserId}
-          strictMode={true}
-        />
-      )}
 
       {!panels.isMobile && panels.isOpen("updates") && (
         <TeamHubPanel
           onClose={() => panels.closePanel("updates")}
-          currentUserId={user.id}
+          currentUserId={String(user._id ?? user.id ?? "")}
           currentUserName={user.name}
           startupId={office.startupId}
           strictMode={true}
@@ -569,6 +878,7 @@ export default function VirtualStartupOfficeWorkspaceV2({
           winsData={wins}
           onCreateAnnouncement={createAnnouncement}
           onCreateWin={createWin}
+          user={user}
         />
       )}
 
@@ -585,23 +895,18 @@ export default function VirtualStartupOfficeWorkspaceV2({
         initialTaskId={taskToOpen || null}
         strictMode={true}
         startupId={office.startupId}
-        founderIdOverride={founderId || user?.id}
-        onTasksSynced={() => office.refresh({ silent: true })}
+        founderIdOverride={founderId || String(user?._id ?? user?.id ?? "")}
+        onTasksSynced={() => office.refresh(user)}
+        onNavigate={onNavigate}
       />
 
-      <MeetingScheduler
-        open={calendarDialogOpen}
-        onClose={() => {
-          if (panels.isMobile) {
-            setMobileMeetingSchedulerOpen(false);
-            return;
-          }
-          panels.closePanel("calendar");
-        }}
-        user={user}
-        teamMembers={office.teamRoster}
-        onMeetingScheduled={() => office.refresh({ silent: true })}
-      />
+      {!panels.isMobile && panels.isOpen("calendar") && (
+        <CalendarHubPanel
+          user={user}
+          startupId={office.startupId}
+          onClose={() => panels.closePanel("calendar")}
+        />
+      )}
 
       {panels.isMobile && (
         <Drawer
@@ -612,9 +917,13 @@ export default function VirtualStartupOfficeWorkspaceV2({
           }}
         >
           <DrawerContent className="max-w-[calc(100%-1rem)] office-panel office-sheet-content">
-            <DrawerHeader className="office-panel-header">
-              <DrawerTitle>{getPanelTitle(panels.mobileSheet)}</DrawerTitle>
-              <DrawerDescription>{getPanelDescription(panels.mobileSheet)}</DrawerDescription>
+            <DrawerHeader className="office-panel-header border-surface-border bg-surface-card">
+              <DrawerTitle className="font-heading text-text-heading">
+                {getPanelTitle(panels.mobileSheet)}
+              </DrawerTitle>
+              <DrawerDescription className="font-body text-text-body">
+                {getPanelDescription(panels.mobileSheet)}
+              </DrawerDescription>
             </DrawerHeader>
 
             <div className="px-4 pb-4 office-panel-body">
@@ -626,11 +935,11 @@ export default function VirtualStartupOfficeWorkspaceV2({
                     panels.closeAll();
                     setMobileMeetingSchedulerOpen(true);
                   }}
-                  currentUserId={user.id}
+                  currentUserId={String(user._id ?? user.id ?? "")}
                   currentUserName={user.name}
                   currentUserRole={user.role}
                   startupId={office.startupId}
-                  teamMembers={office.teamRoster}
+                  teamMembers={office.chatRoster}
                   initialSelectedUserId={selectedMessageUserId}
                   strictMode={true}
                 />
@@ -640,7 +949,7 @@ export default function VirtualStartupOfficeWorkspaceV2({
                 <TeamHubPanel
                   embedded
                   onClose={panels.closeAll}
-                  currentUserId={user.id}
+                  currentUserId={String(user._id ?? user.id ?? "")}
                   currentUserName={user.name}
                   startupId={office.startupId}
                   strictMode={true}
@@ -648,11 +957,19 @@ export default function VirtualStartupOfficeWorkspaceV2({
                   winsData={wins}
                   onCreateAnnouncement={createAnnouncement}
                   onCreateWin={createWin}
+                  user={user}
                 />
               )}
 
               {panels.mobileSheet === "tasks" && (
                 <div className="space-y-3 pb-20">
+                  {myTasks.length === 0 && user?.role === "founder" && (
+                    <p className="text-[13px] text-muted-foreground px-1">
+                      {unassignedTotal > 0
+                        ? "No tasks assigned to you right now. Unassigned counts by milestone are below."
+                        : "No tasks assigned to you yet."}
+                    </p>
+                  )}
                   {myTasks.slice(0, 6).map((task) => (
                     <div
                       key={`sheet-task-${task.id}`}
@@ -667,6 +984,23 @@ export default function VirtualStartupOfficeWorkspaceV2({
                       </div>
                     </div>
                   ))}
+                  {user?.role === "founder" && unassignedByMilestone.length > 0 && (
+                    <div className="rounded-xl border border-primary/20 bg-muted/30 px-3 py-2.5">
+                      <p className="text-[12px] font-semibold text-foreground">Needs assignment</p>
+                      <div className="mt-2 flex flex-wrap gap-1.5">
+                        {unassignedByMilestone.map((row) => (
+                          <Badge
+                            key={row.milestoneId || row.milestoneName || "none"}
+                            variant="outline"
+                            className="border-primary/25 font-normal"
+                          >
+                            <span className="max-w-[140px] truncate">{row.milestoneName}</span>
+                            <span className="ml-1 tabular-nums font-semibold">{row.count}</span>
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                   <div className="sticky bottom-0 bg-background/95 backdrop-blur-sm border-t border-border pt-3">
                     <Button
                       type="button"
@@ -714,6 +1048,16 @@ export default function VirtualStartupOfficeWorkspaceV2({
             </div>
           </DrawerContent>
         </Drawer>
+      )}
+
+      {panels.isMobile && (
+        <MeetingScheduler
+          open={mobileMeetingSchedulerOpen}
+          onClose={() => setMobileMeetingSchedulerOpen(false)}
+          user={user}
+          teamMembers={office.teamRoster}
+          onMeetingScheduled={() => setMobileMeetingSchedulerOpen(false)}
+        />
       )}
     </div>
   );

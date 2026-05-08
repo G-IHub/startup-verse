@@ -5,8 +5,10 @@ import * as announcementsController from "../controllers/announcements.controlle
 import Announcement from "../models/Announcement.js";
 import User from "../models/User.js";
 import Startup from "../models/Startup.js";
+import TeamMemberProfile from "../models/TeamMemberProfile.js";
 import { error as apiError, success as apiSuccess } from "../utils/apiResponse.js";
 import { emitRealtime } from "../services/realtime.service.js";
+import { broadcastNotification } from "../services/notificationService.js";
 import { SOCKET_EVENTS } from "../realtime/events.js";
 import { announcementRoom } from "../realtime/rooms.js";
 
@@ -129,6 +131,30 @@ announcementsRouter.post(
     });
     const dto = mapAnnouncementDto(announcement);
     emitRealtime(SOCKET_EVENTS.ANNOUNCEMENT_CREATED, dto, [announcementRoom(scope.canonicalId)]);
+
+    // Notify all team members of the founder so the announcement reaches them
+    // in their notification center as well as the realtime stream.
+    try {
+      const team = await TeamMemberProfile.find(
+        { founderId: scope.founderUserId || scope.canonicalId },
+        { userId: 1 },
+      ).lean();
+      const recipients = team
+        .map((t) => t.userId)
+        .filter((id) => id && String(id) !== String(req.user.id));
+      if (recipients.length) {
+        await broadcastNotification(recipients, {
+          type: "announcement-created",
+          title: dto.title || "New announcement",
+          message: dto.message || "A new announcement was posted.",
+          actionUrl: `/?view=virtual-office&tab=announcements&announcementId=${dto.id}`,
+          metadata: { announcementId: dto.id, startupId: dto.startupId },
+        });
+      }
+    } catch (err) {
+      console.error("[announcements] notify team failed:", err.message);
+    }
+
     return apiSuccess(res, dto, 201);
   }),
 );

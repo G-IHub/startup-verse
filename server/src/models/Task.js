@@ -1,5 +1,5 @@
 import mongoose from "mongoose";
-import { TASK_STATUSES } from "../utils/enums.js";
+import { TASK_STATUSES, TASK_PRIORITIES } from "../utils/enums.js";
 
 const taskSchema = new mongoose.Schema(
   {
@@ -27,7 +27,18 @@ const taskSchema = new mongoose.Schema(
       index: true 
     },
     assignedTo: { type: mongoose.Schema.Types.ObjectId, ref: "User", index: true },
+    assignedToName: { type: String, default: "", trim: true, maxlength: 200 },
+    assignedToAvatar: { type: String, default: "", trim: true, maxlength: 2000 },
     milestoneId: { type: mongoose.Schema.Types.ObjectId, ref: "Milestone", index: true },
+    priority: {
+      type: String,
+      enum: {
+        values: TASK_PRIORITIES,
+        message: "{VALUE} is not a valid task priority",
+      },
+      default: "medium",
+      index: true,
+    },
     comments: { type: [mongoose.Schema.Types.Mixed], default: [] },
     incentive: { 
       type: String, 
@@ -54,6 +65,23 @@ const taskSchema = new mongoose.Schema(
 );
 
 taskSchema.index({ founderId: 1, startupId: 1, createdAt: -1 });
+
+// Mongoose 8+ / 9+: document middleware does not pass `next`; throw instead.
+taskSchema.pre("validate", function requireBlockerFieldsWhenBlocked() {
+  if (this.status === "blocked") {
+    const reasonOk =
+      typeof this.blockerReason === "string" &&
+      this.blockerReason.trim().length > 0;
+    const noteOk =
+      typeof this.blockerNote === "string" &&
+      this.blockerNote.trim().length > 0;
+    if (!reasonOk || !noteOk) {
+      throw new Error(
+        "Blocked tasks require both blockerReason and blockerNote.",
+      );
+    }
+  }
+});
 
 const Task = mongoose.models.Task || mongoose.model("Task", taskSchema);
 

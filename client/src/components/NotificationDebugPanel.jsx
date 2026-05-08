@@ -3,9 +3,15 @@ import { API_BASE_URL } from "../config/apiBase.js";
 import { Button } from "./ui/button";
 import { Card } from "./ui/card";
 import { useAuth } from "../contexts/AuthContext";
-import { getAccessToken } from "../app/session";
 import { Bell, Zap, Bug } from "lucide-react";
 import { toast } from "sonner";
+
+// Default fetch options for cookie-based auth
+
+const defaultOptions = {
+  credentials: "include",
+  headers: { "Content-Type": "application/json" },
+};
 
 export default function NotificationDebugPanel() {
   const { user } = useAuth();
@@ -26,11 +32,9 @@ export default function NotificationDebugPanel() {
     try {
       console.log("[DEBUG] Creating test notification for user:", user.id);
       const response = await fetch(`${API_BASE_URL}/notifications/test`, {
+        ...defaultOptions,
         method: "POST",
-        headers: {
-          Authorization: `Bearer ${getAccessToken()}`,
-          "Content-Type": "application/json",
-        },
+        ...defaultOptions,
         body: JSON.stringify({
           userId: user.id,
           type: "task-completed",
@@ -75,11 +79,9 @@ export default function NotificationDebugPanel() {
     try {
       console.log("[DEBUG] Fetching notifications for user:", user.id);
       const response = await fetch(`${API_BASE_URL}/users/${user.id}/notifications`, {
+        ...defaultOptions,
         method: "GET",
-        headers: {
-          Authorization: `Bearer ${getAccessToken()}`,
-          "Content-Type": "application/json",
-        },
+        ...defaultOptions,
       });
 
       const payload = await response.json();

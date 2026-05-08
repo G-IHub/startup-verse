@@ -1,13 +1,12 @@
 import axios from "axios";
 import { API_BASE_URL } from "../config/apiBase.js";
-import { getAccessToken } from "../app/session";
 
 /**
  * Shared Axios client for the founder Home wiring.
  *
  * Responsibilities:
  * - Base URL from `VITE_API_URL` (via `apiBase.js`).
- * - Auth interceptor injecting `Authorization: Bearer <token>` from the session module.
+ * - Cookie-based auth (credentials: include) - no manual token handling needed.
  * - Response interceptor that unwraps the `{ success, data }` envelope used by the backend,
  *   keeping parity with `utils/backendClient.js` so stores can consume `data` directly.
  * - Normalized error object `{ status, code, message, details, isApiError }`
@@ -79,6 +78,7 @@ function normalizeAxiosError(error) {
 export const apiClient = axios.create({
   baseURL: API_BASE_URL,
   timeout: REQUEST_TIMEOUT_MS,
+  withCredentials: true, // Enable cookie-based auth
   headers: {
     "Content-Type": "application/json",
     Accept: "application/json",
@@ -86,12 +86,6 @@ export const apiClient = axios.create({
 });
 
 apiClient.interceptors.request.use((config) => {
-  const token = getAccessToken();
-  if (token) {
-    config.headers = config.headers || {};
-    config.headers.Authorization = `Bearer ${token}`;
-  }
-
   config.headers = config.headers || {};
   if (!config.headers["X-Request-Id"]) {
     config.headers["X-Request-Id"] = generateRequestId();

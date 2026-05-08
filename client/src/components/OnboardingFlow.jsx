@@ -9,7 +9,11 @@ import {
   determineInitialStage,
   getStageName,
 } from "../utils/algorithmicStageDetection";
-import { setCurrentStage } from "../utils/journeyProgress";
+import {
+  applyServerJourneySnapshot,
+  configureJourneyUser,
+} from "../utils/journeyProgress";
+import { syncJourneyProgressToServer } from "../utils/founderJourneyApi.js";
 export default function OnboardingFlow({ role, onComplete, onBack }) {
   const [currentStep, setCurrentStep] = useState("auth");
   const [authenticatedUser, setAuthenticatedUser] = useState(null);
@@ -45,7 +49,7 @@ export default function OnboardingFlow({ role, onComplete, onBack }) {
       setProfileStep(profileStep - 1);
     }
   };
-  const handleProfileComplete = (data) => {
+  const handleProfileComplete = async (data) => {
     if (!authenticatedUser) return;
 
     // 🎯 ALGORITHMIC STAGE DETERMINATION
@@ -57,8 +61,30 @@ export default function OnboardingFlow({ role, onComplete, onBack }) {
       monthlyRevenue: data.monthlyRevenue,
     });
 
-    // Set the algorithmically-determined stage
-    setCurrentStage(algorithmicStageId);
+    const journeyForServer = {
+      currentStage: algorithmicStageId,
+      completedStages: [],
+      stageData: {
+        [algorithmicStageId]: {
+          startedAt: new Date().toISOString(),
+          completionPercentage: 0,
+          milestonesCompleted: [],
+        },
+      },
+    };
+    const uid = authenticatedUser.id;
+    if (uid) {
+      configureJourneyUser(uid);
+      applyServerJourneySnapshot(journeyForServer);
+      try {
+        await syncJourneyProgressToServer(uid);
+      } catch (err) {
+        console.warn(
+          "[OnboardingFlow] Initial journey sync skipped (startup may not exist yet)",
+          err,
+        );
+      }
+    }
 
     // Merge profile data with user
     const completedUser = {
@@ -70,22 +96,6 @@ export default function OnboardingFlow({ role, onComplete, onBack }) {
       onboardingComplete: true,
     };
 
-    // Mark Stage 0 (Profile Setup) as complete
-    const journeyProgress = JSON.parse(
-      localStorage.getItem("founder_journey_progress") || "{}",
-    );
-    journeyProgress.profileSetup = {
-      status: "completed",
-      progress: 100,
-      completedAt: new Date().toISOString(),
-    };
-    localStorage.setItem(
-      "founder_journey_progress",
-      JSON.stringify(journeyProgress),
-    );
-
-    // Save founder profile
-    localStorage.setItem("founder_profile", JSON.stringify(data));
     toast.success("🎉 Profile setup complete! Welcome to StartupVerse!", {
       description: `Based on your startup's current state, you're in: ${getStageName(algorithmicStageId)}`,
     });

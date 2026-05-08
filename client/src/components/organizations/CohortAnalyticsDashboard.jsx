@@ -19,10 +19,16 @@ import {
   Activity,
   FileText,
 } from "lucide-react";
-import { getAccessToken } from "../../app/session";
 import { unwrapData } from "../../utils/apiEnvelope";
 
 const API_BASE = API_BASE_URL;
+
+// Default fetch options for cookie-based auth
+
+const defaultOptions = {
+  credentials: "include",
+  headers: { "Content-Type": "application/json" },
+};
 
 export default function CohortAnalyticsDashboard({ cohortId }) {
   const [analytics, setAnalytics] = useState(null);
@@ -33,13 +39,10 @@ export default function CohortAnalyticsDashboard({ cohortId }) {
   const loadAnalytics = async () => {
     try {
       setLoading(true);
-      const token = getAccessToken();
       const response = await fetch(
         `${API_BASE}/cohorts/${cohortId}/analytics/overview`,
         {
-          headers: {
-            ...(token ? { Authorization: `Bearer ${token}` } : {}),
-          },
+          ...defaultOptions,
         },
       );
       if (!response.ok) throw new Error("Failed to fetch analytics");
@@ -80,7 +83,14 @@ export default function CohortAnalyticsDashboard({ cohortId }) {
           <CardDescription className="text-[9px]">
             {"Key metrics across all "}
             {analytics.cohortSize}
-            {" startups"}
+            {" active startups"}
+            {typeof analytics.recentJoinsLast30Days === "number" ? (
+              <>
+                {" · "}
+                {analytics.recentJoinsLast30Days}
+                {" joined in the last 30 days"}
+              </>
+            ) : null}
           </CardDescription>
         </CardHeader>
         <CardContent>

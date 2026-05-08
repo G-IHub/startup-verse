@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { API_BASE_URL } from "../../config/apiBase.js";
-import { loadCurrentUser, persistCurrentUser } from "../../app/session";
+import { persistCurrentUser } from "../../app/session";
 import { Button } from "../ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "../ui/avatar";
 import { toast } from "sonner";
@@ -27,7 +27,19 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "../ui/dropdown-menu";
-import { getAccessToken } from "../../app/session";
+import {
+  getSentInterests,
+  getReceivedInterests,
+  getSentInvitations,
+  getReceivedInvitations,
+} from "../../utils/api/inboxApi";
+
+// Default fetch options for cookie-based auth
+
+const defaultOptions = {
+  credentials: "include",
+  headers: { "Content-Type": "application/json" },
+};
 
 const PAGE_META = {
   dashboard: {
@@ -39,8 +51,12 @@ const PAGE_META = {
     description: "Live startup workspace",
   },
   "team-matching": {
-    title: "Team Matching",
-    description: "Find and evaluate the right people",
+    title: "Browse Talent",
+    description: "Discover talent that can grow into your team",
+  },
+  "browse-startups": {
+    title: "Browse Startups",
+    description: "Discover startup opportunities that match your skills",
   },
   inbox: {
     title: "Inbox",
@@ -53,6 +69,14 @@ const PAGE_META = {
   settings: {
     title: "Settings",
     description: "Profile, preferences, and account controls",
+  },
+  "talent-chat": {
+    title: "My Chats",
+    description: "Conversations with startups you expressed interest in",
+  },
+  "founder-chat": {
+    title: "Team Chat",
+    description: "Messages with team members and interested talents",
   },
   "my-performance": {
     title: "My Performance",
@@ -107,8 +131,18 @@ export default function AppLayoutHybrid({
 }) {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [unreadMessagesCount, setUnreadMessagesCount] = useState(0);
+  const [sidebarMixCount, setSidebarMixCount] = useState(0);
+  const [hasSentInterest, setHasSentInterest] = useState(false);
   const pageMeta = resolvePageMeta(currentPage, user.role);
-  const isWorkspacePage = currentPage === "startup-office";
+  const normalizedPage = String(currentPage || "dashboard").split(":")[0];
+  const isInboxPage = normalizedPage === "inbox";
+  const isTeamDashboardPage =
+    normalizedPage === "dashboard" &&
+    (user.role === "team-member" || user.role === "team");
+  const isWorkspacePage =
+    currentPage === "startup-office" ||
+    currentPage === "talent-chat" ||
+    currentPage === "founder-chat";
 
   useEffect(() => {
     const fetchInboxCount = async () => {
@@ -117,11 +151,8 @@ export default function AppLayoutHybrid({
           const invitationsRes = await fetch(
             `${API_BASE_URL}/invitations/received/${user.id}`,
             {
-              headers: {
-                Authorization: `Bearer ${getAccessToken()}`,
-                "Content-Type": "application/json",
-              },
-            },
+             ...defaultOptions,
+                          },
           );
           if (!invitationsRes.ok) {
             setUnreadMessagesCount(0);
@@ -137,11 +168,8 @@ export default function AppLayoutHybrid({
           const interestsRes = await fetch(
             `${API_BASE_URL}/interests/received/${user.id}`,
             {
-              headers: {
-                Authorization: `Bearer ${getAccessToken()}`,
-                "Content-Type": "application/json",
-              },
-            },
+             ...defaultOptions,
+                          },
           );
           if (!interestsRes.ok) {
             setUnreadMessagesCount(0);
@@ -154,11 +182,8 @@ export default function AppLayoutHybrid({
           const orgInvitationsRes = await fetch(
             `${API_BASE_URL}/invitations/founder/${user.id}`,
             {
-              headers: {
-                Authorization: `Bearer ${getAccessToken()}`,
-                "Content-Type": "application/json",
-              },
-            },
+             ...defaultOptions,
+                          },
           );
           let pendingOrgInvitations = 0;
           if (orgInvitationsRes.ok) {
@@ -174,11 +199,8 @@ export default function AppLayoutHybrid({
           const invitationsRes = await fetch(
             `${API_BASE_URL}/invitations/received/${user.id}`,
             {
-              headers: {
-                Authorization: `Bearer ${getAccessToken()}`,
-                "Content-Type": "application/json",
-              },
-            },
+             ...defaultOptions,
+                          },
           );
           if (!invitationsRes.ok) {
             setUnreadMessagesCount(0);
@@ -199,63 +221,73 @@ export default function AppLayoutHybrid({
     fetchInboxCount();
   }, [user.id, user.role]);
 
-  const getNotificationCount = () => {
-    if (user.role === "talent") {
-      const invitations = JSON.parse(
-        localStorage.getItem("startupverse_sent_invitations") || "[]",
-      );
-      const myInvitations = invitations.filter(
-        (inv) =>
-          (inv.talentId === user.id || inv.talentName === user.name) &&
-          inv.status === "pending",
-      );
+  useEffect(() => {
+    let cancelled = false;
+    const uid = String(user._id ?? user.id ?? "");
+    (async () => {
+      if (!uid || (user.role !== "talent" && user.role !== "founder")) {
+        if (!cancelled) setSidebarMixCount(0);
+        return;
+      }
+      try {
+        if (user.role === "talent") {
+          const [recvInv, sentInt] = await Promise.all([
+            getReceivedInvitations(uid),
+            getSentInterests(uid),
+          ]);
+          if (cancelled) return;
+          const pendInv =
+            recvInv.filter((i) => String(i?.status || "") === "pending")
+              .length || 0;
+          const respondedInt =
+            sentInt.filter((i) => String(i?.status || "") !== "pending")
+              .length || 0;
+          setSidebarMixCount(pendInv + respondedInt);
+          return;
+        }
+        const [recvInt, sentInv] = await Promise.all([
+          getReceivedInterests(uid),
+          getSentInvitations(uid),
+        ]);
+        if (cancelled) return;
+        const pendInt =
+          recvInt.filter((i) => String(i?.status || "") === "pending").length ||
+          0;
+        const respondedInv =
+          sentInv.filter((i) => String(i?.status || "") !== "pending").length ||
+          0;
+        setSidebarMixCount(pendInt + respondedInv);
+      } catch {
+        if (!cancelled) setSidebarMixCount(0);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [user.id, user.role, user._id]);
 
-      const interests = JSON.parse(
-        localStorage.getItem("startupverse_sent_interests") || "[]",
-      );
-      const myResponses = interests.filter(
-        (item) => item.sentById === user.id && item.status !== "pending",
-      );
-      return myInvitations.length + myResponses.length;
-    }
-
-    if (user.role === "founder") {
-      const interests = JSON.parse(
-        localStorage.getItem("startupverse_sent_interests") || "[]",
-      );
-      const myInterests = interests.filter(
-        (item) => item.founderName === user.name && item.status === "pending",
-      );
-
-      const invitations = JSON.parse(
-        localStorage.getItem("startupverse_sent_invitations") || "[]",
-      );
-      const myResponses = invitations.filter(
-        (inv) =>
-          (inv.sentBy === user.name || inv.sentBy === user.id) &&
-          inv.status !== "pending",
-      );
-      return myInterests.length + myResponses.length;
-    }
-
-    return 0;
-  };
-
-  const notificationCount = getNotificationCount();
+  useEffect(() => {
+    if (user.role !== "talent") return;
+    const talentId = String(user._id ?? user.id ?? "");
+    if (!talentId) return;
+    getSentInterests(talentId)
+      .then((interests) => {
+        setHasSentInterest(Array.isArray(interests) && interests.length > 0);
+      })
+      .catch(() => {});
+  }, [user.id, user.role]);
 
   const switchRole = (newRole) => {
-    const parsedUser = loadCurrentUser();
-    if (!parsedUser) {
+    if (!user) {
       toast.error("User data not found");
       return;
     }
 
-    const updatedUser = {
-      ...parsedUser,
+    persistCurrentUser({
+      ...user,
       role: newRole,
       onboardingComplete: true,
-    };
-    persistCurrentUser(updatedUser);
+    });
 
     const roleName = {
       founder: "Founder",
@@ -293,14 +325,21 @@ export default function AppLayoutHybrid({
           onPageChange={onPageChange}
           onVirtualOfficeViewChange={onVirtualOfficeViewChange}
           unreadCount={unreadMessagesCount}
-          notificationCount={notificationCount}
+          notificationCount={sidebarMixCount}
           talentDashboardMode={talentDashboardMode}
+          hasSentInterest={hasSentInterest}
           isOpen={isMobileMenuOpen}
           onClose={() => setIsMobileMenuOpen(false)}
         />
       )}
       <div className="flex flex-1 flex-col overflow-hidden">
-        <header className="z-50 border-b border-border bg-background shadow-sm">
+        <header
+          className={
+            isInboxPage || isTeamDashboardPage
+              ? "z-50 border-b border-[#e2e4f0] bg-white shadow-[0_1px_8px_rgba(0,0,0,0.05)] transition-shadow duration-200 ease-in-out"
+              : "z-50 border-b border-surface-border bg-surface-card shadow-[0_1px_8px_rgba(0,0,0,0.05)] transition-shadow duration-200 ease-in-out"
+          }
+        >
           <PageViewport>
             <div className="flex items-center gap-3 py-2">
               {user.role === "organization-admin" ? (
@@ -309,7 +348,7 @@ export default function AppLayoutHybrid({
                 <Button
                   variant="ghost"
                   size="sm"
-                  className="h-9 w-9 p-0 md:hidden"
+                  className="h-9 w-9 p-0 md:hidden transition-colors duration-200 ease-in-out [&_svg]:text-text-body"
                   onClick={() => setIsMobileMenuOpen(true)}
                 >
                   <Menu className="h-5 w-5" />
@@ -317,10 +356,22 @@ export default function AppLayoutHybrid({
               )}
               {user.role !== "organization-admin" ? (
                 <div className="min-w-0">
-                  <p className="truncate text-sm font-semibold text-foreground">
+                  <p
+                    className={
+                      isInboxPage || isTeamDashboardPage
+                        ? "truncate font-heading text-sm font-bold text-[#0d0d0d]"
+                        : "truncate font-heading text-sm font-bold text-text-heading"
+                    }
+                  >
                     {pageMeta.title}
                   </p>
-                  <p className="truncate text-xs text-muted-foreground">
+                  <p
+                    className={
+                      isInboxPage || isTeamDashboardPage
+                        ? "truncate font-body text-xs font-normal text-[#4a4a5a]"
+                        : "truncate font-body text-xs text-text-body"
+                    }
+                  >
                     {pageMeta.description}
                   </p>
                 </div>
@@ -331,7 +382,7 @@ export default function AppLayoutHybrid({
                   <ThemeToggle
                     variant="ghost"
                     size="sm"
-                    className="bg-muted/80 transition-colors hover:bg-muted"
+                    className="transition-colors duration-200 ease-in-out hover:bg-surface-page [&_svg]:text-text-body"
                   />
                 </div>
                 <NotificationCenter onNavigate={onPageChange} />
@@ -342,15 +393,15 @@ export default function AppLayoutHybrid({
                         <Button
                           variant="ghost"
                           size="sm"
-                          className="h-9 gap-2 rounded-full bg-muted/80 px-2 transition-colors hover:bg-muted"
+                          className="h-9 gap-2 rounded-full bg-transparent px-2 transition-colors duration-200 ease-in-out hover:bg-surface-page"
                         >
                           <Avatar className="h-7 w-7">
                             <AvatarImage src={user.profile?.avatar} />
-                            <AvatarFallback className="text-xs">
+                            <AvatarFallback className="bg-primary font-body text-xs font-semibold text-primary-foreground">
                               {user.name.substring(0, 2).toUpperCase()}
                             </AvatarFallback>
                           </Avatar>
-                          <ChevronDown className="hidden h-3 w-3 text-muted-foreground sm:block" />
+                          <ChevronDown className="hidden h-3 w-3 text-text-body sm:block" />
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end" className="w-64">

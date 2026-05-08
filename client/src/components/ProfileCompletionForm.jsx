@@ -1,5 +1,11 @@
-import React, { useState, useRef, useEffect } from "react";
-import { API_BASE_URL } from "../config/apiBase.js";
+import React, {
+  useState,
+  useRef,
+  useEffect,
+  useLayoutEffect,
+  useCallback,
+} from "react";
+import { createPortal } from "react-dom";
 import { Button } from "./ui/button";
 import {
   Card,
@@ -11,17 +17,65 @@ import {
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
 import { Textarea } from "./ui/textarea";
-import { ArrowLeft, Upload, ChevronDown, ChevronUp, X } from "lucide-react";
+import { ArrowLeft, ChevronDown } from "lucide-react";
 import TalentProfileForm from "./TalentProfileForm";
 import {
   determineInitialStage,
   getStageName,
 } from "../utils/algorithmicStageDetection";
-import { setCurrentStage } from "../utils/journeyProgress";
+import {
+  applyServerJourneySnapshot,
+  configureJourneyUser,
+} from "../utils/journeyProgress";
+import { syncJourneyProgressToServer } from "../utils/founderJourneyApi.js";
 import { toast } from "sonner";
-import { getAccessToken } from "../app/session";
+import * as founderApi from "../utils/api/founderApi";
+import {
+  FOUNDER_INDUSTRY_OPTIONS,
+  FOUNDER_TARGET_AUDIENCE_OPTIONS,
+  FOUNDER_ROLES_NEEDED_OPTIONS,
+  FOUNDER_TEAM_SIZE_OPTIONS,
+  ORG_ADMIN_PROGRAM_STAGE_OPTIONS,
+  resolveIndustryForPersistence,
+  validateFounderStartupFields,
+} from "../domains/founder/founderProfileConfig";
+import { persistedTalentToFormInitialData } from "../utils/talentProfileCompletion";
 
-// Single-select dropdown component with scroll indicators
+const industryOptions = FOUNDER_INDUSTRY_OPTIONS;
+const audienceOptions = FOUNDER_TARGET_AUDIENCE_OPTIONS;
+const rolesOptions = FOUNDER_ROLES_NEEDED_OPTIONS;
+const teamSizeOptions = FOUNDER_TEAM_SIZE_OPTIONS;
+const startupStagesOptions = ORG_ADMIN_PROGRAM_STAGE_OPTIONS;
+
+/** Panel width from trigger + longest option; opaque surface scrolls as one block */
+function computeMenuPanelBox(buttonRect, optionStrings, gap = 4, pad = 12) {
+  const r = buttonRect;
+  const vw = window.innerWidth;
+  const vh = window.innerHeight;
+  const maxPanelWidth = Math.max(260, vw - pad * 2);
+  const triggerW = Math.max(r.width, 160);
+  let longest = 0;
+  for (let i = 0; i < optionStrings.length; i++) {
+    const len = String(optionStrings[i]).length;
+    if (len > longest) longest = len;
+  }
+  const estFromText = Math.min(longest * 7 + 56, maxPanelWidth);
+  const menuWidth = Math.min(Math.max(triggerW, estFromText), maxPanelWidth);
+  let left = r.left;
+  if (left + menuWidth > vw - pad) {
+    left = Math.max(pad, vw - pad - menuWidth);
+  }
+  if (left < pad) left = pad;
+  const availBelow = vh - r.bottom - gap - pad;
+  const maxHeight = Math.min(360, Math.max(160, availBelow));
+  return {
+    top: r.bottom + gap,
+    left,
+    width: menuWidth,
+    maxHeight,
+  };
+}
+
 function SingleSelectDropdown({
   label,
   options,
@@ -33,49 +87,86 @@ function SingleSelectDropdown({
 }) {
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef(null);
-  const listRef = useRef(null);
-  const [showScrollTop, setShowScrollTop] = useState(false);
-  const [showScrollBottom, setShowScrollBottom] = useState(false);
+  const buttonRef = useRef(null);
+  const menuRef = useRef(null);
+  const [menuBox, setMenuBox] = useState(null);
+
+  const layoutMenu = useCallback(() => {
+    if (!isOpen || !buttonRef.current) {
+      setMenuBox(null);
+      return;
+    }
+    const r = buttonRef.current.getBoundingClientRect();
+    setMenuBox(computeMenuPanelBox(r, options));
+  }, [isOpen, options]);
+
+  useLayoutEffect(() => {
+    if (!isOpen) setMenuBox(null);
+    else layoutMenu();
+  }, [isOpen, layoutMenu]);
+
+  useEffect(() => {
+    if (!isOpen) return undefined;
+    layoutMenu();
+    window.addEventListener("resize", layoutMenu);
+    window.addEventListener("scroll", layoutMenu, true);
+    return () => {
+      window.removeEventListener("resize", layoutMenu);
+      window.removeEventListener("scroll", layoutMenu, true);
+    };
+  }, [isOpen, layoutMenu]);
+
   useEffect(() => {
     function handleClickOutside(event) {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
-        setIsOpen(false);
+      const t = event.target;
+      if (
+        dropdownRef.current?.contains(t) ||
+        menuRef.current?.contains(t)
+      ) {
+        return;
       }
+      setIsOpen(false);
     }
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
-  const handleScroll = () => {
-    if (listRef.current) {
-      const { scrollTop, scrollHeight, clientHeight } = listRef.current;
-      setShowScrollTop(scrollTop > 0);
-      setShowScrollBottom(scrollTop + clientHeight < scrollHeight - 5);
-    }
-  };
-  useEffect(() => {
-    if (isOpen && listRef.current) {
-      const { scrollHeight, clientHeight } = listRef.current;
-      setShowScrollBottom(scrollHeight > clientHeight);
-    }
-  }, [isOpen]);
-  const scrollUp = () => {
-    if (listRef.current) {
-      listRef.current.scrollBy({
-        top: -100,
-        behavior: "smooth",
-      });
-    }
-  };
-  const scrollDown = () => {
-    if (listRef.current) {
-      listRef.current.scrollBy({
-        top: 100,
-        behavior: "smooth",
-      });
-    }
-  };
+
   const displayValue = value || placeholder;
   const isPlaceholder = !value;
+
+  const menuPortal =
+    isOpen &&
+    menuBox &&
+    createPortal(
+      <div
+        ref={menuRef}
+        className="fixed z-[10000] overflow-y-auto overflow-x-hidden rounded-md border border-border text-popover-foreground"
+        style={{
+          top: menuBox.top,
+          left: menuBox.left,
+          width: menuBox.width,
+          maxHeight: menuBox.maxHeight,
+          backgroundColor: "var(--popover)",
+          boxShadow: "var(--elevation-3)",
+        }}
+      >
+        {options.map((option) => (
+          <button
+            type="button"
+            key={option}
+            onClick={() => {
+              onChange(option);
+              setIsOpen(false);
+            }}
+            className={`flex w-full px-3 py-2.5 text-left text-xs leading-snug whitespace-normal break-words transition-colors hover:bg-muted ${value === option ? "bg-muted" : ""}`}
+          >
+            {option}
+          </button>
+        ))}
+      </div>,
+      document.body,
+    );
+
   return (
     <div className="space-y-2">
       <Label>
@@ -83,10 +174,14 @@ function SingleSelectDropdown({
       </Label>
       <div ref={dropdownRef} className="relative">
         <button
+          ref={buttonRef}
           type="button"
-          onClick={() => !disabled && setIsOpen(!isOpen)}
+          onClick={() => {
+            if (disabled) return;
+            setIsOpen(!isOpen);
+          }}
           disabled={disabled}
-          className="w-full h-10 px-3 rounded-md border border-border/70 bg-background text-foreground flex items-center justify-between text-left disabled:opacity-50"
+          className="flex h-10 w-full items-center justify-between rounded-md border border-border/70 bg-background px-3 text-left text-foreground disabled:opacity-50"
         >
           <span
             className={`truncate ${isPlaceholder ? "text-xs text-muted-foreground" : "text-xs"}`}
@@ -94,56 +189,15 @@ function SingleSelectDropdown({
             {displayValue}
           </span>
           <ChevronDown
-            className={`w-4 h-4 flex-shrink-0 transition-transform ${isOpen ? "rotate-180" : ""}`}
+            className={`h-4 w-4 shrink-0 transition-transform ${isOpen ? "rotate-180" : ""}`}
           />
         </button>
-        {isOpen && (
-          <div className="absolute z-50 w-full mt-1 bg-background border border-border/70 rounded-md shadow-lg overflow-hidden">
-            {showScrollTop && (
-              <button
-                type="button"
-                onClick={scrollUp}
-                className="w-full py-1.5 bg-muted/50 hover:bg-muted flex items-center justify-center border-b border-border/70"
-              >
-                <ChevronUp className="w-4 h-4 text-muted-foreground" />
-              </button>
-            )}
-            <div
-              ref={listRef}
-              onScroll={handleScroll}
-              className="max-h-48 overflow-y-auto"
-            >
-              {options.map((option) => (
-                <button
-                  type="button"
-                  key={option}
-                  onClick={() => {
-                    onChange(option);
-                    setIsOpen(false);
-                  }}
-                  className={`w-full px-3 py-2 text-left text-xs hover:bg-muted transition-colors ${value === option ? "bg-muted/50" : ""}`}
-                >
-                  {option}
-                </button>
-              ))}
-            </div>
-            {showScrollBottom && (
-              <button
-                type="button"
-                onClick={scrollDown}
-                className="w-full py-1.5 bg-muted/50 hover:bg-muted flex items-center justify-center border-t border-border/70"
-              >
-                <ChevronDown className="w-4 h-4 text-muted-foreground" />
-              </button>
-            )}
-          </div>
-        )}
       </div>
+      {menuPortal}
     </div>
   );
 }
 
-// Multi-select dropdown component
 function MultiSelectDropdown({
   label,
   options,
@@ -154,61 +208,105 @@ function MultiSelectDropdown({
 }) {
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef(null);
-  const listRef = useRef(null);
-  const [showScrollTop, setShowScrollTop] = useState(false);
-  const [showScrollBottom, setShowScrollBottom] = useState(false);
+  const buttonRef = useRef(null);
+  const menuRef = useRef(null);
+  const [menuBox, setMenuBox] = useState(null);
+
+  const layoutMenu = useCallback(() => {
+    if (!isOpen || !buttonRef.current) {
+      setMenuBox(null);
+      return;
+    }
+    const r = buttonRef.current.getBoundingClientRect();
+    setMenuBox(computeMenuPanelBox(r, options));
+  }, [isOpen, options]);
+
+  useLayoutEffect(() => {
+    if (!isOpen) setMenuBox(null);
+    else layoutMenu();
+  }, [isOpen, layoutMenu]);
+
+  useEffect(() => {
+    if (!isOpen) return undefined;
+    layoutMenu();
+    window.addEventListener("resize", layoutMenu);
+    window.addEventListener("scroll", layoutMenu, true);
+    return () => {
+      window.removeEventListener("resize", layoutMenu);
+      window.removeEventListener("scroll", layoutMenu, true);
+    };
+  }, [isOpen, layoutMenu]);
+
   useEffect(() => {
     function handleClickOutside(event) {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
-        setIsOpen(false);
+      const t = event.target;
+      if (
+        dropdownRef.current?.contains(t) ||
+        menuRef.current?.contains(t)
+      ) {
+        return;
       }
+      setIsOpen(false);
     }
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
-  const handleScroll = () => {
-    if (listRef.current) {
-      const { scrollTop, scrollHeight, clientHeight } = listRef.current;
-      setShowScrollTop(scrollTop > 0);
-      setShowScrollBottom(scrollTop + clientHeight < scrollHeight - 5);
-    }
-  };
-  useEffect(() => {
-    if (isOpen && listRef.current) {
-      const { scrollHeight, clientHeight } = listRef.current;
-      setShowScrollBottom(scrollHeight > clientHeight);
-    }
-  }, [isOpen]);
-  const scrollUp = () => {
-    if (listRef.current) {
-      listRef.current.scrollBy({
-        top: -100,
-        behavior: "smooth",
-      });
-    }
-  };
-  const scrollDown = () => {
-    if (listRef.current) {
-      listRef.current.scrollBy({
-        top: 100,
-        behavior: "smooth",
-      });
-    }
-  };
+
   const displayValue =
     selected.length > 0
       ? `${selected.length} item${selected.length !== 1 ? "s" : ""} selected`
       : placeholder;
   const isPlaceholder = selected.length === 0;
+
+  const menuPortal =
+    isOpen &&
+    menuBox &&
+    createPortal(
+      <div
+        ref={menuRef}
+        className="fixed z-[10000] overflow-y-auto overflow-x-hidden rounded-md border border-border text-popover-foreground"
+        style={{
+          top: menuBox.top,
+          left: menuBox.left,
+          width: menuBox.width,
+          maxHeight: menuBox.maxHeight,
+          backgroundColor: "var(--popover)",
+          boxShadow: "var(--elevation-3)",
+        }}
+      >
+        {options.map((option) => (
+          <label
+            key={option}
+            className="flex cursor-pointer items-start gap-2 px-3 py-2.5 text-xs leading-snug hover:bg-muted"
+          >
+            <input
+              type="checkbox"
+              checked={selected.includes(option)}
+              onChange={() => onChange(option)}
+              className="mt-0.5 h-4 w-4 shrink-0"
+            />
+            <span className="min-w-0 flex-1 whitespace-normal break-words">
+              {option}
+            </span>
+          </label>
+        ))}
+      </div>,
+      document.body,
+    );
+
   return (
     <div className="space-y-2">
       <Label>{label}</Label>
       <div ref={dropdownRef} className="relative">
         <button
+          ref={buttonRef}
           type="button"
-          onClick={() => !disabled && setIsOpen(!isOpen)}
+          onClick={() => {
+            if (disabled) return;
+            setIsOpen(!isOpen);
+          }}
           disabled={disabled}
-          className="w-full h-10 px-3 rounded-md border border-border/70 bg-background text-foreground flex items-center justify-between text-left disabled:opacity-50"
+          className="flex h-10 w-full items-center justify-between rounded-md border border-border/70 bg-background px-3 text-left text-foreground disabled:opacity-50"
         >
           <span
             className={`truncate ${isPlaceholder ? "text-xs text-muted-foreground" : "text-xs"}`}
@@ -216,51 +314,9 @@ function MultiSelectDropdown({
             {displayValue}
           </span>
           <ChevronDown
-            className={`w-4 h-4 flex-shrink-0 transition-transform ${isOpen ? "rotate-180" : ""}`}
+            className={`h-4 w-4 shrink-0 transition-transform ${isOpen ? "rotate-180" : ""}`}
           />
         </button>
-        {isOpen && (
-          <div className="absolute z-50 w-full mt-1 bg-background border border-border/70 rounded-md shadow-lg overflow-hidden">
-            {showScrollTop && (
-              <button
-                type="button"
-                onClick={scrollUp}
-                className="w-full py-1.5 bg-muted/50 hover:bg-muted flex items-center justify-center border-b border-border/70"
-              >
-                <ChevronUp className="w-4 h-4 text-muted-foreground" />
-              </button>
-            )}
-            <div
-              ref={listRef}
-              onScroll={handleScroll}
-              className="max-h-48 overflow-y-auto"
-            >
-              {options.map((option) => (
-                <label
-                  key={option}
-                  className="flex items-center gap-2 px-3 py-2 hover:bg-muted cursor-pointer text-xs"
-                >
-                  <input
-                    type="checkbox"
-                    checked={selected.includes(option)}
-                    onChange={() => onChange(option)}
-                    className="w-4 h-4"
-                  />
-                  <span>{option}</span>
-                </label>
-              ))}
-            </div>
-            {showScrollBottom && (
-              <button
-                type="button"
-                onClick={scrollDown}
-                className="w-full py-1.5 bg-muted/50 hover:bg-muted flex items-center justify-center border-t border-border/70"
-              >
-                <ChevronDown className="w-4 h-4 text-muted-foreground" />
-              </button>
-            )}
-          </div>
-        )}
       </div>
       {selected.length > 0 && (
         <p className="text-xs text-muted-foreground">
@@ -270,6 +326,7 @@ function MultiSelectDropdown({
           {" selected"}
         </p>
       )}
+      {menuPortal}
     </div>
   );
 }
@@ -283,12 +340,6 @@ export default function ProfileCompletionForm({
   const [loading, setLoading] = useState(false);
   const talentFormRef = useRef(null);
   const isMountedRef = useRef(true);
-
-  // Avatar upload state
-  const [avatarFile, setAvatarFile] = useState(null);
-  const [avatarPreview, setAvatarPreview] = useState("");
-  const [uploadingAvatar, setUploadingAvatar] = useState(false);
-  const fileInputRef = useRef(null);
 
   // Founder form fields
   const [startupName, setStartupName] = useState("");
@@ -314,100 +365,6 @@ export default function ProfileCompletionForm({
   const [programDuration, setProgramDuration] = useState("");
   const [supportedStages, setSupportedStages] = useState([]);
   const [supportedIndustries, setSupportedIndustries] = useState([]);
-
-  // Industry options
-  const industryOptions = [
-    "FinTech",
-    "HealthTech",
-    "EdTech",
-    "E-commerce",
-    "SaaS",
-    "AI/Machine Learning",
-    "Blockchain/Web3",
-    "CleanTech",
-    "FoodTech",
-    "PropTech",
-    "AgriTech",
-    "BioTech",
-    "HRTech",
-    "MarTech",
-    "CyberSecurity",
-    "Gaming",
-    "Social Media",
-    "IoT",
-    "Logistics/Supply Chain",
-    "Travel/Hospitality",
-    "Entertainment/Media",
-    "Fashion/Beauty",
-    "Sports/Fitness",
-    "Others",
-  ];
-
-  // Target audience options
-  const audienceOptions = [
-    "B2C",
-    "B2B",
-    "Enterprise",
-    "Consumers",
-    "SMB",
-    "Students",
-    "Professionals",
-    "Developers",
-    "Creatives",
-    "Healthcare Providers",
-    "Educators",
-    "Others",
-  ];
-
-  // Roles needed options
-  const rolesOptions = [
-    "CTO",
-    "CMO",
-    "CPO",
-    "CFO",
-    "COO",
-    "Head of Sales",
-    "Head of Marketing",
-    "Head of Product",
-    "Head of Engineering",
-    "Head of Design",
-    "Full-stack Developer",
-    "Frontend Developer",
-    "Backend Developer",
-    "Mobile Developer",
-    "DevOps Engineer",
-    "Data Scientist",
-    "Data Engineer",
-    "ML Engineer",
-    "UI/UX Designer",
-    "Product Designer",
-    "Graphic Designer",
-    "Product Manager",
-    "Project Manager",
-    "Business Analyst",
-    "Sales Manager",
-    "Marketing Manager",
-    "Content Creator",
-    "Social Media Manager",
-    "Growth Hacker",
-    "Customer Success Manager",
-    "HR Manager",
-    "Legal Advisor",
-    "Financial Analyst",
-    "QA Engineer",
-    "Others",
-  ];
-
-  // Team size options
-  const teamSizeOptions = [
-    "Just me (Solo founder)",
-    "2-5 people",
-    "6-10 people",
-    "11-20 people",
-    "21-50 people",
-    "51-100 people",
-    "100+ people",
-  ];
 
   // Organization type options
   const organizationTypeOptions = [
@@ -451,16 +408,6 @@ export default function ProfileCompletionForm({
     "Ongoing/No fixed duration",
   ];
 
-  // Startup stages options
-  const startupStagesOptions = [
-    "Ideation",
-    "Validation",
-    "Building MVP",
-    "Market Testing",
-    "Growth",
-    "Scaling",
-    "All Stages",
-  ];
   const handleTargetAudienceChange = (audience) => {
     setTargetAudience((prev) =>
       prev.includes(audience)
@@ -493,49 +440,6 @@ export default function ProfileCompletionForm({
       isMountedRef.current = false;
     };
   }, []);
-  const handleAvatarChange = (e) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      setAvatarFile(file);
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setAvatarPreview(reader.result);
-      };
-      reader.readAsDataURL(file);
-    }
-  };
-  const uploadAvatar = async () => {
-    if (!avatarFile || !user) return null;
-    setUploadingAvatar(true);
-    try {
-      const formData = new FormData();
-      formData.append("file", avatarFile);
-      formData.append("userId", user.id);
-      const response = await fetch(
-        `${API_BASE_URL}/upload-avatar`,
-        {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${getAccessToken()}`,
-          },
-          body: formData,
-        },
-      );
-      const result = await response.json();
-      if (!response.ok || !result.success) {
-        throw new Error(result.error || "Failed to upload avatar");
-      }
-      console.log("✅ [Avatar] Upload successful:", result.avatarUrl);
-      toast.success("Profile picture uploaded successfully!");
-      return result.avatarUrl;
-    } catch (error) {
-      console.error("❌ [Avatar] Upload failed:", error);
-      toast.error("Failed to upload profile picture");
-      return null;
-    } finally {
-      setUploadingAvatar(false);
-    }
-  };
   const handleSubmit = async (e) => {
     if (e) {
       e.preventDefault();
@@ -552,22 +456,29 @@ export default function ProfileCompletionForm({
     if (!isMountedRef.current) return;
     setLoading(true);
     try {
-      // Upload avatar first if selected
-      let avatarUrl = null;
-      if (avatarFile) {
-        console.log("🖼️ [ProfileCompletion] Uploading avatar...");
-        avatarUrl = await uploadAvatar();
-        if (!avatarUrl) {
-          toast.error(
-            "Failed to upload avatar, but continuing with profile setup",
-          );
-        }
-      }
+      const avatarUrl = null;
 
-      // ALGORITHMIC STAGE DETERMINATION (Founders only)
-      let algorithmicStageId = 1; // Default to Stage 1
+      let algorithmicStageId = 1;
+      let startupIdForUser = user?.startupId;
+
       if (role === "founder") {
-        // Convert form answers to algorithm format
+        const validation = validateFounderStartupFields({
+          startupName,
+          startupDescription,
+          industryFocus,
+          otherIndustry,
+          teamSize,
+          targetAudience,
+          hasValidatedIdea,
+          hasMVP,
+          hasCustomers,
+        });
+        if (!validation.ok) {
+          toast.error(validation.errors[0]);
+          if (isMountedRef.current) setLoading(false);
+          return;
+        }
+
         const hasValidatedIdeaValue = hasValidatedIdea.includes("Yes")
           ? "yes"
           : "no";
@@ -582,7 +493,6 @@ export default function ProfileCompletionForm({
             ? "yes-users"
             : "no";
 
-        // Convert team size to algorithm format
         let currentTeamSizeValue = "1";
         if (teamSize.includes("2-5")) currentTeamSizeValue = "2-3";
         else if (teamSize.includes("6-10")) currentTeamSizeValue = "6-10";
@@ -590,13 +500,7 @@ export default function ProfileCompletionForm({
           currentTeamSizeValue = "10+";
         else if (teamSize.includes("51-100") || teamSize.includes("100+"))
           currentTeamSizeValue = "10+";
-        console.log("🎯 [Onboarding] Stage determination inputs:", {
-          hasValidatedIdea: hasValidatedIdeaValue,
-          hasMVP: hasMVPValue,
-          hasCustomers: hasCustomersValue,
-          currentTeamSize: currentTeamSizeValue,
-          monthlyRevenue: "none",
-        });
+
         algorithmicStageId = determineInitialStage({
           hasValidatedIdea: hasValidatedIdeaValue,
           hasMVP: hasMVPValue,
@@ -604,22 +508,69 @@ export default function ProfileCompletionForm({
           currentTeamSize: currentTeamSizeValue,
           monthlyRevenue: "none",
         });
-        console.log(
-          `🎯 [Onboarding] Determined initial stage: ${algorithmicStageId} - ${getStageName(algorithmicStageId)}`,
-        );
 
-        // Set the algorithmically-determined stage
-        setCurrentStage(algorithmicStageId);
+        const founderId = String(user._id ?? user.id);
+        const resolvedIndustry = resolveIndustryForPersistence(
+          industryFocus,
+          otherIndustry,
+        );
+        const stageLabel = getStageName(algorithmicStageId);
+
+        const startup = await founderApi.upsertFounderStartup({
+          founderId,
+          name: startupName.trim(),
+          description: startupDescription,
+          industry: resolvedIndustry,
+          stage: stageLabel,
+        });
+        startupIdForUser = String(startup._id || startup.id);
+
+        await founderApi.saveFounderProfile({
+          userId: String(user._id ?? user.id),
+          startupId: startupIdForUser,
+          bio: bio || "",
+          background: "",
+          links: {},
+        });
+
+        const journeyForServer = {
+          currentStage: algorithmicStageId,
+          completedStages: [],
+          stageData: {
+            [algorithmicStageId]: {
+              startedAt: new Date().toISOString(),
+              completionPercentage: 0,
+              milestonesCompleted: [],
+            },
+          },
+        };
+        configureJourneyUser(founderId);
+        applyServerJourneySnapshot(journeyForServer);
+        try {
+          await syncJourneyProgressToServer(founderId);
+        } catch (err) {
+          console.warn(
+            "[ProfileCompletionForm] Initial journey sync failed",
+            err,
+          );
+        }
       }
+
+      const resolvedFounderIndustry =
+        role === "founder"
+          ? resolveIndustryForPersistence(industryFocus, otherIndustry)
+          : "";
+
       const profileData = {
         role,
         ...(role === "founder"
           ? {
-              // Founder-specific fields
               startupName,
               startupDescription,
               industryFocus:
                 industryFocus === "Others" ? otherIndustry : industryFocus,
+              industry: resolvedFounderIndustry,
+              startupStage: getStageName(algorithmicStageId),
               targetAudience,
               rolesNeeded: rolesNeeded.includes("Others")
                 ? [...rolesNeeded.filter((r) => r !== "Others"), otherRole]
@@ -629,9 +580,11 @@ export default function ProfileCompletionForm({
               hasValidatedIdea,
               hasMVP,
               hasCustomers,
+              ...(industryFocus === "Others"
+                ? { otherIndustry: otherIndustry.trim() }
+                : {}),
             }
           : {
-              // Organization-admin fields
               organizationName: startupName,
               organizationDescription: startupDescription,
               organizationType:
@@ -646,61 +599,72 @@ export default function ProfileCompletionForm({
         avatarUrl,
         onboardingComplete: true,
       };
-      setTimeout(() => {
-        if (!isMountedRef.current) return;
-        if (user && onUpdateUser) {
-          const updatedUser = {
-            ...user,
-            avatarUrl: avatarUrl || user.avatarUrl,
-            profile: {
-              ...user.profile,
-              ...profileData,
-            },
-            onboardingComplete: true,
-          };
-          onUpdateUser(updatedUser);
-        }
-        if (role === "founder" && isMountedRef.current) {
-          toast.success("🎉 Profile setup complete! Welcome to StartupVerse!", {
-            description: `Based on your startup's current state, you're in: ${getStageName(algorithmicStageId)}`,
-          });
 
-          // Check if user is joining the 12-Week Challenge
-          const urlParams = new URLSearchParams(window.location.search);
-          const challengeCohort = urlParams.get("challenge");
-          if (challengeCohort === "cohort1" && user) {
-            console.log(
-              "🏆 [Challenge] Auto-joining user to 12-Week Challenge Cohort 1...",
-            );
-            // TODO: Auto-join user to challenge organization
-            // This would be an API call to add them to a special "Challenge Cohort 1" organization
-            // For now, we'll add this feature in a future iteration
-            toast.success(
-              "🏆 You're in! Welcome to the 12-Week Execution Challenge",
-              {
-                description:
-                  "Your execution journey starts now. Complete your first weekly outcome!",
-              },
-            );
-          }
-        } else if (role === "organization-admin" && isMountedRef.current) {
+      if (!isMountedRef.current) return;
+
+      if (user && onUpdateUser) {
+        const updatedUser = {
+          ...user,
+          ...(role === "founder"
+            ? {
+                startupName,
+                startupDescription,
+                industry: resolvedFounderIndustry,
+                startupStage: getStageName(algorithmicStageId),
+                teamSize,
+                bio,
+                targetAudience: profileData.targetAudience,
+                rolesNeeded: profileData.rolesNeeded,
+                hasValidatedIdea,
+                hasMVP,
+                hasCustomers,
+                startupId: startupIdForUser,
+              }
+            : {}),
+          profile: {
+            ...user.profile,
+            ...profileData,
+          },
+          onboardingComplete: true,
+        };
+        onUpdateUser(updatedUser);
+      }
+
+      if (role === "founder" && isMountedRef.current) {
+        toast.success("🎉 Profile setup complete! Welcome to StartupVerse!", {
+          description: `Based on your startup's current state, you're in: ${getStageName(algorithmicStageId)}`,
+        });
+        const urlParams = new URLSearchParams(window.location.search);
+        const challengeCohort = urlParams.get("challenge");
+        if (challengeCohort === "cohort1" && user) {
           toast.success(
-            "🎉 Organization setup complete! Welcome to StartupVerse!",
+            "🏆 You're in! Welcome to the 12-Week Execution Challenge",
             {
               description:
-                "You can now create cohorts and invite startups to your program",
+                "Your execution journey starts now. Complete your first weekly outcome!",
             },
           );
         }
-        if (isMountedRef.current) {
-          onComplete(profileData);
-          setLoading(false);
-        }
-      }, 1000);
+      } else if (role === "organization-admin" && isMountedRef.current) {
+        toast.success(
+          "🎉 Organization setup complete! Welcome to StartupVerse!",
+          {
+            description:
+              "You can now create cohorts and invite startups to your program",
+          },
+        );
+      }
+
+      if (isMountedRef.current) {
+        onComplete(profileData);
+        setLoading(false);
+      }
     } catch (error) {
       if (!isMountedRef.current) return;
       console.error("❌ [ProfileCompletion] Error submitting form:", error);
-      toast.error("Failed to complete profile setup");
+      toast.error(
+        error?.message || "Failed to complete profile setup",
+      );
       if (isMountedRef.current) {
         setLoading(false);
       }
@@ -734,10 +698,7 @@ export default function ProfileCompletionForm({
             <TalentProfileForm
               loading={loading}
               ref={talentFormRef}
-              initialData={{
-                name: user?.name,
-                email: user?.email,
-              }}
+              initialData={persistedTalentToFormInitialData(user)}
               onSubmit={(data) => {
                 console.log(
                   "📝 [ProfileCompletion] TalentProfileForm submitted with data:",
@@ -847,7 +808,7 @@ export default function ProfileCompletionForm({
                       />
                     </div>
                     <SingleSelectDropdown
-                      label="Industry Focus"
+                      label="Startup type (industry)"
                       options={industryOptions}
                       value={industryFocus}
                       onChange={setIndustryFocus}
@@ -1055,78 +1016,10 @@ export default function ProfileCompletionForm({
                     </div>
                   </div>
                 )}
-                <div>
-                  <h3 className="mb-4 text-sm font-semibold">Profile Photo</h3>
-                  <div className="border-2 border-dashed border-border/70 rounded-lg p-6 text-center">
-                    {avatarPreview ? (
-                      <div className="space-y-3">
-                        <div className="relative inline-block">
-                          <img
-                            src={avatarPreview}
-                            alt="Avatar preview"
-                            className="w-24 h-24 rounded-full object-cover mx-auto"
-                          />
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setAvatarFile(null);
-                              setAvatarPreview("");
-                            }}
-                            className="absolute top-0 right-0 bg-destructive text-destructive-foreground rounded-full p-1 hover:bg-destructive/90"
-                          >
-                            <X className="w-4 h-4" />
-                          </button>
-                        </div>
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          onClick={() => fileInputRef.current?.click()}
-                          disabled={loading}
-                        >
-                          Change Photo
-                        </Button>
-                      </div>
-                    ) : (
-                      <div className="space-y-3">
-                        <Upload className="w-12 h-12 mx-auto text-muted-foreground" />
-                        <div>
-                          <p className="text-sm text-muted-foreground mb-2">
-                            Upload a profile picture
-                          </p>
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            onClick={() => fileInputRef.current?.click()}
-                            disabled={loading}
-                          >
-                            Choose File
-                          </Button>
-                        </div>
-                      </div>
-                    )}
-                    <input
-                      ref={fileInputRef}
-                      type="file"
-                      accept="image/*"
-                      onChange={handleAvatarChange}
-                      className="hidden"
-                    />
-                  </div>
-                </div>
               </div>
               <div className="flex justify-end gap-3 pt-4 border-t border-border/70">
-                <Button
-                  type="submit"
-                  disabled={loading || uploadingAvatar}
-                  className="px-8"
-                >
-                  {uploadingAvatar
-                    ? "Uploading Photo..."
-                    : loading
-                      ? "Saving..."
-                      : "Complete Profile"}
+                <Button type="submit" disabled={loading} className="px-8">
+                  {loading ? "Saving..." : "Complete Profile"}
                 </Button>
               </div>
             </form>

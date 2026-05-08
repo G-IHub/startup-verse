@@ -74,15 +74,6 @@ export function InvitationComposer({
       startDate: startDate.trim() || undefined,
     };
 
-    // Save to localStorage
-    const storedInvitations = localStorage.getItem("startupverse_invitations");
-    const invitations = storedInvitations ? JSON.parse(storedInvitations) : [];
-    invitations.push(newInvitation);
-    localStorage.setItem(
-      "startupverse_invitations",
-      JSON.stringify(invitations),
-    );
-
     // Generate invitation link
     const invitationLink = `${window.location.origin}?invite=${token}`;
     setTimeout(() => {

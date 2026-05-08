@@ -20,10 +20,16 @@ import {
   ArrowRight,
   BarChart3,
 } from "lucide-react";
-import { getAccessToken } from "../../app/session";
 import { unwrapData } from "../../utils/apiEnvelope";
 
 const API_BASE = API_BASE_URL;
+
+// Default fetch options for cookie-based auth
+
+const defaultOptions = {
+  credentials: "include",
+  headers: { "Content-Type": "application/json" },
+};
 
 export default function PortfolioOverview({ cohortId, onViewStartup }) {
   const [portfolio, setPortfolio] = useState([]);
@@ -42,13 +48,10 @@ export default function PortfolioOverview({ cohortId, onViewStartup }) {
     try {
       setLoading(true);
       setError(null);
-      const token = getAccessToken();
       const response = await fetch(
         `${API_BASE}/cohorts/${cohortId}/portfolio-health`,
         {
-          headers: {
-            ...(token ? { Authorization: `Bearer ${token}` } : {}),
-          },
+          ...defaultOptions,
         },
       );
       if (!response.ok) {

@@ -1,4 +1,20 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+﻿import { useState, useEffect, useRef, useCallback } from "react";
+import {
+  fetchClientPreferences,
+  mergeClientPreferencesPatch,
+} from "../utils/api/clientPreferencesApi";
+
+const AUDIO_PREF_KEY = "startupverse_audio_settings";
+
+const DEFAULT_AUDIO_SETTINGS = {
+  soundProfile: "balanced",
+  isMuted: false,
+  ambientType: "office",
+  voiceCoachEnabled: false,
+  voiceCoachMode: "balanced",
+  voiceCoachVoice: "female",
+  voiceCoachRate: 1.0,
+};
 
 // Generate smooth, soft sounds using Web Audio API
 class SoundGenerator {
@@ -228,26 +244,25 @@ class VoiceCoach {
   }
 }
 
-export function useAudioManager() {
-  const [settings, setSettings] = useState(() => {
-    const saved = localStorage.getItem("startupverse_audio_settings");
-    const defaultSettings = {
-      soundProfile: "balanced",
-      isMuted: false,
-      ambientType: "office",
-      voiceCoachEnabled: false,
-      voiceCoachMode: "balanced",
-      voiceCoachVoice: "female",
-      voiceCoachRate: 1.0,
+export function useAudioManager(userId) {
+  const [settings, setSettings] = useState(DEFAULT_AUDIO_SETTINGS);
+
+  useEffect(() => {
+    if (!userId) return;
+    let cancelled = false;
+    fetchClientPreferences(String(userId))
+      .then((prefs) => {
+        if (cancelled) return;
+        const raw = prefs[AUDIO_PREF_KEY];
+        if (raw && typeof raw === "object") {
+          setSettings({ ...DEFAULT_AUDIO_SETTINGS, ...raw });
+        }
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
     };
-
-    if (saved) {
-      // Merge saved settings with defaults to ensure new fields exist
-      return { ...defaultSettings, ...JSON.parse(saved) };
-    }
-
-    return defaultSettings;
-  });
+  }, [userId]);
 
   const soundGenerator = useRef(null);
   const voiceCoach = useRef(null);
@@ -259,11 +274,14 @@ export function useAudioManager() {
   }, []);
 
   useEffect(() => {
-    localStorage.setItem(
-      "startupverse_audio_settings",
-      JSON.stringify(settings),
-    );
-  }, [settings]);
+    if (!userId) return;
+    const t = setTimeout(() => {
+      mergeClientPreferencesPatch(String(userId), {
+        [AUDIO_PREF_KEY]: settings,
+      }).catch(() => {});
+    }, 450);
+    return () => clearTimeout(t);
+  }, [settings, userId]);
 
   const getEffectiveVolume = useCallback(() => {
     if (settings.isMuted) return 0;

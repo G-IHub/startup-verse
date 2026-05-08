@@ -308,7 +308,7 @@ export default function ThemeShowcase() {
                 Theme Switching
               </h4>
               <ul className="text-sm text-muted-foreground space-y-1 ml-6">
-                <li>• Persistent theme preference (localStorage)</li>
+                <li>• Persistent theme preference (client preferences API)</li>
                 <li>• Smooth transitions between themes</li>
                 <li>• Theme toggle in header and landing page</li>
                 <li>• No flash of wrong theme on load</li>

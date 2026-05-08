@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { Button } from "../ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "../ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "../ui/avatar";
@@ -59,111 +59,113 @@ export default function VideoCallSystem({ user, callType = "mentor-session" }) {
     agenda: "",
   });
 
-  // Mock scheduled calls
-  const scheduledCalls = [
-    {
-      id: "1",
-      title: "Weekly Strategy Review",
-      type: "mentor-session",
-      scheduledTime: new Date(Date.now() + 30 * 60 * 1000),
-      // 30 minutes from now
-      duration: 60,
-      participants: [
-        {
-          id: "1",
-          name: "Dr. Sarah Johnson",
-          role: "Mentor",
-          isHost: true,
-          isMuted: false,
-          hasVideo: true,
-          isPresenting: false,
-        },
-        {
-          id: user.id,
-          name: user.name,
-          role: user.role,
-          isHost: false,
-          isMuted: false,
-          hasVideo: true,
-          isPresenting: false,
-        },
-      ],
-      status: "upcoming",
-      agenda: [
-        "Review last week's progress",
-        "Discuss fundraising strategy",
-        "Plan next milestones",
-        "Q&A session",
-      ],
-    },
-    {
-      id: "2",
-      title: "Team Standup",
-      type: "team-meeting",
-      scheduledTime: new Date(Date.now() + 2 * 60 * 60 * 1000),
-      // 2 hours from now
-      duration: 30,
-      participants: [
-        {
-          id: user.id,
-          name: user.name,
-          role: user.role,
-          isHost: true,
-          isMuted: false,
-          hasVideo: true,
-          isPresenting: false,
-        },
-        {
-          id: "3",
-          name: "Alex Rodriguez",
-          role: "Developer",
-          isHost: false,
-          isMuted: false,
-          hasVideo: true,
-          isPresenting: false,
-        },
-        {
-          id: "4",
-          name: "Lisa Zhang",
-          role: "Designer",
-          isHost: false,
-          isMuted: false,
-          hasVideo: true,
-          isPresenting: false,
-        },
-      ],
-      status: "upcoming",
-    },
-    {
-      id: "3",
-      title: "Investor Pitch Presentation",
-      type: "investor-pitch",
-      scheduledTime: new Date(Date.now() + 24 * 60 * 60 * 1000),
-      // Tomorrow
-      duration: 45,
-      participants: [
-        {
-          id: user.id,
-          name: user.name,
-          role: user.role,
-          isHost: true,
-          isMuted: false,
-          hasVideo: true,
-          isPresenting: false,
-        },
-        {
-          id: "5",
-          name: "TechVentures VC",
-          role: "Investor",
-          isHost: false,
-          isMuted: true,
-          hasVideo: true,
-          isPresenting: false,
-        },
-      ],
-      status: "upcoming",
-    },
-  ];
+  const demoScheduledCalls = useMemo(() => {
+    if (!user?.id) return [];
+    return [
+      {
+        id: "1",
+        title: "Weekly Strategy Review",
+        type: "mentor-session",
+        scheduledTime: new Date(Date.now() + 30 * 60 * 1000),
+        duration: 60,
+        participants: [
+          {
+            id: "1",
+            name: "Dr. Sarah Johnson",
+            role: "Mentor",
+            isHost: true,
+            isMuted: false,
+            hasVideo: true,
+            isPresenting: false,
+          },
+          {
+            id: user.id,
+            name: user.name,
+            role: user.role,
+            isHost: false,
+            isMuted: false,
+            hasVideo: true,
+            isPresenting: false,
+          },
+        ],
+        status: "upcoming",
+        agenda: [
+          "Review last week's progress",
+          "Discuss fundraising strategy",
+          "Plan next milestones",
+          "Q&A session",
+        ],
+      },
+      {
+        id: "2",
+        title: "Team Standup",
+        type: "team-meeting",
+        scheduledTime: new Date(Date.now() + 2 * 60 * 60 * 1000),
+        duration: 30,
+        participants: [
+          {
+            id: user.id,
+            name: user.name,
+            role: user.role,
+            isHost: true,
+            isMuted: false,
+            hasVideo: true,
+            isPresenting: false,
+          },
+          {
+            id: "3",
+            name: "Alex Rodriguez",
+            role: "Developer",
+            isHost: false,
+            isMuted: false,
+            hasVideo: true,
+            isPresenting: false,
+          },
+          {
+            id: "4",
+            name: "Lisa Zhang",
+            role: "Designer",
+            isHost: false,
+            isMuted: false,
+            hasVideo: true,
+            isPresenting: false,
+          },
+        ],
+        status: "upcoming",
+      },
+      {
+        id: "3",
+        title: "Investor Pitch Presentation",
+        type: "investor-pitch",
+        scheduledTime: new Date(Date.now() + 24 * 60 * 60 * 1000),
+        duration: 45,
+        participants: [
+          {
+            id: user.id,
+            name: user.name,
+            role: user.role,
+            isHost: true,
+            isMuted: false,
+            hasVideo: true,
+            isPresenting: false,
+          },
+          {
+            id: "5",
+            name: "TechVentures VC",
+            role: "Investor",
+            isHost: false,
+            isMuted: true,
+            hasVideo: true,
+            isPresenting: false,
+          },
+        ],
+        status: "upcoming",
+      },
+    ];
+  }, [user?.id, user?.name, user?.role]);
+
+  const [userScheduledCalls, setUserScheduledCalls] = useState([]);
+  const scheduledCalls = [...demoScheduledCalls, ...userScheduledCalls];
   useEffect(() => {
     let interval;
     if (isInCall) {
@@ -283,15 +285,7 @@ export default function VideoCallSystem({ user, callType = "mentor-session" }) {
         : undefined,
     };
 
-    // Save to localStorage
-    const savedCalls = JSON.parse(
-      localStorage.getItem("startupverse_scheduled_calls") || "[]",
-    );
-    savedCalls.push(newCall);
-    localStorage.setItem(
-      "startupverse_scheduled_calls",
-      JSON.stringify(savedCalls),
-    );
+    setUserScheduledCalls((prev) => [...prev, newCall]);
     toast.success(
       `📅 Call scheduled for ${scheduledDateTime.toLocaleString()}! Calendar invite will be sent to participants.`,
     );

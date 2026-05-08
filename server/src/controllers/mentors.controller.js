@@ -1,25 +1,142 @@
+import crypto from "crypto";
 import MentorProfile from "../models/MentorProfile.js";
 import User from "../models/User.js";
+import Organization from "../models/Organization.js";
 import { assertFounderInMentorOrganization } from "../utils/mentorFounderAssignment.js";
 import { error as apiError, success as apiSuccess } from "../utils/apiResponse.js";
+import { createNotification } from "../services/notificationService.js";
 
+const isProduction = process.env.NODE_ENV === "production";
+
+const MENTOR_COOKIE = "mentor_token";
+
+async function mentorPayloadFromToken(token) {
+  const trimmed = String(token || "").trim();
+  if (!trimmed) return null;
+  const mentor = await MentorProfile.findOne({ token: trimmed });
+  if (!mentor) return null;
+  const user = await User.findById(mentor.userId).select("name email avatarUrl").lean();
+  const organization = mentor.organizationId
+    ? await Organization.findById(mentor.organizationId).select("name").lean()
+    : null;
+  return {
+    id: String(mentor._id),
+    name: user?.name || "",
+    email: user?.email || "",
+    avatarUrl: user?.avatarUrl || "",
+    organizationId: mentor.organizationId ? String(mentor.organizationId) : null,
+    organizationName: organization?.name || "",
+    expertise: mentor.expertise || [],
+  };
+}
+
+export function setMentorSessionCookie(res, token) {
+  res.cookie(MENTOR_COOKIE, token, {
+    httpOnly: true,
+    secure: isProduction,
+    sameSite: isProduction ? "strict" : "lax",
+    maxAge: 30 * 24 * 60 * 60 * 1000,
+    path: "/",
+  });
+}
+
+export function clearMentorSessionCookie(res) {
+  res.clearCookie(MENTOR_COOKIE, {
+    httpOnly: true,
+    secure: isProduction,
+    sameSite: isProduction ? "strict" : "lax",
+    path: "/",
+  });
+}
+
+export const createMentorSession = async (req, res) => {
+  const token = String(req.body?.token || "").trim();
+  const mentor = await mentorPayloadFromToken(token);
+  if (!mentor) {
+    return apiError(res, "Invalid or expired mentor token.", 401);
+  }
+  setMentorSessionCookie(res, token);
+  return apiSuccess(res, { mentor });
+};
+
+export const getMentorSessionMe = async (req, res) => {
+  const token = String(req.cookies?.[MENTOR_COOKIE] || "").trim();
+  if (!token) {
+    return apiSuccess(res, { mentor: null });
+  }
+  const mentor = await mentorPayloadFromToken(token);
+  if (!mentor) {
+    clearMentorSessionCookie(res);
+    return apiSuccess(res, { mentor: null });
+  }
+  return apiSuccess(res, { mentor });
+};
+
+export const logoutMentorSession = async (req, res) => {
+  clearMentorSessionCookie(res);
+  return apiSuccess(res, { ok: true });
+};
+
+// Phase D2: real mentor magic-link verification.
 export const verifyMentorToken = async (req, res) => {
-  const t = String(req.params.token || "");
+  const token = String(req.params.token || "").trim();
+  if (!token) {
+    return apiError(res, "Token is required.", 400);
+  }
+  const mentor = await MentorProfile.findOne({ token });
+  if (!mentor) {
+    return apiSuccess(res, { verified: false, token });
+  }
+  const mentorDto = await mentorPayloadFromToken(token);
   return apiSuccess(res, {
     verified: true,
-    token: t,
-    mentor: {
-      id: `mentor-token-${t.slice(0, 8) || "session"}`,
-      name: "Mentor",
-      email: "",
-    },
+    token,
+    mentor: mentorDto,
   });
 };
 
+// Phase D2: real mentor magic-link issuer.
+// Resolves the user by email, ensures (or upserts) a MentorProfile, mints a
+// fresh token, and returns it. In a future Phase G2 step the email sender will
+// deliver the magic link to the mentor's inbox.
 export const requestMentorLink = async (req, res) => {
+  const email = String(req.body?.email || "").trim().toLowerCase();
+  const organizationId = req.body?.organizationId || null;
+  if (!email) {
+    return apiError(res, "email is required.", 400);
+  }
+  const user = await User.findOne({ email });
+  if (!user) {
+    return apiError(res, "No registered user with that email.", 404);
+  }
+
+  const token = crypto.randomUUID();
+  const mentor = await MentorProfile.findOneAndUpdate(
+    { userId: user._id },
+    {
+      userId: user._id,
+      organizationId: organizationId || undefined,
+      token,
+      tokenIssuedAt: new Date(),
+    },
+    { upsert: true, new: true, runValidators: true },
+  );
+
+  await createNotification({
+    userId: user._id,
+    type: "mentor-link",
+    title: "Mentor access link",
+    message: "Your mentor magic link has been generated.",
+    actionUrl: `/?mentor-token=${token}`,
+    metadata: { mentorId: String(mentor._id), token },
+    skipPreferences: true,
+  });
+
   return apiSuccess(res, {
     sent: true,
-    email: req.body?.email || "",
+    email,
+    token,
+    mentorId: String(mentor._id),
   });
 };
 
@@ -57,6 +174,15 @@ export const inviteOrganizationMentor = async (req, res) => {
     { upsert: true, new: true, runValidators: true },
   );
 
+  await createNotification({
+    userId,
+    type: "mentor-invited",
+    title: "You're invited to mentor",
+    message: "An organisation has invited you to join as a mentor.",
+    actionUrl: `/?view=mentor-portal`,
+    metadata: { mentorId: String(mentor._id), organizationId: String(orgId) },
+  }).catch(() => null);
+
   const o = mentor.toObject();
   return apiSuccess(res, { mentor: { ...o, id: String(o._id) } }, 201);
 };
@@ -82,10 +208,25 @@ export const getMentorAssignedFounders = async (req, res) => {
   }
 
   const founderIds = (mentor.assignedFounders || []).map((id) => String(id));
+  const founders = founderIds.length
+    ? await User.find({ _id: { $in: founderIds } })
+        .select("name email avatarUrl role")
+        .lean()
+    : [];
+  const byId = new Map(founders.map((f) => [String(f._id), f]));
   return apiSuccess(res, {
     mentorId: req.params.mentorId,
     founderIds,
-    founders: founderIds.map((id) => ({ id, name: "", email: "" })),
+    founders: founderIds.map((id) => {
+      const u = byId.get(id);
+      return {
+        id,
+        name: u?.name || "",
+        email: u?.email || "",
+        avatarUrl: u?.avatarUrl || "",
+        role: u?.role || "",
+      };
+    }),
   });
 };
 
@@ -113,9 +254,36 @@ export const assignFounderToMentor = async (req, res) => {
   }
 
   const founders = new Set((mentor.assignedFounders || []).map((id) => String(id)));
+  const wasAlreadyAssigned = founders.has(founderId);
   if (founderId) founders.add(founderId);
   mentor.assignedFounders = Array.from(founders);
   await mentor.save();
+
+  if (!wasAlreadyAssigned) {
+    const mentorUser = await User.findById(mentor.userId)
+      .select("name email")
+      .lean();
+    await Promise.all([
+      createNotification({
+        userId: founderId,
+        type: "mentor-assigned",
+        title: "Mentor assigned",
+        message: `${mentorUser?.name || "A mentor"} has been assigned to support you.`,
+        actionUrl: `/?view=virtual-office&tab=mentors&mentorId=${mentor._id}`,
+        metadata: { mentorId: String(mentor._id), cohortId: cohortId || null },
+      }).catch(() => null),
+      mentor.userId
+        ? createNotification({
+            userId: mentor.userId,
+            type: "mentor-assigned",
+            title: "Founder assigned to you",
+            message: "A founder has been added to your mentee list.",
+            actionUrl: `/?view=mentor-portal`,
+            metadata: { mentorId: String(mentor._id), founderId },
+          }).catch(() => null)
+        : Promise.resolve(null),
+    ]);
+  }
 
   const o = mentor.toObject();
   return apiSuccess(res, { mentor: { ...o, id: String(o._id) } });

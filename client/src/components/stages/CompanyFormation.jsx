@@ -19,6 +19,10 @@ import {
   FastForward,
 } from "lucide-react";
 import { toast } from "sonner";
+import {
+  useHydrateStageDraft,
+  persistStageDraft,
+} from "../../hooks/useStageDraftFromJourney";
 const cacPackages = [
   {
     id: "business-name",
@@ -109,13 +113,10 @@ export default function CompanyFormation({ user, onBack }) {
   });
   const [currentStep, setCurrentStep] = useState("choice");
 
-  // Load saved data
-  useEffect(() => {
-    const savedData = localStorage.getItem("company_formation");
-    if (savedData) {
-      setCompanyData(JSON.parse(savedData));
-    }
-  }, []);
+  useHydrateStageDraft(user, "company_formation", (raw) => {
+    if (!raw || typeof raw !== "object") return;
+    setCompanyData((prev) => ({ ...prev, ...raw }));
+  });
 
   // Auto-navigate based on saved choices
   useEffect(() => {
@@ -134,7 +135,7 @@ export default function CompanyFormation({ user, onBack }) {
 
   // Save and continue
   const saveAndContinue = () => {
-    localStorage.setItem("company_formation", JSON.stringify(companyData));
+    persistStageDraft("company_formation", companyData);
     toast.success("Progress saved! Moving to next stage...");
     setTimeout(() => onBack(), 500);
   };
@@ -145,7 +146,7 @@ export default function CompanyFormation({ user, onBack }) {
       skipped: true,
       skipReason: "Already completed independently",
     };
-    localStorage.setItem("company_formation", JSON.stringify(skipData));
+    persistStageDraft("company_formation", skipData);
     toast.success("Phase skipped - You can come back anytime to add details");
     setTimeout(() => onBack(), 500);
   };
@@ -181,7 +182,7 @@ export default function CompanyFormation({ user, onBack }) {
     });
 
     // Save data before payment
-    localStorage.setItem("company_formation", JSON.stringify(companyData));
+    persistStageDraft("company_formation", companyData);
   };
   const selectedCACPackage = cacPackages.find(
     (p) => p.id === companyData.cacPackage,

@@ -5,6 +5,8 @@ import Startup from "../models/Startup.js";
 import StartupPost from "../models/StartupPost.js";
 import FounderTalentInvitation from "../models/FounderTalentInvitation.js";
 import { error as apiError, success as apiSuccess } from "../utils/apiResponse.js";
+import { filterTalentProfilesForBrowse } from "../domain/talentBrowseCompletion.js";
+import { attachMatchScores } from "../utils/talentMatching.js";
 
 export const createOrUpdateProfile = async (req, res) => {
   const requestedUserId = String(req.body?.userId || "").trim();
@@ -14,16 +16,37 @@ export const createOrUpdateProfile = async (req, res) => {
     return apiError(res, "Forbidden.", 403);
   }
 
+  const b = req.body?.profileData || req.body || {};
+
+  const update = {
+    userId: targetUserId,
+    ...(b.fullName != null ? { fullName: String(b.fullName).trim().slice(0, 100) } : {}),
+    ...(b.professionalTitle != null ? { professionalTitle: String(b.professionalTitle).slice(0, 200) } : {}),
+    ...(b.headline != null ? { headline: String(b.headline).slice(0, 200) } : {}),
+    ...(b.location != null ? { location: String(b.location).slice(0, 200) } : {}),
+    ...(b.bio != null ? { bio: String(b.bio).slice(0, 2000) } : {}),
+    ...(b.professionalGoals != null ? { professionalGoals: String(b.professionalGoals).slice(0, 2000) } : {}),
+    ...(Array.isArray(b.skills) ? { skills: b.skills.map((s) => String(s).slice(0, 100)) } : {}),
+    ...(b.yearsOfExperience != null ? { yearsOfExperience: String(b.yearsOfExperience) } : {}),
+    ...(b.availability != null ? { availability: String(b.availability).slice(0, 50) } : {}),
+    ...(b.availabilityStatus != null ? { availabilityStatus: String(b.availabilityStatus) } : {}),
+    ...(b.preferredCommitment != null ? { preferredCommitment: String(b.preferredCommitment) } : {}),
+    ...(b.linkedinUrl != null ? { linkedinUrl: String(b.linkedinUrl).slice(0, 1000) } : {}),
+    ...(b.githubUrl != null ? { githubUrl: String(b.githubUrl).slice(0, 1000) } : {}),
+    ...(b.websiteUrl != null ? { websiteUrl: String(b.websiteUrl).slice(0, 1000) } : {}),
+    ...(Array.isArray(b.portfolioLinks) ? { portfolioLinks: b.portfolioLinks } : {}),
+    ...(Array.isArray(b.preferredRoles) ? { preferredRoles: b.preferredRoles } : {}),
+    ...(Array.isArray(b.industryPreferences) ? { industryPreferences: b.industryPreferences } : {}),
+    ...(Array.isArray(b.interests) ? { interests: b.interests } : {}),
+    ...(Array.isArray(b.workExperiences) ? { workExperiences: b.workExperiences } : {}),
+    ...(Array.isArray(b.educationList) ? { educationList: b.educationList } : {}),
+    ...(Array.isArray(b.certifications) ? { certifications: b.certifications } : {}),
+    ...(Array.isArray(b.portfolioItems) ? { portfolioItems: b.portfolioItems } : {}),
+  };
+
   const profile = await TalentProfile.findOneAndUpdate(
     { userId: targetUserId },
-    {
-      userId: targetUserId,
-      headline: req.body?.headline || "",
-      bio: req.body?.bio || "",
-      skills: req.body?.skills || [],
-      availability: req.body?.availability || "open",
-      portfolioLinks: req.body?.portfolioLinks || [],
-    },
+    update,
     { upsert: true, new: true, runValidators: true },
   );
   return apiSuccess(res, profile, 201);
@@ -38,12 +61,22 @@ export const getProfile = async (req, res) => {
 };
 
 export const getProfiles = async (req, res) => {
-  const profiles = await TalentProfile.find({}).sort({ createdAt: -1 }).limit(100);
+  const raw = await TalentProfile.find({})
+    .sort({ createdAt: -1 })
+    .limit(100)
+    .populate({ path: "userId", select: "name email" })
+    .lean();
+  const profiles = filterTalentProfilesForBrowse(raw);
   return apiSuccess(res, profiles);
 };
 
 export const browseTalent = async (req, res) => {
-  const profiles = await TalentProfile.find({}).sort({ createdAt: -1 }).limit(100);
+  const raw = await TalentProfile.find({})
+    .sort({ createdAt: -1 })
+    .limit(100)
+    .populate({ path: "userId", select: "name email" })
+    .lean();
+  const profiles = filterTalentProfilesForBrowse(raw);
   return apiSuccess(res, profiles);
 };
 
@@ -57,20 +90,44 @@ export const getStartupPostsFeed = async (req, res) => {
   const page = Math.max(1, Number(req.query.page) || 1);
   const pageSize = Math.min(100, Math.max(1, Number(req.query.pageSize) || 50));
   const skip = (page - 1) * pageSize;
-  const [posts, total] = await Promise.all([
-    StartupPost.find({}).sort({ createdAt: -1 }).skip(skip).limit(pageSize).lean(),
+  const [rawPosts, total] = await Promise.all([
+    StartupPost.find({})
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(pageSize)
+      .populate("founderId", "name")
+      .lean(),
     StartupPost.countDocuments({}),
   ]);
+  const posts = rawPosts.map((post) => {
+    const resolvedName =
+      post.founderName ||
+      post.founderId?.name ||
+      "";
+    const lookingFor = Array.isArray(post.lookingFor) ? post.lookingFor : [];
+    return {
+      ...post,
+      founderId: post.founderId?._id ?? post.founderId,
+      founderName: resolvedName,
+      founder: resolvedName,
+      role: lookingFor[0] || "",
+      requirements: lookingFor,
+      type: post.stage || "startup",
+    };
+  });
   return apiSuccess(res, { posts, total, page, pageSize });
 };
 
 export const applyForPosition = async (req, res) => {
+  const letter = String(req.body?.coverLetter || req.body?.coverNote || "").slice(0, 2000);
   const application = await TalentApplication.create({
     talentId: req.params.talentId,
     startupId: req.body?.startupId || null,
     founderId: req.body?.founderId || null,
+    postId: req.body?.postId || null,
     position: req.body?.position || "",
-    coverNote: req.body?.coverNote || "",
+    coverNote: letter,
+    coverLetter: letter,
     status: req.body?.status || "submitted",
   });
   return apiSuccess(res, application, 201);
@@ -114,6 +171,20 @@ export const unsaveItem = async (req, res) => {
 };
 
 export const getMatches = async (req, res) => {
-  const invitations = await FounderTalentInvitation.find({ talentId: req.params.talentId }).sort({ createdAt: -1 });
-  return apiSuccess(res, invitations);
+  const talentId = req.params.talentId;
+  const [invitations, profile, posts] = await Promise.all([
+    FounderTalentInvitation.find({ talentId }).sort({ createdAt: -1 }).lean(),
+    TalentProfile.findOne({ userId: talentId }).lean(),
+    StartupPost.find({ visibility: "public" }).sort({ createdAt: -1 }).limit(150).lean(),
+  ]);
+
+  const scored = attachMatchScores(profile, posts).sort(
+    (a, b) => (b.matchScore || 0) - (a.matchScore || 0),
+  );
+
+  return apiSuccess(res, {
+    invitations,
+    matches: scored,
+    opportunities: scored,
+  });
 };

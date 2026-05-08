@@ -11,6 +11,7 @@ import {
   Inbox,
   BarChart3,
   X,
+  MessageCircle,
 } from "lucide-react";
 
 export default function VerticalSidebar({
@@ -44,15 +45,36 @@ export default function VerticalSidebar({
       roles: ["founder", "team-member", "team"],
     },
     {
-      id: "team",
+      id: user.role === "talent" ? "browse" : "browse",
       icon: Users,
-      label: "Team",
-      page: user.role === "talent" ? "dashboard" : "startup-office",
+      label: user.role === "talent" ? "Browse" : "Browse",
+      page: user.role === "talent" ? "browse-startups" : "startup-office",
       view: user.role === "talent" ? undefined : "matching",
-      options: user.role === "talent" ? { mode: "opportunities" } : undefined,
       badge: null,
       roles: ["founder", "talent"],
     },
+    // Chat icon — for all talents
+    ...(user.role === "talent"
+      ? [{
+          id: "talent-chat",
+          icon: MessageCircle,
+          label: "Chat",
+          page: "talent-chat",
+          badge: null,
+          roles: ["talent"],
+        }]
+      : []),
+    // Chat icon for founders and team members
+    ...(user.role === "founder" || user.role === "team-member" || user.role === "team"
+      ? [{
+          id: "founder-chat",
+          icon: MessageCircle,
+          label: "Chat",
+          page: "founder-chat",
+          badge: null,
+          roles: ["founder", "team-member", "team"],
+        }]
+      : []),
   ];
 
   const primaryNavItems = allNavItems.filter((item) => item.roles.includes(user.role));
@@ -89,11 +111,11 @@ export default function VerticalSidebar({
   );
 
   const isActive = (item) => {
-    if (user.role === "talent" && item.id === "team") {
-      return currentPage === "dashboard" && talentDashboardMode === "opportunities";
+    if (user.role === "talent" && item.id === "browse") {
+      return currentPage === "browse-startups";
     }
     if (user.role === "talent" && item.id === "dashboard") {
-      return currentPage === "dashboard" && talentDashboardMode !== "opportunities";
+      return currentPage === "dashboard";
     }
     if (item.page && item.view) {
       return currentPage === item.page && virtualOfficeView === item.view;
@@ -103,9 +125,12 @@ export default function VerticalSidebar({
 
   const handleNavClick = (item) => {
     if (item.page) {
-      onPageChange(item.page, item.options);
-    }
-    if (item.view && onVirtualOfficeViewChange) {
+      const opts =
+        item.view != null
+          ? { ...item.options, officeView: item.view }
+          : item.options;
+      onPageChange(item.page, opts);
+    } else if (item.view && onVirtualOfficeViewChange) {
       onVirtualOfficeViewChange(item.view);
     }
     if (onClose) {
@@ -122,41 +147,43 @@ export default function VerticalSidebar({
         type="button"
         data-tour={item.id}
         className={cn(
-          "group relative flex w-full flex-col items-center justify-center gap-1 rounded-2xl px-2 py-2.5 text-center transition-colors",
-          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/45",
-          active ? "bg-blue-50 text-blue-700 dark:bg-blue-950/35 dark:text-blue-200" : "text-muted-foreground hover:bg-muted/50 hover:text-foreground",
+          "group relative mx-1 flex w-[calc(100%-0.5rem)] flex-col items-center justify-center gap-0.5 rounded-lg px-1 py-1 text-center transition-colors duration-200 ease-in-out",
+          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary/45",
+          active
+            ? "bg-[rgba(58,90,254,0.15)] text-primary before:absolute before:left-0 before:top-1/2 before:h-6 before:w-0.5 before:-translate-y-1/2 before:rounded-full before:bg-primary before:content-['']"
+            : "text-[rgba(255,255,255,0.45)] hover:bg-[rgba(255,255,255,0.06)] hover:text-[rgba(255,255,255,0.85)]",
         )}
         onClick={() => handleNavClick(item)}
       >
-        {active ? (
-          <span className="absolute left-0 top-1/2 h-8 w-1 -translate-y-1/2 rounded-r-full bg-blue-600" />
-        ) : null}
         <span
           className={cn(
-            "relative inline-flex h-12 w-12 items-center justify-center rounded-2xl transition-colors",
-            active ? "bg-blue-100 text-blue-700 dark:bg-blue-900/45 dark:text-blue-100" : "bg-muted/40 text-muted-foreground group-hover:bg-muted/80 group-hover:text-foreground",
+            "relative inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md transition-colors duration-200 ease-in-out",
+            active
+              ? "bg-transparent text-primary"
+              : "bg-transparent text-[rgba(255,255,255,0.45)] group-hover:bg-white/[0.06] group-hover:text-[rgba(255,255,255,0.85)]",
           )}
         >
-          <Icon className="h-6 w-6" />
+          <Icon className="h-4 w-4 shrink-0" strokeWidth={1.75} />
           {item.badge ? (
-            <span className="absolute -right-1 -top-1">
+            <span className="absolute -right-0.5 -top-0.5 flex">
               <Badge
                 variant={item.id === "inbox" ? "destructive" : "default"}
-                className="h-5 min-w-5 rounded-full px-1.5 text-[10px] leading-none"
+                className="flex h-4 min-h-4 min-w-4 items-center justify-center rounded-full px-1 text-[9px] font-semibold leading-none"
               >
                 {item.badge}
               </Badge>
             </span>
           ) : null}
         </span>
-        <span className="mt-0.5 max-w-[72px] truncate text-[12px] font-medium leading-4">
+        <span
+          className={cn(
+            "max-w-[4.25rem] truncate text-[10px] font-medium leading-tight tracking-wide transition-colors duration-200 ease-in-out",
+            active
+              ? "text-primary"
+              : "text-[rgba(255,255,255,0.45)] group-hover:text-[rgba(255,255,255,0.85)]",
+          )}
+        >
           {item.label}
-        </span>
-        <span className="absolute right-2 top-2 flex items-center gap-1">
-          {item.badge ? (
-            <span className="h-1.5 w-1.5 rounded-full bg-blue-500/70" />
-          ) : null}
-          {active ? <span className="h-1.5 w-1.5 rounded-full bg-blue-600" /> : null}
         </span>
       </button>
     );
@@ -169,23 +196,23 @@ export default function VerticalSidebar({
       ) : null}
       <aside
         className={[
-          "fixed left-0 top-0 z-50 flex h-screen w-24 flex-col border-r border-border/60 bg-background/95 backdrop-blur",
+          "fixed left-0 top-0 z-50 flex h-screen w-24 flex-col bg-primary-dark shadow-[2px_0_12px_rgba(26,35,126,0.10)]",
           "transition-transform duration-300 ease-out md:static",
           isOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0",
         ].join(" ")}
       >
-        <div className="relative flex items-center justify-center px-2 py-3">
+        <div className="relative flex items-center justify-center px-2 py-2">
           <button
             type="button"
-            className="relative inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-blue-600 text-white shadow-[0_8px_20px_rgba(30,64,255,0.22)] ring-1 ring-blue-200/40 dark:ring-blue-800/40"
+            className="relative inline-flex h-10 w-10 items-center justify-center rounded-[12px] bg-primary text-primary-foreground shadow-none transition-opacity duration-200 ease-in-out hover:bg-primary-hover hover:opacity-100"
             aria-label="StartupVerse"
           >
-            <Sparkles className="h-6 w-6" />
+            <Sparkles className="h-[18px] w-[18px]" strokeWidth={1.75} />
           </button>
           {isOpen && onClose ? (
             <button
               type="button"
-              className="absolute right-2 top-2 inline-flex h-8 w-8 items-center justify-center rounded-xl bg-muted/60 text-foreground md:hidden"
+              className="absolute right-2 top-2 inline-flex h-8 w-8 items-center justify-center rounded-lg bg-white/10 text-white transition-colors duration-200 ease-in-out hover:bg-white/15 md:hidden"
               onClick={onClose}
               aria-label="Close sidebar"
             >
@@ -194,21 +221,21 @@ export default function VerticalSidebar({
           ) : null}
         </div>
 
-        <Separator className="opacity-70" />
+        <Separator className="bg-white/10" />
 
-        <div className="flex-1 overflow-y-auto py-2">
+        <div className="flex-1 overflow-y-auto py-1.5">
           <div className="flex h-full flex-col">
-          <nav className="space-y-1">
+          <nav className="space-y-0.5">
             {primaryNavItems.map((item) => (
               <NavButton key={item.id} item={item} />
             ))}
           </nav>
 
-          <div className="my-4 flex items-center justify-center">
-            <span className="h-px w-14 bg-border/70" />
+          <div className="my-3 flex items-center justify-center px-2">
+            <span className="h-px w-12 bg-white/10" />
           </div>
 
-          <div className="mt-auto space-y-1 pb-3">
+          <div className="mt-auto space-y-0.5 pb-2">
             {utilityNavItems.map((item) => (
               <NavButton key={item.id} item={item} />
             ))}

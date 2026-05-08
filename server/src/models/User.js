@@ -50,6 +50,8 @@ const userSchema = new mongoose.Schema(
     isAdmin: { type: Boolean, default: false },
     profile: { type: mongoose.Schema.Types.Mixed, default: {} },
     notificationPreferences: { type: mongoose.Schema.Types.Mixed, default: {} },
+    /** Client-only UX state (theme, dismiss flags, drafts); validated on PUT. */
+    clientPreferences: { type: mongoose.Schema.Types.Mixed, default: {} },
     avatarUrl: {
       type: String,
       default: "",

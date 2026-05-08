@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import { Button } from "./ui/button";
 import { Badge } from "./ui/badge";
@@ -24,6 +24,33 @@ import {
   X,
   Search,
 } from "lucide-react";
+import { useJourneyStore } from "../state/useJourneyStore";
+import { getStageStatus } from "../utils/journeyProgress";
+import { persistStageDraft } from "../hooks/useStageDraftFromJourney";
+
+function mapFounderJourneyStage(jp, stageNum, fallbackStatus, fallbackProgress) {
+  if (!jp) {
+    return { status: fallbackStatus, progress: fallbackProgress };
+  }
+  const server = getStageStatus(stageNum);
+  const status =
+    server === "completed"
+      ? "completed"
+      : server === "current"
+        ? "in-progress"
+        : server === "upcoming"
+          ? "available"
+          : "locked";
+  const rawPct = jp.stageData?.[stageNum]?.completionPercentage;
+  const progress =
+    typeof rawPct === "number"
+      ? rawPct
+      : status === "completed"
+        ? 100
+        : fallbackProgress;
+  return { status, progress };
+}
+
 export default function FounderJourney({ user, onNavigate }) {
   const [selectedStage, setSelectedStage] = useState(null);
 
@@ -38,10 +65,19 @@ export default function FounderJourney({ user, onNavigate }) {
     },
   ]);
 
-  // Load progress from localStorage
-  const savedProgress = JSON.parse(
-    localStorage.getItem("founder_journey_progress") || "{}",
-  );
+  useEffect(() => {
+    const uid = user?.id ?? user?._id;
+    if (uid) void useJourneyStore.getState().hydrate(String(uid));
+  }, [user?.id, user?._id]);
+
+  const jp = useJourneyStore((s) => s.progress);
+  const s1 = mapFounderJourneyStage(jp, 1, "in-progress", 35);
+  const s2 = mapFounderJourneyStage(jp, 2, "available", 0);
+  const s3 = mapFounderJourneyStage(jp, 3, "available", 0);
+  const s4 = mapFounderJourneyStage(jp, 4, "available", 0);
+  const s5 = mapFounderJourneyStage(jp, 5, "locked", 0);
+  const s6 = mapFounderJourneyStage(jp, 6, "locked", 0);
+
   const stages = [
     {
       id: "ideation",
@@ -50,8 +86,8 @@ export default function FounderJourney({ user, onNavigate }) {
       description: "Validate your idea before building",
       icon: Lightbulb,
       estimatedWeeks: "1-4 weeks",
-      status: savedProgress.ideation?.status || "in-progress",
-      progress: savedProgress.ideation?.progress || 35,
+      status: s1.status,
+      progress: s1.progress,
       badge: "Idea Validated",
       features: [
         "Idea Canvas - Problem, solution, market analysis",
@@ -74,8 +110,8 @@ export default function FounderJourney({ user, onNavigate }) {
       description: "Establish legal entity and documents",
       icon: FileText,
       estimatedWeeks: "1-2 weeks",
-      status: savedProgress.formation?.status || "available",
-      progress: savedProgress.formation?.progress || 0,
+      status: s2.status,
+      progress: s2.progress,
       badge: "Company Formed",
       features: [
         "Entity Setup Wizard - LLC/C-Corp guidance",
@@ -98,8 +134,8 @@ export default function FounderJourney({ user, onNavigate }) {
       description: "Assemble your founding team",
       icon: Users,
       estimatedWeeks: "4-8 weeks",
-      status: savedProgress.teamBuilding?.status || "available",
-      progress: savedProgress.teamBuilding?.progress || 0,
+      status: s3.status,
+      progress: s3.progress,
       badge: "Team Built",
       features: [
         "Smart Team Matching - Find cofounders",
@@ -122,8 +158,8 @@ export default function FounderJourney({ user, onNavigate }) {
       description: "Build and launch your MVP",
       icon: Rocket,
       estimatedWeeks: "8-16 weeks",
-      status: savedProgress.productDev?.status || "available",
-      progress: savedProgress.productDev?.progress || 0,
+      status: s4.status,
+      progress: s4.progress,
       badge: "MVP Launched",
       features: [
         "Product Roadmap - Visual timeline",
@@ -146,8 +182,8 @@ export default function FounderJourney({ user, onNavigate }) {
       description: "Acquire your first 100 customers",
       icon: TrendingUp,
       estimatedWeeks: "8-12 weeks",
-      status: savedProgress.goToMarket?.status || "locked",
-      progress: savedProgress.goToMarket?.progress || 0,
+      status: s5.status,
+      progress: s5.progress,
       badge: "First Revenue",
       features: [
         "Customer CRM - Lead management",
@@ -170,8 +206,8 @@ export default function FounderJourney({ user, onNavigate }) {
       description: "Scale operations systematically",
       icon: Briefcase,
       estimatedWeeks: "12-24 weeks",
-      status: savedProgress.operations?.status || "locked",
-      progress: savedProgress.operations?.progress || 0,
+      status: s6.status,
+      progress: s6.progress,
       badge: "Product-Market Fit",
       features: [
         "Financial Dashboard - Real-time metrics",
@@ -273,20 +309,19 @@ export default function FounderJourney({ user, onNavigate }) {
       return;
     }
 
-    // Save to localStorage
-    const existingMembers = JSON.parse(
-      localStorage.getItem("team_invitations") || "[]",
-    );
     const newInvitations = validInvites.map((invite) => ({
       ...invite,
       id: Date.now() + Math.random(),
       invitedAt: new Date().toISOString(),
       status: "pending",
     }));
-    localStorage.setItem(
-      "team_invitations",
-      JSON.stringify([...existingMembers, ...newInvitations]),
-    );
+    const prevQueue =
+      useJourneyStore.getState().homeUi?.stageDrafts
+        ?.founder_team_invite_queue || [];
+    persistStageDraft("founder_team_invite_queue", [
+      ...(Array.isArray(prevQueue) ? prevQueue : []),
+      ...newInvitations,
+    ]);
 
     // Show success message
     toast.success(

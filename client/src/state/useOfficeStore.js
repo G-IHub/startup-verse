@@ -6,6 +6,7 @@ import * as agendaApi from "../utils/api/agendaApi";
 import * as taskApi from "../utils/api/taskApi";
 import { getStartupAnnouncements, postStartupAnnouncement } from "../utils/announcementApi";
 import { postWin } from "../utils/activityApi";
+import { getReceivedInterests } from "../utils/api/inboxApi";
 
 function initialState() {
   return {
@@ -14,6 +15,7 @@ function initialState() {
     userId: "",
     userRole: "",
     teamMembers: [],
+    pendingTalents: [],
     presenceRows: [],
     activities: [],
     wins: [],
@@ -44,7 +46,7 @@ function mergeById(existing, incoming) {
 }
 
 function resolveFounderId(user = {}) {
-  if (user?.role === "founder") return String(user.id || "");
+  if (user?.role === "founder") return String(user._id ?? user.id ?? "");
   return String(user?.startupId || user?.founderId || "");
 }
 
@@ -52,9 +54,10 @@ export const useOfficeStore = create((set, get) => ({
   ...initialState(),
 
   async loadWorkspace(user, options = {}) {
-    const startupId = String(user?.startupId || user?.id || "");
+    const rawId = String(user?._id ?? user?.id ?? "");
+    const startupId = String(user?.startupId || rawId);
     const founderId = resolveFounderId(user);
-    const userId = String(user?.id || "");
+    const userId = rawId;
     const userRole = String(user?.role || "");
 
     if (!startupId || !founderId || !userId) {
@@ -84,6 +87,7 @@ export const useOfficeStore = create((set, get) => ({
       agendaRes,
       presenceRes,
       tasksRes,
+      pendingTalentsRes,
     ] = await Promise.allSettled([
       teamMemberApi.getStartupTeamMembers(startupId),
       activityApi.getStartupActivities(startupId, { limit: 50 }),
@@ -92,6 +96,7 @@ export const useOfficeStore = create((set, get) => ({
       agendaApi.getUpcomingAgenda(userId, 14),
       presenceApi.getActiveUsers(startupId),
       tasksPromise,
+      userRole === "founder" ? getReceivedInterests(founderId) : Promise.resolve([]),
     ]);
 
     const hasCriticalError =
@@ -108,6 +113,29 @@ export const useOfficeStore = create((set, get) => ({
         teamMembersRes.status === "fulfilled"
           ? safeArray(teamMembersRes.value)
           : previous.teamMembers,
+      pendingTalents:
+        pendingTalentsRes.status === "fulfilled"
+          ? (() => {
+              // Dedup by talentId — keep the most recent interest per talent
+              const byTalentId = new Map();
+              for (const i of safeArray(pendingTalentsRes.value)) {
+                if (i.status !== "pending" && i.status !== "proposed-by-talent") continue;
+                const tid = String(i.talentId?._id || i.talentId || "");
+                if (!tid) continue;
+                const existing = byTalentId.get(tid);
+                if (!existing || new Date(i.createdAt) > new Date(existing.createdAt)) {
+                  byTalentId.set(tid, i);
+                }
+              }
+              return Array.from(byTalentId.values()).map((i) => ({
+                id: String(i.talentId?._id || i.talentId || ""),
+                name: String(i.talentName || i.talentId?.name || "Interested Talent"),
+                role: "talent",
+                title: String(i.talentArea || ""),
+                interestId: String(i._id || i.id || ""),
+              }));
+            })()
+          : previous.pendingTalents,
       activities:
         activitiesRes.status === "fulfilled" && activitiesRes.value?.success
           ? safeArray(activitiesRes.value.activities)

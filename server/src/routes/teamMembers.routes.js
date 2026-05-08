@@ -15,5 +15,6 @@ teamMembersRouter.get("/team-members/:teamMemberId/activity", requireAuth, requi
 teamMembersRouter.get("/team-members/:teamMemberId/status", requireAuth, requireSelfOrAdmin("teamMemberId"), asyncHandler(teamMembersController.getStatus));
 teamMembersRouter.post("/team-members/:teamMemberId/status", requireAuth, requireSelfOrAdmin("teamMemberId"), asyncHandler(teamMembersController.updateStatus));
 teamMembersRouter.get("/team-members/:teamMemberId/performance", requireAuth, requireSelfOrAdmin("teamMemberId"), asyncHandler(teamMembersController.getPerformance));
+teamMembersRouter.post("/team-members/:userId/leave", requireAuth, asyncHandler(teamMembersController.leaveStartup));
 
 export default teamMembersRouter;

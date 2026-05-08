@@ -8,21 +8,25 @@
  * in the "Sent" tab instead of only in the "Received" tab.
  */
 
-import { getAccessToken } from "../../app/session";
 import { API_BASE_URL } from "../../config/apiBase.js";
 
 const BASE_URL = API_BASE_URL;
+
+// Default fetch options for cookie-based auth
+const defaultOptions = {
+  credentials: "include",
+  headers: {
+    "Content-Type": "application/json",
+  },
+};
 
 export async function runOrgInvitationMigration() {
   try {
     console.log("🚀 [Migration] Starting organization invitation migration...");
 
     const response = await fetch(`${BASE_URL}/migrations/fix-org-invitations`, {
+      ...defaultOptions,
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${getAccessToken()}`,
-      },
     });
 
     if (!response.ok) {

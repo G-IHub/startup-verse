@@ -15,10 +15,17 @@ import {
   FolderOpen,
   Link as LinkIcon,
 } from "lucide-react";
-import { getAccessToken } from "../../app/session";
 import { unwrapData } from "../../utils/apiEnvelope";
 
 const API_BASE = API_BASE_URL;
+
+// Default fetch options for cookie-based auth
+const defaultOptions = {
+  credentials: "include",
+  headers: {
+    "Content-Type": "application/json",
+  },
+};
 
 export default function FounderResourcesView({ founderId }) {
   const [resources, setResources] = useState([]);
@@ -30,11 +37,8 @@ export default function FounderResourcesView({ founderId }) {
   const loadResources = async () => {
     try {
       setLoading(true);
-      const token = getAccessToken();
       const response = await fetch(`${API_BASE}/founders/${founderId}/resources`, {
-        headers: {
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
+        ...defaultOptions,
       });
       if (!response.ok) throw new Error("Failed to fetch resources");
       const inner = unwrapData(await response.json());

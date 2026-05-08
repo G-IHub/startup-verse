@@ -13,6 +13,14 @@ import { Switch } from "./ui/switch";
 import { Badge } from "./ui/badge";
 import { Separator } from "./ui/separator";
 import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "./ui/dialog";
+import {
   UserCircle,
   Monitor,
   Database,
@@ -26,18 +34,58 @@ import {
   Bell,
   CheckCircle2,
   Calendar,
+  LogOut,
+  Building2,
+  Loader2,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useOfficeSettings } from "../hooks/useOfficeSettings";
 import * as authApi from "../utils/api/authApi";
+import {
+  fetchClientPreferences,
+  mergeClientPreferencesPatch,
+} from "../utils/api/clientPreferencesApi";
+import { wipeLegacyStartupVerseStorage } from "../utils/clearLegacyClientStorage";
+import { leaveStartup } from "../utils/api/teamMemberApi";
 import { AdminDatabaseClear } from "./AdminDatabaseClear";
 import ProfilePage from "./ProfilePage";
-export default function SettingsPage({ user, onUpdateUser }) {
+export default function SettingsPage({
+  user,
+  onUpdateUser,
+  initialProfileEditing = false,
+}) {
   const [showConfirmClear, setShowConfirmClear] = useState(false);
   const [showConfirmDeleteAccount, setShowConfirmDeleteAccount] =
     useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
-  const officeSettings = useOfficeSettings();
+  const [showLeaveConfirm, setShowLeaveConfirm] = useState(false);
+  const [isLeaving, setIsLeaving] = useState(false);
+  const officeSettings = useOfficeSettings(user?._id ?? user?.id);
+
+  const isTeamMember = user?.role === "team-member";
+
+  const handleLeaveStartup = async () => {
+    const userId = String(user?._id ?? user?.id ?? "");
+    if (!userId) return;
+    setIsLeaving(true);
+    try {
+      const result = await leaveStartup(userId);
+      const updatedUser = {
+        ...user,
+        role: "talent",
+        startupId: null,
+        founderId: null,
+        onboardingComplete: false,
+      };
+      setShowLeaveConfirm(false);
+      toast.success("You have left the startup. Your profile data is preserved.");
+      if (onUpdateUser) onUpdateUser(updatedUser);
+    } catch (err) {
+      toast.error(err?.message || "Failed to leave startup. Please try again.");
+    } finally {
+      setIsLeaving(false);
+    }
+  };
 
   // Determine if user has access to Virtual Office (founders and team members only)
   const hasVirtualOffice =
@@ -45,49 +93,23 @@ export default function SettingsPage({ user, onUpdateUser }) {
     (user.role === "founder" ||
       user.role === "team-member" ||
       user.role === "team");
-  const getAllStorageData = () => {
-    const keys = [
-      "founder_journey_progress",
-      "ideation_canvas",
-      "ideation_competitors",
-      "ideation_interviews",
-      "company_entity",
-      "company_founders",
-      "company_documents",
-      "company_ip",
-      "product_milestones",
-      "product_sprints",
-      "product_tech_stack",
-      "product_launch_checklist",
-      "gtm_contacts",
-      "gtm_deals",
-      "gtm_campaigns",
-      "gtm_feedback",
-      "ops_financials",
-      "ops_budget",
-      "ops_invoices",
-      "ops_okrs",
-      "startupverse_office_settings",
-    ];
+  const exportUserId = user?._id ?? user?.id;
+
+  const exportData = async () => {
+    let prefs = {};
+    if (exportUserId) {
+      try {
+        prefs = await fetchClientPreferences(String(exportUserId));
+      } catch {
+        /* ignore */
+      }
+    }
     const data = {
       exportDate: new Date().toISOString(),
-      version: "1.0",
+      version: "2.0",
       appName: "StartupVerse",
+      clientPreferences: prefs,
     };
-    keys.forEach((key) => {
-      const value = localStorage.getItem(key);
-      if (value) {
-        try {
-          data[key] = JSON.parse(value);
-        } catch (e) {
-          data[key] = value;
-        }
-      }
-    });
-    return data;
-  };
-  const exportData = () => {
-    const data = getAllStorageData();
     const blob = new Blob([JSON.stringify(data, null, 2)], {
       type: "application/json",
     });
@@ -99,37 +121,39 @@ export default function SettingsPage({ user, onUpdateUser }) {
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
-    toast.success("Data exported successfully!");
+    toast.success("Preferences exported.");
   };
   const importData = (event) => {
     const file = event.target.files?.[0];
     if (!file) return;
     const reader = new FileReader();
-    reader.onload = (e) => {
+    reader.onload = async (e) => {
       try {
         const data = JSON.parse(e.target?.result);
-
-        // Restore all data except metadata
-        Object.keys(data).forEach((key) => {
-          if (key !== "exportDate" && key !== "version" && key !== "appName") {
-            localStorage.setItem(key, JSON.stringify(data[key]));
-          }
-        });
-        toast.success(
-          "Data imported successfully! Refresh the page to see changes.",
+        const uid = user?._id ?? user?.id;
+        if (
+          uid &&
+          data.clientPreferences &&
+          typeof data.clientPreferences === "object"
+        ) {
+          await mergeClientPreferencesPatch(String(uid), data.clientPreferences);
+          toast.success("Preferences imported from file.");
+          return;
+        }
+        toast.error(
+          "Invalid backup. Export again from Settings — file must include clientPreferences.",
         );
-      } catch (error) {
+      } catch {
         toast.error("Failed to import data. Invalid file format.");
       }
     };
     reader.readAsText(file);
   };
   const clearData = () => {
-    // Clear all localStorage
-    localStorage.clear();
+    wipeLegacyStartupVerseStorage();
     setShowConfirmClear(false);
-    toast.success("All data cleared successfully!");
-    setTimeout(() => window.location.reload(), 1000);
+    toast.success("Legacy browser keys cleared.");
+    setTimeout(() => window.location.reload(), 800);
   };
   const loadSample = () => {
     toast.info("Sample data feature is temporarily disabled");
@@ -150,12 +174,8 @@ export default function SettingsPage({ user, onUpdateUser }) {
       console.log("🗑️ [SettingsPage] Delete account result:", result);
       if (result.success) {
         console.log(
-          "✅ [SettingsPage] Account deleted successfully, clearing data...",
+          "✅ [SettingsPage] Account deleted successfully",
         );
-
-        // Clear local storage
-        localStorage.clear();
-        console.log("✅ [SettingsPage] Local data cleared");
 
         // Update parent component to clear user state immediately
         if (onUpdateUser) {
@@ -184,11 +204,16 @@ export default function SettingsPage({ user, onUpdateUser }) {
       setIsDeleting(false);
     }
   };
+  const tabTriggerClass =
+    "rounded-none border-0 border-b-2 border-transparent bg-transparent font-body font-medium text-text-body shadow-none transition-colors duration-200 ease-in-out hover:text-primary data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:font-semibold data-[state=active]:text-primary data-[state=active]:shadow-none [&_svg]:text-text-muted data-[state=active]:[&_svg]:text-primary hover:[&_svg]:text-primary";
+
   return (
-    <div className="p-2 md:p-3 lg:p-4 space-y-3 md:space-y-4">
+    <div className="min-h-full space-y-3 bg-surface-page p-2 font-body md:space-y-4 md:p-3 lg:p-4">
       <div>
-        <h1 className="text-2xl mb-2">Settings</h1>
-        <p className="text-sm text-muted-foreground">
+        <h1 className="mb-2 font-heading text-2xl font-bold text-text-heading">
+          Settings
+        </h1>
+        <p className="font-body text-sm text-text-body">
           {hasVirtualOffice
             ? "Manage your platform preferences, Virtual Office settings, and data"
             : "Manage your platform preferences and data"}
@@ -196,54 +221,156 @@ export default function SettingsPage({ user, onUpdateUser }) {
       </div>
       <Tabs defaultValue="profile" className="w-full">
         {hasVirtualOffice ? (
-          <TabsList className="grid w-full grid-cols-3 lg:w-[600px]">
-            <TabsTrigger value="profile">
-              <UserCircle className="w-4 h-4 mr-2" />
+          <TabsList className="grid h-auto min-h-10 w-full grid-cols-3 gap-0 rounded-none border-0 border-b border-surface-border bg-transparent p-0 lg:w-[600px]">
+            <TabsTrigger value="profile" className={tabTriggerClass}>
+              <UserCircle className="mr-2 h-4 w-4" />
               Profile
             </TabsTrigger>
-            <TabsTrigger value="virtual-office">
-              <Monitor className="w-4 h-4 mr-2" />
+            <TabsTrigger value="virtual-office" className={tabTriggerClass}>
+              <Monitor className="mr-2 h-4 w-4" />
               Virtual Office
             </TabsTrigger>
-            <TabsTrigger value="data">
-              <Database className="w-4 h-4 mr-2" />
+            <TabsTrigger value="data" className={tabTriggerClass}>
+              <Database className="mr-2 h-4 w-4" />
               Data & Backup
             </TabsTrigger>
           </TabsList>
         ) : (
-          <TabsList className="grid w-full grid-cols-2 lg:w-[400px]">
-            <TabsTrigger value="profile">
-              <UserCircle className="w-4 h-4 mr-2" />
+          <TabsList className="grid h-auto min-h-10 w-full grid-cols-2 gap-0 rounded-none border-0 border-b border-surface-border bg-transparent p-0 lg:w-[400px]">
+            <TabsTrigger value="profile" className={tabTriggerClass}>
+              <UserCircle className="mr-2 h-4 w-4" />
               Profile
             </TabsTrigger>
-            <TabsTrigger value="data">
-              <Database className="w-4 h-4 mr-2" />
+            <TabsTrigger value="data" className={tabTriggerClass}>
+              <Database className="mr-2 h-4 w-4" />
               Data & Backup
             </TabsTrigger>
           </TabsList>
         )}
         <TabsContent value="profile" className="space-y-0">
           {user && onUpdateUser ? (
-            <ProfilePage user={user} onUpdateUser={onUpdateUser} />
+            <ProfilePage
+              user={user}
+              onUpdateUser={onUpdateUser}
+              initialEditing={initialProfileEditing}
+            />
           ) : (
-            <Card>
+            <Card className="border-0 bg-surface-card shadow-soft rounded-card">
               <CardContent className="pt-6">
-                <p className="text-muted-foreground text-center">
+                <p className="text-center font-body text-text-muted">
                   Profile settings not available
                 </p>
               </CardContent>
             </Card>
           )}
+          {isTeamMember && (
+            <Card className="mt-4 border-0 bg-surface-card shadow-soft rounded-card">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 font-heading text-base font-semibold text-text-heading">
+                  <Building2 className="h-5 w-5 text-primary" />
+                  Startup Membership
+                </CardTitle>
+                <CardDescription className="font-body text-text-body">
+                  You are currently an active team member of a startup.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex flex-wrap items-center gap-3">
+                  <div className="flex items-center gap-2">
+                    <Users className="h-4 w-4 text-text-muted" />
+                    <span className="font-body text-sm text-text-muted">
+                      Role:
+                    </span>
+                    <Badge variant="secondary">Team Member</Badge>
+                  </div>
+                  {user?.startupId && (
+                    <div className="flex items-center gap-2">
+                      <Building2 className="h-4 w-4 text-text-muted" />
+                      <span className="font-body text-sm text-text-muted">
+                        Startup ID:
+                      </span>
+                      <Badge variant="outline" className="font-mono text-xs">
+                        {String(user.startupId).slice(-8)}
+                      </Badge>
+                    </div>
+                  )}
+                </div>
+                <Separator className="bg-surface-border" />
+                <div className="space-y-2">
+                  <p className="font-body text-sm text-text-body">
+                    Leaving will revert your role to <strong>talent</strong>{" "}
+                    and detach you from the startup. All your profile data —
+                    skills, experience, education, and certifications — will be
+                    fully preserved. You can be re-onboarded to a startup at any
+                    time.
+                  </p>
+                  <Button
+                    variant="outline"
+                    className="rounded-input border border-status-error/40 bg-surface-card font-body font-semibold text-status-error transition-colors duration-200 ease-in-out hover:border-status-error hover:bg-surface-card hover:text-status-error"
+                    onClick={() => setShowLeaveConfirm(true)}
+                  >
+                    <LogOut className="mr-2 h-4 w-4" />
+                    Leave Startup
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          )}
         </TabsContent>
+
+        {/* Leave Startup Confirmation Dialog */}
+        <Dialog open={showLeaveConfirm} onOpenChange={setShowLeaveConfirm}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2 font-heading font-semibold text-text-heading">
+                <LogOut className="h-5 w-5 text-status-error" />
+                Leave Startup?
+              </DialogTitle>
+              <DialogDescription className="space-y-2 pt-1 font-body text-text-body">
+                <p>
+                  You will be removed from the startup team and your role will
+                  revert to <strong>talent</strong>.
+                </p>
+                <p className="text-sm">
+                  Your profile data (skills, experience, education,
+                  certifications) will <strong>not</strong> be deleted. You can
+                  join a new startup at any time without re-filling your
+                  profile.
+                </p>
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter className="gap-2">
+              <Button
+                variant="outline"
+                className="rounded-input border border-surface-border bg-surface-card font-body font-semibold text-text-body transition-colors duration-200 ease-in-out hover:border-status-error hover:text-status-error"
+                onClick={() => setShowLeaveConfirm(false)}
+                disabled={isLeaving}
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="destructive"
+                onClick={handleLeaveStartup}
+                disabled={isLeaving}
+              >
+                {isLeaving ? (
+                  <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Leaving...</>
+                ) : (
+                  <><LogOut className="w-4 h-4 mr-2" />Yes, Leave Startup</>
+                )}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
         {hasVirtualOffice && (
           <TabsContent value="virtual-office" className="space-y-4">
-            <Card>
+            <Card className="border-0 bg-surface-card shadow-soft rounded-card">
               <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Monitor className="w-5 h-5" />
+                <CardTitle className="flex items-center gap-2 font-heading text-base font-semibold text-text-heading">
+                  <Monitor className="h-5 w-5 text-primary" />
                   Virtual Office Preferences
                 </CardTitle>
-                <CardDescription>
+                <CardDescription className="font-body text-text-body">
                   Control workspace visibility and collaboration features
                 </CardDescription>
               </CardHeader>
@@ -252,15 +379,15 @@ export default function SettingsPage({ user, onUpdateUser }) {
                   <div className="flex items-start justify-between space-x-4">
                     <div className="flex-1 space-y-1">
                       <div className="flex items-center gap-2">
-                        <Radio className="w-4 h-4 text-purple-600" />
+                        <Radio className="h-4 w-4 text-primary" />
                         <Label
                           htmlFor="show-activity-feed"
-                          className="text-base"
+                          className="font-body text-base font-medium text-text-heading"
                         >
                           Live Activity Feed
                         </Label>
                       </div>
-                      <p className="text-sm text-muted-foreground">
+                      <p className="font-body text-sm text-text-muted">
                         Display real-time team activities in the sidebar
                       </p>
                     </div>
@@ -275,20 +402,20 @@ export default function SettingsPage({ user, onUpdateUser }) {
                     />
                   </div>
                 </div>
-                <Separator />
+                <Separator className="bg-surface-border" />
                 <div className="space-y-4">
                   <div className="flex items-start justify-between space-x-4">
                     <div className="flex-1 space-y-1">
                       <div className="flex items-center gap-2">
-                        <Users className="w-4 h-4 text-blue-600" />
+                        <Users className="h-4 w-4 text-primary" />
                         <Label
                           htmlFor="show-presence-bar"
-                          className="text-base"
+                          className="font-body text-base font-medium text-text-heading"
                         >
                           Team Presence Bar
                         </Label>
                       </div>
-                      <p className="text-sm text-muted-foreground">
+                      <p className="font-body text-sm text-text-muted">
                         Show who's online and their current status
                       </p>
                     </div>
@@ -303,21 +430,23 @@ export default function SettingsPage({ user, onUpdateUser }) {
                     />
                   </div>
                 </div>
-                <Separator />
+                <Separator className="bg-surface-border" />
                 <div className="space-y-4">
-                  <div className="flex items-center gap-2 mb-2">
-                    <Bell className="w-4 h-4" />
-                    <h3 className="font-semibold">Notifications</h3>
+                  <div className="mb-2 flex items-center gap-2">
+                    <Bell className="h-4 w-4 text-primary" />
+                    <h3 className="font-heading text-base font-semibold text-text-heading">
+                      Notifications
+                    </h3>
                   </div>
                   <div className="flex items-start justify-between space-x-4">
                     <div className="flex-1 space-y-1">
                       <Label
                         htmlFor="activity-notifications"
-                        className="text-base"
+                        className="font-body text-base font-medium text-text-heading"
                       >
                         Activity Notifications
                       </Label>
-                      <p className="text-sm text-muted-foreground">
+                      <p className="font-body text-sm text-text-muted">
                         Get notified about team activities and updates
                       </p>
                     </div>
@@ -333,10 +462,13 @@ export default function SettingsPage({ user, onUpdateUser }) {
                   </div>
                   <div className="flex items-start justify-between space-x-4">
                     <div className="flex-1 space-y-1">
-                      <Label htmlFor="join-leave-alerts" className="text-base">
+                      <Label
+                        htmlFor="join-leave-alerts"
+                        className="font-body text-base font-medium text-text-heading"
+                      >
                         Join/Leave Alerts
                       </Label>
-                      <p className="text-sm text-muted-foreground">
+                      <p className="font-body text-sm text-text-muted">
                         Show alerts when team members join or leave
                       </p>
                     </div>
@@ -351,10 +483,11 @@ export default function SettingsPage({ user, onUpdateUser }) {
                     />
                   </div>
                 </div>
-                <Separator />
+                <Separator className="bg-surface-border" />
                 <div className="pt-2">
                   <Button
                     variant="outline"
+                    className="rounded-input border border-surface-border bg-surface-card font-body font-semibold text-text-body shadow-none transition-colors duration-200 ease-in-out hover:border-primary hover:text-primary"
                     onClick={() => {
                       officeSettings.resetToDefaults();
                       toast.success("Settings reset to defaults");
@@ -368,43 +501,48 @@ export default function SettingsPage({ user, onUpdateUser }) {
           </TabsContent>
         )}
         <TabsContent value="data" className="space-y-4">
-          <Card>
+          <Card className="border-0 bg-surface-card shadow-soft rounded-card">
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Database className="w-5 h-5" />
+              <CardTitle className="flex items-center gap-2 font-heading text-base font-semibold text-text-heading">
+                <Database className="h-5 w-5 text-primary" />
                 Data Management
               </CardTitle>
-              <CardDescription>
+              <CardDescription className="font-body text-text-body">
                 Export, import, or reset your StartupVerse data
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="flex items-start gap-4 p-4 bg-blue-50 dark:bg-blue-950/20 rounded-lg">
-                <Download className="w-5 h-5 text-blue-600 dark:text-blue-400 mt-0.5" />
+              <div className="flex items-start gap-4 rounded-input bg-primary-tint p-4">
+                <Download className="mt-0.5 h-5 w-5 shrink-0 text-primary" />
                 <div className="flex-1 space-y-2">
                   <div>
-                    <h3 className="font-semibold text-blue-900 dark:text-blue-100">
+                    <h3 className="font-heading text-base font-semibold text-text-heading">
                       Export Data
                     </h3>
-                    <p className="text-sm text-blue-700 dark:text-blue-300 mt-1">
+                    <p className="mt-1 font-body text-sm text-text-body">
                       Download all your data as a JSON file for backup or
                       migration
                     </p>
                   </div>
-                  <Button onClick={exportData} size="sm" variant="default">
-                    <Download className="w-4 h-4 mr-2" />
+                  <Button
+                    onClick={exportData}
+                    size="sm"
+                    variant="default"
+                    className="rounded-input bg-primary font-body font-semibold text-white shadow-[0_4px_16px_rgba(58,90,254,0.20)] transition-colors duration-200 ease-in-out hover:bg-primary-hover [&_svg]:text-white"
+                  >
+                    <Download className="mr-2 h-4 w-4" />
                     Export to JSON
                   </Button>
                 </div>
               </div>
-              <div className="flex items-start gap-4 p-4 bg-green-50 dark:bg-green-950/20 rounded-lg">
-                <Upload className="w-5 h-5 text-green-600 dark:text-green-400 mt-0.5" />
+              <div className="flex items-start gap-4 rounded-input bg-surface-page p-4">
+                <Upload className="mt-0.5 h-5 w-5 shrink-0 text-status-success" />
                 <div className="flex-1 space-y-2">
                   <div>
-                    <h3 className="font-semibold text-green-900 dark:text-green-100">
+                    <h3 className="font-heading text-base font-semibold text-text-heading">
                       Import Data
                     </h3>
-                    <p className="text-sm text-green-700 dark:text-green-300 mt-1">
+                    <p className="mt-1 font-body text-sm text-text-body">
                       Restore your data from a previously exported JSON file
                     </p>
                   </div>
@@ -416,43 +554,53 @@ export default function SettingsPage({ user, onUpdateUser }) {
                       className="hidden"
                       id="import-file"
                     />
-                    <Button asChild={true} size="sm" variant="default">
+                    <Button
+                      asChild={true}
+                      size="sm"
+                      variant="default"
+                      className="rounded-input bg-primary font-body font-semibold text-white shadow-[0_4px_16px_rgba(58,90,254,0.20)] transition-colors duration-200 ease-in-out hover:bg-primary-hover [&_svg]:text-white"
+                    >
                       <label htmlFor="import-file" className="cursor-pointer">
-                        <Upload className="w-4 h-4 mr-2" />
+                        <Upload className="mr-2 h-4 w-4" />
                         Import from JSON
                       </label>
                     </Button>
                   </div>
                 </div>
               </div>
-              <div className="flex items-start gap-4 p-4 bg-purple-50 dark:bg-purple-950/20 rounded-lg">
-                <FileJson className="w-5 h-5 text-purple-600 dark:text-purple-400 mt-0.5" />
+              <div className="flex items-start gap-4 rounded-input bg-surface-page p-4">
+                <FileJson className="mt-0.5 h-5 w-5 shrink-0 text-accent" />
                 <div className="flex-1 space-y-2">
                   <div>
-                    <h3 className="font-semibold text-purple-900 dark:text-purple-100">
+                    <h3 className="font-heading text-base font-semibold text-text-heading">
                       Load Sample Data
                     </h3>
-                    <p className="text-sm text-purple-700 dark:text-purple-300 mt-1">
+                    <p className="mt-1 font-body text-sm text-text-body">
                       Populate your workspace with example data to explore
                       features
                     </p>
                   </div>
-                  <Button onClick={loadSample} size="sm" variant="default">
-                    <FileJson className="w-4 h-4 mr-2" />
+                  <Button
+                    onClick={loadSample}
+                    size="sm"
+                    variant="default"
+                    className="rounded-input bg-primary font-body font-semibold text-white shadow-[0_4px_16px_rgba(58,90,254,0.20)] transition-colors duration-200 ease-in-out hover:bg-primary-hover [&_svg]:text-white"
+                  >
+                    <FileJson className="mr-2 h-4 w-4" />
                     Load Sample Data
                   </Button>
                 </div>
               </div>
-              <Separator />
+              <Separator className="bg-surface-border" />
               <div className="space-y-4">
-                <div className="flex items-start gap-4 p-4 bg-red-50 dark:bg-red-950/20 rounded-lg border border-red-200 dark:border-red-800">
-                  <AlertCircle className="w-5 h-5 text-red-600 dark:text-red-400 mt-0.5" />
+                <div className="flex items-start gap-4 rounded-input bg-status-error/5 p-4">
+                  <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-status-error" />
                   <div className="flex-1 space-y-2">
                     <div>
-                      <h3 className="font-semibold text-red-900 dark:text-red-100">
+                      <h3 className="font-heading text-base font-semibold text-text-heading">
                         Danger Zone
                       </h3>
-                      <p className="text-sm text-red-700 dark:text-red-300 mt-1">
+                      <p className="mt-1 font-body text-sm text-text-body">
                         Permanently delete all your data from this device. This
                         action cannot be undone.
                       </p>
@@ -463,7 +611,7 @@ export default function SettingsPage({ user, onUpdateUser }) {
                         size="sm"
                         variant="destructive"
                       >
-                        <Trash2 className="w-4 h-4 mr-2" />
+                        <Trash2 className="mr-2 h-4 w-4" />
                         Clear All Data
                       </Button>
                     ) : (
@@ -473,13 +621,14 @@ export default function SettingsPage({ user, onUpdateUser }) {
                           size="sm"
                           variant="destructive"
                         >
-                          <CheckCircle2 className="w-4 h-4 mr-2" />
+                          <CheckCircle2 className="mr-2 h-4 w-4" />
                           Yes, Delete Everything
                         </Button>
                         <Button
                           onClick={() => setShowConfirmClear(false)}
                           size="sm"
                           variant="outline"
+                          className="rounded-input border border-surface-border bg-surface-card font-body font-semibold text-text-body transition-colors duration-200 ease-in-out hover:border-status-error hover:text-status-error"
                         >
                           Cancel
                         </Button>
@@ -489,14 +638,14 @@ export default function SettingsPage({ user, onUpdateUser }) {
                 </div>
               </div>
               <div className="space-y-4">
-                <div className="flex items-start gap-4 p-4 bg-red-50 dark:bg-red-950/20 rounded-lg border border-red-200 dark:border-red-800">
-                  <AlertCircle className="w-5 h-5 text-red-600 dark:text-red-400 mt-0.5" />
+                <div className="flex items-start gap-4 rounded-input bg-status-error/5 p-4">
+                  <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-status-error" />
                   <div className="flex-1 space-y-2">
                     <div>
-                      <h3 className="font-semibold text-red-900 dark:text-red-100">
+                      <h3 className="font-heading text-base font-semibold text-text-heading">
                         Delete Account
                       </h3>
-                      <p className="text-sm text-red-700 dark:text-red-300 mt-1">
+                      <p className="mt-1 font-body text-sm text-text-body">
                         Permanently delete your account and all associated data.
                         This action cannot be undone.
                       </p>
@@ -507,7 +656,7 @@ export default function SettingsPage({ user, onUpdateUser }) {
                         size="sm"
                         variant="destructive"
                       >
-                        <Trash2 className="w-4 h-4 mr-2" />
+                        <Trash2 className="mr-2 h-4 w-4" />
                         Delete Account
                       </Button>
                     ) : (
@@ -519,9 +668,9 @@ export default function SettingsPage({ user, onUpdateUser }) {
                           disabled={isDeleting}
                         >
                           {isDeleting ? (
-                            <CheckCircle2 className="w-4 h-4 mr-2" />
+                            <CheckCircle2 className="mr-2 h-4 w-4" />
                           ) : (
-                            <CheckCircle2 className="w-4 h-4 mr-2" />
+                            <CheckCircle2 className="mr-2 h-4 w-4" />
                           )}
                           {isDeleting ? "Deleting..." : "Yes, Delete Account"}
                         </Button>
@@ -529,6 +678,7 @@ export default function SettingsPage({ user, onUpdateUser }) {
                           onClick={() => setShowConfirmDeleteAccount(false)}
                           size="sm"
                           variant="outline"
+                          className="rounded-input border border-surface-border bg-surface-card font-body font-semibold text-text-body transition-colors duration-200 ease-in-out hover:border-status-error hover:text-status-error"
                         >
                           Cancel
                         </Button>
@@ -538,10 +688,10 @@ export default function SettingsPage({ user, onUpdateUser }) {
                 </div>
               </div>
               <AdminDatabaseClear />
-              <div className="pt-4 border-t">
-                <div className="flex items-center justify-between text-sm text-muted-foreground">
+              <div className="border-t border-surface-border pt-4">
+                <div className="flex items-center justify-between font-body text-sm text-text-muted">
                   <div className="flex items-center gap-2">
-                    <Calendar className="w-4 h-4" />
+                    <Calendar className="h-4 w-4" />
                     <span>Last backup</span>
                   </div>
                   <Badge variant="secondary">No backups yet</Badge>

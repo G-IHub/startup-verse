@@ -23,18 +23,17 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "../ui/tooltip";
-import ProfileCompletionModal from "../ProfileCompletionModal";
 import { TalentProfileModal } from "../TalentProfileModal";
 import OutcomeSelectionModal from "../execution-engine/OutcomeSelectionModal";
 import MilestoneDetailView from "../execution-engine/MilestoneDetailView";
 import IntentCaptureModal from "../execution-engine/IntentCaptureModal";
 import { WeeklyReviewModal } from "../execution-engine/WeeklyReviewModal";
-import Phase3Welcome from "../execution-engine/Phase3Welcome";
 import StageLearningModal from "../learning/StageLearningModal";
 import StageRoadmapModal from "../roadmap/StageRoadmapModal";
 import CohortMembershipBadge from "../organizations/CohortMembershipBadge";
 
 import { useHomeStore } from "../../state/useHomeStore";
+import { useStageTaskStore } from "../../state/useStageTaskStore";
 import { useWeeklyLoopStore } from "../../state/useWeeklyLoopStore";
 import { useExecutionScoreStore } from "../../state/useExecutionScoreStore";
 import { useTeamStore } from "../../state/useTeamStore";
@@ -45,10 +44,9 @@ import {
   selectUnreadCount,
 } from "../../state/useNotificationsStore";
 
-// 🔥 REMOVED: OrganizationEventsWidget and OrganizationAnnouncementsWidget
-// Events appear in Virtual Office updates/calendar, announcements in inbox
+import OrganizationAnnouncementsWidget from "../organizations/OrganizationAnnouncementsWidget";
+import OrganizationEventsWidget from "../organizations/OrganizationEventsWidget";
 import { checkAndSendEventReminders } from "../../utils/eventReminders";
-import { initializeStageProgressionCheck } from "../../utils/automaticStageProgression";
 import {
   Rocket,
   Building,
@@ -70,25 +68,22 @@ import {
   Flame,
   Share2,
   Copy,
+  Loader2,
 } from "lucide-react";
 import {
   generateSmartTeamRecommendations,
   getTalentMatchesForRoles,
 } from "../../utils/smartTeamMatching";
-import { getUnreadCount } from "../../utils/messaging";
+import { useNavigate } from "react-router-dom";
+import { JOURNEY_STAGES } from "../../utils/journeyProgress";
 import {
-  completeCurrentStage,
-  updateStageProgress,
-  getOverallProgress,
-  getTimeInCurrentStage,
-  JOURNEY_STAGES,
-} from "../../utils/journeyProgress";
-import {
+  buildWeeklyPlanCustom,
   buildWeeklyPlanFromIntent,
   buildWeeklyPlanFromTemplate,
+  validateWeeklyPlanMilestones,
 } from "../../domains/founder/mappers/weeklyPlanPayload.js";
-import { migrateTasksToBackend } from "../../utils/taskMigration";
 import PendingCompensationCard from "../compensation/PendingCompensationCard";
+import * as founderApi from "../../utils/api/founderApi";
 
 // Stage-specific task definitions
 const STAGE_TASKS = {
@@ -308,10 +303,10 @@ function ExecutionScoreInlineCard({ userId }) {
     }
   }, [userId, storeUserId, loadScore]);
   const getScoreColor = (score) => {
-    if (score >= 80) return "text-green-600";
+    if (score >= 80) return "text-status-success";
     if (score >= 60) return "text-primary";
-    if (score >= 40) return "text-yellow-600";
-    return "text-red-600";
+    if (score >= 40) return "text-status-warning";
+    return "text-primary";
   };
   const generateShareText = () => {
     const percentileText =
@@ -355,12 +350,12 @@ https://startupverse.com/12-week-challenge
   };
   return (
     <>
-      <Card className="border shadow-none flex flex-col">
-        <CardContent className="p-1 flex flex-col flex-1 min-h-[80px] md:min-h-[90px]">
-          <div className="flex flex-col space-y-0.5 items-center text-center flex-1 justify-center">
+      <Card className="flex flex-col rounded-card border border-surface-border bg-white shadow-soft transition-shadow duration-200 ease-in-out hover:shadow-[0_4px_24px_rgba(58,90,254,0.08)]">
+        <CardContent className="flex min-h-[80px] flex-1 flex-col p-4 md:min-h-[90px]">
+          <div className="flex flex-1 flex-col items-center justify-center space-y-0.5 text-center">
             <div className="flex items-center gap-1">
-              <Zap className="w-4 h-4 text-primary" />
-              <span className="text-[8px] font-medium text-muted-foreground uppercase">
+              <Zap className="h-4 w-4 text-status-warning" />
+              <span className="font-body text-[11px] font-semibold uppercase tracking-[0.08em] text-text-muted">
                 Score
               </span>
             </div>
@@ -371,7 +366,7 @@ https://startupverse.com/12-week-challenge
             ) : scoreData ? (
               <>
                 <span
-                  className={`text-3xl font-bold ${getScoreColor(scoreData.score)}`}
+                  className={`font-heading text-3xl font-extrabold ${getScoreColor(scoreData.score)}`}
                 >
                   {scoreData.score}
                 </span>
@@ -379,11 +374,11 @@ https://startupverse.com/12-week-challenge
                   {scoreData.weeklyChange !== 0 && (
                     <>
                       {scoreData.weeklyChange > 0 ? (
-                        <TrendingUp className="w-2 h-2 text-green-600" />
+                        <TrendingUp className="h-2 w-2 text-status-success" />
                       ) : (
-                        <TrendingUp className="w-2 h-2 text-red-600 rotate-180" />
+                        <TrendingUp className="h-2 w-2 rotate-180 text-status-error" />
                       )}
-                      <span className="text-[8px] font-medium">
+                      <span className="font-body text-[8px] font-medium text-text-body">
                         {scoreData.weeklyChange > 0 ? "+" : ""}
                         {scoreData.weeklyChange}
                       </span>
@@ -405,7 +400,7 @@ https://startupverse.com/12-week-challenge
           {scoreData && (
             <button
               onClick={() => setShowBreakdown(true)}
-              className="text-[8px] text-primary hover:text-primary/80 font-medium py-0.5 flex items-center justify-center gap-0.5 transition-colors"
+              className="flex items-center justify-center gap-0.5 py-0.5 font-body text-[8px] font-medium text-primary transition-colors duration-200 ease-in-out hover:text-primary/80"
             >
               View Breakdown
               <ChevronRight className="w-2 h-2" />
@@ -415,11 +410,11 @@ https://startupverse.com/12-week-challenge
       </Card>
       {showBreakdown && scoreData && (
         <div
-          className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 sv-modal-backdrop"
           onClick={() => setShowBreakdown(false)}
         >
           <Card
-            className="w-full max-w-md"
+            className="sv-modal-panel w-full max-w-md rounded-[16px] border-0 shadow-modal"
             onClick={(e) => e.stopPropagation()}
           >
             <CardHeader>
@@ -601,12 +596,8 @@ export default function FounderDashboard({
   onNavigate,
   onVirtualOfficeViewChange,
 }) {
-  const [showProfileModal, setShowProfileModal] = useState(
-    !user.onboardingComplete,
-  );
-  const [completedTasks, setCompletedTasks] = useState(new Set());
+  const navigate = useNavigate();
   const [activeTaskId, setActiveTaskId] = useState(null);
-  const [taskFormData, setTaskFormData] = useState({});
   const [showSkipWarning, setShowSkipWarning] = useState(false);
   const [teamRecommendations, setTeamRecommendations] = useState([]);
   const [talentMatches, setTalentMatches] = useState([]);
@@ -618,6 +609,9 @@ export default function FounderDashboard({
   const [showIntentCaptureModal, setShowIntentCaptureModal] = useState(false);
   const [showMilestoneDetailView, setShowMilestoneDetailView] = useState(false);
   const [showWeeklyReviewModal, setShowWeeklyReviewModal] = useState(false);
+  /** True while saving a new weekly outcome (modal closes; this section shows progress). */
+  const [weeklyOutcomeSubmitting, setWeeklyOutcomeSubmitting] =
+    useState(false);
 
   // Deliverable submission form state (UI only; data comes from store)
   const [submittingDeliverable, setSubmittingDeliverable] = useState(null);
@@ -638,7 +632,15 @@ export default function FounderDashboard({
   const weeklyTasksRaw = useWeeklyLoopStore((s) => s.tasks);
   const executionScore = useWeeklyLoopStore((s) => s.executionScore);
   const weeklyLoopLoading = useWeeklyLoopStore((s) => s.loading);
+  const weeklyLoopLastLoadedAt = useWeeklyLoopStore((s) => s.lastLoadedAt);
   const weeklyLoop = useWeeklyLoopStore();
+
+  /** API + stores use string id; session user may only have Mongo `_id`. */
+  const founderId = useMemo(() => {
+    const raw = user?._id ?? user?.id;
+    if (raw == null || raw === "") return null;
+    return String(raw);
+  }, [user?._id, user?.id]);
 
   const teamMembers = useTeamStore((s) => s.members);
 
@@ -646,10 +648,14 @@ export default function FounderDashboard({
   const submitDeliverableAction = useDeliverablesStore((s) => s.submit);
 
   const journeyProgress = useJourneyStore((s) => s.progress);
-  const setJourneyProgress = (progress) => {
-    if (!progress) return;
-    useJourneyStore.setState({ progress });
-  };
+  const overallProgress = useJourneyStore((s) => s.overallProgress);
+  const timeInStage = useJourneyStore((s) => s.timeInStage);
+
+  const stageTaskGetResponse = useStageTaskStore((s) => s.getResponse);
+  const stageTaskIsCompleted = useStageTaskStore((s) => s.isCompleted);
+  const stageTaskGetCompleted = useStageTaskStore((s) => s.getCompletedTaskIds);
+  const stageTaskSave = useStageTaskStore((s) => s.saveResponse);
+  const stageTaskMarkComplete = useStageTaskStore((s) => s.markComplete);
 
   const unreadNotificationsCount = useNotificationsStore(selectUnreadCount);
 
@@ -659,12 +665,29 @@ export default function FounderDashboard({
 
   // Derive the legacy `executionData` shape from store state for minimal UI churn.
   const executionData = useMemo(() => {
-    if (!user?.id) return null;
+    if (!founderId) return null;
+    const idKey = (v) => {
+      if (v == null || v === "") return "";
+      if (typeof v === "object") {
+        if (typeof v.toString === "function") {
+          const s = v.toString();
+          if (s && s !== "[object Object]") return s;
+        }
+        return String(v._id ?? v.id ?? "");
+      }
+      return String(v);
+    };
     const outcomes = Array.isArray(outcomesRaw) ? outcomesRaw : [];
     const milestones = Array.isArray(milestonesRaw) ? milestonesRaw : [];
     const isStatus = (row, target) =>
       String(row?.status || "").toLowerCase() === target;
-    const activeRaw = outcomes.find((o) => isStatus(o, "active")) || null;
+    const sortedOutcomes = [...outcomes].sort(
+      (a, b) =>
+        new Date(b.weekOf || b.createdAt || 0) -
+        new Date(a.weekOf || a.createdAt || 0),
+    );
+    const activeRaw =
+      sortedOutcomes.find((o) => isStatus(o, "active")) || null;
     const completedOutcomes = outcomes.filter(
       (o) =>
         isStatus(o, "completed") ||
@@ -681,10 +704,8 @@ export default function FounderDashboard({
 
     let currentOutcome = activeRaw;
     if (activeRaw) {
-      const oid = String(activeRaw._id || activeRaw.id || "");
-      const linked = milestones.filter(
-        (m) => String(m.weeklyOutcomeId || "") === oid,
-      );
+      const oid = idKey(activeRaw._id ?? activeRaw.id);
+      const linked = milestones.filter((m) => idKey(m.weeklyOutcomeId) === oid);
       const title = activeRaw.goal || activeRaw.title || "This week";
       const weekNumber = completedOutcomes.length + 1;
 
@@ -724,7 +745,7 @@ export default function FounderDashboard({
     }
 
     return {
-      userId: user.id,
+      userId: founderId,
       currentOutcome,
       streak,
       hasPartialWeeks,
@@ -738,28 +759,44 @@ export default function FounderDashboard({
         completionData: o.completionData,
         achievement: o.completionData?.achievement || o.status,
       })),
-      lastUpdated: useWeeklyLoopStore.getState().lastLoadedAt,
+      lastUpdated: weeklyLoopLastLoadedAt,
     };
-  }, [outcomesRaw, milestonesRaw, executionScore, user?.id]);
+  }, [
+    outcomesRaw,
+    milestonesRaw,
+    executionScore,
+    founderId,
+    weeklyLoopLastLoadedAt,
+  ]);
 
-  // Tasks filtered to the current outcome (same rule as legacy).
+  // Tasks filtered to the current outcome. Avoid `undefined === undefined` on weekId,
+  // which previously matched every task and inflated counts (e.g. 58 vs 9 in the modal).
   const tasks = useMemo(() => {
     const all = Array.isArray(weeklyTasksRaw) ? weeklyTasksRaw : [];
     const current = executionData?.currentOutcome;
     if (!current) return [];
-    return all.filter(
-      (t) =>
-        t.weekId === current.weekId ||
-        t.outcomeId === (current.id || current._id) ||
-        current.milestones?.some((m) => m.id === t.milestoneId),
+    const curOutcomeId = String(current.id || current._id || "");
+    const milestoneIds = new Set(
+      (current.milestones || []).map((m) => String(m.id || m._id || "")),
     );
-  }, [weeklyTasksRaw, executionData]);
+    return all.filter((t) => {
+      const mid = String(t.milestoneId ?? "");
+      if (mid && milestoneIds.has(mid)) return true;
 
-  // Phase 3 Welcome - Show once per user
-  const [showPhase3Welcome, setShowPhase3Welcome] = useState(() => {
-    const seen = localStorage.getItem(`phase3_welcome_seen_${user.id}`);
-    return !seen && user.onboardingComplete;
-  });
+      const taskOutcomeId = String(
+        t.outcomeId ?? t.raw?.weeklyOutcomeId ?? "",
+      );
+      if (curOutcomeId && taskOutcomeId && taskOutcomeId === curOutcomeId) {
+        return true;
+      }
+
+      const tw = t.weekId ?? t.raw?.weekId;
+      const cw = current.weekId ?? current.raw?.weekId;
+      if (tw != null && cw != null && String(tw) === String(cw)) return true;
+
+      return false;
+    });
+  }, [weeklyTasksRaw, executionData]);
 
   // Stage Learning Modal State
   const [showStageLearningModal, setShowStageLearningModal] = useState(false);
@@ -773,49 +810,22 @@ export default function FounderDashboard({
   const teamSize = teamMembers.length + 1;
 
   // Orchestrate Home hydration through the Zustand stores.
-  // Guarded by user.id so we never fire `/founders/undefined/...` requests.
+  // Guarded by founderId so we never fire `/founders/undefined/...` requests.
   useEffect(() => {
-    if (!user?.id) return undefined;
+    if (!founderId) return undefined;
 
-    initializeStageProgressionCheck();
-
-    checkAndSendEventReminders(user.id).catch((err) => {
+    checkAndSendEventReminders(founderId).catch((err) => {
       console.warn("Event reminder check failed:", err);
     });
 
-    // Background, non-blocking legacy task migration.
-    migrateTasksToBackend(user.id)
-      .then((migrationResult) => {
-        if (migrationResult?.migrated > 0) {
-          console.log(
-            `🔄 Migrated ${migrationResult.migrated} tasks from localStorage to backend`,
-          );
-        }
-      })
-      .catch(() => {});
-
-    loadHome({ userId: user.id, startupId: user.startupId || user.id }).catch(
+    loadHome({ userId: founderId, startupId: user.startupId || founderId }).catch(
       (error) => {
         console.warn("Home data load failed:", error);
       },
     );
 
     return undefined;
-  }, [user?.id, user?.startupId, loadHome]);
-
-  // Load completed-task ids the user has manually checked from the stage
-  // learning checklist. Still kept on localStorage since it's purely local UX.
-  useEffect(() => {
-    if (!user?.id) return;
-    const saved = localStorage.getItem(`completed_tasks_${user.id}`);
-    if (saved) {
-      try {
-        setCompletedTasks(new Set(JSON.parse(saved)));
-      } catch {
-        // ignore corrupted payloads
-      }
-    }
-  }, [user?.id]);
+  }, [founderId, user?.startupId, loadHome]);
 
   // Generate team recommendations for Stage 3
   useEffect(() => {
@@ -844,8 +854,6 @@ export default function FounderDashboard({
   const currentStage =
     JOURNEY_STAGES.find((s) => s.id === currentStageId) || JOURNEY_STAGES[0];
   const currentTasks = STAGE_TASKS[currentStageId] || [];
-  const overallProgress = getOverallProgress();
-  const timeInStage = getTimeInCurrentStage();
 
   // 🎯 Calculate Startup Stage Progress based on completed weekly outcomes
   // This creates incremental progress (0.5-2% per outcome) that moves with every execution
@@ -874,9 +882,11 @@ export default function FounderDashboard({
   };
   const startupStageProgress = calculateStartupStageProgress();
 
-  // Calculate stage completion based on tasks
+  // Calculate stage completion based on tasks (from store)
+  const completedTaskIdsForStage = stageTaskGetCompleted(currentStageId);
+  const completedTasksSet = new Set(completedTaskIdsForStage);
   const tasksCompleted = currentTasks.filter((task) =>
-    completedTasks.has(task.id),
+    completedTasksSet.has(task.id),
   ).length;
   const stageProgress =
     currentTasks.length > 0 ? (tasksCompleted / currentTasks.length) * 100 : 0;
@@ -911,7 +921,6 @@ export default function FounderDashboard({
   };
   const outcomeProgress = getCurrentOutcomeProgress();
 
-  const unreadMessages = getUnreadCount();
   const unreadNotifications = unreadNotificationsCount;
   const onlineMembers =
     teamMembers.filter((m) => m.status === "online" || m.isOnline).length + 1;
@@ -920,8 +929,12 @@ export default function FounderDashboard({
   const getSmartInsight = () => {
     const weekNumber = (executionData?.weekHistory.length || 0) + 1;
     const totalTasks = tasks.length;
-    const completedTasksCount = tasks.filter((t) => t.completed).length;
-    const blockedTasksCount = tasks.filter((t) => t.blocked).length;
+    const taskDone = (t) =>
+      Boolean(t?.completed) || String(t?.status || "").toLowerCase() === "completed";
+    const taskBlocked = (t) =>
+      Boolean(t?.blocked) || String(t?.status || "").toLowerCase() === "blocked";
+    const completedTasksCount = tasks.filter(taskDone).length;
+    const blockedTasksCount = tasks.filter(taskBlocked).length;
     const activeTeamCount = teamSize;
     const streakCount = executionData?.streak || 0;
     const totalCompletedWeeks =
@@ -979,7 +992,7 @@ export default function FounderDashboard({
     // High progress (80-99%) - Speed & finishing stories
     if (executionData?.currentOutcome && outcomeProgress >= 80) {
       const speedStories = [
-        `Discord shipped their first stable voice chat in 72 hours during beta testing when a critical bug blocked everything. You're at ${outcomeProgress}% completion with just ${tasks.filter((t) => !t.completed).length} task${tasks.filter((t) => !t.completed).length !== 1 ? "s" : ""} remaining—you're in the final sprint. Studies show 80% → 100% is where most teams lose focus and add scope. Stay disciplined. Finish this week strong and you'll be in the top 12% of startups who actually complete their weekly outcomes.`,
+        `Discord shipped their first stable voice chat in 72 hours during beta testing when a critical bug blocked everything. You're at ${outcomeProgress}% completion with just ${tasks.filter((t) => !taskDone(t)).length} task${tasks.filter((t) => !taskDone(t)).length !== 1 ? "s" : ""} remaining—you're in the final sprint. Studies show 80% → 100% is where most teams lose focus and add scope. Stay disciplined. Finish this week strong and you'll be in the top 12% of startups who actually complete their weekly outcomes.`,
         `Dropbox's Drew Houston coded the entire first MVP demo video in one final 36-hour push at 93% complete. You're at ${outcomeProgress}%—so close you can taste it. The last 20% is often the most valuable: polish, edge cases, and completeness separate "works on my machine" from "ready to ship." Your ${activeTeamCount}-person team is almost there. Push through to 100%.`,
         `Shopify's Tobias Lütke has a rule: "90% done is 0% done." You're at ${outcomeProgress}% for Week ${weekNumber}. The graveyard of startups is filled with "almost finished" features. ${totalCompletedWeeks > 0 ? `You've already completed ${totalCompletedWeeks} week${totalCompletedWeeks !== 1 ? "s" : ""}—you know how to finish.` : "Prove you can finish, not just start."} Cross the finish line and lock in this weekly win.`,
       ];
@@ -1054,39 +1067,40 @@ export default function FounderDashboard({
     };
   };
   const smartInsight = getSmartInsight();
-  const handleProfileComplete = (profileData) => {
-    onUpdateUser({
-      ...user,
-      profile: {
-        ...user.profile,
-        ...profileData,
-      },
-      onboardingComplete: true,
-    });
-    updateStageProgress(1, 25);
-  };
-  const handleCompleteTask = (taskId) => {
-    const newCompleted = new Set(completedTasks);
-    newCompleted.add(taskId);
-    setCompletedTasks(newCompleted);
-    localStorage.setItem(
-      `completed_tasks_${user.id}`,
-      JSON.stringify(Array.from(newCompleted)),
-    );
 
-    // Update journey progress
-    const newProgress = (newCompleted.size / currentTasks.length) * 100;
-    updateStageProgress(currentStageId, Math.min(newProgress, 95));
+  const [startupMissingBanner, setStartupMissingBanner] = useState(false);
+  useEffect(() => {
+    if (!founderId || !user?.onboardingComplete) {
+      setStartupMissingBanner(false);
+      return;
+    }
+    let cancelled = false;
+    founderApi.getFounderStartupSafe(founderId).then((doc) => {
+      if (!cancelled) setStartupMissingBanner(!doc);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [founderId, user?.onboardingComplete]);
+  const handleCompleteTask = async (taskId) => {
+    const textForTask = stageTaskGetResponse(currentStageId, taskId)?.text || "";
+    await stageTaskMarkComplete(founderId, currentStageId, taskId, textForTask);
+
+    const newCompletedIds = useStageTaskStore.getState().getCompletedTaskIds(currentStageId);
+    const newCount = newCompletedIds.length;
+    const newProgress = currentTasks.length > 0 ? (newCount / currentTasks.length) * 100 : 0;
+    useJourneyStore.getState().setStageCompletion(
+      currentStageId,
+      Math.min(newProgress, 95),
+    );
     toast.success("Task completed! 🎉", {
       description: "Great progress on your startup journey!",
     });
     setActiveTaskId(null);
-    setTaskFormData({});
 
-    // Check if stage is complete
-    if (newCompleted.size === currentTasks.length) {
+    if (newCount >= currentTasks.length) {
       toast.success("🎊 Stage Complete!", {
-        description: `You've finished ${currentStage.title}! Ready to move to the next stage?`,
+        description: `You've finished ${currentStage.name}! Ready to move to the next stage?`,
         action: {
           label: "Continue",
           onClick: handleCompleteStage,
@@ -1095,16 +1109,27 @@ export default function FounderDashboard({
     }
   };
   const handleCompleteStage = () => {
-    const updatedProgress = completeCurrentStage();
-    setJourneyProgress(updatedProgress);
-    setCompletedTasks(new Set()); // Reset tasks for new stage
+    const completedCount = stageTaskGetCompleted(currentStageId).length;
+    useJourneyStore.getState().completeStage({
+      method: "completed",
+      tasksCompletedCount: completedCount,
+      tasksTotal: currentTasks.length,
+    });
     toast.success("🚀 Moving to next stage!", {
-      description: `Welcome to ${JOURNEY_STAGES[currentStageId]?.title || "the next phase"}!`,
+      description: `Welcome to ${JOURNEY_STAGES[currentStageId]?.name || "the next phase"}!`,
     });
   };
   const handleSkipStage = () => {
     setShowSkipWarning(false);
-    handleCompleteStage();
+    const completedCount = stageTaskGetCompleted(currentStageId).length;
+    useJourneyStore.getState().completeStage({
+      method: "skipped",
+      tasksCompletedCount: completedCount,
+      tasksTotal: currentTasks.length,
+    });
+    toast.success("🚀 Moving to next stage!", {
+      description: `Welcome to ${JOURNEY_STAGES[currentStageId]?.name || "the next phase"}!`,
+    });
   };
   const handleViewTalent = (talent) => {
     const recommendation = teamRecommendations.find(
@@ -1137,114 +1162,298 @@ export default function FounderDashboard({
     templateId,
     customTitle,
     customDescription,
+    customMilestones,
   ) => {
-    if (!executionData) return;
+    if (!founderId) {
+      toast.error("Could not identify your account", {
+        description: "Please sign in again, then set your weekly goal.",
+      });
+      throw new Error("Missing founder id");
+    }
+    const weekNumber = (executionData?.weekHistory?.length ?? 0) + 1;
+
+    const plan =
+      templateId === "custom"
+        ? buildWeeklyPlanCustom(
+            customTitle,
+            customDescription,
+            currentStageId,
+            weekNumber,
+            outcomesRaw,
+            customMilestones,
+          )
+        : buildWeeklyPlanFromTemplate(
+            templateId,
+            currentStageId,
+            weekNumber,
+            { customTitle, customDescription, customMilestones },
+            outcomesRaw,
+          );
+    if (!plan?.goal) {
+      toast.error("Failed to create outcome", {
+        description:
+          templateId === "custom"
+            ? "Add a title and description for your weekly goal."
+            : "Pick a template or try another stage.",
+      });
+      return;
+    }
+
+    const milestoneCheck = validateWeeklyPlanMilestones(plan.milestones);
+    if (!milestoneCheck.ok) {
+      toast.error("Complete each milestone", {
+        description: milestoneCheck.message,
+      });
+      return;
+    }
+
+    setWeeklyOutcomeSubmitting(true);
+    setShowOutcomeModal(false);
     try {
-      const weekNumber = (executionData.weekHistory.length || 0) + 1;
-
-      const plan = buildWeeklyPlanFromTemplate(
-        templateId,
-        currentStageId,
-        weekNumber,
-        { customTitle, customDescription },
-      );
-      if (!plan?.goal) {
-        toast.error("Failed to create outcome");
-        return;
-      }
-
-      await weeklyLoop.saveWeeklyPlan(plan);
+      await weeklyLoop.saveWeeklyPlan(plan, founderId);
       await refreshHome();
 
       toast.success("🎯 Weekly outcome set!", {
         description: `${plan.goal} - Let's make it happen this week!`,
       });
-      setShowOutcomeModal(false);
     } catch (error) {
       console.error("Error setting outcome:", error);
       toast.error("Failed to set outcome", {
-        description: "Please try again",
+        description:
+          error?.message ||
+          "Could not save your weekly plan. Create a startup profile first if you have not.",
       });
+      setShowOutcomeModal(true);
+    } finally {
+      setWeeklyOutcomeSubmitting(false);
     }
   };
-  const handleToggleTask = async (taskId) => {
-    try {
-      await weeklyLoop.toggleTask(taskId);
-      toast.success("Task updated! ✓");
-    } catch (error) {
-      console.error("Error toggling task:", error);
-      toast.error("Failed to update task");
-    }
-  };
-  const handleBlockTask = async (taskId, reason, note) => {
-    try {
-      await weeklyLoop.blockTask(taskId, reason, note);
-      toast.info("Task marked as blocked", {
-        description: "Your team will be notified",
-      });
+  const taskIdStr = (t) => String(t?.id ?? t?._id ?? "");
 
-      const task = useWeeklyLoopStore
-        .getState()
-        .tasks.find((t) => String(t.id || t._id) === String(taskId));
-      if (task) {
-        const { sendTaskBlockedNotification } = await import(
-          "../../utils/emailNotifications"
+  const handleCommitTaskDraft = async (payload) => {
+    const baseline = payload?.baselineTasks ?? [];
+    const draft = payload?.draftTasks ?? [];
+    const baselineMilestones = Array.isArray(payload?.baselineMilestones)
+      ? payload.baselineMilestones
+      : [];
+    const draftMilestones = Array.isArray(payload?.draftMilestones)
+      ? payload.draftMilestones
+      : [];
+    const skip = { skipRefresh: true };
+    const baseById = new Map(baseline.map((t) => [taskIdStr(t), t]));
+    const baselineMidSet = new Set(
+      baselineMilestones.map((m) => String(m.id)),
+    );
+    const weeklyOutcomeId = executionData?.currentOutcome?.id;
+    const milestoneIdMap = new Map();
+
+    try {
+      const milestonesPayload = draftMilestones.map((m) => ({
+        title: m.title,
+        tasks: draft
+          .filter((t) => String(t.milestoneId ?? "") === String(m.id))
+          .map((t) => ({ title: t.title })),
+      }));
+      const milestoneCheck = validateWeeklyPlanMilestones(milestonesPayload);
+      if (!milestoneCheck.ok) {
+        toast.error("Cannot save week plan", {
+          description: milestoneCheck.message,
+        });
+        throw new Error(milestoneCheck.message);
+      }
+
+      const draftTaskIdSet = new Set(draft.map((t) => taskIdStr(t)));
+      const draftMilestoneIdSet = new Set(
+        draftMilestones.map((m) => String(m.id)),
+      );
+      const deletedMilestoneIdSet = new Set(
+        baselineMilestones
+          .filter((bm) => !draftMilestoneIdSet.has(String(bm.id)))
+          .map((bm) => String(bm.id)),
+      );
+
+      for (const mid of deletedMilestoneIdSet) {
+        if (mid.startsWith("temp-ms-")) continue;
+        await weeklyLoop.deleteMilestone(mid, skip);
+      }
+
+      for (const t of baseline) {
+        const tid = taskIdStr(t);
+        if (tid.startsWith("temp-task-")) continue;
+        if (draftTaskIdSet.has(tid)) continue;
+        const tMid = String(t.milestoneId || "");
+        if (deletedMilestoneIdSet.has(tMid)) continue;
+        await weeklyLoop.deleteTask(tid, skip);
+      }
+
+      for (const dm of draftMilestones) {
+        const mid = String(dm.id);
+        if (baselineMidSet.has(mid)) continue;
+        const titleRaw = String(dm.title || "").trim();
+        const title = titleRaw.slice(0, 200);
+        const created = await weeklyLoop.saveMilestone(
+          {
+            title,
+            description: String(dm.description || "").trim().slice(0, 5000),
+            weeklyOutcomeId,
+            sequence:
+              Number(dm.sequence) ||
+              draftMilestones.findIndex((x) => String(x.id) === mid) + 1,
+          },
+          skip,
         );
-        sendTaskBlockedNotification({
-          userId: user.id,
-          founderEmail: user.email || "",
-          founderName: user.name,
-          taskTitle: task.title,
-          blockerReason: reason,
-          blockerNote: note,
-          teamMemberName: task.assignedToName || "",
-        }).catch((err) => console.warn("Email notification failed:", err));
+        const realId = String(created?._id || created?.id || "");
+        if (realId) milestoneIdMap.set(mid, realId);
       }
-    } catch (error) {
-      console.error("Error blocking task:", error);
-      toast.error("Failed to block task");
-    }
-  };
-  const handleUnblockTask = async (taskId) => {
-    try {
-      await weeklyLoop.unblockTask(taskId);
-      toast.success("Task unblocked!");
-    } catch (error) {
-      console.error("Error unblocking task:", error);
-      toast.error("Failed to unblock task");
-    }
-  };
-  const handleAssignTask = async (taskId, assignedTo, assignedToName) => {
-    try {
-      await weeklyLoop.assignTask(taskId, assignedTo, assignedToName);
 
-      if (assignedToName) {
-        toast.success(`Task assigned to ${assignedToName}! 👤`);
-
-        const task = useWeeklyLoopStore
-          .getState()
-          .tasks.find((t) => String(t.id || t._id) === String(taskId));
-        const teamMember = teamMembers.find((m) => m.id === assignedTo);
-        if (task && assignedTo) {
-          const { sendTaskAssignedNotification } = await import(
-            "../../utils/emailNotifications"
+      for (const dm of draftMilestones) {
+        const mid = String(dm.id);
+        if (!baselineMidSet.has(mid)) continue;
+        const bm = baselineMilestones.find((b) => String(b.id) === mid);
+        if (!bm) continue;
+        if (
+          String(bm.title || "").trim() !== String(dm.title || "").trim() ||
+          String(bm.description || "").trim() !==
+            String(dm.description || "").trim()
+        ) {
+          const nextTitle = String(dm.title || "").trim();
+          await weeklyLoop.updateMilestone(
+            mid,
+            {
+              title: nextTitle.slice(0, 200),
+              description: String(dm.description || "").trim().slice(0, 5000),
+            },
+            skip,
           );
-          sendTaskAssignedNotification({
-            userId: assignedTo,
-            teamMemberEmail: teamMember?.email || "",
-            teamMemberName: assignedToName,
-            taskTitle: task.title,
-            taskDescription: task.description || "",
-            founderName: user.name,
-            milestoneName: task.milestoneName || "General Tasks",
-          }).catch((err) => console.warn("Email notification failed:", err));
         }
-      } else {
-        toast.success("Task unassigned");
       }
+
+      const resolveMilestoneId = (raw) => {
+        const s = String(raw ?? "");
+        return milestoneIdMap.get(s) || s;
+      };
+
+      for (const d of draft) {
+        const id = taskIdStr(d);
+        const base = baseById.get(id);
+        if (!base) {
+          const mid = resolveMilestoneId(d.milestoneId);
+          if (!mid) continue;
+          await weeklyLoop.saveTask(
+            {
+              title: String(d.title || "").trim().slice(0, 500),
+              description: String(d.description || "").trim().slice(0, 5000),
+              milestoneId: mid,
+              status: d.status || "pending",
+              priority: String(d.priority || "medium").toLowerCase(),
+              assignedTo: d.assignedTo || null,
+              assignedToName: String(d.assignedToName || "").trim(),
+              assignedToAvatar: String(d.assignedToAvatar || "").trim(),
+            },
+            skip,
+          );
+          continue;
+        }
+
+        const wasBlocked = base.status === "blocked";
+        const isBlocked = d.status === "blocked";
+        const statusChanged = base.status !== d.status;
+        const blockMetaChanged =
+          isBlocked &&
+          (base.blockerReason !== d.blockerReason ||
+            base.blockerNote !== d.blockerNote);
+
+        if (isBlocked) {
+          const needBlock =
+            !wasBlocked || statusChanged || blockMetaChanged;
+          if (needBlock) {
+            const noteRaw =
+              (d.blockerNote && String(d.blockerNote).trim()) || "(none)";
+            await weeklyLoop.blockTask(
+              id,
+              d.blockerReason || "scope",
+              noteRaw,
+              skip,
+            );
+            const { sendTaskBlockedNotification } = await import(
+              "../../utils/emailNotifications"
+            );
+            sendTaskBlockedNotification({
+              userId: founderId,
+              founderEmail: user.email || "",
+              founderName: user.name,
+              taskTitle: d.title,
+              blockerReason: d.blockerReason,
+              blockerNote: d.blockerNote,
+              teamMemberName: d.assignedToName || "",
+            }).catch((err) => console.warn("Email notification failed:", err));
+          }
+        } else if (!isBlocked && (wasBlocked || statusChanged)) {
+          await weeklyLoop.applyTaskStatusTransition(
+            id,
+            base.status,
+            d.status,
+            skip,
+          );
+        }
+
+        const bp = String(base.priority || "medium").toLowerCase();
+        const dp = String(d.priority || "medium").toLowerCase();
+        if (["low", "medium", "high"].includes(dp) && bp !== dp) {
+          await weeklyLoop.setTaskPriority(id, dp, skip);
+        }
+
+        const a0 = String(base.assignedTo ?? "");
+        const a1 = String(d.assignedTo ?? "");
+        const n0 = base.assignedToName || "";
+        const n1 = d.assignedToName || "";
+        const v0 = base.assignedToAvatar || "";
+        const v1 = d.assignedToAvatar || "";
+        if (a0 !== a1 || n0 !== n1 || v0 !== v1) {
+          await weeklyLoop.assignTask(id, a1, n1, v1, skip);
+          if (n1 && a1) {
+            const teamMember = teamMembers.find((m) => m.id === a1);
+            const { sendTaskAssignedNotification } = await import(
+              "../../utils/emailNotifications"
+            );
+            sendTaskAssignedNotification({
+              userId: a1,
+              teamMemberEmail: teamMember?.email || "",
+              teamMemberName: n1,
+              taskTitle: d.title,
+              taskDescription: d.description || "",
+              founderName: user.name,
+              milestoneName: d.milestoneName || "General Tasks",
+            }).catch((err) => console.warn("Email notification failed:", err));
+          }
+        }
+
+        const bt = String(base.title || "").trim();
+        const dt = String(d.title || "").trim();
+        const bde = String(base.description || "").trim();
+        const dde = String(d.description || "").trim();
+        if (bt !== dt || bde !== dde) {
+          await weeklyLoop.updateTaskPatch(
+            id,
+            { title: dt.slice(0, 200), description: dde },
+            skip,
+          );
+        }
+      }
+
+      await weeklyLoop.refresh();
+      toast.success("Week plan updated");
     } catch (error) {
-      console.error("Error assigning task:", error);
-      toast.error("Failed to assign task");
+      console.error("Error saving task changes:", error);
+      toast.error("Failed to save task changes", {
+        description:
+          error?.message &&
+          String(error.message).length > 0 &&
+          error.message !== "Failed to save task changes"
+            ? error.message
+            : undefined,
+      });
+      throw error;
     }
   };
   const handleSetTaskIncentive = async (taskId, incentive) => {
@@ -1269,30 +1478,60 @@ export default function FounderDashboard({
     customTitle,
     customDescription,
   ) => {
-    if (!executionData) return;
-    try {
-      const weekNumber = (executionData.weekHistory.length || 0) + 1;
+    if (!founderId) {
+      toast.error("Could not identify your account", {
+        description: "Please sign in again, then set your weekly goal.",
+      });
+      throw new Error("Missing founder id");
+    }
+    const weekNumber = (executionData?.weekHistory?.length ?? 0) + 1;
 
-      const plan = buildWeeklyPlanFromIntent(parsedIntent, weekNumber, {
+    const plan = buildWeeklyPlanFromIntent(
+      parsedIntent,
+      weekNumber,
+      {
         customTitle,
         customDescription,
-      });
-      if (!plan?.goal) {
-        toast.error("Failed to set outcome");
-        return;
-      }
+      },
+      outcomesRaw,
+    );
+    if (!plan?.goal) {
+      toast.error("Failed to set outcome");
+      return;
+    }
 
-      await weeklyLoop.saveWeeklyPlan(plan);
+    const milestoneCheck = validateWeeklyPlanMilestones(plan.milestones);
+    if (!milestoneCheck.ok) {
+      toast.error("Complete each milestone", {
+        description: milestoneCheck.message,
+      });
+      return;
+    }
+
+    setWeeklyOutcomeSubmitting(true);
+    setShowIntentCaptureModal(false);
+    try {
+      await weeklyLoop.saveWeeklyPlan(plan, founderId);
       await refreshHome();
 
       toast.success("🎯 Weekly outcome set!", {
         description: `${plan.goal} - Powered by your vision!`,
       });
-      setShowIntentCaptureModal(false);
     } catch (error) {
       console.error("Error confirming intent:", error);
-      toast.error("Failed to set outcome");
+      toast.error("Failed to set outcome", {
+        description: error?.message || "Please try again.",
+      });
+      setShowIntentCaptureModal(true);
+    } finally {
+      setWeeklyOutcomeSubmitting(false);
     }
+  };
+  const handleParseIntent = async (inputText) => {
+    if (!founderId) {
+      throw new Error("Missing founder id");
+    }
+    return founderApi.parseFounderIntent(founderId, inputText);
   };
 
   // ===== PHASE 5: WEEKLY REVIEW HANDLER =====
@@ -1325,11 +1564,14 @@ export default function FounderDashboard({
     } catch (error) {
       console.error("Error completing weekly review:", error);
       toast.error("Failed to complete review");
+      throw error;
     }
   };
   const renderTaskForm = (task) => {
     const isActive = activeTaskId === task.id;
-    const isCompleted = completedTasks.has(task.id);
+    const isCompleted = stageTaskIsCompleted(currentStageId, task.id);
+    const savedResponse = stageTaskGetResponse(currentStageId, task.id);
+    const currentText = savedResponse?.text || "";
     if (isCompleted) {
       return (
         <div className="flex items-center gap-3 p-4 bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-800 rounded-lg">
@@ -1388,19 +1630,16 @@ export default function FounderDashboard({
           <div className="space-y-3">
             <Textarea
               placeholder={`Enter your ${task.title.toLowerCase()}...`}
-              value={taskFormData[task.id] || ""}
+              value={currentText}
               onChange={(e) =>
-                setTaskFormData({
-                  ...taskFormData,
-                  [task.id]: e.target.value,
-                })
+                stageTaskSave(founderId, currentStageId, task.id, e.target.value)
               }
               className="min-h-[120px]"
             />
             <div className="flex gap-2">
               <Button
                 onClick={() => handleCompleteTask(task.id)}
-                disabled={!taskFormData[task.id]?.trim()}
+                disabled={!currentText.trim()}
                 className="flex-1"
               >
                 <CheckCircle2 className="w-4 h-4 mr-2" />
@@ -1481,19 +1720,32 @@ export default function FounderDashboard({
     );
   }
   return (
-    <div className="min-h-screen flex flex-col pt-2 pb-12 md:pb-16">
+    <div className="flex min-h-screen flex-col bg-surface-page pb-12 pt-2 font-body md:pb-16">
       {isRefreshing && (
-        <div className="fixed top-16 right-4 z-50 bg-blue-600 text-white px-4 py-2 rounded-lg shadow-lg flex items-center gap-2">
-          <div className="inline-block animate-spin rounded-full h-4 w-4 border-b-2 border-white" />
-          <span className="text-sm">Syncing...</span>
+        <div className="fixed top-16 right-4 z-50">
+          <span className="inline-flex items-center gap-1.5 rounded-pill border border-primary/20 bg-primary-tint px-3 py-1 font-body text-[10px] font-medium text-primary shadow-sm">
+            <div className="inline-block h-2.5 w-2.5 animate-spin rounded-full border border-primary border-t-transparent" />
+            Syncing
+          </span>
         </div>
       )}
-      {showProfileModal && !user.onboardingComplete && (
-        <ProfileCompletionModal
-          role={user.role}
-          onComplete={handleProfileComplete}
-          onClose={() => setShowProfileModal(false)}
-        />
+      {startupMissingBanner && (
+        <div className="mx-3 md:mx-4 mb-2 rounded-lg border border-amber-500/40 bg-amber-500/10 px-4 py-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+          <p className="text-sm text-foreground">
+            Finish startup setup so weekly goals and execution data can sync to
+            your company record.
+          </p>
+          {onNavigate && (
+            <Button
+              type="button"
+              size="sm"
+              variant="secondary"
+              onClick={() => onNavigate("settings")}
+            >
+              Open settings
+            </Button>
+          )}
+        </div>
       )}
       {selectedTalent && (
         <TalentProfileModal
@@ -1506,8 +1758,8 @@ export default function FounderDashboard({
         />
       )}
       {showSkipWarning && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <Card className="max-w-md w-full">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sv-modal-backdrop">
+          <Card className="sv-modal-panel w-full max-w-md rounded-[16px] border-0 shadow-modal">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <AlertCircle className="w-5 h-5 text-orange-500" />
@@ -1548,26 +1800,21 @@ export default function FounderDashboard({
           </Card>
         </div>
       )}
-      <div className="relative overflow-hidden rounded-lg bg-gradient-to-br from-primary via-primary/90 to-primary/80 p-2 md:p-2.5 text-white shadow-md flex-shrink-0">
-        <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGRlZnM+PHBhdHRlcm4gaWQ9ImdyaWQiIHdpZHRoPSI2MCIgaGVpZ2h0PSI2MCIgcGF0dGVyblVuaXRzPSJ1c2VyU3BhY2VPblVzZSI+PHBhdGggZD0iTSAxMCAwIEwgMCAwIDAgMTAiIGZpbGw9Im5vbmUiIHN0cm9rZT0id2hpdGUiIHN0cm9rZS1vcGFjaXR5PSIwLjA1IiBzdHJva2Utd2lkdGg9IjEiLz48L3BhdHRlcm4+PC9kZWZzPjxyZWN0IHdpZHRoPSIxMDAlIiBoZWlnaHQ9IjEwMCUiIGZpbGw9InVybCgjZ3JpZCkiLz48L3N2Zz4=')] opacity-40" />
-        <div className="relative flex items-center justify-between flex-wrap gap-1.5">
-          <div className="flex-1">
-            <div className="flex items-center gap-1.5">
-              <div className="w-8 h-8 md:w-9 md:h-9 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center">
-                <Rocket className="w-4 h-4 md:w-4.5 md:h-4.5 text-white" />
-              </div>
-              <div>
-                <h1 className="text-sm md:text-base font-bold text-white">
-                  {"Welcome back, "}
-                  {user.name}
-                </h1>
-                <p className="text-white/90 text-[10px] md:text-xs mt-0.5">
-                  {"Building "}
-                  {user.profile?.startupName || "Your Startup"}
-                  {" - Let's make progress today!"}
-                </p>
-              </div>
-            </div>
+      <div className="flex flex-shrink-0 items-center justify-between rounded-card bg-[linear-gradient(135deg,#3a5afe_0%,#7c4dff_100%)] px-4 py-3 shadow-[0_4px_24px_rgba(58,90,254,0.18)] transition-shadow duration-200 ease-in-out">
+        <div className="flex items-center gap-3">
+          <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-input bg-white/15">
+            <Rocket className="h-4 w-4 text-white" />
+          </div>
+          <div>
+            <h1 className="font-heading text-sm font-bold text-white md:text-base">
+              {"Welcome back, "}
+              {user.name}
+            </h1>
+            <p className="mt-0.5 font-body text-[10px] text-white/80 md:text-xs">
+              {"Building "}
+              {user.profile?.startupName || "Your Startup"}
+              {" · Let's make progress today!"}
+            </p>
           </div>
         </div>
       </div>
@@ -1587,7 +1834,7 @@ export default function FounderDashboard({
                 <Button
                   size="sm"
                   className="mt-1 h-5 text-[9px] px-2"
-                  onClick={() => setShowProfileModal(true)}
+                  onClick={() => navigate("/onboarding")}
                 >
                   Complete Profile
                 </Button>
@@ -1600,7 +1847,7 @@ export default function FounderDashboard({
         <div className="mt-3">
           <PendingCompensationCard
             startupId={user.startupId}
-            founderId={user.id}
+            founderId={founderId}
             onCompensationSet={() => {
               // Optionally reload team members or show success message
               console.log("✅ Compensation set, reloading team data...");
@@ -1610,42 +1857,45 @@ export default function FounderDashboard({
       )}
       {user.onboardingComplete && (
         <>
-          <div className="flex flex-col gap-3 mt-3 mb-2 lg:grid lg:grid-cols-5">
+          <div
+            className="flex w-full flex-col min-h-[calc(100dvh-11rem)] sm:min-h-[calc(100dvh-12rem)] lg:min-h-[calc(100dvh-13rem)]"
+          >
+            <div className="flex flex-col gap-6 mt-3 mb-2 lg:grid lg:grid-cols-5 shrink-0">
             <div className="flex flex-col lg:col-span-2 min-h-0 lg:max-h-[calc(100vh-140px)]">
-              <Card className="border flex flex-col h-full overflow-hidden">
-                <CardHeader className="pb-1.5 pt-2 border-b flex-shrink-0">
+              <Card className="flex h-full flex-col overflow-hidden rounded-card border border-surface-border bg-white shadow-soft transition-all duration-200 ease-in-out hover:border-primary hover:shadow-[0_4px_24px_rgba(58,90,254,0.08)]">
+                <CardHeader className="flex-shrink-0 border-b border-surface-border px-4 pb-1.5 pt-2">
                   <Button
                     variant="outline"
                     size="sm"
                     onClick={() => setShowRoadmapModal(true)}
-                    className="w-full h-7 text-[10px] border-gray-200 dark:border-gray-700 bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-950/20 dark:to-purple-950/20 hover:from-blue-100 hover:to-purple-100 dark:hover:from-blue-900/40 dark:hover:to-purple-900/40 text-gray-700 dark:text-gray-300 flex items-center justify-between px-2.5"
+                    className="flex h-7 w-full items-center justify-between border-0 bg-transparent px-2.5 text-[10px] font-body font-medium text-text-body shadow-none transition-all duration-200 ease-in-out hover:bg-surface-page"
                   >
                     <span className="flex items-center gap-1.5">
-                      <Rocket className="w-3.5 h-3.5 text-primary" />
-                      <span className="font-semibold">Your Startup Stage</span>
-                      <span className="text-[8px] text-muted-foreground">
+                      <Rocket className="h-3.5 w-3.5 text-primary" />
+                      <span className="font-medium">Your Startup Stage</span>
+                      <span className="text-[8px] text-primary">
                         • View all 6 stages
                       </span>
                     </span>
-                    <ChevronRight className="w-3 h-3" />
+                    <ChevronRight className="h-3 w-3 text-primary" />
                   </Button>
                 </CardHeader>
-                <CardContent className="py-2 flex-1 flex flex-col overflow-y-auto min-h-0 scrollbar-thin scrollbar-thumb-gray-300 dark:scrollbar-thumb-gray-700 scrollbar-track-transparent">
+                <CardContent className="py-3 px-4 flex-1 flex flex-col overflow-y-auto min-h-0 scrollbar-thin scrollbar-thumb-gray-300 dark:scrollbar-thumb-gray-700 scrollbar-track-transparent">
                   <TooltipProvider>
                     <div className="flex items-start justify-between gap-1.5 mb-2">
                       <div className="flex items-center gap-1.5 flex-1 min-w-0">
-                        <div className="w-7 h-7 md:w-7.5 md:h-7.5 rounded-xl bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center flex-shrink-0 shadow-md">
-                          <currentStage.icon className="w-3.5 h-3.5 text-white" />
+                        <div className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-xl bg-primary-tint md:h-8 md:w-8">
+                          <currentStage.icon className="h-3.5 w-3.5 text-primary" />
                         </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-0.5 mb-0.5">
-                            <span className="text-[8px] md:text-[9px] font-medium text-muted-foreground uppercase tracking-wide">
+                        <div className="min-w-0 flex-1">
+                          <div className="mb-0.5 flex items-center gap-0.5">
+                            <span className="font-body text-[11px] font-medium uppercase tracking-[0.08em] text-text-muted">
                               Current Stage
                             </span>
                             <Tooltip delayDuration={0}>
                               <TooltipTrigger asChild={true}>
                                 <button className="focus:outline-none">
-                                  <Info className="w-2.5 h-2.5 text-blue-600 cursor-help" />
+                                  <Info className="h-2.5 w-2.5 cursor-help text-primary" />
                                 </button>
                               </TooltipTrigger>
                               <TooltipContent
@@ -1658,35 +1908,30 @@ export default function FounderDashboard({
                               </TooltipContent>
                             </Tooltip>
                           </div>
-                          <h3 className="text-xs md:text-sm font-bold">
+                          <h3 className="font-heading text-xs font-bold text-text-heading md:text-sm">
                             {currentStage.name}
                           </h3>
                         </div>
                       </div>
-                      <Badge
-                        variant="secondary"
-                        className="text-[8px] md:text-[9px] px-1.5 py-0 flex-shrink-0 flex items-center gap-0.5"
-                      >
-                        <span className="text-[7px]">🤖</span>
-                        {"Stage "}
-                        {currentStageId}/6
-                      </Badge>
+                      <span className="flex flex-shrink-0 items-center gap-0.5 rounded-pill bg-primary-tint px-2.5 py-0.5 font-body text-[9px] font-semibold text-primary">
+                        Stage {currentStageId}/6
+                      </span>
                     </div>
                   </TooltipProvider>
                   <div className="space-y-1 mb-2">
                     <div className="flex items-center justify-between text-[9px] md:text-[10px]">
-                      <span className="text-muted-foreground">
+                      <span className="font-body text-text-muted">
                         Startup Stage Progress
                       </span>
-                      <span className="font-semibold text-primary">
+                      <span className="font-body font-semibold text-primary">
                         {startupStageProgress}%
                       </span>
                     </div>
                     <Progress
                       value={startupStageProgress}
-                      className="h-1 bg-primary/10 [&>div]:bg-gradient-to-r [&>div]:from-primary [&>div]:to-primary/80"
+                      className="h-1.5 border-0 bg-surface-border [&_[data-slot=progress-indicator]]:!bg-gradient-to-r [&_[data-slot=progress-indicator]]:!from-primary [&_[data-slot=progress-indicator]]:!to-accent"
                     />
-                    <p className="text-[8px] text-muted-foreground mt-0.5">
+                    <p className="mt-0.5 font-body text-[8px] text-text-muted">
                       {startupStageProgress >= 100
                         ? "Journey Complete! 🎉"
                         : `${executionData?.weekHistory.length || 0} outcomes completed • ${currentStage.name}`}
@@ -1696,53 +1941,45 @@ export default function FounderDashboard({
                     variant="outline"
                     size="sm"
                     onClick={() => setShowStageLearningModal(true)}
-                    className="w-full h-7 text-[10px] border-blue-200 dark:border-blue-800 bg-blue-50/50 dark:bg-blue-950/20 hover:bg-blue-100 dark:hover:bg-blue-900/40 text-blue-700 dark:text-blue-300 mb-2 flex items-center justify-between px-3"
+                    className="mb-2 flex h-8 w-full items-center justify-between rounded-input border border-surface-border bg-surface-page px-3 font-body text-[10px] font-medium text-primary transition-all duration-200 ease-in-out hover:border-primary hover:bg-primary-tint"
                   >
                     <span className="flex items-center">
                       Learn About This Stage from YC Experts
                     </span>
-                    <div
-                      className="ml-2 w-5 h-5 rounded bg-blue-600 dark:bg-blue-500 flex items-center justify-center hover:bg-blue-700 dark:hover:bg-blue-600 transition-colors"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setShowStageLearningModal(true);
-                      }}
-                    >
-                      <ChevronRight className="w-3 h-3 text-white" />
-                    </div>
+                    <ChevronRight className="h-3.5 w-3.5 text-primary" />
                   </Button>
                   <div className="mb-2">
-                    <CohortMembershipBadge startupId={user.id} />
+                    <CohortMembershipBadge startupId={user.startupId || founderId} />
                   </div>
-                  <div className="border-t my-2" />
+                  <div className="my-2 border-t border-surface-border" />
                   <div className="flex-1 flex flex-col gap-2 py-2">
-                    <h3 className="text-[8px] md:text-[9px] font-medium text-muted-foreground uppercase tracking-wide">
-                      WEEKLY OUTCOME STREAK
+                    <h3 className="font-body text-[11px] font-medium uppercase tracking-[0.08em] text-text-muted">
+                      Weekly Outcome Streak
                     </h3>
                     <div className="grid grid-cols-3 gap-2">
-                      <Card className="border shadow-none">
-                        <CardContent className="p-1 flex items-center justify-center min-h-[80px] md:min-h-[90px]">
-                          <div className="flex flex-col space-y-0.5 items-center text-center">
+                      <Card className="rounded-card border border-surface-border bg-white shadow-soft transition-shadow duration-200 ease-in-out hover:shadow-[0_4px_24px_rgba(58,90,254,0.08)]">
+                        <CardContent className="flex min-h-[80px] items-center justify-center p-4 md:min-h-[90px]">
+                          <div className="flex flex-col items-center space-y-0.5 text-center">
                             <div className="flex items-center gap-1">
                               <Flame
-                                className={`w-5 h-5 ${(executionData?.streak || 0) === 0 ? "text-muted-foreground" : (executionData?.streak || 0) < 4 ? "text-orange-500" : (executionData?.streak || 0) < 8 ? "text-orange-600" : "text-red-500"}`}
+                                className={`h-5 w-5 ${(executionData?.streak || 0) === 0 ? "text-text-muted/40" : "text-[#ff6b00]"}`}
                               />
-                              <span className="text-3xl font-bold bg-gradient-to-r from-primary to-primary/70 bg-clip-text text-transparent">
+                              <span className="font-heading text-3xl font-extrabold text-primary">
                                 {executionData?.streak || 0}
                               </span>
-                              <span className="text-xs text-muted-foreground">
+                              <span className="font-body text-xs text-text-muted">
                                 {(executionData?.streak || 0) === 1
                                   ? "wk"
                                   : "wks"}
                               </span>
                             </div>
-                            <div className="flex items-center gap-1">
-                              <TrendingUp className="w-2 h-2 text-muted-foreground" />
-                              <span className="text-[8px] font-medium">
+                            <div className="mt-1 flex items-center gap-1">
+                              <TrendingUp className="h-2.5 w-2.5 text-status-success" />
+                              <span className="font-body text-[9px] font-medium text-text-body">
                                 {outcomeProgress}% this week
                               </span>
                             </div>
-                            <p className="text-[7px] text-muted-foreground">
+                            <p className="font-body text-[8px] text-text-muted">
                               {(executionData?.streak || 0) === 0
                                 ? "Start your first week"
                                 : "Keep it going!"}
@@ -1750,44 +1987,30 @@ export default function FounderDashboard({
                           </div>
                         </CardContent>
                       </Card>
-                      <Card className="border shadow-none">
-                        <CardContent className="p-1.5 flex items-center justify-center min-h-[80px] md:min-h-[90px]">
+                      <Card className="rounded-card border border-surface-border bg-white shadow-soft transition-shadow duration-200 ease-in-out hover:shadow-[0_4px_24px_rgba(58,90,254,0.08)]">
+                        <CardContent className="flex min-h-[80px] items-center justify-center p-4 md:min-h-[90px]">
                           <div className="relative flex flex-col items-center gap-1">
                             <div className="relative">
                               <svg
                                 width="60"
                                 height="60"
                                 viewBox="0 0 60 60"
-                                className="transform -rotate-90"
+                                className="-rotate-90 transform"
                               >
-                                <defs>
-                                  <linearGradient
-                                    id="progress-grad"
-                                    x1="100%"
-                                    y1="100%"
-                                    x2="0%"
-                                    y2="0%"
-                                  >
-                                    <stop offset="0%" stopColor="#ef4444" />
-                                    <stop offset="50%" stopColor="#f97316" />
-                                    <stop offset="100%" stopColor="#047857" />
-                                  </linearGradient>
-                                </defs>
                                 <circle
                                   cx="30"
                                   cy="30"
                                   r="25"
-                                  stroke="#e5e7eb"
-                                  strokeWidth="5"
+                                  className="stroke-surface-border"
+                                  strokeWidth="3"
                                   fill="none"
-                                  opacity="0.3"
                                 />
                                 <circle
                                   cx="30"
                                   cy="30"
                                   r="25"
-                                  stroke="url(#progress-grad)"
-                                  strokeWidth="5"
+                                  className="stroke-primary"
+                                  strokeWidth="3"
                                   fill="none"
                                   strokeLinecap="round"
                                   strokeDasharray={2 * Math.PI * 25}
@@ -1798,7 +2021,7 @@ export default function FounderDashboard({
                                 />
                               </svg>
                               <div className="absolute inset-0 flex items-center justify-center">
-                                <span className="text-sm font-bold">
+                                <span className="font-heading text-sm font-bold text-primary">
                                   {outcomeProgress}%
                                 </span>
                               </div>
@@ -1814,19 +2037,18 @@ export default function FounderDashboard({
                           </div>
                         </CardContent>
                       </Card>
-                      <ExecutionScoreInlineCard userId={user.id} />
+                      <ExecutionScoreInlineCard userId={founderId} />
                     </div>
                   </div>
                 </CardContent>
               </Card>
             </div>
             <div className="flex flex-col min-h-0 lg:col-span-3 lg:max-h-[calc(100vh-140px)]">
-              <Card className="border flex flex-col h-full overflow-hidden">
-                <CardHeader className="flex-shrink-0 pb-1.5 pt-2 border-b">
+              <Card className="relative flex h-full flex-col overflow-hidden rounded-card border border-surface-border bg-white shadow-soft transition-all duration-200 ease-in-out hover:shadow-[0_4px_24px_rgba(58,90,254,0.08)]">
+                <CardHeader className="flex-shrink-0 border-b border-surface-border px-4 pb-2 pt-3">
                   <div className="flex items-center justify-between">
-                    <CardTitle className="flex items-center gap-1 text-xs">
-                      <Target className="w-3 h-3 text-green-600" />
-                      This Week's Focus
+                    <CardTitle className="font-body text-[11px] font-medium uppercase tracking-[0.08em] text-text-muted">
+                      This Week&#39;s Focus
                     </CardTitle>
                     <div className="flex items-center gap-1">
                       {executionData?.currentOutcome?.isOrganizationDriven && (
@@ -1849,25 +2071,39 @@ export default function FounderDashboard({
                           </TooltipContent>
                         </Tooltip>
                       )}
-                      {executionData?.currentOutcome && (
-                        <Badge
-                          variant="outline"
-                          className="text-[8px] md:text-[9px]"
-                        >
-                          {"Week "}
-                          {(executionData?.weekHistory.length || 0) + 1}
-                        </Badge>
+                      {executionData?.currentOutcome && tasks.length > 0 && (
+                        <span className="rounded-pill bg-primary-tint px-2 py-0.5 font-body text-[9px] font-semibold text-primary">
+                          Week {(executionData?.weekHistory.length || 0) + 1}
+                        </span>
                       )}
                     </div>
                   </div>
-                  {executionData?.currentOutcome && (
-                    <CardDescription className="mt-0.5 text-[9px] md:text-[10px]">
+                  {executionData?.currentOutcome && tasks.length > 0 && (
+                    <p className="mt-1 font-body text-[13px] font-medium leading-snug text-text-heading md:text-[14px]">
                       {executionData.currentOutcome.title}
-                    </CardDescription>
+                    </p>
                   )}
                 </CardHeader>
-                <CardContent className="flex-1 pt-2 pb-2 overflow-y-auto min-h-0 scrollbar-thin scrollbar-thumb-gray-300 dark:scrollbar-thumb-gray-700 scrollbar-track-transparent">
-                  {isLoadingExecutionData ? (
+                <CardContent className="flex-1 pt-3 px-4 pb-3 overflow-y-auto min-h-0 scrollbar-thin scrollbar-thumb-gray-300 dark:scrollbar-thumb-gray-700 scrollbar-track-transparent">
+                  {weeklyOutcomeSubmitting ? (
+                    <div
+                      className="flex min-h-[120px] flex-col items-center justify-center gap-2 px-4 text-center"
+                      role="status"
+                      aria-live="polite"
+                    >
+                      <Loader2
+                        className="h-8 w-8 animate-spin text-primary"
+                        aria-hidden
+                      />
+                      <p className="text-xs font-medium text-foreground">
+                        Saving your weekly goal…
+                      </p>
+                      <p className="max-w-[240px] text-[10px] leading-snug text-muted-foreground">
+                        We received your request and are updating your plan. This
+                        usually takes a few seconds.
+                      </p>
+                    </div>
+                  ) : isLoadingExecutionData ? (
                     <div className="space-y-2 py-3 px-2">
                       <div className="flex items-center justify-between mb-3">
                         <div className="w-16 h-3 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
@@ -1890,15 +2126,16 @@ export default function FounderDashboard({
                         <div className="w-24 h-6 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
                       </div>
                     </div>
-                  ) : executionData?.currentOutcome ? (
+                  ) : (
                     <TooltipProvider>
+                      {executionData?.currentOutcome && tasks.length > 0 ? (
                       <div className="space-y-1.5 md:space-y-2 pb-0.5">
                         <div className="space-y-1 md:space-y-1.5">
                           <div className="flex items-center justify-between">
-                            <h4 className="text-[9px] md:text-[10px] font-semibold">
+                            <h4 className="font-body text-[11px] font-medium uppercase tracking-[0.08em] text-text-muted">
                               Milestones
                             </h4>
-                            <span className="text-[8px] md:text-[9px] text-muted-foreground">
+                            <span className="rounded-pill border border-surface-border bg-white px-2 py-0.5 font-body text-[9px] font-medium text-text-muted">
                               {
                                 executionData.currentOutcome.milestones.filter(
                                   (m) => m.tasksCompleted === m.totalTasks,
@@ -1908,26 +2145,41 @@ export default function FounderDashboard({
                               {" complete"}
                             </span>
                           </div>
-                          <div className="space-y-1 md:space-y-1.5">
+                          <div className="space-y-0">
                             {executionData.currentOutcome.milestones.map(
-                              (milestone) => {
+                              (milestone, milestoneIdx) => {
                                 const progress =
                                   milestone.totalTasks > 0
                                     ? (milestone.tasksCompleted /
                                         milestone.totalTasks) *
                                       100
                                     : 0;
+                                const dotColor =
+                                  milestone.status === 'completed'
+                                    ? '#00c896'
+                                    : milestone.status === 'in-progress'
+                                      ? '#3a5afe'
+                                      : '#a0a0b0';
                                 return (
                                   <div
                                     key={milestone.id}
-                                    className="space-y-0.5 md:space-y-1 p-1.5 rounded-lg bg-muted/30 border"
+                                    className={`space-y-1.5 rounded-input border border-surface-border p-2 md:p-2.5 ${
+                                      milestoneIdx % 2 === 1
+                                        ? 'bg-surface-page'
+                                        : 'bg-white'
+                                    }`}
+                                    style={{ marginBottom: '6px' }}
                                   >
-                                    <div className="flex items-start justify-between gap-1.5">
-                                      <div className="flex-1 min-w-0 flex items-center gap-0.5">
+                                    <div className="flex items-center justify-between gap-2">
+                                      <div className="flex items-center gap-2 flex-1 min-w-0">
+                                        <span
+                                          className="flex-shrink-0 rounded-full"
+                                          style={{ width: 6, height: 6, background: dotColor }}
+                                        />
                                         <Tooltip>
                                           <TooltipTrigger asChild={true}>
                                             <button className="focus:outline-none text-left">
-                                              <p className="font-medium text-[9px] md:text-[10px]">
+                                              <p className="font-body text-[9px] font-medium text-text-heading md:text-[10px]">
                                                 {milestone.title}
                                               </p>
                                             </button>
@@ -1942,21 +2194,13 @@ export default function FounderDashboard({
                                           </TooltipContent>
                                         </Tooltip>
                                       </div>
-                                      <Badge
-                                        variant={
-                                          progress === 100
-                                            ? "default"
-                                            : "secondary"
-                                        }
-                                        className="text-[8px] md:text-[9px] px-1 py-0 flex-shrink-0"
-                                      >
-                                        {milestone.tasksCompleted}/
-                                        {milestone.totalTasks}
-                                      </Badge>
+                                      <span className="flex-shrink-0 rounded-pill border border-surface-border bg-white px-1.5 py-0.5 font-body text-[9px] font-medium text-text-muted">
+                                        {milestone.tasksCompleted}/{milestone.totalTasks}
+                                      </span>
                                     </div>
                                     <Progress
                                       value={progress}
-                                      className="h-0.5"
+                                      className="h-1 rounded-full border-0 bg-surface-border [&_[data-slot=progress-indicator]]:!bg-gradient-to-r [&_[data-slot=progress-indicator]]:!from-primary [&_[data-slot=progress-indicator]]:!to-accent"
                                     />
                                   </div>
                                 );
@@ -1968,7 +2212,7 @@ export default function FounderDashboard({
                           <div className="space-y-1 md:space-y-1.5 pt-2 mt-2 border-t">
                             <div className="flex items-center justify-between">
                               <h4 className="text-[9px] md:text-[10px] font-semibold flex items-center gap-1">
-                                <FileText className="w-3 h-3 text-blue-600" />
+                                <FileText className="h-3 w-3 text-primary" />
                                 Organization Deliverables
                               </h4>
                               <span className="text-[8px] md:text-[9px] text-muted-foreground">
@@ -2012,7 +2256,7 @@ export default function FounderDashboard({
                                       {isSubmitted ? (
                                         <Badge
                                           variant="outline"
-                                          className={`text-[7px] ${deliverable.mySubmission.status === "approved" ? "bg-green-500/10 text-green-700 dark:text-green-400 border-green-500/20" : deliverable.mySubmission.status === "needs-revision" ? "bg-yellow-500/10 text-yellow-700 dark:text-yellow-400 border-yellow-500/20" : "bg-purple-500/10 text-purple-700 dark:text-purple-400 border-purple-500/20"}`}
+                                          className={`text-[7px] ${deliverable.mySubmission.status === "approved" ? "bg-green-500/10 text-green-700 dark:text-green-400 border-green-500/20" : deliverable.mySubmission.status === "revision_requested" || deliverable.mySubmission.status === "needs-revision" ? "bg-yellow-500/10 text-yellow-700 dark:text-yellow-400 border-yellow-500/20" : deliverable.mySubmission.status === "rejected" ? "bg-red-500/10 text-red-700 dark:text-red-400 border-red-500/20" : "bg-purple-500/10 text-purple-700 dark:text-purple-400 border-purple-500/20"}`}
                                         >
                                           {deliverable.mySubmission.status}
                                         </Badge>
@@ -2078,7 +2322,7 @@ export default function FounderDashboard({
                                                   await submitDeliverableAction(
                                                     deliverable.id,
                                                     {
-                                                      founderId: user.id,
+                                                      founderId,
                                                       submissionUrl:
                                                         deliverableSubmissionData.submissionUrl,
                                                       notes:
@@ -2135,108 +2379,104 @@ export default function FounderDashboard({
                             </div>
                           </div>
                         )}
-                        <div className="flex gap-1 md:gap-1.5 pt-1.5 border-t">
+                        <div className="flex gap-2 border-t border-surface-border pt-2">
                           <Button
                             size="sm"
                             onClick={() => setShowMilestoneDetailView(true)}
-                            className="flex-1 h-6 md:h-6.5 text-[9px] md:text-[10px]"
+                            className="flex-1 h-11 rounded-input bg-primary font-body text-[11px] font-semibold text-white shadow-[0_4px_16px_rgba(58,90,254,0.25)] transition-all duration-200 ease-in-out hover:bg-primary-hover"
                           >
-                            <Eye className="w-2.5 h-2.5 mr-1" />
+                            <Eye className="mr-1.5 h-3 w-3" />
                             View Tasks
                           </Button>
                           <Button
                             size="sm"
                             variant="outline"
                             onClick={() => setShowWeeklyReviewModal(true)}
-                            className="h-6 md:h-6.5 text-[9px] md:text-[10px]"
+                            className="h-11 rounded-input border border-surface-border bg-white font-body text-[11px] font-medium text-primary transition-all duration-200 ease-in-out hover:bg-primary-tint"
                           >
-                            <CheckCircle2 className="w-2.5 h-2.5 mr-1" />
+                            <CheckCircle2 className="mr-1.5 h-3 w-3" />
                             Complete Week
                           </Button>
                         </div>
                       </div>
+                      ) : (
+                        <div className="flex min-h-[120px] flex-col items-center justify-center px-2 py-4 text-center md:px-3 md:py-5">
+                          <Target className="mb-1.5 h-8 w-8 text-surface-border md:mb-2 md:h-9 md:w-9" />
+                          <h3 className="mb-1 font-heading text-xs font-semibold text-text-heading md:text-sm">
+                            No weekly outcome set yet
+                          </h3>
+                          <p className="mb-2 max-w-md font-body text-[9px] text-text-body md:mb-3 md:text-[10px]">
+                            Set a clear, achievable goal for this week to drive your
+                            startup forward
+                          </p>
+                          <Button
+                            onClick={() => setShowOutcomeModal(true)}
+                            className="h-6 gap-1.5 rounded-input bg-primary font-body text-[9px] font-semibold text-white shadow-[0_4px_16px_rgba(58,90,254,0.25)] transition-all duration-200 ease-in-out hover:bg-primary-hover md:h-7 md:text-[10px]"
+                          >
+                            <PlayCircle className="w-2.5 h-2.5" />
+                            Set This Week's Goal
+                          </Button>
+                        </div>
+                      )}
                     </TooltipProvider>
-                  ) : (
-                    <div className="flex flex-col items-center justify-center py-4 md:py-5 px-2 md:px-3 text-center min-h-[120px]">
-                      <Target className="w-8 h-8 md:w-9 md:h-9 text-muted-foreground/30 mb-1.5 md:mb-2" />
-                      <h3 className="text-xs md:text-sm font-semibold mb-1">
-                        No weekly outcome set yet
-                      </h3>
-                      <p className="text-[9px] md:text-[10px] text-muted-foreground mb-2 md:mb-3 max-w-md">
-                        Set a clear, achievable goal for this week to drive your
-                        startup forward
-                      </p>
-                      <Button
-                        onClick={() => setShowOutcomeModal(true)}
-                        className="gap-1.5 h-6 md:h-6.5 text-[9px] md:text-[10px]"
-                      >
-                        <PlayCircle className="w-2.5 h-2.5" />
-                        Set This Week's Goal
-                      </Button>
-                    </div>
                   )}
                 </CardContent>
               </Card>
             </div>
           </div>
-          <Card
-            className={`mt-1.5 mb-12 md:mb-16 flex-shrink-0 border-l-4 ${smartInsight.variant === "success" ? "border-l-green-500 bg-green-50/50 dark:bg-green-950/20" : smartInsight.variant === "warning" ? "border-l-orange-500 bg-orange-50/50 dark:bg-orange-950/20" : smartInsight.variant === "info" ? "border-l-blue-500 bg-blue-50/50 dark:bg-blue-950/20" : "border-l-primary bg-primary/5"}`}
-          >
-            <CardContent className="py-2 px-2.5 md:py-2.5 md:px-3">
-              <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between md:gap-3">
-                <div className="flex items-start gap-2 flex-1 min-w-0">
-                  <Sparkles
-                    className={`w-3.5 h-3.5 md:w-4 md:h-4 flex-shrink-0 mt-0.5 ${smartInsight.variant === "success" ? "text-green-600" : smartInsight.variant === "warning" ? "text-orange-600" : smartInsight.variant === "info" ? "text-blue-600" : "text-primary"}`}
-                  />
-                  <p className="md:text-xs font-medium flex-1 leading-relaxed text-[11px]">
-                    {smartInsight.message}
-                  </p>
-                </div>
+            {founderId ? (
+              <div className="mt-4 grid shrink-0 grid-cols-1 gap-4 lg:grid-cols-2">
+                <OrganizationAnnouncementsWidget founderId={founderId} />
+                <OrganizationEventsWidget
+                  founderId={founderId}
+                  founderName={user.name || ""}
+                />
+              </div>
+            ) : null}
+            <div className="min-h-6 flex-1 basis-0 sm:min-h-8" aria-hidden />
+            <div className="mb-12 flex-shrink-0 md:mb-16">
+              <div className="flex flex-col gap-3 border-t border-surface-border bg-surface-page py-3 md:flex-row md:items-center md:justify-between md:gap-4 md:px-1">
+                <p className="flex-1 font-body text-[14px] italic leading-relaxed text-text-body">
+                  {smartInsight.message}
+                </p>
                 {smartInsight.action && smartInsight.actionLabel && (
-                  <>
-                    <div className="hidden md:flex md:items-center md:px-2">
-                      <div className="w-px h-12 bg-gradient-to-b from-transparent via-gray-300 dark:via-gray-600 to-transparent" />
-                    </div>
-                    <div className="flex justify-center md:flex md:items-center">
-                      <Button
-                        size="sm"
-                        variant={
-                          smartInsight.variant === "success"
-                            ? "default"
-                            : "outline"
+                  <div className="flex-shrink-0">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="h-8 rounded-input border border-surface-border bg-white px-4 font-body text-[10px] font-semibold text-primary transition-all duration-200 ease-in-out hover:bg-primary-tint md:text-[11px]"
+                      onClick={() => {
+                        if (smartInsight.action === "set-outcome") {
+                          setShowOutcomeModal(true);
+                        } else if (
+                          smartInsight.action === "milestone-detail"
+                        ) {
+                          setShowMilestoneDetailView(true);
+                        } else if (smartInsight.action === "complete-week") {
+                          setShowWeeklyReviewModal(true);
                         }
-                        className="h-7 md:h-8 text-[10px] md:text-xs px-4 md:px-5"
-                        onClick={() => {
-                          if (smartInsight.action === "set-outcome") {
-                            setShowOutcomeModal(true);
-                          } else if (
-                            smartInsight.action === "milestone-detail"
-                          ) {
-                            setShowMilestoneDetailView(true);
-                          } else if (smartInsight.action === "complete-week") {
-                            setShowWeeklyReviewModal(true);
-                          }
-                        }}
-                      >
-                        {smartInsight.actionLabel}
-                      </Button>
-                    </div>
-                  </>
+                      }}
+                    >
+                      {smartInsight.actionLabel}
+                    </Button>
+                  </div>
                 )}
               </div>
-            </CardContent>
-          </Card>
+            </div>
+          </div>
           <StageLearningModal
             isOpen={showStageLearningModal}
             onClose={() => setShowStageLearningModal(false)}
             stageName={currentStage.name}
             stageKey={currentStage.id.toString()}
+            founderId={founderId}
           />
           <StageRoadmapModal
             isOpen={showRoadmapModal}
             onClose={() => setShowRoadmapModal(false)}
             journeyProgress={journeyProgress}
             currentStageId={currentStageId}
+            founderId={founderId}
           />
           <OutcomeSelectionModal
             isOpen={showOutcomeModal}
@@ -2255,6 +2495,7 @@ export default function FounderDashboard({
             onClose={() => setShowIntentCaptureModal(false)}
             stageName={currentStage.name}
             weekNumber={(executionData?.weekHistory.length || 0) + 1}
+            onParseIntent={handleParseIntent}
             onConfirmIntent={handleConfirmIntent}
           />
           {executionData?.currentOutcome && (
@@ -2263,10 +2504,7 @@ export default function FounderDashboard({
               onClose={() => setShowMilestoneDetailView(false)}
               outcome={executionData.currentOutcome}
               tasks={tasks}
-              onToggleTask={handleToggleTask}
-              onBlockTask={handleBlockTask}
-              onUnblockTask={handleUnblockTask}
-              onAssignTask={handleAssignTask}
+              onCommitTaskDraft={handleCommitTaskDraft}
               onSetTaskIncentive={handleSetTaskIncentive}
               teamMembers={teamMembers.map((m) => ({
                 id: m.id,
@@ -2275,23 +2513,11 @@ export default function FounderDashboard({
                 avatar: m.avatar,
                 status: m.status,
               }))}
-              founderId={user.id}
+              founderId={founderId}
               founderName={user.name}
+              founderAvatar={user.avatar || user.profileImage || ""}
               onNavigate={onNavigate}
               onVirtualOfficeViewChange={onVirtualOfficeViewChange}
-            />
-          )}
-          {showPhase3Welcome && (
-            <Phase3Welcome
-              onDismiss={() => {
-                setShowPhase3Welcome(false);
-                localStorage.setItem(`phase3_welcome_seen_${user.id}`, "true");
-              }}
-              onStartFlow={() => {
-                setShowPhase3Welcome(false);
-                localStorage.setItem(`phase3_welcome_seen_${user.id}`, "true");
-                setShowOutcomeModal(true);
-              }}
             />
           )}
           {executionData?.currentOutcome && (
@@ -2299,8 +2525,10 @@ export default function FounderDashboard({
               open={showWeeklyReviewModal}
               onClose={() => setShowWeeklyReviewModal(false)}
               outcome={executionData.currentOutcome}
+              tasks={tasks}
               onComplete={handleCompleteWeeklyReview}
               currentStreak={executionData.streak}
+              founderId={founderId}
             />
           )}
         </>

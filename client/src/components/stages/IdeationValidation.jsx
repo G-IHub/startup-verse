@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "../ui/card";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
@@ -6,6 +6,8 @@ import { Textarea } from "../ui/textarea";
 import { Label } from "../ui/label";
 import { Lightbulb, ArrowLeft, ArrowRight } from "lucide-react";
 import { toast } from "sonner";
+import { useHydrateStageDraft, persistStageDraft } from "../../hooks/useStageDraftFromJourney";
+
 export default function IdeationValidation({ user, onBack }) {
   const [ideaCanvas, setIdeaCanvas] = useState({
     problem: "",
@@ -14,25 +16,19 @@ export default function IdeationValidation({ user, onBack }) {
     valueProposition: "",
   });
 
-  // Load saved data
-  useEffect(() => {
-    const savedCanvas = localStorage.getItem("ideation_canvas");
-    if (savedCanvas) {
-      const parsed = JSON.parse(savedCanvas);
-      setIdeaCanvas({
-        problem: parsed.problem || "",
-        solution: parsed.solution || "",
-        targetAudience: parsed.targetAudience || "",
-        valueProposition: parsed.valueProposition || "",
-      });
-    }
-  }, []);
+  useHydrateStageDraft(user, "ideation_canvas", (raw) => {
+    if (!raw || typeof raw !== "object") return;
+    setIdeaCanvas({
+      problem: raw.problem || "",
+      solution: raw.solution || "",
+      targetAudience: raw.targetAudience || "",
+      valueProposition: raw.valueProposition || "",
+    });
+  });
 
-  // Save and continue to next stage
   const saveAndContinue = () => {
-    localStorage.setItem("ideation_canvas", JSON.stringify(ideaCanvas));
+    persistStageDraft("ideation_canvas", ideaCanvas);
     toast.success("Progress saved! Moving to next stage...");
-    // Go back to journey which will show next stage
     setTimeout(() => onBack(), 500);
   };
   return (

@@ -19,16 +19,15 @@ import {
   Info,
   Zap,
 } from "lucide-react";
-import {
-  getJourneyProgress,
-  JOURNEY_STAGES,
-} from "../../utils/journeyProgress";
+import { JOURNEY_STAGES } from "../../utils/journeyProgress";
+import { useJourneyStore } from "../../state/useJourneyStore";
 import { getStageProgressSummary } from "../../utils/outcomeBasedProgression";
 export default function StageProgressIndicator({
   compact = false,
   showUpcoming = true,
 }) {
-  const progress = getJourneyProgress();
+  const progress = useJourneyStore((s) => s.progress);
+  if (!progress) return null;
   const currentStageId = progress.currentStage;
   const currentStageInfo = JOURNEY_STAGES.find((s) => s.id === currentStageId);
   const currentStageData = progress.stageData[currentStageId];

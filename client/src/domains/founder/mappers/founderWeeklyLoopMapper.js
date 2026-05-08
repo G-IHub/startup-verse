@@ -60,18 +60,50 @@ function normalizeMilestones(milestones = []) {
   });
 }
 
+function normalizeTaskPriority(priority) {
+  const raw = String(priority || "medium").toLowerCase();
+  if (raw === "low" || raw === "high" || raw === "medium") return raw;
+  return "medium";
+}
+
+function normalizeAssignedTo(value) {
+  if (value == null || value === "") return null;
+  if (typeof value === "object") {
+    const s = String(value._id || value.id || "").trim();
+    return s || null;
+  }
+  return String(value).trim() || null;
+}
+
 function normalizeTasks(tasks = []) {
-  return tasks.map((item) => ({
+  return tasks.map((item) => {
+    const assignedToRaw = item.assignedTo;
+    const assignedTo = normalizeAssignedTo(assignedToRaw);
+    const fromPopulate =
+      typeof assignedToRaw === "object" && assignedToRaw
+        ? String(
+            assignedToRaw.name ||
+              assignedToRaw.displayName ||
+              assignedToRaw.fullName ||
+              "",
+          ).trim()
+        : "";
+    return {
     id: toId(item),
     title: item.title || "Untitled task",
     status: normalizeTaskStatus(item.status),
     milestoneId: String(item.milestoneId || ""),
-    assignedTo: item.assignedTo || null,
+    assignedTo,
+    assignedToName:
+      String(item.assignedToName || "").trim() || fromPopulate || "",
+    assignedToAvatar: String(item.assignedToAvatar || "").trim() || "",
+    priority: normalizeTaskPriority(item.priority),
     blockerReason: item.blockerReason || item.blockedReason || "",
     blockerNote: item.blockerNote || item.blockedNote || "",
     createdAt: item.createdAt || null,
     raw: item,
-  }));
+  };
+  });
 }
 
 function computeStreak(outcomes = []) {

@@ -3,8 +3,15 @@
  * Tests if the backend API is reachable and responding.
  */
 
-import { getAccessToken } from "../app/session";
 import { API_BASE_URL } from "../config/apiBase.js";
+
+// Default fetch options for cookie-based auth
+const defaultOptions = {
+  credentials: "include",
+  headers: {
+    "Content-Type": "application/json",
+  },
+};
 
 /**
  * Check if backend is online.
@@ -17,11 +24,8 @@ export async function checkBackendHealth(silent = false) {
     const timeoutId = setTimeout(() => controller.abort(), 10000);
 
     const response = await fetch(`${API_BASE_URL}/health`, {
+      ...defaultOptions,
       method: "GET",
-      headers: {
-        Authorization: `Bearer ${getAccessToken()}`,
-        "Content-Type": "application/json",
-      },
       signal: controller.signal,
     });
 
@@ -187,19 +191,21 @@ Check backend server logs and deployment status.
 
 /**
  * Run auth mapping migration for existing users.
+ * @deprecated Auth migration is no longer needed with cookie-based auth
  */
-export async function runAuthMappingMigration(silent = false) {
+export async function runAuthMappingMigration(userId, silent = false) {
+  if (!userId) {
+    console.warn("Auth migration skipped: no userId provided");
+    return { success: false, error: "No userId provided" };
+  }
+
   try {
     if (!silent) {
       console.log("Running auth mapping migration...");
     }
 
-    const response = await fetch(`${API_BASE_URL}/migrate/auth-mappings`, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${getAccessToken()}`,
-        "Content-Type": "application/json",
-      },
+    const response = await fetch(`${API_BASE_URL}/auth/account/${userId}`, {
+      ...defaultOptions,
     });
 
     if (!response.ok) {

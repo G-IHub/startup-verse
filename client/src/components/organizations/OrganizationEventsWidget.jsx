@@ -30,10 +30,17 @@ import {
   isEventSoon,
   getTimeUntilEvent,
 } from "../../utils/eventReminders";
-import { getAccessToken } from "../../app/session";
 import { unwrapData } from "../../utils/apiEnvelope";
 
 const API_BASE = API_BASE_URL;
+
+// Default fetch options for cookie-based auth
+const defaultOptions = {
+  credentials: "include",
+  headers: {
+    "Content-Type": "application/json",
+  },
+};
 
 export default function OrganizationEventsWidget({
   founderId,
@@ -47,11 +54,8 @@ export default function OrganizationEventsWidget({
     try {
       setLoading(true);
       // Get events for this founder from their cohorts
-      const token = getAccessToken();
       const response = await fetch(`${API_BASE}/founder/${founderId}/events`, {
-        headers: {
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
+        ...defaultOptions,
       });
       if (!response.ok) {
         console.error("Failed to fetch founder events");
@@ -93,13 +97,9 @@ export default function OrganizationEventsWidget({
   const handleRSVP = async (eventId, status) => {
     setRsvpingEventId(eventId);
     try {
-      const token = getAccessToken();
       const response = await fetch(`${API_BASE}/events/${eventId}/rsvp`, {
+        ...defaultOptions,
         method: "POST",
-        headers: {
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-          "Content-Type": "application/json",
-        },
         body: JSON.stringify({
           founderId,
           founderName,
@@ -176,9 +176,10 @@ export default function OrganizationEventsWidget({
     return colors[eventType] || colors["other"];
   };
   const upcomingEvents = events.filter((e) => isEventUpcoming(e.startTime));
+  const cardSurface = "border-primary/18 shadow-[var(--shadow-soft)]";
   if (loading) {
     return (
-      <Card>
+      <Card className={cardSurface}>
         <CardHeader className="pb-3">
           <CardTitle className="text-sm flex items-center gap-2">
             <Calendar className="w-4 h-4" />
@@ -200,7 +201,7 @@ export default function OrganizationEventsWidget({
   }
   if (upcomingEvents.length === 0) {
     return (
-      <Card>
+      <Card className={cardSurface}>
         <CardHeader className="pb-3">
           <CardTitle className="text-sm flex items-center gap-2">
             <Calendar className="w-4 h-4" />
@@ -216,7 +217,7 @@ export default function OrganizationEventsWidget({
     );
   }
   return (
-    <Card>
+    <Card className={cardSurface}>
       <CardHeader className="pb-3">
         <CardTitle className="text-sm flex items-center gap-2">
           <Calendar className="w-4 h-4" />

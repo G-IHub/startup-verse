@@ -73,7 +73,7 @@ export default function MyTasksView({ userId, userName, founderId }) {
     const task = myTasks.find((t) => t.id === taskId);
     const newStatus = task?.status === "completed" ? "pending" : "completed";
 
-    // 1. Update localStorage INSTANTLY for zero-latency UX
+    // 1. Update optimistic UI state immediately for zero-latency UX
     const updatedTasks = toggleTask(founderId, taskId);
     loadMyTasks();
 
@@ -108,7 +108,7 @@ export default function MyTasksView({ userId, userName, founderId }) {
   const handleBlockTask = () => {
     if (!blockingTaskId || !blockReason) return;
 
-    // 1. Update localStorage INSTANTLY
+    // 1. Update optimistic UI state immediately
     const updatedTasks = blockTask(
       founderId,
       blockingTaskId,
@@ -143,7 +143,7 @@ export default function MyTasksView({ userId, userName, founderId }) {
   const handleAddComment = (taskId) => {
     if (!commentText.trim()) return;
 
-    // 1. Update localStorage INSTANTLY
+    // 1. Update optimistic UI state immediately
     addTaskCommentLocal(founderId, taskId, userId, userName, commentText);
     loadMyTasks();
 
@@ -436,8 +436,8 @@ export default function MyTasksView({ userId, userName, founderId }) {
         );
       })}
       {blockingTaskId && (
-        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
-          <Card className="max-w-md w-full">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sv-modal-backdrop">
+          <Card className="sv-modal-panel w-full max-w-md rounded-[16px] border-0 shadow-modal">
             <CardHeader>
               <div className="flex items-start justify-between">
                 <div>

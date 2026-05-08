@@ -1,8 +1,15 @@
 // Team Messaging Utilities - Real Backend Integration
 
-import { getAccessToken } from "../app/session";
 import { API_BASE_URL } from "../config/apiBase.js";
 import { request } from "./backendClient";
+
+// Default fetch options for cookie-based auth
+const defaultOptions = {
+  credentials: "include",
+  headers: {
+    "Content-Type": "application/json",
+  },
+};
 
 const API_BASE = API_BASE_URL;
 
@@ -69,26 +76,6 @@ export async function sendMessage(
     ...(fileType && { fileType }),
   };
 
-  if (!options?.strict) {
-    try {
-      const localStorageKey = `messages_${startupId}_${senderId}_${recipientId}`;
-      const existingMessages = JSON.parse(
-        localStorage.getItem(localStorageKey) || "[]",
-      );
-      existingMessages.push(message);
-      localStorage.setItem(localStorageKey, JSON.stringify(existingMessages));
-
-      const reverseKey = `messages_${startupId}_${recipientId}_${senderId}`;
-      const recipientMessages = JSON.parse(
-        localStorage.getItem(reverseKey) || "[]",
-      );
-      recipientMessages.push(message);
-      localStorage.setItem(reverseKey, JSON.stringify(recipientMessages));
-    } catch (e) {
-      console.warn("Failed to save message to localStorage:", e);
-    }
-  }
-
   // Then send to backend
   try {
     const payload = await request("/messages/send", {
@@ -109,7 +96,7 @@ export async function sendMessage(
       throw error;
     }
     if (process.env.NODE_ENV === "development") {
-      console.debug("Message send fallback to localStorage:", error?.message);
+      console.debug("Message send failed:", error?.message);
     }
     return message;
   }
@@ -118,34 +105,99 @@ export async function sendMessage(
 // Get conversation between two users or team chat
 export async function getConversation(userId, otherUserId, startupId, options = {}) {
   try {
-    const payload = await request(
-      `/messages/conversation/${startupId}/${userId}/${otherUserId}`,
-      { method: "GET" },
-    );
-    const rows = payload?.data || payload?.messages || [];
-    return rows.map(mapMessageDto).filter(Boolean);
+    const results = [];
+
+    // Always fetch direct (null-startupId) DMs — includes interest origin message
+    try {
+      const directPayload = await request(
+        `/messages/direct/${userId}/${otherUserId}`,
+        { method: "GET" },
+      );
+      const directRows = directPayload?.data || directPayload?.messages || [];
+      results.push(...directRows.map(mapMessageDto).filter(Boolean));
+    } catch (_) { }
+
+    // Also fetch startup-scoped messages when startupId is present
+    if (startupId) {
+      try {
+        const payload = await request(
+          `/messages/conversation/${startupId}/${userId}/${otherUserId}`,
+          { method: "GET" },
+        );
+        const rows = payload?.data || payload?.messages || [];
+        results.push(...rows.map(mapMessageDto).filter(Boolean));
+      } catch (_) { }
+    }
+
+    // De-dup by id, sort chronologically
+    const byId = new Map();
+    for (const m of results) { if (m?.id) byId.set(m.id, m); }
+    return Array.from(byId.values()).sort((a, b) => a.timestamp - b.timestamp);
   } catch (error) {
     if (options?.strict) throw error;
     if (process.env.NODE_ENV === "development") {
-      console.debug("⚠️ Conversation fetch failed, using localStorage");
+      console.debug("⚠️ Conversation fetch failed");
     }
-    return getMessagesFromLocalStorage(userId, otherUserId, startupId);
+    return [];
   }
 }
 
 // Get all conversations for a user
 export async function getUserConversations(userId, startupId, teamMembers, options = {}) {
   try {
-    const payload = await request(`/messages/conversations/${startupId}/${userId}`, {
-      method: "GET",
-    });
-    const rows = payload?.data || payload?.conversations || [];
-    return rows.map(mapMessageDto).filter(Boolean).map((row) => {
-      const teammate =
-        teamMembers.find((m) => String(m.id) === String(row.senderId)) ||
-        teamMembers.find((m) => String(m.id) === String(row.recipientId));
+    let rows = [];
+
+    // 1. Startup-scoped conversations (team members)
+    if (startupId) {
+      try {
+        const payload = await request(`/messages/conversations/${startupId}/${userId}`, {
+          method: "GET",
+        });
+        rows = payload?.data || payload?.conversations || [];
+      } catch (err) {
+        if (options?.strict) throw err;
+      }
+    }
+
+    // 2. Direct DMs (pending talents / pre-team conversations)
+    try {
+      const directPayload = await request(`/messages/${userId}`, { method: "GET" });
+      const allDirect = (directPayload?.data || directPayload?.messages || [])
+        .map(mapMessageDto)
+        .filter(Boolean);
+
+      // De-dup by other-user-id — keep latest
+      const directByPeer = new Map();
+      for (const m of allDirect) {
+        const peerId = String(m.senderId) === String(userId) ? m.recipientId : m.senderId;
+        if (!directByPeer.has(peerId) || m.timestamp > directByPeer.get(peerId).timestamp) {
+          directByPeer.set(peerId, m);
+        }
+      }
+
+      for (const [peerId, m] of directByPeer.entries()) {
+        // Only include if the peer is in teamMembers (i.e. known to this chat roster)
+        const teammate = teamMembers.find((t) => String(t.id) === peerId);
+        if (!teammate) continue;
+        // Avoid duplicate if already in startup-scoped rows
+        const alreadyPresent = rows.some((r) => {
+          const mapped = mapMessageDto(r);
+          const otherId = String(mapped?.senderId) === String(userId)
+            ? mapped?.recipientId
+            : mapped?.senderId;
+          return otherId === peerId;
+        });
+        if (!alreadyPresent) rows.push(m);
+      }
+    } catch (err) {
+      // Non-critical — skip direct DM merge on error
+    }
+
+    const mapped = (Array.isArray(rows) ? rows : []).map(mapMessageDto).filter(Boolean);
+    const entries = mapped.map((row) => {
       const otherId =
         String(row.senderId) === String(userId) ? row.recipientId : row.senderId;
+      const teammate = teamMembers.find((m) => String(m.id) === String(otherId));
       return {
         userId: String(otherId),
         userName: teammate?.name || "Team Member",
@@ -155,12 +207,43 @@ export async function getUserConversations(userId, startupId, teamMembers, optio
         unreadCount: 0,
       };
     });
+
+    // Dedup by peer userId — keep entry with the latest message
+    const byPeer = new Map();
+    for (const conv of entries) {
+      if (!conv.userId) continue;
+      const prev = byPeer.get(conv.userId);
+      if (!prev || conv.lastMessageTime > prev.lastMessageTime) {
+        byPeer.set(conv.userId, conv);
+      }
+    }
+    return Array.from(byPeer.values()).sort((a, b) => b.lastMessageTime - a.lastMessageTime);
   } catch (error) {
     if (options?.strict) throw error;
     if (process.env.NODE_ENV === "development") {
-      console.debug("⚠️ Conversations fetch failed, using localStorage");
+      console.debug("⚠️ Conversations fetch failed");
     }
-    return getConversationsFromLocalStorage(userId, startupId, teamMembers);
+    const roster = Array.isArray(teamMembers) ? teamMembers : [];
+    const base = roster.map((member) => ({
+      userId: String(member.id),
+      userName: member.name || "Team Member",
+      userRole: member.role || "team-member",
+      lastMessage: "",
+      lastMessageTime: 0,
+      unreadCount: 0,
+    }));
+    if (startupId) {
+      base.unshift({
+        userId: `team-${startupId}`,
+        userName: "Team Chat",
+        userRole: "Team",
+        lastMessage: "",
+        lastMessageTime: 0,
+        unreadCount: 0,
+        isTeamChat: true,
+      });
+    }
+    return base;
   }
 }
 
@@ -245,9 +328,7 @@ export async function uploadMessageFile(file, startupId, senderId, options = {})
 
     const response = await fetch(`${API_BASE}/messages/upload-file`, {
       method: "POST",
-      headers: {
-        Authorization: `Bearer ${getAccessToken()}`,
-      },
+      credentials: "include",
       body: formData,
     });
 
@@ -280,198 +361,3 @@ export function formatFileSize(bytes) {
   return Math.round((bytes / Math.pow(k, i)) * 100) / 100 + " " + sizes[i];
 }
 
-// LocalStorage fallback for conversations
-function getConversationsFromLocalStorage(userId, startupId, teamMembers) {
-  // 🔧 FIX: Build conversations from actual messages, not just teamMembers array
-  // This ensures founders see conversations with team members who have sent them messages
-
-  // Get all messages for this startup from localStorage
-  const allMessages = [];
-  for (let i = 0; i < localStorage.length; i++) {
-    const key = localStorage.key(i);
-    // Check for both old format (startupverse_messages_) and new format (messages_)
-    if (
-      key &&
-      (key.startsWith(`messages_${startupId}_`) ||
-        key.includes(`_${startupId}_`))
-    ) {
-      try {
-        const messages = JSON.parse(localStorage.getItem(key) || "[]");
-        if (Array.isArray(messages)) {
-          allMessages.push(
-            ...messages.filter((m) => m && m.startupId === startupId),
-          );
-        }
-      } catch (e) {
-        // Skip invalid entries
-      }
-    }
-  }
-
-  console.log(
-    `🔍 [LocalStorage] Found ${allMessages.length} messages for startup ${startupId}, user ${userId}`,
-  );
-
-  // Filter messages that involve this user
-  const userMessages = allMessages.filter(
-    (msg) =>
-      msg &&
-      (msg.senderId === userId ||
-        msg.recipientId === userId ||
-        msg.isTeamMessage),
-  );
-
-  console.log(
-    `🔍 [LocalStorage] Filtered to ${userMessages.length} messages involving user ${userId}`,
-  );
-
-  // Build conversation map
-  const conversationMap = new Map();
-
-  // Team messages
-  const teamMessages = userMessages.filter((msg) => msg && msg.isTeamMessage);
-  if (teamMessages.length > 0) {
-    const lastTeamMsg = teamMessages[teamMessages.length - 1];
-    const unreadTeamCount = teamMessages.filter(
-      (msg) => msg && !msg.read && msg.senderId !== userId,
-    ).length;
-
-    conversationMap.set(`team-${startupId}`, {
-      userId: `team-${startupId}`,
-      userName: "Team Chat",
-      userRole: "Team",
-      lastMessage: lastTeamMsg.content || "",
-      lastMessageTime: lastTeamMsg.timestamp || 0,
-      unreadCount: unreadTeamCount,
-      isTeamChat: true,
-    });
-  } else {
-    // Add empty team chat even if no messages
-    conversationMap.set(`team-${startupId}`, {
-      userId: `team-${startupId}`,
-      userName: "Team Chat",
-      userRole: "Team",
-      lastMessage: "",
-      lastMessageTime: 0,
-      unreadCount: 0,
-      isTeamChat: true,
-    });
-  }
-
-  // Direct messages - build from actual messages
-  userMessages
-    .filter((msg) => msg && !msg.isTeamMessage)
-    .forEach((msg) => {
-      if (!msg) return;
-
-      const otherUserId =
-        msg.senderId === userId ? msg.recipientId : msg.senderId;
-      const otherUserName =
-        msg.senderId === userId
-          ? msg.recipientName || "Unknown"
-          : msg.senderName || "Unknown";
-      const otherUserRole = msg.senderId === userId ? "" : msg.senderRole || "";
-
-      if (!otherUserId) return;
-
-      if (!conversationMap.has(otherUserId)) {
-        conversationMap.set(otherUserId, {
-          userId: otherUserId,
-          userName: otherUserName,
-          userRole: otherUserRole,
-          lastMessage: "",
-          lastMessageTime: 0,
-          unreadCount: 0,
-          isTeamChat: false,
-        });
-      }
-
-      const conversation = conversationMap.get(otherUserId);
-      if (
-        conversation &&
-        typeof msg.timestamp === "number" &&
-        msg.timestamp > conversation.lastMessageTime
-      ) {
-        conversation.lastMessage = msg.content || "";
-        conversation.lastMessageTime = msg.timestamp;
-      }
-
-      if (conversation && !msg.read && msg.recipientId === userId) {
-        conversation.unreadCount++;
-      }
-    });
-
-  console.log(
-    `🔍 [LocalStorage] Built ${conversationMap.size - 1} direct conversations (+ team chat)`,
-  );
-
-  // Also add team members who don't have messages yet (for new conversations)
-  teamMembers.forEach((member) => {
-    if (!conversationMap.has(member.id)) {
-      conversationMap.set(member.id, {
-        userId: member.id,
-        userName: member.name,
-        userRole: member.role,
-        lastMessage: "",
-        lastMessageTime: 0,
-        unreadCount: 0,
-        isTeamChat: false,
-      });
-    }
-  });
-
-  // Convert to array and sort by last message time
-  const conversations = Array.from(conversationMap.values()).sort(
-    (a, b) => b.lastMessageTime - a.lastMessageTime,
-  );
-
-  console.log(
-    `🔍 [LocalStorage] Returning ${conversations.length} total conversations`,
-  );
-  return conversations;
-}
-
-// LocalStorage fallback for messages
-function getMessagesFromLocalStorage(userId, otherUserId, startupId) {
-  // 🔧 FIX: Check BOTH directions to ensure founders see messages from team members
-  const keyDirection1 = `messages_${startupId}_${userId}_${otherUserId}`;
-  const keyDirection2 = `messages_${startupId}_${otherUserId}_${userId}`;
-
-  const messages1 = localStorage.getItem(keyDirection1);
-  const messages2 = localStorage.getItem(keyDirection2);
-
-  const allMessages = [];
-
-  if (messages1) {
-    try {
-      const parsed = JSON.parse(messages1);
-      if (Array.isArray(parsed)) {
-        allMessages.push(...parsed);
-      }
-    } catch (e) {
-      console.error("Error parsing messages from direction 1:", e);
-    }
-  }
-
-  if (messages2) {
-    try {
-      const parsed = JSON.parse(messages2);
-      if (Array.isArray(parsed)) {
-        allMessages.push(...parsed);
-      }
-    } catch (e) {
-      console.error("Error parsing messages from direction 2:", e);
-    }
-  }
-
-  // Deduplicate by message ID and sort by timestamp
-  const uniqueMessages = Array.from(
-    new Map(allMessages.map((msg) => [msg.id, msg])).values(),
-  ).sort((a, b) => a.timestamp - b.timestamp);
-
-  console.log(
-    `📥 [LocalStorage] Loaded ${uniqueMessages.length} messages between ${userId} and ${otherUserId} (${allMessages.length} total from both directions)`,
-  );
-
-  return uniqueMessages;
-}

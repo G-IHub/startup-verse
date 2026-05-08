@@ -11,6 +11,7 @@ const notificationSchema = new mongoose.Schema(
     title: { type: String, default: "Notification" },
     message: { type: String, required: true },
     type: { type: String, default: "general", index: true },
+    actionUrl: { type: String, default: "", maxlength: 2000 },
     metadata: { type: mongoose.Schema.Types.Mixed, default: {} },
     readAt: { type: Date, default: null },
   },

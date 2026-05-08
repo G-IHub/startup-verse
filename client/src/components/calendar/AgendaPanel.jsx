@@ -1,8 +1,6 @@
 import React, { useState, useEffect } from "react";
-import { Card, CardContent, CardHeader } from "../ui/card";
 import { Button } from "../ui/button";
 import { Badge } from "../ui/badge";
-import { ScrollArea } from "../ui/scroll-area";
 import {
   Select,
   SelectContent,
@@ -62,7 +60,7 @@ function itemMatchesSelectedTypes(item, selectedTypes) {
 
 export default function AgendaPanel({ user, onItemClick, compact = false }) {
   const [agendaItems, setAgendaItems] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [selectedTypes, setSelectedTypes] = useState([
     "meeting",
@@ -78,11 +76,13 @@ export default function AgendaPanel({ user, onItemClick, compact = false }) {
   ]);
   const [showFilters, setShowFilters] = useState(false);
   const [view, setView] = useState("upcoming");
-  const calendarUserId = user?.id;
+  const calendarUserId = user?.id || user?._id || null;
 
   useEffect(() => {
     if (calendarUserId) {
       loadAgenda();
+    } else {
+      setLoading(false);
     }
   }, [calendarUserId, selectedTypes, view]);
 
@@ -263,65 +263,75 @@ export default function AgendaPanel({ user, onItemClick, compact = false }) {
     },
   ];
   return (
-    <Card className={compact ? "" : "h-full"}>
-      <CardHeader className="pb-0 pt-0.5 px-2">
-        <div className="flex items-center gap-1">
-          <Select value={view} onValueChange={(value) => setView(value)}>
-            <SelectTrigger className="h-4 w-[75px] text-[8px]">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent className="z-[9999]">
-              <SelectItem value="upcoming" className="text-[8px]">
-                Upcoming
-              </SelectItem>
-              <SelectItem value="today" className="text-[8px]">
-                Today
-              </SelectItem>
-              <SelectItem value="week" className="text-[8px]">
-                Week
-              </SelectItem>
-              <SelectItem value="overdue" className="text-[8px]">
-                Overdue
-              </SelectItem>
-            </SelectContent>
-          </Select>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild={true}>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-4 text-[8px] px-1.5"
+    <div style={{ display: "flex", flexDirection: "column", height: "100%", overflow: "hidden" }}>
+      {/* Controls bar */}
+      <div style={{
+        flexShrink: 0,
+        display: "flex",
+        alignItems: "center",
+        gap: 8,
+        padding: "10px 16px 8px",
+        borderBottom: "1px solid #f1f5f9",
+      }}>
+        <Select value={view} onValueChange={(value) => setView(value)}>
+          <SelectTrigger
+            style={{
+              height: 30, fontSize: 12, fontWeight: 500,
+              border: "1px solid #e5e7eb", borderRadius: 7,
+              padding: "0 10px", backgroundColor: "#f9fafb",
+              color: "#374151", cursor: "pointer", width: 110,
+            }}
+          >
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent className="z-[9999]">
+            <SelectItem value="upcoming">Upcoming</SelectItem>
+            <SelectItem value="today">Today</SelectItem>
+            <SelectItem value="week">This Week</SelectItem>
+            <SelectItem value="overdue">Overdue</SelectItem>
+          </SelectContent>
+        </Select>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild={true}>
+            <Button
+              variant="ghost"
+              size="sm"
+              style={{
+                height: 30, fontSize: 12, fontWeight: 500,
+                border: "1px solid #e5e7eb", borderRadius: 7,
+                padding: "0 10px", backgroundColor: "#f9fafb",
+                color: "#374151", gap: 4,
+              }}
+            >
+              <Filter style={{ width: 12, height: 12 }} />
+              Filter
+              <ChevronDown style={{ width: 12, height: 12 }} />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start" className="w-[150px] z-[9999]">
+            {typeOptions.map((option) => (
+              <DropdownMenuItem
+                key={option.type}
+                className="text-[12px] flex items-center gap-2 cursor-pointer"
+                onSelect={(e) => {
+                  e.preventDefault();
+                  toggleType(option.type);
+                }}
               >
-                <Filter className="w-2 h-2 mr-0.5" />
-                Filter
-                <ChevronDown className="w-2 h-2 ml-0.5" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="start" className="w-[120px] z-[9999]">
-              {typeOptions.map((option) => (
-                <DropdownMenuItem
-                  key={option.type}
-                  className="text-[9px] flex items-center gap-2 cursor-pointer"
-                  onSelect={(e) => {
-                    e.preventDefault();
-                    toggleType(option.type);
-                  }}
-                >
-                  <div
-                    className={`w-3 h-3 border border-gray-400 rounded-sm flex items-center justify-center ${selectedTypes.includes(option.type) ? "bg-black" : "bg-white"}`}
-                  />
-                  <span>{option.label}</span>
-                </DropdownMenuItem>
-              ))}
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </div>
-      </CardHeader>
-      <CardContent className="p-2 pt-0">
-        <ScrollArea className={compact ? "h-[300px]" : "h-[calc(100vh-280px)]"}>
+                <div
+                  className={`w-3.5 h-3.5 border border-gray-400 rounded-sm flex items-center justify-center ${selectedTypes.includes(option.type) ? "bg-indigo-600 border-indigo-600" : "bg-white"}`}
+                />
+                <span>{option.label}</span>
+              </DropdownMenuItem>
+            ))}
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
+      {/* Scrollable content fills remaining height */}
+      <div style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: "8px 12px 16px" }}>
           {loading ? (
-            <div className="flex items-center justify-center py-8">
-              <div className="w-6 h-6 border-2 border-[#3A5AFE] border-t-transparent rounded-full animate-spin" />
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "center", padding: "40px 0" }}>
+              <div style={{ width: 24, height: 24, border: "2px solid #4f46e5", borderTopColor: "transparent", borderRadius: "50%", animation: "spin 0.7s linear infinite" }} />
             </div>
           ) : error ? (
             <div className="text-center py-8 px-2 text-muted-foreground space-y-2">
@@ -338,102 +348,103 @@ export default function AgendaPanel({ user, onItemClick, compact = false }) {
               </Button>
             </div>
           ) : agendaItems.length === 0 ? (
-            <div className="text-center py-8 text-muted-foreground">
-              <Calendar className="w-8 h-8 mx-auto mb-2 opacity-50" />
-              <p className="text-[11px]">No agenda items</p>
-              <p className="text-[9px] mt-1">
-                {view === "overdue"
-                  ? "You're all caught up!"
-                  : "Nothing scheduled for this period"}
+            <div style={{ textAlign: "center", padding: "48px 16px", color: "#9ca3af" }}>
+              <Calendar style={{ width: 36, height: 36, margin: "0 auto 12px", opacity: 0.35 }} />
+              <p style={{ fontSize: 14, fontWeight: 600, color: "#374151", marginBottom: 4 }}>No agenda items</p>
+              <p style={{ fontSize: 12 }}>
+                {view === "overdue" ? "You're all caught up!" : "Nothing scheduled for this period"}
               </p>
             </div>
           ) : (
-            <div className="space-y-2">
+            <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
               {sortedDates.map((dateKey) => (
-                <div key={dateKey} className="space-y-1">
-                  <div className="flex items-center gap-2 sticky top-0 bg-background/95 backdrop-blur-sm py-0.5 z-10">
-                    <div className="text-[10px] font-semibold text-muted-foreground">
+                <div key={dateKey}>
+                  {/* Date group header */}
+                  <div style={{
+                    display: "flex", alignItems: "center", gap: 8,
+                    marginBottom: 8,
+                    position: "sticky", top: 0,
+                    backgroundColor: "#fafbff",
+                    paddingTop: 4, paddingBottom: 4,
+                    zIndex: 10,
+                  }}>
+                    <span style={{ fontSize: 11, fontWeight: 700, color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.06em" }}>
                       {getDateLabel(dateKey)}
-                    </div>
-                    <div className="flex-1 h-px bg-border" />
+                    </span>
+                    <div style={{ flex: 1, height: 1, backgroundColor: "#e9eef6" }} />
+                    <span style={{ fontSize: 10, color: "#9ca3af" }}>
+                      {groupedItems[dateKey].length} item{groupedItems[dateKey].length !== 1 ? "s" : ""}
+                    </span>
                   </div>
-                  <div className="space-y-1.5">
+                  {/* Items */}
+                  <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                     {groupedItems[dateKey].map((item) => {
                       const Icon = getItemIcon(item);
+                      const accentColor = item.color || "#6b7280";
                       return (
                         <button
                           key={`${item.kind || "item"}-${item.id}`}
                           onClick={() => onItemClick?.(item)}
-                          className="w-full text-left p-2.5 rounded-lg border bg-card hover:bg-muted/50 transition-colors group"
+                          style={{
+                            width: "100%", textAlign: "left",
+                            padding: "10px 12px",
+                            borderRadius: 10,
+                            border: "1px solid #e9eef6",
+                            backgroundColor: "#ffffff",
+                            cursor: "pointer",
+                            display: "flex", alignItems: "flex-start", gap: 10,
+                            borderLeft: `3px solid ${accentColor}`,
+                          }}
                         >
-                          <div className="flex items-start gap-2">
-                            <div className="w-7 h-7 rounded-md flex items-center justify-center flex-shrink-0 bg-white border border-gray-200">
-                              <Icon
-                                className="w-3.5 h-3.5"
-                                style={{
-                                  color: item.color,
-                                }}
-                              />
+                          <div style={{
+                            width: 30, height: 30, borderRadius: 8, flexShrink: 0,
+                            backgroundColor: "#f8f7ff",
+                            display: "flex", alignItems: "center", justifyContent: "center",
+                          }}>
+                            <Icon style={{ width: 14, height: 14, color: accentColor }} />
+                          </div>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 6, marginBottom: 3 }}>
+                              <p style={{
+                                fontSize: 13, fontWeight: 600, color: "#111827",
+                                textDecoration: item.status === "completed" ? "line-through" : "none",
+                                opacity: item.status === "completed" ? 0.5 : 1,
+                                overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                              }}>
+                                {item.title}
+                              </p>
+                              {getItemStatusBadge(item)}
                             </div>
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-start justify-between gap-2">
-                                <div className="flex-1 min-w-0">
-                                  <p
-                                    className={`text-[11px] font-medium truncate ${item.status === "completed" ? "line-through text-muted-foreground" : ""}`}
-                                  >
-                                    {item.title}
-                                  </p>
-                                  {item.description && (
-                                    <p className="text-[9px] text-muted-foreground truncate mt-0.5">
-                                      {item.description}
-                                    </p>
-                                  )}
-                                </div>
-                                {getItemStatusBadge(item)}
-                              </div>
-                              <div className="flex items-center gap-2 mt-1.5">
-                                {item.startTime && (
-                                  <div className="flex items-center gap-1 text-[9px] text-muted-foreground">
-                                    <Clock className="w-2.5 h-2.5" />
-                                    {item.startTime}
-                                    {item.endTime && ` - ${item.endTime}`}
-                                  </div>
-                                )}
-                                {item.type === "task" &&
-                                  item.metadata?.progress !== undefined && (
-                                    <Badge
-                                      variant="outline"
-                                      className="text-[8px] px-1.5 py-0"
-                                    >
-                                      {item.metadata.progress}%
-                                    </Badge>
-                                  )}
-                                {item.type === "milestone" &&
-                                  item.metadata?.tasksCompleted !==
-                                    undefined && (
-                                    <Badge
-                                      variant="outline"
-                                      className="text-[8px] px-1.5 py-0"
-                                    >
-                                      {item.metadata.tasksCompleted}/
-                                      {item.metadata.totalTasks}
-                                      {" tasks"}
-                                    </Badge>
-                                  )}
-                                {item.priority &&
-                                  item.priority !== "medium" && (
-                                    <Badge
-                                      variant={
-                                        item.priority === "urgent"
-                                          ? "destructive"
-                                          : "secondary"
-                                      }
-                                      className="text-[8px] px-1.5 py-0"
-                                    >
-                                      {item.priority}
-                                    </Badge>
-                                  )}
-                              </div>
+                            {item.description && (
+                              <p style={{ fontSize: 11, color: "#9ca3af", marginBottom: 4, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                                {item.description}
+                              </p>
+                            )}
+                            <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
+                              {item.startTime && (
+                                <span style={{ display: "flex", alignItems: "center", gap: 3, fontSize: 11, color: "#6b7280" }}>
+                                  <Clock style={{ width: 10, height: 10, color: "#4f46e5" }} />
+                                  {item.startTime}{item.endTime ? ` – ${item.endTime}` : ""}
+                                </span>
+                              )}
+                              {item.type === "task" && item.metadata?.progress !== undefined && (
+                                <Badge variant="outline" className="text-[10px] px-1.5 py-0">
+                                  {item.metadata.progress}%
+                                </Badge>
+                              )}
+                              {item.type === "milestone" && item.metadata?.tasksCompleted !== undefined && (
+                                <Badge variant="outline" className="text-[10px] px-1.5 py-0">
+                                  {item.metadata.tasksCompleted}/{item.metadata.totalTasks} tasks
+                                </Badge>
+                              )}
+                              {item.priority && item.priority !== "medium" && (
+                                <Badge
+                                  variant={item.priority === "urgent" ? "destructive" : "secondary"}
+                                  className="text-[10px] px-1.5 py-0"
+                                >
+                                  {item.priority}
+                                </Badge>
+                              )}
                             </div>
                           </div>
                         </button>
@@ -444,8 +455,7 @@ export default function AgendaPanel({ user, onItemClick, compact = false }) {
               ))}
             </div>
           )}
-        </ScrollArea>
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 }

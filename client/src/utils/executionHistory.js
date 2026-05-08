@@ -89,25 +89,7 @@ export const calculateExecutionHistory = (userId, userName, founderId) => {
 /**
  * Get all tasks for a user across all founders they've worked with
  */
-const getAllTasksForUser = (userId) => {
-  // For MVP, we'll check localStorage for all founder keys
-  const allTasks = [];
-
-  // Iterate through localStorage to find all task keys
-  for (let i = 0; i < localStorage.length; i++) {
-    const key = localStorage.key(i);
-    if (key && key.startsWith("startupverse_tasks_")) {
-      try {
-        const tasks = JSON.parse(localStorage.getItem(key) || "[]");
-        allTasks.push(...tasks);
-      } catch (error) {
-        console.warn("Failed to parse tasks from", key);
-      }
-    }
-  }
-
-  return allTasks;
-};
+const getAllTasksForUser = (_userId) => [];
 
 /**
  * Calculate average completion time for completed tasks

@@ -22,7 +22,12 @@ import { ScrollArea } from "../ui/scroll-area";
 import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
 import { Separator } from "../ui/separator";
 import { useNotifications } from "../../contexts/NotificationContext";
+import { useAuth } from "../../contexts/AuthContext";
+import { resolveDashboardIntent } from "../../app/session";
+import { dashboardIntentToPath } from "../../app/dashboardPaths";
+
 export default function NotificationCenter({ onNavigate }) {
+  const { user } = useAuth();
   const {
     notifications,
     unreadCount,
@@ -127,6 +132,16 @@ export default function NotificationCenter({ onNavigate }) {
     if (notification.actionUrl && onNavigate) {
       // Parse the actionUrl to determine the page and extract IDs
       const url = notification.actionUrl;
+
+      if (url.startsWith("/?")) {
+        const search = url.slice(1);
+        const intent = resolveDashboardIntent({ pathname: "/", search });
+        const path =
+          user && intent ? dashboardIntentToPath(intent, user.role) : null;
+        window.location.assign(path || url);
+        setOpen(false);
+        return;
+      }
 
       // 🔥 NEW: Handle Virtual Office room URLs (event reminders with meeting links)
       // Check if URL is a Virtual Office room URL (contains /room/ or /office/room/)
@@ -235,9 +250,9 @@ export default function NotificationCenter({ onNavigate }) {
         <Button
           variant="ghost"
           size="sm"
-          className="relative h-8 w-8 p-0 rounded-full bg-muted/80 hover:bg-accent/20 transition-colors cursor-pointer"
+          className="relative h-8 w-8 cursor-pointer rounded-full bg-transparent p-0 transition-colors duration-200 ease-in-out hover:bg-surface-page"
         >
-          <Bell className="w-3.5 h-3.5" />
+          <Bell className="h-3.5 w-3.5 text-text-body" />
           {unreadCount > 0 && (
             <Badge className="absolute -top-1 -right-1 h-4 min-w-4 flex items-center justify-center p-0 bg-red-600 text-white text-[10px]">
               {unreadCount > 9 ? "9+" : unreadCount}

@@ -3,6 +3,7 @@
  */
 import React, { useState, useEffect } from "react";
 import MentorAssignmentManager from "./MentorAssignmentManager";
+import MentorManager from "./MentorManager";
 import { getCohort } from "../../utils/organizationHelpersBackend";
 export default function MentorNetwork({
   cohortId,
@@ -44,11 +45,20 @@ export default function MentorNetwork({
     );
   }
   return (
-    <MentorAssignmentManager
-      cohortId={cohortId}
-      organizationId={organizationId}
-      cohorts={cohorts}
-      isAdmin={isAdmin}
-    />
+    <div className="space-y-6">
+      <MentorAssignmentManager
+        cohortId={cohortId}
+        organizationId={organizationId}
+        cohorts={cohorts}
+        isAdmin={isAdmin}
+      />
+      {isAdmin && organizationId ? (
+        <MentorManager
+          organizationId={organizationId}
+          cohorts={cohorts}
+          isAdmin={isAdmin}
+        />
+      ) : null}
+    </div>
   );
 }

@@ -8,6 +8,7 @@ import {
   CardDescription,
 } from "./ui/card";
 import { Input } from "./ui/input";
+import { PasswordInput } from "./ui/password-input";
 import { Label } from "./ui/label";
 import { Separator } from "./ui/separator";
 import { ArrowLeft, Rocket, Star, Building } from "lucide-react";
@@ -192,10 +193,10 @@ export default function InlineSignupForm({ role, onBack, onSignup }) {
               <Label htmlFor="password" className="text-sm">
                 Password
               </Label>
-              <Input
+              <PasswordInput
                 id="password"
-                type="password"
-                placeholder="••••••••"
+                autoComplete="new-password"
+                placeholder="Please choose a password (min. 8 characters)"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required={true}

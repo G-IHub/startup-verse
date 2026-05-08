@@ -3,29 +3,25 @@ import * as teamMemberApi from "../../../utils/api/teamMemberApi";
 import * as agendaApi from "../../../utils/api/agendaApi";
 import * as presenceApi from "../../../utils/presenceApi";
 import { getTasks } from "../../../utils/executionEngine";
-import { STORAGE_KEYS } from "../../../app/session";
 import { mapTeamMemberHomeViewModel } from "../mappers/teamMemberViewModel";
 
 function readFallbackUsers() {
-  try {
-    const rows = JSON.parse(localStorage.getItem(STORAGE_KEYS.teamMembers) || "[]");
-    return Array.isArray(rows) ? rows : [];
-  } catch {
-    return [];
-  }
+  return [];
 }
 
 function readFallbackTasks(user) {
   const founderId = String(user?.startupId || user?.founderId || "");
+  const normalizedUserId = String(user?._id || user?.id || "");
   if (!founderId) return [];
   const rows = getTasks(founderId);
   return (Array.isArray(rows) ? rows : []).filter(
-    (task) => String(task.assignedTo || "") === String(user?.id || ""),
+    (task) => String(task.assignedTo || "") === normalizedUserId,
   );
 }
 
 export function useTeamMemberHomeData({ user }) {
   const startupId = String(user?.startupId || user?.founderId || "");
+  const normalizedUserId = String(user?._id || user?.id || "");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [updatingTaskId, setUpdatingTaskId] = useState("");
@@ -41,7 +37,7 @@ export function useTeamMemberHomeData({ user }) {
 
   const loadData = useCallback(
     async ({ silent = false } = {}) => {
-      if (!user?.id) {
+      if (!normalizedUserId) {
         setLoading(false);
         return;
       }
@@ -54,9 +50,9 @@ export function useTeamMemberHomeData({ user }) {
 
       const [tasksResult, statusResult, agendaResult, presenceResult] =
         await Promise.allSettled([
-          teamMemberApi.getTeamMemberTasks(user.id),
-          teamMemberApi.getTeamMemberStatus(user.id),
-          agendaApi.getUpcomingAgenda(user.id, 14),
+          teamMemberApi.getTeamMemberTasks(normalizedUserId),
+          teamMemberApi.getTeamMemberStatus(normalizedUserId),
+          agendaApi.getUpcomingAgenda(normalizedUserId, 14),
           startupId ? presenceApi.getActiveUsers(startupId) : Promise.resolve({ success: true, presence: [] }),
         ]);
 
@@ -91,7 +87,7 @@ export function useTeamMemberHomeData({ user }) {
 
       setLoading(false);
     },
-    [startupId, user],
+    [normalizedUserId, startupId, user],
   );
 
   useEffect(() => {
@@ -112,7 +108,7 @@ export function useTeamMemberHomeData({ user }) {
 
         if (update.status === "completed") {
           payload.completedAt = new Date().toISOString();
-          payload.completedBy = user.id;
+          payload.completedBy = normalizedUserId;
           payload.completedByName = user.name;
         }
 
@@ -121,7 +117,7 @@ export function useTeamMemberHomeData({ user }) {
           payload.blockerNote = String(update.blockerNote || "");
         }
 
-        await teamMemberApi.updateTaskStatus(user.id, task.id, payload);
+        await teamMemberApi.updateTaskStatus(normalizedUserId, task.id, payload);
         await loadData({ silent: true });
         return { success: true };
       } catch (err) {
@@ -133,14 +129,14 @@ export function useTeamMemberHomeData({ user }) {
         setUpdatingTaskId("");
       }
     },
-    [loadData, user.id, user.name],
+    [loadData, normalizedUserId, user.name],
   );
 
   const saveCheckIn = useCallback(
     async ({ status, note }) => {
       setSavingCheckIn(true);
       try {
-        await teamMemberApi.saveTeamMemberStatus(user.id, {
+        await teamMemberApi.saveTeamMemberStatus(normalizedUserId, {
           status,
           note,
           startupId,
@@ -156,7 +152,7 @@ export function useTeamMemberHomeData({ user }) {
         setSavingCheckIn(false);
       }
     },
-    [loadData, startupId, user.id],
+    [loadData, normalizedUserId, startupId],
   );
 
   const viewModel = useMemo(

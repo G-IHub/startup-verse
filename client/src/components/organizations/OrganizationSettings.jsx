@@ -28,10 +28,17 @@ import {
   Check,
   AlertCircle,
 } from "lucide-react";
-import { getAccessToken } from "../../app/session";
 import { unwrapData } from "../../utils/apiEnvelope";
 
 const API_BASE = API_BASE_URL;
+
+// Default fetch options for cookie-based auth
+const defaultOptions = {
+  credentials: "include",
+  headers: {
+    "Content-Type": "application/json",
+  },
+};
 
 export default function OrganizationSettings({
   organizationId,
@@ -82,12 +89,9 @@ export default function OrganizationSettings({
       // Create new abort controller for this request
       abortControllerRef.current = new AbortController();
 
-      const token = getAccessToken();
-      const auth = token ? { Authorization: `Bearer ${token}` } : {};
-
       // Load organization data
       const orgResponse = await fetch(`${API_BASE}/organizations/${organizationId}`, {
-        headers: { ...auth },
+        ...defaultOptions,
         signal: abortControllerRef.current.signal,
       });
       if (!isMountedRef.current) return;
@@ -107,7 +111,7 @@ export default function OrganizationSettings({
       const adminsResponse = await fetch(
         `${API_BASE}/organizations/${organizationId}/admins`,
         {
-          headers: { ...auth },
+          ...defaultOptions,
           signal: abortControllerRef.current.signal,
         },
       );
@@ -138,15 +142,11 @@ export default function OrganizationSettings({
       setSaving(true);
       setErrorMessage("");
       setSuccessMessage("");
-      const token = getAccessToken();
       const response = await fetch(
         `${API_BASE}/organizations/${organizationId}/update`,
         {
+          ...defaultOptions,
           method: "PUT",
-          headers: {
-            ...(token ? { Authorization: `Bearer ${token}` } : {}),
-            "Content-Type": "application/json",
-          },
           body: JSON.stringify({
             name,
             description,
@@ -196,7 +196,6 @@ export default function OrganizationSettings({
     try {
       setUploadingLogo(true);
       setErrorMessage("");
-      const token = getAccessToken();
       const dataUrl = await new Promise((resolve, reject) => {
         const reader = new FileReader();
         reader.onload = () => resolve(reader.result);
@@ -206,11 +205,8 @@ export default function OrganizationSettings({
       const response = await fetch(
         `${API_BASE}/organizations/${organizationId}/logo`,
         {
+          ...defaultOptions,
           method: "PUT",
-          headers: {
-            ...(token ? { Authorization: `Bearer ${token}` } : {}),
-            "Content-Type": "application/json",
-          },
           body: JSON.stringify({ logo: dataUrl }),
         },
       );
@@ -240,15 +236,11 @@ export default function OrganizationSettings({
       setAddingAdmin(true);
       setErrorMessage("");
       setSuccessMessage("");
-      const token = getAccessToken();
       const response = await fetch(
         `${API_BASE}/organizations/${organizationId}/admins/add`,
         {
+          ...defaultOptions,
           method: "POST",
-          headers: {
-            ...(token ? { Authorization: `Bearer ${token}` } : {}),
-            "Content-Type": "application/json",
-          },
           body: JSON.stringify({
             email: newAdminEmail.trim(),
             addedBy: userId,
@@ -280,15 +272,11 @@ export default function OrganizationSettings({
     try {
       setErrorMessage("");
       setSuccessMessage("");
-      const token = getAccessToken();
       const response = await fetch(
         `${API_BASE}/organizations/${organizationId}/admins/${adminUserId}/remove`,
         {
+          ...defaultOptions,
           method: "DELETE",
-          headers: {
-            ...(token ? { Authorization: `Bearer ${token}` } : {}),
-            "Content-Type": "application/json",
-          },
           body: JSON.stringify({
             removedBy: userId,
           }),

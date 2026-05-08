@@ -13,7 +13,12 @@ import {
   completeCurrentStage,
   JOURNEY_STAGES,
 } from "./journeyProgress";
+import { syncJourneyProgressToServer } from "./founderJourneyApi.js";
+import { useJourneyStore } from "../state/useJourneyStore.js";
 import { toast } from "sonner";
+
+/** In-memory outcome→stage links for current session (server journey is source of truth). */
+const outcomeStageHistory = {};
 
 /**
  * Stage Keyword Mapping
@@ -307,12 +312,13 @@ export function calculateProgressIncrement(
  * Process a completed weekly outcome and update stage progress
  * This is called after a founder completes their weekly review
  */
-export function processOutcomeForProgression(
+export async function processOutcomeForProgression(
   outcomeTitle,
   outcomeDescription,
   achievement,
   whatWorked = "",
   learnings = "",
+  userId,
 ) {
   const progress = getJourneyProgress();
   const currentStage = progress.currentStage;
@@ -395,6 +401,15 @@ export function processOutcomeForProgression(
       }
     }
   }
+
+  if (userId) {
+    try {
+      await syncJourneyProgressToServer(userId);
+      useJourneyStore.getState().refresh();
+    } catch (e) {
+      console.warn("[OutcomeProgression] Journey sync failed:", e?.message || e);
+    }
+  }
 }
 
 /**
@@ -430,13 +445,8 @@ export function getStageProgressSummary(stageId) {
   const progress = getJourneyProgress();
   const stageData = progress.stageData[stageId];
 
-  // Count outcomes that contributed to this stage (stored in localStorage)
-  const outcomeHistory = JSON.parse(
-    localStorage.getItem("outcome_stage_history") || "{}",
-  );
-  const outcomesContributed = outcomeHistory[stageId]?.length || 0;
+  const outcomesContributed = outcomeStageHistory[stageId]?.length || 0;
 
-  // Templates completed (would come from another system)
   const templatesCompleted = stageData?.milestonesCompleted?.length || 0;
 
   return {
@@ -450,19 +460,13 @@ export function getStageProgressSummary(stageId) {
  * Track which outcomes contributed to which stages (for analytics)
  */
 export function trackOutcomeContribution(outcomeId, stageId) {
-  const history = JSON.parse(
-    localStorage.getItem("outcome_stage_history") || "{}",
-  );
-
-  if (!history[stageId]) {
-    history[stageId] = [];
+  if (!outcomeStageHistory[stageId]) {
+    outcomeStageHistory[stageId] = [];
   }
 
-  if (!history[stageId].includes(outcomeId)) {
-    history[stageId].push(outcomeId);
+  if (!outcomeStageHistory[stageId].includes(outcomeId)) {
+    outcomeStageHistory[stageId].push(outcomeId);
   }
-
-  localStorage.setItem("outcome_stage_history", JSON.stringify(history));
 }
 
 /**
@@ -474,24 +478,18 @@ export function calculateCombinedProgress(stageId) {
   const outcomeProgress =
     progress.stageData[stageId]?.completionPercentage || 0;
 
-  // Template completion (check localStorage for template tasks)
-  const stageTasks = JSON.parse(
-    localStorage.getItem(`stage_${stageId}_tasks`) || "[]",
-  );
-  const completedTasks = stageTasks.filter((t) => t.completed).length;
+  const milestones = progress.stageData[stageId]?.milestonesCompleted;
+  const completedTasks = Array.isArray(milestones) ? milestones.length : 0;
   const templateProgress =
-    stageTasks.length > 0
-      ? Math.round((completedTasks / stageTasks.length) * 100)
-      : 0;
+    completedTasks > 0 ? Math.min(100, completedTasks * 10) : 0;
 
-  // Take the MAX of both sources (whichever is higher)
   return Math.max(outcomeProgress, templateProgress);
 }
 
 /**
  * Export hook for weekly review completion
  */
-export function onWeeklyReviewCompleted(
+export async function onWeeklyReviewCompleted(
   outcomeTitle,
   outcomeDescription,
   achievement,
@@ -499,17 +497,19 @@ export function onWeeklyReviewCompleted(
   whatDidnt,
   learnings,
   outcomeId,
+  userId,
 ) {
   console.log(
     "🎯 [OutcomeProgression] Weekly review completed, processing for progression...",
   );
 
-  processOutcomeForProgression(
+  await processOutcomeForProgression(
     outcomeTitle,
     outcomeDescription,
     achievement,
     whatWorked,
     learnings,
+    userId,
   );
 
   // Track this outcome's contribution

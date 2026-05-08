@@ -10,8 +10,15 @@
 
 import React, { useState } from "react";
 import { API_BASE_URL } from "../config/apiBase.js";
-import { getAccessToken } from "../app/session";
 import { Button } from "./ui/button";
+
+// Default fetch options for cookie-based auth
+const defaultOptions = {
+  credentials: "include",
+  headers: {
+    "Content-Type": "application/json",
+  },
+};
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
 import { Badge } from "./ui/badge";
@@ -37,12 +44,17 @@ import { Checkbox } from "./ui/checkbox";
 import { toast } from "sonner";
 import * as founderApi from "../utils/api/founderApi";
 import * as inboxApi from "../utils/api/inboxApi";
+import * as compensationApi from "../utils/api/compensationApi";
+import { buildFounderProfile } from "../app/session.js";
+import { broadcastMessageUpdate } from "../utils/realtimeSubscriptions";
 import OfferDisplay from "./OfferDisplay";
-import TalentProfileDetailsDialog from "./TalentProfileDetailsDialog";
 import {
   generateSmartTeamRecommendations,
   getTalentMatchesForRoles,
 } from "../utils/smartTeamMatching";
+import { TALENT_BROWSE_MIN_COMPLETION } from "../constants/talentProfile.js";
+import { augmentTalentBrowseFields } from "../utils/talentBrowseNormalize";
+import { getTalentBrowseProfileCompletionPercent } from "../utils/talentProfileCompletion.js";
 import TeamOnboardingManager from "./compensation/TeamOnboardingManager";
 import CompensationSetupWizard from "./compensation/CompensationSetupWizard";
 import {
@@ -73,6 +85,32 @@ import {
   UserPlus,
   Edit,
 } from "lucide-react";
+function normalizeTalentProfile(profile) {
+  if (!profile) return null;
+  if (
+    getTalentBrowseProfileCompletionPercent(profile) <
+    TALENT_BROWSE_MIN_COMPLETION
+  ) {
+    return null;
+  }
+  const enriched = augmentTalentBrowseFields(profile);
+  if (!enriched) return null;
+  const toArr = (v) => (Array.isArray(v) ? v : []);
+  return {
+    ...enriched,
+    id: String(profile._id || profile.id || ""),
+    interests: toArr(enriched.interests),
+    skills: toArr(enriched.skills),
+    industryPreferences: toArr(enriched.industryPreferences),
+    preferredRoles: toArr(enriched.preferredRoles),
+    workExperiences: toArr(enriched.workExperiences),
+    educationList: toArr(enriched.educationList),
+    certifications: toArr(enriched.certifications),
+    portfolioItems: toArr(enriched.portfolioItems),
+    portfolioLinks: toArr(enriched.portfolioLinks),
+  };
+}
+
 export default function TeamMatching({ user, onNavigate }) {
   const [searchQuery, setSearchQuery] = useState("");
   const [isPostIdeaOpen, setIsPostIdeaOpen] = useState(false);
@@ -80,7 +118,6 @@ export default function TeamMatching({ user, onNavigate }) {
   const [isEditingExisting, setIsEditingExisting] = useState(false);
   const [selectedIdea, setSelectedIdea] = useState(null);
   const [showDetailsDialog, setShowDetailsDialog] = useState(false);
-  const [selectedMember, setSelectedMember] = useState(null);
   const [startupIdeas, setStartupIdeas] = useState([]);
   const [availableTalent, setAvailableTalent] = useState([]);
   const [sortBy, setSortBy] = useState("match");
@@ -121,14 +158,15 @@ export default function TeamMatching({ user, onNavigate }) {
     customPerks: "",
   });
 
-  // Load data from localStorage on mount
   React.useEffect(() => {
-    if (user.role === "founder") {
-      loadStartupIdeas();
-      loadPendingOnboarding();
-    }
+    loadStartupIdeas();
     loadTalentProfiles();
-  }, [user.role]);
+    if (user.role === "founder") {
+      loadPendingOnboarding();
+    } else {
+      setPendingOnboarding([]);
+    }
+  }, [user.role, user.id]);
 
   // Generate smart recommendations for founders
   React.useEffect(() => {
@@ -152,28 +190,6 @@ export default function TeamMatching({ user, onNavigate }) {
   }, [user.role, user.profile, user.onboardingComplete, availableTalent]);
   const loadStartupIdeas = () => {
     console.log("🔄 [TeamMatching-Founder] Loading startup ideas...");
-
-    // Load from localStorage immediately for instant UI
-    const cachedIdeas = JSON.parse(
-      localStorage.getItem("startupverse_startup_posts") || "[]",
-    );
-    if (cachedIdeas.length > 0) {
-      console.log(
-        "📦 [TeamMatching-Founder] Loaded from cache:",
-        cachedIdeas.length,
-        "posts",
-      );
-      setStartupIdeas(
-        cachedIdeas.map((idea) => ({
-          ...idea,
-          postedDate: new Date(idea.postedDate),
-        })),
-      );
-    } else {
-      console.log("⚠️ [TeamMatching-Founder] No cached posts found");
-    }
-
-    // Load from backend to sync latest data
     console.log("🌐 [TeamMatching-Founder] Fetching from backend...");
     founderApi
       .getAllPosts()
@@ -185,12 +201,6 @@ export default function TeamMatching({ user, onNavigate }) {
             response.posts.length,
             "posts from backend",
           );
-          // Update localStorage cache
-          localStorage.setItem(
-            "startupverse_startup_posts",
-            JSON.stringify(response.posts),
-          );
-          // Update UI with backend data (source of truth)
           setStartupIdeas(
             response.posts.map((idea) => ({
               ...idea,
@@ -199,6 +209,7 @@ export default function TeamMatching({ user, onNavigate }) {
           );
         } else {
           console.log("⚠️ [TeamMatching-Founder] Backend returned no posts");
+          setStartupIdeas([]);
         }
       })
       .catch((error) => {
@@ -207,99 +218,48 @@ export default function TeamMatching({ user, onNavigate }) {
           message: error.message,
           stack: error.stack,
         });
-        // Use cached data if backend fails
-        if (cachedIdeas.length === 0) {
-          console.warn(
-            "⚠️ [TeamMatching-Founder] No cached data available and backend failed",
-          );
-        }
+        setStartupIdeas([]);
       });
   };
+
+  function founderProfileForTalentMatching(u) {
+    if (!u?.profile) return null;
+    const fp = buildFounderProfile(u);
+    const raw =
+      fp.neededRoles ||
+      fp.rolesNeeded ||
+      (Array.isArray(fp.lookingFor) ? fp.lookingFor : []);
+    const neededRoles = Array.isArray(raw)
+      ? raw
+      : typeof raw === "string"
+        ? raw.split(/[,;]/).map((s) => s.trim()).filter(Boolean)
+        : [];
+    return { ...fp, neededRoles };
+  }
+
   const loadTalentProfiles = () => {
     console.log("🔍 [TeamMatching] Loading talent profiles...");
-
-    // Load from localStorage first (for immediate display)
-    const cachedProfiles = JSON.parse(
-      localStorage.getItem("startupverse_talent_profiles") || "[]",
-    );
-    console.log(
-      "📦 [TeamMatching] Cached talent profiles:",
-      cachedProfiles.length,
-    );
-
-    // If user is founder, sort by match score
-    if (user.role === "founder") {
-      const founderProfiles = JSON.parse(
-        localStorage.getItem("startupverse_founder_profiles") || "[]",
-      );
-      const myProfile = founderProfiles.find((p) => p.founderId === user.id);
-      if (myProfile) {
-        // Calculate match scores and sort
-        const scoredProfiles = cachedProfiles.map((talent) => ({
-          ...talent,
-          matchScore: calculateTalentMatchScore(talent, myProfile),
-        }));
-        scoredProfiles.sort((a, b) => b.matchScore - a.matchScore);
-        console.log("✅ [TeamMatching] Profiles sorted by match score");
-        setAvailableTalent(scoredProfiles);
-      } else {
-        console.log(
-          "⚠️ [TeamMatching] No founder profile found for user:",
-          user.id,
-        );
-        setAvailableTalent(cachedProfiles);
-      }
-    } else {
-      setAvailableTalent(cachedProfiles);
-    }
-
-    // **NEW: Fetch fresh data from backend**
     console.log("🌐 [TeamMatching] Fetching talent profiles from backend...");
-    fetch(
-      `${API_BASE_URL}/talent/profiles`,
-      {
-        headers: {
-          Authorization: `Bearer ${getAccessToken()}`,
-        },
-      },
-    )
+    fetch(`${API_BASE_URL}/talent/profiles`, defaultOptions)
       .then((res) => res.json())
       .then((data) => {
         console.log("✅ [TeamMatching] Backend talent response:", data);
-        if (data.success && data.profiles) {
-          console.log(
-            "📊 [TeamMatching] Received",
-            data.profiles.length,
-            "profiles from backend",
-          );
-
-          // Save to localStorage for caching
-          localStorage.setItem(
-            "startupverse_talent_profiles",
-            JSON.stringify(data.profiles),
-          );
-
-          // Sort and display
-          if (user.role === "founder") {
-            const founderProfiles = JSON.parse(
-              localStorage.getItem("startupverse_founder_profiles") || "[]",
-            );
-            const myProfile = founderProfiles.find(
-              (p) => p.founderId === user.id,
-            );
-            if (myProfile) {
-              const scoredProfiles = data.profiles.map((talent) => ({
-                ...talent,
-                matchScore: calculateTalentMatchScore(talent, myProfile),
-              }));
-              scoredProfiles.sort((a, b) => b.matchScore - a.matchScore);
-              setAvailableTalent(scoredProfiles);
-            } else {
-              setAvailableTalent(data.profiles);
-            }
-          } else {
-            setAvailableTalent(data.profiles);
-          }
+        const rawProfiles = data.data || data.profiles || [];
+        if (!data.success || !Array.isArray(rawProfiles)) {
+          setAvailableTalent([]);
+          return;
+        }
+        const normalized = rawProfiles.map(normalizeTalentProfile).filter(Boolean);
+        const matchSource = founderProfileForTalentMatching(user);
+        if (user.role === "founder" && matchSource) {
+          const scoredProfiles = normalized.map((talent) => ({
+            ...talent,
+            matchScore: calculateTalentMatchScore(talent, matchSource),
+          }));
+          scoredProfiles.sort((a, b) => b.matchScore - a.matchScore);
+          setAvailableTalent(scoredProfiles);
+        } else {
+          setAvailableTalent(normalized);
         }
       })
       .catch((error) => {
@@ -307,21 +267,59 @@ export default function TeamMatching({ user, onNavigate }) {
           "❌ [TeamMatching] Failed to fetch talent profiles from backend:",
           error,
         );
-        // Keep using cached data if backend fails
+        setAvailableTalent([]);
       });
   };
-  const loadPendingOnboarding = () => {
-    // Load accepted invitations that haven't been onboarded yet
-    const invitations = JSON.parse(
-      localStorage.getItem("startupverse_sent_invitations") || "[]",
-    );
-    const pending = invitations.filter(
-      (inv) =>
-        (inv.sentById === user.id || inv.sentBy === user.name) &&
-        inv.status === "accepted" &&
-        !inv.onboarded,
-    );
-    setPendingOnboarding(pending);
+
+  const loadPendingOnboarding = async () => {
+    const founderKey = user.id ?? user._id;
+    if (!founderKey || user.role !== "founder") {
+      setPendingOnboarding([]);
+      return;
+    }
+    try {
+      const [receivedInterests, sentInvitations] = await Promise.all([
+        inboxApi.getReceivedInterests(founderKey),
+        inboxApi.getSentInvitations(founderKey),
+      ]);
+      const pending = [];
+
+      for (const i of receivedInterests) {
+        if (i.status === "accepted" && !i.onboarded) {
+          pending.push({
+            id: `interest-${i.id}`,
+            talentId: String(i.talentId),
+            talentName: i.talentName || "Talent",
+            respondedAt: i.respondedAt || i.updatedAt || i.sentAt,
+            response: i.response || i.responseMessage || "",
+            interestId: String(i.id),
+            startupId: String(i.startupId || user.startupId || founderKey),
+          });
+        }
+      }
+
+      const interestTalentIds = new Set(pending.map((p) => p.talentId));
+
+      for (const inv of sentInvitations) {
+        if (inv.status !== "accepted") continue;
+        const tid = String(inv.talentId || "");
+        if (!tid || interestTalentIds.has(tid)) continue;
+        pending.push({
+          id: `invitation-${inv.id}`,
+          talentId: tid,
+          talentName: inv.talentName || "Talent",
+          respondedAt: inv.updatedAt || inv.sentAt,
+          response: inv.response || "",
+          invitationId: String(inv.id),
+          startupId: String(inv.startupId || user.startupId || founderKey),
+        });
+      }
+
+      setPendingOnboarding(pending);
+    } catch (e) {
+      console.error("[TeamMatching] loadPendingOnboarding failed:", e);
+      setPendingOnboarding([]);
+    }
   };
 
   // Calculate how well a talent matches founder's needs
@@ -390,15 +388,28 @@ export default function TeamMatching({ user, onNavigate }) {
 
   // Calculate how well a startup matches talent's profile
   const handlePostIdea = () => {
-    if (!postFormData.title || !postFormData.description) {
-      toast.error("Please fill in title and description");
+    const missing = [];
+    if (!postFormData.title?.trim()) missing.push("Startup Title");
+    if (!postFormData.description?.trim()) missing.push("Description");
+    if (!postFormData.industry) missing.push("Industry");
+    if (!postFormData.stage) missing.push("Stage");
+    if (!postFormData.lookingFor?.trim()) missing.push("Looking For (roles)");
+    if (!postFormData.commitment) missing.push("Commitment");
+
+    if (missing.length > 0) {
+      toast.error(`Please fill in: ${missing.join(", ")}`);
+      return;
+    }
+
+    if (postFormData.description.trim().length < 50) {
+      toast.error("Description must be at least 50 characters so talent can evaluate your startup.");
       return;
     }
 
     // Show preview instead of posting immediately
     setShowPreview(true);
   };
-  const handleConfirmPost = () => {
+  const handleConfirmPost = async () => {
     // Build offer object from form data if compensationPhilosophy is selected
     let offer = undefined;
     if (postFormData.compensationPhilosophy) {
@@ -418,8 +429,13 @@ export default function TeamMatching({ user, onNavigate }) {
     }
 
     // Check if we're editing an existing post
+    const resolvedUserId = String(user._id ?? user.id ?? "");
+    if (!resolvedUserId || resolvedUserId === "undefined") {
+      toast.error("Session error: could not identify your account. Please log out and log back in.");
+      return;
+    }
     const existingPost = startupIdeas.find(
-      (idea) => idea.founderId === user.id,
+      (idea) => idea.founderId === resolvedUserId,
     );
     const ideaData = {
       id: existingPost?.id || Date.now().toString(),
@@ -427,7 +443,7 @@ export default function TeamMatching({ user, onNavigate }) {
       title: postFormData.title,
       description: postFormData.description,
       founder: user.name,
-      founderId: user.id,
+      founderId: resolvedUserId,
       founderAvatar: user.profile?.avatar,
       industry: postFormData.industry || "Other",
       stage: postFormData.stage || "Idea Stage",
@@ -466,89 +482,25 @@ export default function TeamMatching({ user, onNavigate }) {
         pitchDeckUrl: postFormData.pitchDeckUrl,
       }),
     };
-    if (isEditingExisting) {
-      console.log(
-        "📝 [TeamMatching] Updating existing startup post:",
-        ideaData,
+    try {
+      const savedPost = await founderApi.saveStartupPost(String(user._id ?? user.id), ideaData);
+      const canonical = savedPost || ideaData;
+      if (isEditingExisting) {
+        setStartupIdeas((prev) =>
+          prev.map((idea) => (idea.founderId === resolvedUserId ? canonical : idea)),
+        );
+        toast.success("Your startup post has been updated!");
+      } else {
+        setStartupIdeas((prev) => [canonical, ...prev]);
+        toast.success("Startup posted! Now visible to all talent.");
+      }
+    } catch (error) {
+      console.error("❌ [TeamMatching] Failed to save startup post:", error);
+      toast.error(
+        error?.message || "Failed to save post. Please try again.",
       );
-
-      // Update in localStorage
-      const ideas = JSON.parse(
-        localStorage.getItem("startupverse_startup_posts") || "[]",
-      );
-      const updatedIdeas = ideas.map((idea) =>
-        idea.founderId === user.id ? ideaData : idea,
-      );
-      localStorage.setItem(
-        "startupverse_startup_posts",
-        JSON.stringify(updatedIdeas),
-      );
-      console.log("✅ [TeamMatching] Updated in localStorage");
-
-      // Update in backend
-      console.log("🌐 [TeamMatching] Updating in backend...");
-      founderApi
-        .saveStartupPost(user.id, ideaData)
-        .then((response) => {
-          console.log(
-            "✅ [TeamMatching] Startup post updated in backend successfully",
-          );
-          console.log("Backend response:", response);
-          toast.success("Your startup post has been updated!");
-        })
-        .catch((error) => {
-          console.error(
-            "❌ [TeamMatching] CRITICAL: Failed to update startup post in backend",
-          );
-          console.error("Error details:", {
-            message: error.message,
-            stack: error.stack,
-          });
-          toast.error(
-            "Warning: Post updated locally but may not sync to other users.",
-          );
-        });
-    } else {
-      console.log("💾 [TeamMatching] Saving new startup post:", ideaData);
-
-      // Save to localStorage immediately for instant UI
-      const ideas = JSON.parse(
-        localStorage.getItem("startupverse_startup_posts") || "[]",
-      );
-      ideas.push(ideaData);
-      localStorage.setItem("startupverse_startup_posts", JSON.stringify(ideas));
-      console.log(
-        "✅ [TeamMatching] Saved to localStorage. Total posts now:",
-        ideas.length,
-      );
-
-      // Save to backend (CRITICAL for cross-user visibility)
-      console.log("🌐 [TeamMatching] Saving to backend...");
-      founderApi
-        .saveStartupPost(user.id, ideaData)
-        .then((response) => {
-          console.log(
-            "✅ [TeamMatching] Startup post saved to backend successfully",
-          );
-          console.log("Backend response:", response);
-          toast.success(
-            "Startup posted successfully! Now visible to all talent.",
-          );
-        })
-        .catch((error) => {
-          console.error(
-            "❌ [TeamMatching] CRITICAL: Failed to save startup post to backend",
-          );
-          console.error("Error details:", {
-            message: error.message,
-            stack: error.stack,
-          });
-          toast.error(
-            "Warning: Post saved locally but may not be visible to other users. Check console for details.",
-          );
-        });
+      return;
     }
-    loadStartupIdeas();
     setShowPreview(false);
     setIsPostIdeaOpen(false);
     setIsEditingExisting(false);
@@ -607,13 +559,14 @@ export default function TeamMatching({ user, onNavigate }) {
       }
 
       // Send interest via backend API
+      const talentUserId = String(user._id ?? user.id ?? "");
       const interest = {
-        id: `interest_${Date.now()}_${user.id}`,
+        id: `interest_${Date.now()}_${talentUserId}`,
         startupId: selectedIdea.id,
         startupTitle: selectedIdea.title,
         founderName: selectedIdea.founder,
         founderId: selectedIdea.founderId,
-        talentId: user.id,
+        talentId: talentUserId,
         talentName: user.name,
         talentArea: user.professionalTitle || undefined,
         // Add talent's professional area
@@ -627,6 +580,18 @@ export default function TeamMatching({ user, onNavigate }) {
       console.log("📨 Sending interest object:", interest);
       await inboxApi.sendInterest(interest);
       console.log("✅ Interest sent successfully");
+
+      // 🔥 REALTIME: Broadcast to founder that new chat connection is available
+      await broadcastMessageUpdate(null, "new_conversation", {
+        type: "interest",
+        talentId: interest.talentId,
+        talentName: interest.talentName,
+        founderId: interest.founderId,
+        startupId: interest.startupId,
+        startupTitle: interest.startupTitle,
+        message: `New interest from ${interest.talentName} for ${interest.startupTitle}`,
+      });
+
       toast.success(
         `✉️ Your interest has been sent to ${selectedIdea.founder}! Redirecting to your inbox...`,
       );
@@ -645,144 +610,93 @@ export default function TeamMatching({ user, onNavigate }) {
       }
     } catch (error) {
       console.error("❌ Error sending interest:", error);
-      toast.error("Failed to send interest. Please try again.");
+      const msg = String(error?.message || "");
+      if (msg.toLowerCase().includes("already sent")) {
+        toast.error(msg);
+      } else {
+        toast.error("Failed to send interest. Please try again.");
+      }
     }
   };
   const handleStartOnboarding = (talent) => {
     setSelectedOnboardingTalent(talent);
     setShowCompensationWizard(true);
   };
-  const handleCompleteOnboarding = (compensationConfig) => {
+  const handleCompleteOnboarding = async (compensationConfig) => {
     if (!selectedOnboardingTalent) return;
 
-    // Mark the invitation as onboarded
-    const invitations = JSON.parse(
-      localStorage.getItem("startupverse_sent_invitations") || "[]",
-    );
-    const updated = invitations.map((inv) =>
-      inv.id === selectedOnboardingTalent.id
-        ? {
-            ...inv,
-            onboarded: true,
-            compensationConfig,
-            onboardedAt: new Date().toISOString(),
-          }
-        : inv,
-    );
-    localStorage.setItem(
-      "startupverse_sent_invitations",
-      JSON.stringify(updated),
-    );
+    const founderId = user.id ?? user._id;
+    const startupId =
+      selectedOnboardingTalent.startupId ||
+      user.startupId ||
+      founderId;
 
-    // Create team member record
-    const teamMembers = JSON.parse(
-      localStorage.getItem("startupverse_team_members") || "[]",
-    );
-    teamMembers.push({
-      id: Date.now().toString(),
-      founderId: user.id,
-      talentId: selectedOnboardingTalent.talentId,
-      talentName: selectedOnboardingTalent.talentName,
-      compensationConfig,
-      joinedAt: new Date().toISOString(),
-      status: "active",
-    });
-    localStorage.setItem(
-      "startupverse_team_members",
-      JSON.stringify(teamMembers),
-    );
-    toast.success(
-      `🎉 ${selectedOnboardingTalent.talentName} has been onboarded successfully!`,
-    );
-    setShowCompensationWizard(false);
-    setSelectedOnboardingTalent(null);
-    loadPendingOnboarding();
-  };
-  const handleSendInvitation = async (message) => {
-    if (!message.trim()) {
-      toast.error("Please write a message to invite this person");
-      return;
-    }
-    if (!selectedMember) return;
     try {
-      // Send invitation to backend
-      const invitation = {
-        id: Date.now().toString(),
-        talentId: selectedMember.id,
-        talentName: selectedMember.name,
-        founderId: user.id,
-        founderName: user.name,
-        message: message,
-        sentAt: new Date().toISOString(),
-        status: "pending",
-        messages: [],
-        companyName: user.startupIdea || user.companyName || "Your Startup",
-        startupId: user.startupId || user.id,
-      };
-      console.log(
-        "📤 [TeamMatching] Sending invitation to backend...",
-        invitation,
-      );
-      const sendResult = await inboxApi.sendInvitation(invitation);
-      console.log(
-        "✅ [TeamMatching] Invitation sent successfully to backend",
-        sendResult,
-      );
-
-      // Log debug information from backend
-      if (sendResult.debug) {
-        console.log("🔍 [TeamMatching] Backend debug info:", sendResult.debug);
-        console.log("  - Saved keys:", sendResult.debug.savedKeys);
-        console.log(
-          "  - Verification prefix:",
-          sendResult.debug.verificationPrefix,
+      if (selectedOnboardingTalent.interestId) {
+        await compensationApi.convertTalentToTeamMember(
+          selectedOnboardingTalent.talentId,
+          founderId,
+          startupId,
+          compensationConfig,
+          selectedOnboardingTalent.interestId,
         );
-        console.log(
-          "  - Verification count:",
-          sendResult.debug.verificationCount,
+      } else if (selectedOnboardingTalent.invitationId) {
+        await compensationApi.createCompensationContract(
+          founderId,
+          selectedOnboardingTalent.talentId,
+          startupId,
+          compensationConfig,
         );
-        console.log(
-          "  - Verification data:",
-          sendResult.debug.verificationData,
-        );
-      }
-
-      // Verify it was saved by fetching immediately
-      console.log("🔍 [TeamMatching] Verifying invitation was saved...");
-      const sentInvitations = await inboxApi.getSentInvitations(user.id);
-      console.log(
-        "📊 [TeamMatching] Verification - sent invitations count:",
-        sentInvitations.length,
-      );
-      console.log(
-        "📋 [TeamMatching] Verification - sent invitations data:",
-        sentInvitations,
-      );
-      toast.success(
-        `🎯 Invitation sent to ${selectedMember.name}! Redirecting to your inbox...`,
-      );
-      setSelectedMember(null);
-
-      // Navigate to inbox with sent tab active
-      if (onNavigate) {
-        console.log("🚀 [TeamMatching] Navigating to inbox:sent in 1000ms...");
-        // Add delay to ensure backend has processed and saved the invitation
-        setTimeout(() => {
-          console.log('📍 [TeamMatching] Calling onNavigate("inbox:sent")');
-          onNavigate("inbox:sent");
-        }, 1000);
       } else {
-        console.warn("⚠️ [TeamMatching] onNavigate prop not provided!");
+        toast.error(
+          "Could not complete onboarding — refresh the page and try again.",
+        );
+        return;
       }
-    } catch (error) {
-      console.error("❌ [TeamMatching] Error sending invitation:", error);
-      console.error("Error details:", {
-        message: error.message,
-        stack: error.stack,
-      });
-      toast.error(
-        `Failed to send invitation: ${error.message || "Unknown error"}. Please try again.`,
+
+      toast.success(
+        `🎉 ${selectedOnboardingTalent.talentName} has been onboarded successfully!`,
       );
+      setShowCompensationWizard(false);
+      setSelectedOnboardingTalent(null);
+      await loadPendingOnboarding();
+    } catch (err) {
+      console.error("[TeamMatching] handleCompleteOnboarding failed:", err);
+      toast.error(
+        err?.message || "Failed to complete onboarding. Please try again.",
+      );
+    }
+  };
+  const viewTalentProfile = (member) => {
+    if (!member) return;
+    
+    // Navigate to the talent profile page with formatted talent data
+    if (onNavigate) {
+      onNavigate("talent-profile", {
+        talent: {
+          id: member.id,
+          fullName: member.name,
+          professionalTitle: member.role,
+          location: member.location,
+          bio: member.bio,
+          skills: member.skills,
+          linkedinUrl: member.linkedinUrl,
+          githubUrl: member.githubUrl,
+          portfolioWebsite: member.portfolioWebsite,
+          workExperiences: member.workExperiences,
+          educationList: member.educationList,
+          certifications: member.certifications,
+          portfolioItems: member.portfolioItems,
+          availabilityStatus: member.availability,
+          preferredCommitment: member.preferredCommitment,
+          yearsOfExperience: member.experience,
+          email: member.email,
+          match: member.matchScore,
+          primaryRole: member.role,
+          interests: member.interests,
+          lookingFor: member.lookingFor,
+        }
+      });
     }
   };
 
@@ -881,40 +795,24 @@ export default function TeamMatching({ user, onNavigate }) {
     "user.role:",
     user.role,
   );
-  if (user.role === "talent") {
-    return (
-      <div className="p-4">
-        <Card className="mx-auto max-w-2xl border border-border">
-          <CardHeader>
-            <CardTitle className="text-xl">Talent Browse Moved</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <p className="text-sm text-muted-foreground">
-              Opportunities are now canonical on Talent Home. Use Home/Browse to discover startups, save items, and send interests.
-            </p>
-            <Button
-              type="button"
-              onClick={() => onNavigate?.("dashboard", { mode: "opportunities" })}
-            >
-              Open Talent Home
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
+  const founderUserId = String(user._id ?? user.id ?? "");
+  const founderStartupPost =
+    user.role === "founder"
+      ? startupIdeas.find((idea) => String(idea.founderId ?? "") === founderUserId)
+      : null;
+  const founderCanBrowseTalent = user.role !== "founder" || Boolean(founderStartupPost);
   return (
-    <div className="p-2 md:p-3 lg:p-4 space-y-3 md:space-y-4">
+    <div className="min-h-full bg-surface-page p-2 font-body md:p-3 lg:p-4 space-y-3 md:space-y-4">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 mb-4 md:mb-6">
         <div>
-          <h2 className="text-xl md:text-2xl text-gray-900 dark:text-white mb-1">
+          <h2 className="mb-1 font-heading text-xl font-extrabold text-text-heading md:text-2xl">
             {user.role === "founder"
-              ? "Smart Team Matching"
+              ? "Browse Talent"
               : "Browse Startups"}
           </h2>
-          <p className="text-xs md:text-sm text-gray-600 dark:text-gray-400">
+          <p className="font-body text-xs text-text-body md:text-sm">
             {user.role === "founder"
-              ? "Find your dream team"
+              ? "Discover talent that can grow into your team"
               : user.role === "team-member"
                 ? "Already committed to a startup"
                 : "Find your next startup opportunity"}
@@ -922,31 +820,20 @@ export default function TeamMatching({ user, onNavigate }) {
         </div>
         {user.role === "founder" &&
           (() => {
-            // Check if founder has an existing post
-            const founderPost = startupIdeas.find(
-              (idea) => idea.founderId === user.id,
-            );
-            const hasExistingPost = !!founderPost;
+            const hasExistingPost = Boolean(founderStartupPost);
             return (
               <div className="flex gap-2">
                 <Button
                   onClick={() => {
-                    if (hasExistingPost) {
-                      // Show preview directly for existing post
-                      setSelectedIdea(founderPost);
-                      setShowPreview(true);
-                    } else {
-                      // Open form for new post
-                      setIsEditingExisting(false);
-                      setIsPostIdeaOpen(true);
-                    }
+                    // Navigate to the new dedicated Post Startup page
+                    onNavigate?.("post-startup");
                   }}
-                  className="bg-blue-600 hover:bg-blue-700 text-sm"
+                  className="rounded-input bg-primary font-body text-sm font-semibold text-white shadow-[0_4px_16px_rgba(58,90,254,0.20)] transition-colors duration-200 ease-in-out hover:bg-primary-hover"
                 >
                   {hasExistingPost ? (
                     <>
-                      <Eye className="w-4 h-4 mr-1.5" />
-                      Preview
+                      <Edit className="w-4 h-4 mr-1.5" />
+                      Edit Startup Post
                     </>
                   ) : (
                     <>
@@ -958,7 +845,7 @@ export default function TeamMatching({ user, onNavigate }) {
                 <Button
                   onClick={() => setShowCompensationManager(true)}
                   variant="outline"
-                  className="text-sm"
+                  className="rounded-input border border-surface-border bg-surface-card font-body text-sm font-semibold text-text-body transition-colors duration-200 ease-in-out hover:border-primary hover:bg-surface-card hover:text-primary"
                 >
                   <DollarSign className="w-4 h-4 mr-1.5" />
                   Onboarding & Comp
@@ -968,7 +855,7 @@ export default function TeamMatching({ user, onNavigate }) {
           })()}
       </div>
       {user.role === "team-member" && (
-        <Card className="border-2 border-yellow-200 bg-yellow-50 dark:bg-yellow-900/10">
+        <Card className="rounded-card border border-surface-border bg-yellow-50/90 shadow-soft dark:bg-yellow-900/10">
           <CardContent className="p-4 md:p-6">
             <div className="flex items-start gap-3">
               <div className="w-10 h-10 rounded-full bg-yellow-200 dark:bg-yellow-800 flex items-center justify-center flex-shrink-0">
@@ -994,11 +881,37 @@ export default function TeamMatching({ user, onNavigate }) {
           </CardContent>
         </Card>
       )}
-      {(user.role === "founder" || user.role === "talent") && (
+      {user.role === "founder" && !founderCanBrowseTalent && (
+        <Card className="rounded-card border border-amber-200 bg-amber-50/90 shadow-soft dark:border-amber-800 dark:bg-amber-950/20">
+          <CardContent className="p-4 md:p-6">
+            <div className="flex items-start gap-3">
+              <div className="w-10 h-10 rounded-full bg-amber-200 dark:bg-amber-800 flex items-center justify-center flex-shrink-0">
+                <AlertCircle className="w-5 h-5 text-amber-700 dark:text-amber-200" />
+              </div>
+              <div className="space-y-2">
+                <h3 className="text-base md:text-lg font-medium text-amber-900 dark:text-amber-100">
+                  Post your startup first
+                </h3>
+                <p className="text-xs md:text-sm text-amber-800 dark:text-amber-200">
+                  Founders must publish at least one startup before browsing talent or sending invitations.
+                </p>
+                <Button
+                  onClick={() => onNavigate?.("post-startup")}
+                  className="rounded-input bg-primary font-body text-sm font-semibold text-white hover:bg-primary-hover"
+                >
+                  <Plus className="w-4 h-4 mr-1.5" />
+                  Launch Startup
+                </Button>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+      {(user.role === "talent" || (user.role === "founder" && founderCanBrowseTalent)) && (
         <>
           <div className="flex flex-col sm:flex-row gap-2 mb-4">
             <div className="flex-1 relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-muted" />
               <Input
                 placeholder={
                   user.role === "founder"
@@ -1007,11 +920,11 @@ export default function TeamMatching({ user, onNavigate }) {
                 }
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-9 text-sm"
+                className="rounded-input border-[1.5px] border-surface-border bg-surface-card pl-9 font-body text-sm text-text-heading placeholder:text-text-muted transition-shadow duration-200 ease-in-out focus-visible:border-primary focus-visible:shadow-[0_0_0_3px_rgba(58,90,254,0.10)] focus-visible:ring-0"
               />
             </div>
             <Select value={sortBy} onValueChange={setSortBy}>
-              <SelectTrigger className="w-full sm:w-40 text-sm">
+              <SelectTrigger className="w-full rounded-input border-[1.5px] border-surface-border bg-surface-card font-body text-sm font-medium text-text-heading transition-colors duration-200 ease-in-out hover:border-primary sm:w-40 [&_svg]:text-text-body">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -1024,7 +937,7 @@ export default function TeamMatching({ user, onNavigate }) {
             <>
               {pendingOnboarding.length > 0 && (
                 <div className="mb-6">
-                  <Card className="border-2 border-green-500/30 bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-950/20 dark:to-emerald-950/20">
+                  <Card className="rounded-card border border-surface-border bg-gradient-to-br from-green-50 to-emerald-50 shadow-soft dark:from-green-950/20 dark:to-emerald-950/20">
                     <CardHeader className="pb-3">
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
@@ -1051,7 +964,7 @@ export default function TeamMatching({ user, onNavigate }) {
                         {pendingOnboarding.map((talent) => (
                           <Card
                             key={talent.id}
-                            className="border border-green-200 dark:border-green-800"
+                            className="rounded-card border border-surface-border bg-surface-card shadow-soft dark:border-surface-border"
                           >
                             <CardContent className="p-4">
                               <div className="flex items-start justify-between mb-3">
@@ -1099,7 +1012,7 @@ export default function TeamMatching({ user, onNavigate }) {
               {teamRecommendations.length > 0 &&
                 recommendedTalent.length > 0 && (
                   <div className="mb-6">
-                    <Card className="border-2 border-primary/20 bg-gradient-to-br from-primary/5 to-primary/10">
+                    <Card className="rounded-card border border-surface-border bg-gradient-to-br from-primary/5 to-primary/10 shadow-soft">
                       <CardHeader className="pb-3">
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-2">
@@ -1130,7 +1043,7 @@ export default function TeamMatching({ user, onNavigate }) {
                             {teamRecommendations.slice(0, 3).map((rec) => (
                               <div
                                 key={rec.id}
-                                className="p-3 rounded-lg border bg-background/50"
+                                className="rounded-input bg-surface-page p-3 shadow-soft"
                               >
                                 <div className="flex items-start justify-between mb-1">
                                   <p className="font-medium text-sm">
@@ -1173,37 +1086,33 @@ export default function TeamMatching({ user, onNavigate }) {
                             <Users className="w-4 h-4 text-blue-600" />
                             Top Matches
                           </h4>
-                          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                             {recommendedTalent.map((member) => (
                               <Card
                                 key={member.id}
-                                className="relative hover:shadow-md transition-shadow"
+                                className="group relative overflow-hidden rounded-xl border border-slate-200/60 bg-white shadow-sm transition-all duration-300 ease-out hover:shadow-lg hover:border-primary/20 hover:-translate-y-0.5"
                               >
-                                <CardContent className="p-3">
+                                <CardContent className="p-4">
                                   {member.matchScore && (
                                     <Badge
-                                      className="absolute top-2 right-2 text-white border-0 text-xs"
-                                      style={{
-                                        background: "#3A5AFE",
-                                        boxShadow:
-                                          "0 2px 8px rgba(58, 90, 254, 0.3)",
-                                      }}
+                                      className="absolute top-3 right-3 text-white border-0 text-xs font-semibold px-2 py-0.5 bg-gradient-to-r from-primary to-primary/90 shadow-md"
                                     >
+                                      <Star className="w-3 h-3 mr-1 fill-white" />
                                       {member.matchScore}% Match
                                     </Badge>
                                   )}
-                                  <div className="flex items-start space-x-3 mb-2">
-                                    <Avatar className="w-10 h-10">
+                                  <div className="flex items-start gap-3 mb-3">
+                                    <Avatar className="w-11 h-11 ring-2 ring-slate-100 ring-offset-1.5 transition-transform duration-300 group-hover:scale-105">
                                       <AvatarImage src={member.avatar} />
-                                      <AvatarFallback>
-                                        {member.name?.substring(0, 2) || "??"}
+                                      <AvatarFallback className="bg-gradient-to-br from-primary/10 to-primary/5 text-primary font-semibold">
+                                        {member.name?.split(" ").map(n => n[0]).join("").slice(0, 2).toUpperCase() || "??"}
                                       </AvatarFallback>
                                     </Avatar>
-                                    <div className="flex-1 min-w-0">
-                                      <h3 className="text-sm font-semibold mb-0.5 truncate">
+                                    <div className="flex-1 min-w-0 pt-0.5">
+                                      <h3 className="text-sm font-semibold text-slate-900 truncate">
                                         {member.name || "Unknown"}
                                       </h3>
-                                      <div className="flex items-center space-x-1 text-xs text-muted-foreground">
+                                      <div className="flex items-center gap-1 text-xs text-slate-500">
                                         {getRoleIcon(member.role || "")}
                                         <span className="truncate">
                                           {member.role || "Role not specified"}
@@ -1211,47 +1120,40 @@ export default function TeamMatching({ user, onNavigate }) {
                                       </div>
                                     </div>
                                   </div>
-                                  <p className="text-xs text-muted-foreground mb-2 line-clamp-2">
+                                  <p className="text-xs text-slate-600 mb-3 line-clamp-2 leading-relaxed">
                                     {member.bio || "No bio provided"}
                                   </p>
-                                  <div className="flex flex-wrap gap-1 mb-2">
+                                  <div className="flex flex-wrap gap-1 mb-3">
                                     {(Array.isArray(member.skills)
                                       ? member.skills
                                       : []
                                     )
-                                      .slice(0, 4)
+                                      .slice(0, 3)
                                       .map((skill) => (
-                                        <Badge
+                                        <span
                                           key={skill}
-                                          variant="secondary"
-                                          className="text-xs h-5"
+                                          className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-slate-100 text-slate-600 border border-slate-200/60"
                                         >
                                           {skill}
-                                        </Badge>
+                                        </span>
                                       ))}
                                     {(Array.isArray(member.skills)
                                       ? member.skills
                                       : []
-                                    ).length > 4 && (
-                                      <Badge
-                                        variant="secondary"
-                                        className="text-xs h-5"
-                                      >
-                                        +
-                                        {(Array.isArray(member.skills)
+                                    ).length > 3 && (
+                                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-slate-50 text-slate-500 border border-slate-200/60">
+                                        +{(Array.isArray(member.skills)
                                           ? member.skills
-                                          : []
-                                        ).length - 4}
-                                      </Badge>
+                                          : []).length - 3}
+                                      </span>
                                     )}
                                   </div>
                                   <Button
                                     size="sm"
-                                    className="w-full text-xs h-7"
-                                    onClick={() => setSelectedMember(member)}
+                                    className="w-full text-xs bg-primary hover:bg-primary/90 text-white font-medium"
+                                    onClick={() => viewTalentProfile(member)}
                                   >
-                                    <Mail className="w-3 h-3 mr-1.5" />
-                                    View Profile & Invite
+                                    View Profile
                                   </Button>
                                 </CardContent>
                               </Card>
@@ -1263,7 +1165,7 @@ export default function TeamMatching({ user, onNavigate }) {
                   </div>
                 )}
               {(!user.onboardingComplete || !user.profile) && (
-                <Card className="border-2 border-orange-200 bg-orange-50/50 dark:bg-orange-950/20 mb-4">
+                <Card className="mb-4 rounded-card border border-surface-border bg-orange-50/50 shadow-soft dark:bg-orange-950/20">
                   <CardContent className="p-4">
                     <div className="flex items-start gap-3">
                       <AlertCircle className="w-5 h-5 text-orange-600 flex-shrink-0 mt-0.5" />
@@ -1280,152 +1182,165 @@ export default function TeamMatching({ user, onNavigate }) {
                   </CardContent>
                 </Card>
               )}
-              <div className="border-t pt-4">
-                <h3 className="text-base font-semibold mb-3 flex items-center gap-2">
-                  <Search className="w-4 h-4" />
-                  Browse All Talent
+              <div className="pt-6">
+                <h3 className="mb-3 flex items-center gap-2 font-heading text-base font-semibold text-text-heading">
+                  <Search className="h-4 w-4 text-primary" />
+                  Browse Talent
                 </h3>
                 {filteredTalent.length === 0 ? (
-                  <Card className="border-2 border-dashed">
+                  <Card className="rounded-card border-0 bg-surface-card shadow-soft">
                     <CardContent className="flex flex-col items-center justify-center py-12">
-                      <Users className="w-16 h-16 text-gray-300 mb-4" />
-                      <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
+                      <Users className="mb-4 h-16 w-16 text-surface-border" />
+                      <h3 className="mb-2 font-heading text-lg font-semibold text-text-heading">
                         No talent profiles yet
                       </h3>
-                      <p className="text-sm text-gray-500 dark:text-gray-400 text-center max-w-md">
+                      <p className="max-w-md text-center font-body text-sm text-text-muted">
                         Check back soon! Talented people are joining
                         StartupVerse every day.
                       </p>
                     </CardContent>
                   </Card>
                 ) : (
-                  <div className="grid gap-4 md:grid-cols-3">
+                  <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-3">
                     {filteredTalent.map((member) => (
-                      <Card key={member.id} className="relative">
-                        <CardContent className="p-4">
-                          {member.matchScore && member.matchScore >= 40 && (
+                      <Card 
+                        key={member.id} 
+                        className="group relative overflow-hidden rounded-2xl border border-slate-200/60 bg-white shadow-sm transition-all duration-300 ease-out hover:shadow-xl hover:shadow-primary/5 hover:border-primary/20 hover:-translate-y-1"
+                      >
+                        {/* Match Score Badge - Premium Style */}
+                        {member.matchScore && member.matchScore >= 40 && (
+                          <div className="absolute top-4 right-4 z-10">
                             <Badge
-                              className="absolute top-2 right-2 text-white border-0"
-                              style={{
-                                background:
-                                  member.matchScore >= 80
-                                    ? "#3A5AFE"
-                                    : member.matchScore >= 60
-                                      ? "#5B7FFF"
-                                      : "#10B981",
-                                boxShadow: "0 2px 8px rgba(58, 90, 254, 0.3)",
-                              }}
+                              className={`text-white border-0 font-semibold text-xs px-2.5 py-1 shadow-lg ${
+                                member.matchScore >= 80
+                                  ? "bg-gradient-to-r from-emerald-500 to-emerald-600"
+                                  : member.matchScore >= 60
+                                    ? "bg-gradient-to-r from-blue-500 to-blue-600"
+                                    : "bg-gradient-to-r from-slate-500 to-slate-600"
+                              }`}
                             >
+                              <Star className="w-3 h-3 mr-1 fill-white" />
                               {member.matchScore}% Match
                             </Badge>
-                          )}
-                          <div className="flex items-start space-x-3 mb-3">
-                            <Avatar className="w-12 h-12">
-                              <AvatarImage src={member.avatar} />
-                              <AvatarFallback>
-                                {member.name?.substring(0, 2) || "??"}
-                              </AvatarFallback>
-                            </Avatar>
-                            <div className="flex-1">
-                              <h3 className="mb-0.5">
-                                {member.name || "Unknown"}
-                              </h3>
-                              <div className="flex items-center space-x-1 text-xs text-muted-foreground mb-2">
-                                {getRoleIcon(member.role || "")}
-                                <span>
-                                  {member.role || "Role not specified"}
-                                </span>
-                              </div>
-                              <div className="flex flex-wrap gap-1">
-                                {(Array.isArray(member.skills)
-                                  ? member.skills
-                                  : []
-                                )
-                                  .slice(0, 3)
-                                  .map((skill) => (
-                                    <Badge
-                                      key={skill}
-                                      variant="secondary"
-                                      className="text-xs h-5"
-                                    >
-                                      {skill}
-                                    </Badge>
-                                  ))}
-                                {(Array.isArray(member.skills)
-                                  ? member.skills
-                                  : []
-                                ).length > 3 && (
-                                  <Badge
-                                    variant="secondary"
-                                    className="text-xs h-5"
-                                  >
-                                    +
-                                    {(Array.isArray(member.skills)
-                                      ? member.skills
-                                      : []
-                                    ).length - 3}
-                                  </Badge>
-                                )}
+                          </div>
+                        )}
+
+                        <CardContent className="p-0">
+                          {/* Header Section with Avatar */}
+                          <div className="p-5 pb-4">
+                            <div className="flex items-start gap-4">
+                              <Avatar className="w-14 h-14 ring-2 ring-slate-100 ring-offset-2 transition-transform duration-300 group-hover:scale-105">
+                                <AvatarImage src={member.avatar} />
+                                <AvatarFallback className="bg-gradient-to-br from-primary/10 to-primary/5 text-primary font-semibold text-lg">
+                                  {member.name?.split(" ").map(n => n[0]).join("").slice(0, 2).toUpperCase() || "??"}
+                                </AvatarFallback>
+                              </Avatar>
+                              <div className="flex-1 min-w-0 pt-0.5">
+                                <h3 className="font-semibold text-slate-900 text-lg leading-tight truncate">
+                                  {member.name || "Unknown"}
+                                </h3>
+                                <div className="flex items-center gap-1.5 text-sm text-slate-500 mt-1">
+                                  {getRoleIcon(member.role || "")}
+                                  <span className="truncate">
+                                    {member.role || "Role not specified"}
+                                  </span>
+                                </div>
                               </div>
                             </div>
                           </div>
-                          <p className="text-sm text-muted-foreground mb-3 line-clamp-2">
-                            {member.bio || "No bio provided"}
-                          </p>
-                          <div className="space-y-2 mb-3">
-                            <div className="flex items-center justify-between text-xs">
-                              <span className="text-muted-foreground">
-                                Location:
-                              </span>
-                              <span>{member.location || "Not specified"}</span>
-                            </div>
-                            <div className="flex items-center justify-between text-xs">
-                              <span className="text-muted-foreground">
-                                Experience:
-                              </span>
-                              <span>
-                                {member.experience || "Not specified"}
-                              </span>
-                            </div>
-                            <div className="flex items-center justify-between text-xs">
-                              <span className="text-muted-foreground">
-                                Available:
-                              </span>
-                              <Badge variant="outline" className="text-xs h-5">
-                                {member.availability || "Not specified"}
-                              </Badge>
-                            </div>
-                          </div>
-                          <div className="mb-3">
-                            <p className="text-xs text-muted-foreground mb-1">
-                              Interested in:
+
+                          {/* Bio Section */}
+                          <div className="px-5 pb-4">
+                            <p className="text-sm text-slate-600 line-clamp-2 leading-relaxed">
+                              {member.bio || "No bio provided"}
                             </p>
-                            <div className="flex flex-wrap gap-1">
-                              {(member.interests || []).map((interest) => (
-                                <Badge
-                                  key={interest}
-                                  variant="outline"
-                                  className="text-xs h-5"
-                                >
-                                  {interest}
-                                </Badge>
-                              ))}
-                              {(!member.interests ||
-                                member.interests.length === 0) && (
-                                <span className="text-xs text-muted-foreground">
-                                  Not specified
+                          </div>
+
+                          {/* Skills Section - Premium Tags */}
+                          <div className="px-5 pb-4">
+                            <div className="flex flex-wrap gap-1.5">
+                              {(Array.isArray(member.skills) ? member.skills : [])
+                                .slice(0, 4)
+                                .map((skill) => (
+                                  <span
+                                    key={skill}
+                                    className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-slate-100 text-slate-700 border border-slate-200/60"
+                                  >
+                                    {skill}
+                                  </span>
+                                ))}
+                              {(Array.isArray(member.skills) ? member.skills : []).length > 4 && (
+                                <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-slate-50 text-slate-500 border border-slate-200/60">
+                                  +{(Array.isArray(member.skills) ? member.skills : []).length - 4}
                                 </span>
                               )}
                             </div>
                           </div>
-                          <div className="flex space-x-2">
+
+                          {/* Info Grid */}
+                          <div className="px-5 pb-4">
+                            <div className="grid grid-cols-2 gap-3 text-sm">
+                              <div className="flex items-center gap-2 text-slate-600">
+                                <MapPin className="w-4 h-4 text-slate-400 flex-shrink-0" />
+                                <span className="truncate">{member.location || "Remote"}</span>
+                              </div>
+                              <div className="flex items-center gap-2 text-slate-600">
+                                <Briefcase className="w-4 h-4 text-slate-400 flex-shrink-0" />
+                                <span className="truncate">{member.experience || "N/A"}</span>
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Availability & Interests */}
+                          <div className="px-5 pb-5">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-2">
+                                {member.availability ? (
+                                  <Badge 
+                                    variant="outline" 
+                                    className={`text-xs font-medium ${
+                                      member.availability.toLowerCase().includes("full") 
+                                        ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                                        : member.availability.toLowerCase().includes("part")
+                                          ? "border-amber-200 bg-amber-50 text-amber-700"
+                                          : "border-slate-200 bg-slate-50 text-slate-700"
+                                    }`}
+                                  >
+                                    <div className={`w-1.5 h-1.5 rounded-full mr-1.5 ${
+                                      member.availability.toLowerCase().includes("full")
+                                        ? "bg-emerald-500"
+                                        : member.availability.toLowerCase().includes("part")
+                                          ? "bg-amber-500"
+                                          : "bg-slate-400"
+                                    }`} />
+                                    {member.availability}
+                                  </Badge>
+                                ) : (
+                                  <Badge variant="outline" className="text-xs font-medium border-slate-200 bg-slate-50 text-slate-600">
+                                    <div className="w-1.5 h-1.5 rounded-full mr-1.5 bg-slate-400" />
+                                    Unknown
+                                  </Badge>
+                                )}
+                              </div>
+                              
+                              {(member.interests || []).length > 0 && (
+                                <div className="flex items-center gap-1 text-xs text-slate-500">
+                                  <Heart className="w-3.5 h-3.5 text-rose-400" />
+                                  <span>{member.interests.length} interests</span>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Action Button */}
+                          <div className="px-5 pb-5 pt-0">
                             <Button
-                              size="sm"
-                              className="flex-1"
-                              onClick={() => setSelectedMember(member)}
+                              size="default"
+                              className="w-full bg-gradient-to-r from-primary to-primary/90 hover:from-primary/95 hover:to-primary/85 text-white font-medium shadow-lg shadow-primary/20 transition-all duration-200 hover:shadow-xl hover:shadow-primary/30"
+                              onClick={() => viewTalentProfile(member)}
                             >
-                              <Mail className="w-4 h-4 mr-1" />
-                              View Profile
+                              View Full Profile
+                              <ExternalLink className="w-4 h-4 ml-2" />
                             </Button>
                           </div>
                         </CardContent>
@@ -1440,11 +1355,13 @@ export default function TeamMatching({ user, onNavigate }) {
           {user.role === "talent" && (
             <div className="space-y-3">
               {filteredIdeas.length === 0 ? (
-                <Card className="bg-purple-50 dark:bg-purple-950/20 border-purple-200 dark:border-purple-900">
+                <Card className="rounded-card border-0 bg-surface-card shadow-soft transition-shadow duration-200 ease-in-out">
                   <CardContent className="p-4 text-center">
-                    <Rocket className="w-8 h-8 mx-auto mb-2 text-purple-600 dark:text-purple-400" />
-                    <p className="text-sm mb-1">No startup ideas found</p>
-                    <p className="text-xs text-muted-foreground">
+                    <Rocket className="w-8 h-8 mx-auto mb-2 text-accent" />
+                    <p className="font-heading text-sm font-semibold text-text-heading mb-1">
+                      No startup ideas found
+                    </p>
+                    <p className="font-body text-xs text-text-muted">
                       Check back soon! Founders post new opportunities every
                       day.
                     </p>
@@ -1453,7 +1370,7 @@ export default function TeamMatching({ user, onNavigate }) {
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   {filteredIdeas.map((idea) => (
-                    <Card key={idea.id} className="flex flex-col">
+                    <Card key={idea.id} className="flex flex-col rounded-card border border-surface-border bg-surface-card shadow-soft transition-shadow duration-200 ease-in-out hover:shadow-[0_4px_16px_rgba(0,0,0,0.08)]">
                       <CardContent className="p-4 flex flex-col flex-1">
                         <div className="flex items-start gap-3 mb-3">
                           <Avatar className="w-10 h-10">
@@ -1523,21 +1440,11 @@ export default function TeamMatching({ user, onNavigate }) {
                         </div>
                         <div className="flex flex-col gap-2 pt-3 border-t mt-auto">
                           <Button
-                            size="sm"
+                            variant="outline"
                             className="w-full"
                             onClick={() => {
-                              console.log(
-                                "🔍 [Talent] Clicked to view startup details:",
-                                {
-                                  title: idea.title,
-                                  founder: idea.founder,
-                                  founderId: idea.founderId,
-                                  hasFounderId: !!idea.founderId,
-                                  fullIdea: idea,
-                                },
-                              );
-                              setSelectedIdea(idea);
-                              setShowDetailsDialog(true);
+                              // Navigate to the new dedicated Startup Detail page
+                              onNavigate?.("startup-detail", { startup: idea });
                             }}
                           >
                             View Details
@@ -1733,23 +1640,24 @@ export default function TeamMatching({ user, onNavigate }) {
         </DialogContent>
       </Dialog>
       <Dialog open={isPostIdeaOpen} onOpenChange={setIsPostIdeaOpen}>
-        <DialogContent className="max-w-3xl max-h-[90vh]">
-          <ScrollArea className="max-h-[80vh] pr-4">
-            <DialogHeader>
-              <DialogTitle>
-                {isEditingExisting
-                  ? "Edit Your Startup Post"
-                  : "Post Your Startup Idea"}
-              </DialogTitle>
-              <DialogDescription>
-                {isEditingExisting
-                  ? "Update your startup post to keep talent informed about your latest opportunities."
-                  : "Share your startup vision and attract talented co-founders and early team members."}
-              </DialogDescription>
-            </DialogHeader>
-            <div className="space-y-4 mt-6">
+        <DialogContent className="max-w-3xl flex flex-col max-h-[90vh]">
+          <DialogHeader className="shrink-0">
+            <DialogTitle>
+              {isEditingExisting
+                ? "Edit Your Startup Post"
+                : "Post Your Startup Idea"}
+            </DialogTitle>
+            <DialogDescription>
+              {isEditingExisting
+                ? "Update your startup post to keep talent informed about your latest opportunities."
+                : "Share your startup vision and attract talented co-founders and early team members."}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex-1 overflow-y-auto pr-2">
+            <div className="space-y-4 mt-2 pb-2">
+              <p className="text-xs text-muted-foreground"><span className="text-red-500">*</span> Required fields</p>
               <div>
-                <Label htmlFor="title">Startup Title *</Label>
+                <Label htmlFor="title">Startup Title <span className="text-red-500">*</span></Label>
                 <Input
                   id="title"
                   placeholder="e.g., AI-Powered Healthcare Platform"
@@ -1764,10 +1672,10 @@ export default function TeamMatching({ user, onNavigate }) {
                 />
               </div>
               <div>
-                <Label htmlFor="description">Description *</Label>
+                <Label htmlFor="description">Description <span className="text-red-500">*</span></Label>
                 <Textarea
                   id="description"
-                  placeholder="Describe your startup idea, vision, and what problem you're solving..."
+                  placeholder="Describe your startup idea, the problem you solve, your traction so far, and why someone should join you. Min 50 characters."
                   value={postFormData.description}
                   onChange={(e) =>
                     setPostFormData({
@@ -1777,64 +1685,47 @@ export default function TeamMatching({ user, onNavigate }) {
                   }
                   className="mt-1 min-h-[120px]"
                 />
+                <p className="text-xs text-muted-foreground mt-1">{postFormData.description.length}/5000 — min 50 characters</p>
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <Label htmlFor="industry">Industry</Label>
-                  <Select
+                  <Label htmlFor="industry">Industry <span className="text-red-500">*</span></Label>
+                  <select
+                    id="industry"
                     value={postFormData.industry}
-                    onValueChange={(value) =>
-                      setPostFormData({
-                        ...postFormData,
-                        industry: value,
-                      })
-                    }
+                    onChange={(e) => setPostFormData({ ...postFormData, industry: e.target.value })}
+                    className="mt-1 flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
                   >
-                    <SelectTrigger id="industry" className="mt-1">
-                      <SelectValue placeholder="Select industry" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="HealthTech">HealthTech</SelectItem>
-                      <SelectItem value="EdTech">EdTech</SelectItem>
-                      <SelectItem value="FinTech">FinTech</SelectItem>
-                      <SelectItem value="E-Commerce">E-Commerce</SelectItem>
-                      <SelectItem value="CleanTech">CleanTech</SelectItem>
-                      <SelectItem value="SaaS">SaaS</SelectItem>
-                      <SelectItem value="AI/ML">AI/ML</SelectItem>
-                      <SelectItem value="Other">Other</SelectItem>
-                    </SelectContent>
-                  </Select>
+                    <option value="">Select industry</option>
+                    <option value="HealthTech">HealthTech</option>
+                    <option value="EdTech">EdTech</option>
+                    <option value="FinTech">FinTech</option>
+                    <option value="E-Commerce">E-Commerce</option>
+                    <option value="CleanTech">CleanTech</option>
+                    <option value="SaaS">SaaS</option>
+                    <option value="AI/ML">AI/ML</option>
+                    <option value="Other">Other</option>
+                  </select>
                 </div>
                 <div>
-                  <Label htmlFor="stage">Stage</Label>
-                  <Select
+                  <Label htmlFor="stage">Stage <span className="text-red-500">*</span></Label>
+                  <select
+                    id="stage"
                     value={postFormData.stage}
-                    onValueChange={(value) =>
-                      setPostFormData({
-                        ...postFormData,
-                        stage: value,
-                      })
-                    }
+                    onChange={(e) => setPostFormData({ ...postFormData, stage: e.target.value })}
+                    className="mt-1 flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
                   >
-                    <SelectTrigger id="stage" className="mt-1">
-                      <SelectValue placeholder="Select stage" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="Idea Stage">Idea Stage</SelectItem>
-                      <SelectItem value="MVP Development">
-                        MVP Development
-                      </SelectItem>
-                      <SelectItem value="Early Traction">
-                        Early Traction
-                      </SelectItem>
-                      <SelectItem value="Growth">Growth</SelectItem>
-                    </SelectContent>
-                  </Select>
+                    <option value="">Select stage</option>
+                    <option value="Idea Stage">Idea Stage</option>
+                    <option value="MVP Development">MVP Development</option>
+                    <option value="Early Traction">Early Traction</option>
+                    <option value="Growth">Growth</option>
+                  </select>
                 </div>
               </div>
               <div>
                 <Label htmlFor="lookingFor">
-                  Looking For (comma-separated roles)
+                  Looking For <span className="text-red-500">*</span> <span className="font-normal text-muted-foreground">(comma-separated roles)</span>
                 </Label>
                 <Input
                   id="lookingFor"
@@ -1851,7 +1742,7 @@ export default function TeamMatching({ user, onNavigate }) {
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <Label htmlFor="location">Location</Label>
+                  <Label htmlFor="location">Location <span className="text-muted-foreground font-normal text-xs">(e.g. Remote)</span></Label>
                   <Input
                     id="location"
                     placeholder="e.g., Remote, San Francisco, etc."
@@ -1866,26 +1757,19 @@ export default function TeamMatching({ user, onNavigate }) {
                   />
                 </div>
                 <div>
-                  <Label htmlFor="commitment">Commitment</Label>
-                  <Select
+                  <Label htmlFor="commitment">Commitment <span className="text-red-500">*</span></Label>
+                  <select
+                    id="commitment"
                     value={postFormData.commitment}
-                    onValueChange={(value) =>
-                      setPostFormData({
-                        ...postFormData,
-                        commitment: value,
-                      })
-                    }
+                    onChange={(e) => setPostFormData({ ...postFormData, commitment: e.target.value })}
+                    className="mt-1 flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
                   >
-                    <SelectTrigger id="commitment" className="mt-1">
-                      <SelectValue placeholder="Select commitment" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="Full-time">Full-time</SelectItem>
-                      <SelectItem value="Part-time">Part-time</SelectItem>
-                      <SelectItem value="Contract">Contract</SelectItem>
-                      <SelectItem value="Flexible">Flexible</SelectItem>
-                    </SelectContent>
-                  </Select>
+                    <option value="">Select commitment</option>
+                    <option value="Full-time">Full-time</option>
+                    <option value="Part-time">Part-time</option>
+                    <option value="Contract">Contract</option>
+                    <option value="Flexible">Flexible</option>
+                  </select>
                 </div>
               </div>
               <div>
@@ -2031,33 +1915,17 @@ export default function TeamMatching({ user, onNavigate }) {
                     <Label htmlFor="compensationPhilosophy">
                       Compensation Philosophy
                     </Label>
-                    <Select
+                    <select
+                      id="compensationPhilosophy"
                       value={postFormData.compensationPhilosophy}
-                      onValueChange={(value) =>
-                        setPostFormData({
-                          ...postFormData,
-                          compensationPhilosophy: value,
-                        })
-                      }
+                      onChange={(e) => setPostFormData({ ...postFormData, compensationPhilosophy: e.target.value })}
+                      className="mt-1 flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
                     >
-                      <SelectTrigger
-                        id="compensationPhilosophy"
-                        className="mt-1"
-                      >
-                        <SelectValue placeholder="Select approach" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="equity-focused">
-                          Equity-Focused (High equity, lower cash)
-                        </SelectItem>
-                        <SelectItem value="balanced">
-                          Balanced (Mix of equity and cash)
-                        </SelectItem>
-                        <SelectItem value="cash-focused">
-                          Cash-Focused (Competitive salary, lower equity)
-                        </SelectItem>
-                      </SelectContent>
-                    </Select>
+                      <option value="">Select approach</option>
+                      <option value="equity-focused">Equity-Focused (High equity, lower cash)</option>
+                      <option value="balanced">Balanced (Mix of equity and cash)</option>
+                      <option value="cash-focused">Cash-Focused (Competitive salary, lower equity)</option>
+                    </select>
                   </div>
                   {postFormData.compensationPhilosophy && (
                     <>
@@ -2103,30 +1971,17 @@ export default function TeamMatching({ user, onNavigate }) {
                       </div>
                       <div>
                         <Label htmlFor="salaryApproach">Salary Approach</Label>
-                        <Select
+                        <select
+                          id="salaryApproach"
                           value={postFormData.salaryApproach}
-                          onValueChange={(value) =>
-                            setPostFormData({
-                              ...postFormData,
-                              salaryApproach: value,
-                            })
-                          }
+                          onChange={(e) => setPostFormData({ ...postFormData, salaryApproach: e.target.value })}
+                          className="mt-1 flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
                         >
-                          <SelectTrigger id="salaryApproach" className="mt-1">
-                            <SelectValue placeholder="Select approach" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="deferred">
-                              Deferred (No salary now, equity only)
-                            </SelectItem>
-                            <SelectItem value="startup-friendly">
-                              Startup-Friendly (Below market rate)
-                            </SelectItem>
-                            <SelectItem value="competitive">
-                              Competitive (Market rate)
-                            </SelectItem>
-                          </SelectContent>
-                        </Select>
+                          <option value="">Select approach</option>
+                          <option value="deferred">Deferred (No salary now, equity only)</option>
+                          <option value="startup-friendly">Startup-Friendly (Below market rate)</option>
+                          <option value="competitive">Competitive (Market rate)</option>
+                        </select>
                       </div>
                       {postFormData.salaryApproach !== "deferred" && (
                         <div className="grid grid-cols-2 gap-4">
@@ -2258,21 +2113,21 @@ export default function TeamMatching({ user, onNavigate }) {
                   )}
                 </div>
               </div>
-              <div className="flex gap-2 pt-4 border-t">
-                <Button
-                  variant="outline"
-                  onClick={() => setIsPostIdeaOpen(false)}
-                  className="flex-1"
-                >
-                  Cancel
-                </Button>
-                <Button onClick={handlePostIdea} className="flex-1">
-                  <Eye className="w-4 h-4 mr-2" />
-                  Preview Post
-                </Button>
-              </div>
             </div>
-          </ScrollArea>
+          </div>
+          <div className="flex gap-2 pt-4 border-t shrink-0">
+            <Button
+              variant="outline"
+              onClick={() => setIsPostIdeaOpen(false)}
+              className="flex-1"
+            >
+              Cancel
+            </Button>
+            <Button onClick={handlePostIdea} className="flex-1">
+              <Eye className="w-4 h-4 mr-2" />
+              Preview Post
+            </Button>
+          </div>
         </DialogContent>
       </Dialog>
       <Dialog open={showPreview} onOpenChange={setShowPreview}>
@@ -2292,7 +2147,7 @@ export default function TeamMatching({ user, onNavigate }) {
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-4 mt-6">
-              <Card className="hover:shadow-lg transition-shadow border-2 border-primary/20">
+              <Card className="rounded-card border border-surface-border bg-surface-card shadow-soft transition-shadow duration-200 ease-in-out hover:shadow-[0_4px_16px_rgba(0,0,0,0.08)]">
                 <CardHeader className="pb-3">
                   <div className="flex items-start justify-between mb-2">
                     <div className="flex items-start gap-3 flex-1">
@@ -2644,42 +2499,10 @@ export default function TeamMatching({ user, onNavigate }) {
           </ScrollArea>
         </DialogContent>
       </Dialog>
-      <TalentProfileDetailsDialog
-        isOpen={selectedMember !== null}
-        onClose={() => setSelectedMember(null)}
-        talent={
-          selectedMember
-            ? {
-                id: selectedMember.id,
-                fullName: selectedMember.name,
-                professionalTitle: selectedMember.role,
-                location: selectedMember.location,
-                bio: selectedMember.bio,
-                skills: selectedMember.skills,
-                linkedinUrl: selectedMember.linkedinUrl,
-                githubUrl: selectedMember.githubUrl,
-                portfolioWebsite: selectedMember.portfolioWebsite,
-                workExperiences: selectedMember.workExperiences,
-                educationList: selectedMember.educationList,
-                certifications: selectedMember.certifications,
-                portfolioItems: selectedMember.portfolioItems,
-                availabilityStatus: selectedMember.availability,
-                preferredCommitment: selectedMember.preferredCommitment,
-                yearsOfExperience: selectedMember.experience,
-                email: selectedMember.email,
-                match: selectedMember.matchScore,
-                primaryRole: selectedMember.role,
-                interests: selectedMember.interests,
-                lookingFor: selectedMember.lookingFor,
-              }
-            : null
-        }
-        onInvite={handleSendInvitation}
-      />
       {showCompensationManager && (
-        <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4">
-          <div className="w-full max-w-6xl h-[90vh] bg-background rounded-lg shadow-xl overflow-hidden flex flex-col">
-            <div className="flex items-center justify-between p-4 border-b">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sv-modal-backdrop">
+          <div className="sv-modal-panel flex h-[90vh] w-full max-w-6xl flex-col overflow-hidden rounded-[16px] border-0 bg-white shadow-modal">
+            <div className="flex items-center justify-between border-b border-[#e2e4f0] p-4">
               <h2 className="text-xl font-bold flex items-center gap-2">
                 <DollarSign className="w-6 h-6 text-primary" />
                 Team Onboarding & Compensation

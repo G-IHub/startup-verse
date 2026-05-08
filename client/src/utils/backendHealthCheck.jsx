@@ -3,11 +3,18 @@
  * Monitors Express API availability and response time.
  */
 
-import { getAccessToken } from "../app/session";
 import { API_BASE_URL } from "../config/apiBase.js";
 
 const API_URL = API_BASE_URL;
 const HEALTH_TIMEOUT = 10000; // 10 seconds
+
+// Default fetch options for cookie-based auth
+const defaultOptions = {
+  credentials: "include",
+  headers: {
+    "Content-Type": "application/json",
+  },
+};
 
 /**
  * Check backend health with timeout
@@ -26,10 +33,8 @@ export async function checkBackendHealth(silent = true) {
 
     // Try to hit a simple endpoint
     const response = await fetch(`${API_URL}/health`, {
+      ...defaultOptions,
       method: "GET",
-      headers: {
-        Authorization: `Bearer ${getAccessToken()}`,
-      },
       signal: controller.signal,
     });
 
@@ -110,10 +115,8 @@ export async function runBackendDiagnostics() {
   for (const endpoint of testEndpoints) {
     try {
       const response = await fetch(`${API_URL}${endpoint}`, {
+        ...defaultOptions,
         method: "GET",
-        headers: {
-          Authorization: `Bearer ${getAccessToken()}`,
-        },
         signal: AbortSignal.timeout(5000),
       });
 
@@ -165,8 +168,8 @@ The backend API is not responding. This could mean:
 
 ## Working in Offline Mode
 
-While the backend is unavailable, StartupVerse will use localStorage for data persistence.
-All features work normally, but data won't sync across devices.
+While the backend is unavailable, StartupVerse runs in a limited offline mode.
+Previously cached data is not guaranteed; reconnect for full functionality.
 
 ## Need Help?
 

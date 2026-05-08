@@ -3,10 +3,17 @@
  * Frontend utility to trigger backend notification routes.
  */
 
-import { getAccessToken } from "../app/session";
 import { API_BASE_URL } from "../config/apiBase.js";
 
 const API_BASE = API_BASE_URL;
+
+// Default fetch options for cookie-based auth
+const defaultOptions = {
+  credentials: "include",
+  headers: {
+    "Content-Type": "application/json",
+  },
+};
 
 function resolveArgs(args, orderedKeys) {
   if (args.length === 1 && args[0] && typeof args[0] === "object") {
@@ -22,11 +29,8 @@ function resolveArgs(args, orderedKeys) {
 async function postNotification(path, payload) {
   try {
     const response = await fetch(`${API_BASE}${path}`, {
+      ...defaultOptions,
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${getAccessToken()}`,
-      },
       body: JSON.stringify(payload),
     });
 

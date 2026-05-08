@@ -1,34 +1,36 @@
 import React, { useState } from "react";
 import { API_BASE_URL } from "../config/apiBase.js";
-import { getAccessToken } from "../app/session";
+import { useAuth } from "../contexts/AuthContext";
 
 /**
  * ADMIN DEBUG DATABASE COMPONENT
  * Shows exactly what's in the database to help debug deletion issues
  */
+
+// Default fetch options for cookie-based auth
+const defaultOptions = {
+  credentials: "include",
+  headers: {
+    "Content-Type": "application/json",
+  },
+};
+
 export function AdminDebugDatabase() {
+  const { user } = useAuth();
   const [loading, setLoading] = useState(false);
   const [dbData, setDbData] = useState(null);
   const handleInspect = async () => {
     setLoading(true);
     try {
-      // Get team members for current founder
-      const currentUser = JSON.parse(
-        localStorage.getItem("startupverse_current_user") || "{}",
-      );
-      if (!currentUser.id) {
-        alert("No current user found!");
+      const currentUser = user;
+      if (!currentUser?.id) {
+        alert("No signed-in user.");
         setLoading(false);
         return;
       }
       const response = await fetch(
         `${API_BASE_URL}/team-members/${currentUser.id}`,
-        {
-          method: "GET",
-          headers: {
-            Authorization: `Bearer ${getAccessToken()}`,
-          },
-        },
+        defaultOptions,
       );
       const data = await response.json();
       setDbData({

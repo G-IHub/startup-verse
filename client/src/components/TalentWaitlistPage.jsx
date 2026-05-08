@@ -23,28 +23,32 @@ import {
   Globe2,
 } from "lucide-react";
 import { ImageWithFallback } from "./figma/ImageWithFallback";
+import { toast } from "sonner";
+import { fetchEnvelope } from "../utils/backendClient.js";
+
 export default function TalentWaitlistPage({ onBack }) {
   const [email, setEmail] = useState("");
   const [isSubmitted, setIsSubmitted] = useState(false);
-  const handleSubmit = (e) => {
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const handleSubmit = async (e) => {
     e.preventDefault();
-
-    // Save to localStorage
-    const existingTalent = JSON.parse(
-      localStorage.getItem("talent_waitlist") || "[]",
-    );
-    existingTalent.push({
-      email,
-      timestamp: new Date().toISOString(),
-    });
-    localStorage.setItem("talent_waitlist", JSON.stringify(existingTalent));
-    setIsSubmitted(true);
-
-    // Reset after 5 seconds
-    setTimeout(() => {
-      setIsSubmitted(false);
-      setEmail("");
-    }, 5000);
+    setIsSubmitting(true);
+    try {
+      await fetchEnvelope("/public/talent-waitlist", {
+        method: "POST",
+        body: JSON.stringify({ email, payload: { source: "talent-waitlist-page" } }),
+      });
+      setIsSubmitted(true);
+      setTimeout(() => {
+        setIsSubmitted(false);
+        setEmail("");
+      }, 5000);
+    } catch (err) {
+      toast.error(err?.message || "Could not join waitlist. Try again.");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
   return (
     <div className="min-h-screen bg-background">

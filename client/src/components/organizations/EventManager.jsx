@@ -28,10 +28,17 @@ import { notifyEventCreated } from "../../utils/eventNotifications";
 import { toast } from "sonner";
 import MiniCalendar from "../calendar/MiniCalendar";
 import { getOrganizationCalendarEvents } from "../../utils/calendarIntegration";
-import { getAccessToken } from "../../app/session";
 import { unwrapData } from "../../utils/apiEnvelope";
 
 const API_BASE = API_BASE_URL;
+
+// Default fetch options for cookie-based auth
+const defaultOptions = {
+  credentials: "include",
+  headers: {
+    "Content-Type": "application/json",
+  },
+};
 
 export default function EventManager({
   cohortId,
@@ -72,11 +79,8 @@ export default function EventManager({
   const loadEvents = async () => {
     try {
       setLoading(true);
-      const token = getAccessToken();
       const response = await fetch(`${API_BASE}/cohorts/${cohortId}/events`, {
-        headers: {
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
+        ...defaultOptions,
       });
       if (!response.ok) throw new Error("Failed to fetch events");
       const payload = await response.json();
@@ -98,13 +102,9 @@ export default function EventManager({
         // Generate Jitsi meeting room
         meetingUrl = `${window.location.origin}/join/Event-${eventId}`;
       }
-      const token = getAccessToken();
       const response = await fetch(`${API_BASE}/cohorts/${cohortId}/events`, {
+        ...defaultOptions,
         method: "POST",
-        headers: {
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-          "Content-Type": "application/json",
-        },
         body: JSON.stringify({
           organizationId,
           title: formData.title,
@@ -571,11 +571,11 @@ export default function EventManager({
       )}
       {selectedAgenda && (
         <div
-          className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 sv-modal-backdrop"
           onClick={() => setSelectedAgenda(null)}
         >
           <Card
-            className="w-full max-w-xl"
+            className="sv-modal-panel w-full max-w-xl rounded-[16px] border-0 shadow-modal"
             onClick={(e) => e.stopPropagation()}
           >
             <CardContent className="p-6">

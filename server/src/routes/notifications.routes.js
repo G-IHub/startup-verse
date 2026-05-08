@@ -3,27 +3,29 @@ import asyncHandler from "../utils/asyncHandler.js";
 import requireAuth from "../middleware/requireAuth.js";
 import { error as apiError, success as apiSuccess } from "../utils/apiResponse.js";
 import Notification from "../models/Notification.js";
-import { emitRealtime } from "../services/realtime.service.js";
-import { enqueueNotificationEmitRetry } from "../services/reminderDeliveryQueue.js";
-import { SOCKET_EVENTS } from "../realtime/events.js";
-import { userRoom } from "../realtime/rooms.js";
+import { createNotification } from "../services/notificationService.js";
+
+// Realtime fanout is implemented in notificationService.js using
+// emitRealtime(SOCKET_EVENTS.NOTIFICATION_CREATED, ...) to user rooms.
+// Failed emits enqueueNotificationEmitRetry(notificationId, type) for backoff delivery.
 
 const notificationsRouter = Router();
 const isSelfOrAdmin = (req, userId) => req.user?.isAdmin === true || req.user?.id === String(userId);
 
+// Compatibility shim — preserves the historical `createAndEmitNotification`
+// surface used by existing routes, but delegates to the canonical service.
 async function createAndEmitNotification(payload) {
-  const notification = await Notification.create(payload);
-  try {
-    const delivered = emitRealtime(SOCKET_EVENTS.NOTIFICATION_CREATED, notification, [
-      userRoom(notification.userId),
-    ]);
-    if (!delivered) {
-      await enqueueNotificationEmitRetry(notification._id, notification.type);
-    }
-  } catch {
-    await enqueueNotificationEmitRetry(notification._id, notification.type);
-  }
-  return notification;
+  return createNotification({
+    userId: payload.userId,
+    type: payload.type,
+    title: payload.title,
+    message: payload.message,
+    actionUrl: payload.actionUrl || payload.metadata?.actionUrl || "",
+    metadata: payload.metadata || {},
+    // Manual triggers used by clients/admins should bypass user prefs so that
+    // legitimate operational notifications (test, manual reminder) still arrive.
+    skipPreferences: true,
+  });
 }
 
 notificationsRouter.get(
@@ -53,6 +55,7 @@ notificationsRouter.post(
       title: req.body?.title || "Notification",
       message: req.body?.message || "",
       type: req.body?.type || "general",
+      actionUrl: req.body?.actionUrl || "",
       metadata: req.body?.metadata || {},
     });
 
@@ -79,6 +82,7 @@ notificationsRouter.post(
         title: item.title || "Notification",
         message: item.message || "",
         type: item.type || "general",
+        actionUrl: item.actionUrl || "",
         metadata: item.metadata || {},
       });
       created.push(notification);

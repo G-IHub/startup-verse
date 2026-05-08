@@ -74,7 +74,7 @@ const SheetOverlay = React.forwardRef(({ className, ...props }, ref) => {
           ref: ref,
           "data-slot": "sheet-overlay",
           className: cn(
-            "data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 fixed inset-0 z-50 bg-black/50",
+            "sv-modal-backdrop data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 fixed inset-0 z-50",
             className,
           ),
         },
@@ -93,15 +93,15 @@ function SheetContent({ className, children, side = "right", ...props }) {
           {
             "data-slot": "sheet-content",
             className: cn(
-              "bg-background data-[state=open]:animate-in data-[state=closed]:animate-out fixed z-50 flex flex-col gap-4 shadow-lg transition ease-in-out data-[state=closed]:duration-300 data-[state=open]:duration-500",
+              "bg-surface-card font-body text-text-body data-[state=open]:animate-in data-[state=closed]:animate-out shadow-modal transition ease-in-out duration-200 fixed z-50 flex flex-col gap-4 border-0 data-[state=closed]:duration-300 data-[state=open]:duration-500",
               side === "right" &&
-                "data-[state=closed]:slide-out-to-right data-[state=open]:slide-in-from-right inset-y-0 right-0 h-full w-3/4 border-l sm:max-w-sm",
+                "data-[state=closed]:slide-out-to-right data-[state=open]:slide-in-from-right inset-y-0 right-0 h-full w-3/4 rounded-l-[16px] sm:max-w-sm",
               side === "left" &&
-                "data-[state=closed]:slide-out-to-left data-[state=open]:slide-in-from-left inset-y-0 left-0 h-full w-3/4 border-r sm:max-w-sm",
+                "data-[state=closed]:slide-out-to-left data-[state=open]:slide-in-from-left inset-y-0 left-0 h-full w-3/4 rounded-r-[16px] sm:max-w-sm",
               side === "top" &&
-                "data-[state=closed]:slide-out-to-top data-[state=open]:slide-in-from-top inset-x-4 top-4 h-auto max-w-[calc(100%-2rem)] mx-auto border-b rounded-b-lg sm:inset-x-auto sm:max-w-lg",
+                "data-[state=closed]:slide-out-to-top data-[state=open]:slide-in-from-top inset-x-4 top-4 h-auto max-w-[calc(100%-2rem)] mx-auto rounded-b-[16px] sm:inset-x-auto sm:max-w-lg",
               side === "bottom" &&
-                "data-[state=closed]:slide-out-to-bottom data-[state=open]:slide-in-from-bottom inset-x-4 bottom-4 h-auto max-w-[calc(100%-2rem)] mx-auto border-t rounded-t-lg sm:inset-x-auto sm:max-w-lg",
+                "data-[state=closed]:slide-out-to-bottom data-[state=open]:slide-in-from-bottom inset-x-4 bottom-4 h-auto max-w-[calc(100%-2rem)] mx-auto rounded-t-[16px] sm:inset-x-auto sm:max-w-lg",
               className,
             ),
           },
@@ -109,7 +109,7 @@ function SheetContent({ className, children, side = "right", ...props }) {
         )}
       >
         {children}
-        <SheetPrimitive.Close className="ring-offset-background focus:ring-ring data-[state=open]:bg-secondary absolute top-4 right-4 rounded-xs opacity-70 transition-opacity hover:opacity-100 focus:ring-2 focus:ring-offset-2 focus:outline-hidden disabled:pointer-events-none">
+        <SheetPrimitive.Close className="absolute top-4 right-4 rounded-lg bg-transparent p-1.5 text-[#a0a0b0] transition-all duration-200 ease-in-out hover:bg-[#f4f5ff] hover:text-text-heading focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 disabled:pointer-events-none">
           <XIcon className="size-4" />
           <span className="sr-only">Close</span>
         </SheetPrimitive.Close>
@@ -123,7 +123,10 @@ function SheetHeader({ className, ...props }) {
       {..._extends(
         {
           "data-slot": "sheet-header",
-          className: cn("flex flex-col gap-1.5 p-4", className),
+          className: cn(
+            "flex flex-col gap-1.5 border-b border-[#e2e4f0] p-4 pb-4",
+            className,
+          ),
         },
         props,
       )}
@@ -149,7 +152,10 @@ function SheetTitle({ className, ...props }) {
       {..._extends(
         {
           "data-slot": "sheet-title",
-          className: cn("text-foreground font-semibold", className),
+          className: cn(
+            "font-heading font-bold text-[#0d0d0d]",
+            className,
+          ),
         },
         props,
       )}
@@ -162,7 +168,10 @@ function SheetDescription({ className, ...props }) {
       {..._extends(
         {
           "data-slot": "sheet-description",
-          className: cn("text-muted-foreground text-sm", className),
+          className: cn(
+            "font-body text-sm font-normal text-[#4a4a5a]",
+            className,
+          ),
         },
         props,
       )}

@@ -27,6 +27,7 @@ const messageSchema = new mongoose.Schema(
     body: { type: String, required: true },
     attachments: { type: [mongoose.Schema.Types.Mixed], default: [] },
     readAt: { type: Date, default: null },
+    metadata: { type: mongoose.Schema.Types.Mixed, default: {} },
   },
   { timestamps: true },
 );

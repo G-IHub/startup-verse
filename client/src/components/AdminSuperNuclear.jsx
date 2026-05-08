@@ -1,6 +1,13 @@
 import React, { useState } from "react";
 import { API_BASE_URL } from "../config/apiBase.js";
-import { getAccessToken } from "../app/session";
+import { removeBrowserKVExcept } from "../utils/clearLegacyClientStorage.js";
+
+// Default fetch options for cookie-based auth
+
+const defaultOptions = {
+  credentials: "include",
+  headers: { "Content-Type": "application/json" },
+};
 
 /**
  * SUPER NUCLEAR ADMIN COMPONENT
@@ -23,11 +30,8 @@ export function AdminSuperNuclear() {
       const resetResponse = await fetch(
         `${API_BASE_URL}/admin/nuclear-reset`,
         {
+          ...defaultOptions,
           method: "POST",
-          headers: {
-            Authorization: `Bearer ${getAccessToken()}`,
-            "Content-Type": "application/json",
-          },
         },
       );
       const resetData = await resetResponse.json();
@@ -41,15 +45,9 @@ export function AdminSuperNuclear() {
       };
       setResult(summaryData);
 
-      // Clear localStorage
-      console.log("🧹 [SUPER NUCLEAR] Clearing localStorage...");
-      const keysToKeep = ["startupverse_ui_mode", "theme"];
-      const allKeys = Object.keys(localStorage);
-      allKeys.forEach((key) => {
-        if (!keysToKeep.includes(key)) {
-          localStorage.removeItem(key);
-        }
-      });
+      // Clear legacy browser keys (keep theme preferences only)
+      console.log("🧹 [SUPER NUCLEAR] Clearing legacy browser keys...");
+      removeBrowserKVExcept(["startupverse_ui_mode", "theme"]);
       alert(
         `🚨 SUPER NUCLEAR COMPLETE!\n\n` +
           `DELETED:\n` +
@@ -60,7 +58,7 @@ export function AdminSuperNuclear() {
           `  • ${summaryData.remainingFounders.length} founders\n` +
           `${summaryData.remainingFounders.map((f) => `    - ${f.name} (${f.email})`).join("\n")}\n\n` +
           `✅ Database wiped!\n` +
-          `✅ localStorage cleared!\n\n` +
+          `✅ Legacy browser keys cleared!\n\n` +
           `Page will reload in 2 seconds...`,
       );
       setTimeout(() => {

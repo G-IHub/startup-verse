@@ -4,12 +4,15 @@ import { Button } from "../ui/button";
 import { Avatar, AvatarFallback } from "../ui/avatar";
 import { Textarea } from "../ui/textarea";
 import { Progress } from "../ui/progress";
-import ProfileCompletionModal from "../ProfileCompletionModal";
 import OfferDisplay from "../OfferDisplay";
 import { toast } from "sonner";
 import { getTalentProfileCompletionPercent } from "../../utils/talentProfileCompletion";
-import { TALENT_ACTIONS_MIN_COMPLETION } from "../../constants/talentProfile.js";
+import {
+  TALENT_ACTIONS_MIN_COMPLETION,
+  TALENT_BROWSE_MIN_COMPLETION,
+} from "../../constants/talentProfile.js";
 import { useTalentHomeData } from "../../domains/talent/hooks/useTalentHomeData";
+import { getFirstName } from "../../utils/nameHelpers";
 import {
   Star,
   Heart,
@@ -23,6 +26,13 @@ import {
   LayoutGrid,
   List,
   X,
+  Search,
+  ArrowRight,
+  DollarSign,
+  Bookmark,
+  Sparkles,
+  Eye,
+  CheckCircle2,
 } from "lucide-react";
 import {
   Dialog,
@@ -137,9 +147,12 @@ function getMatchStyle(score) {
 export default function TalentDashboard({
   user,
   onUpdateUser,
+  onNavigate,
+  entryMode = "overview",
 }) {
-  const [showProfileModal, setShowProfileModal] = useState(false);
   const talentCompletion = getTalentProfileCompletionPercent(user);
+  const visibleToFoundersInBrowse =
+    talentCompletion >= TALENT_BROWSE_MIN_COMPLETION;
   const canUsePrimaryTalentActions =
     talentCompletion >= TALENT_ACTIONS_MIN_COMPLETION;
   const [selectedStartup, setSelectedStartup] = useState(null);
@@ -157,19 +170,16 @@ export default function TalentDashboard({
     viewModel,
     toggleSaved,
     sendInterest,
-    refresh,
   } = useTalentHomeData({ user });
   const matchedOpportunities = viewModel.opportunities || [];
-
 
   const hasExpressedInterest = (startup) => {
     const startupId = String(startup?.startupId || startup?.id || "");
     return viewModel.sentInterestStartupIds.includes(startupId);
   };
 
-  const handleProfileComplete = async () => {
-    await refresh();
-    setShowProfileModal(false);
+  const handleCompleteProfileClick = () => {
+    onNavigate?.("settings", { editProfile: true });
   };
 
   const handleExpressInterest = async () => {
@@ -178,7 +188,7 @@ export default function TalentDashboard({
       toast.info("Complete your profile first", {
         description: `Reach at least ${TALENT_ACTIONS_MIN_COMPLETION}% profile depth to send interest.`,
       });
-      setShowProfileModal(true);
+      handleCompleteProfileClick();
       return;
     }
     if (!interestMessage.trim()) {
@@ -221,7 +231,6 @@ export default function TalentDashboard({
     toast.success(result.saved ? "Saved for later!" : "Removed from saved");
   };
 
-
   const displayedMatches = matchedOpportunities;
   const startupRows = useMemo(
     () =>
@@ -240,7 +249,8 @@ export default function TalentDashboard({
           posted: toRelativePosted(startup.postedDate, startup.posted),
         };
         return {
-          id: startup.id?.toString() || `${startup.title || "startup"}-${index}`,
+          id:
+            startup.id?.toString() || `${startup.title || "startup"}-${index}`,
           startupId:
             startup.startupId?.toString() ||
             startup.id?.toString() ||
@@ -312,10 +322,16 @@ export default function TalentDashboard({
         ) {
           return false;
         }
-        if (filters.equity.length > 0 && !filters.equity.includes(row.equityBucket)) {
+        if (
+          filters.equity.length > 0 &&
+          !filters.equity.includes(row.equityBucket)
+        ) {
           return false;
         }
-        if (filters.location.length > 0 && !filters.location.includes(row.location)) {
+        if (
+          filters.location.length > 0 &&
+          !filters.location.includes(row.location)
+        ) {
           return false;
         }
         if (
@@ -331,10 +347,12 @@ export default function TalentDashboard({
   const sortedRows = useMemo(() => {
     const rows = [...filteredRows];
     rows.sort((left, right) => {
-      if (sortBy === "newest") return right.postedDateValue - left.postedDateValue;
+      if (sortBy === "newest")
+        return right.postedDateValue - left.postedDateValue;
       if (sortBy === "equity") {
         return (
-          (right.equityRange?.midpoint || -1) - (left.equityRange?.midpoint || -1)
+          (right.equityRange?.midpoint || -1) -
+          (left.equityRange?.midpoint || -1)
         );
       }
       if (sortBy === "teamSize") return right.teamSize - left.teamSize;
@@ -371,17 +389,560 @@ export default function TalentDashboard({
       hint: `${viewModel.summary.pendingInvitationCount} pending`,
     },
   ];
+
+  const topMatches = sortedRows.slice(0, 6);
+
+  const today = new Date();
+  const dateLabel = today.toLocaleDateString("en-US", {
+    weekday: "long",
+    month: "long",
+    day: "numeric",
+  });
+
+  if (entryMode !== "opportunities") {
+    return (
+      <div className="min-h-full bg-background">
+        <div className="max-w-7xl mx-auto py-4 space-y-4 ">
+          {/* Welcome Header */}
+          <div className="flex items-start justify-between">
+            <div>
+              <h1 className="font-heading text-2xl font-extrabold text-text-heading">
+                {"Welcome back, "}
+                {getFirstName(user?.name) || "New User"}
+              </h1>
+              <p className="font-body text-sm text-text-muted mt-0.5">
+                {dateLabel}
+              </p>
+            </div>
+            <div className="flex items-center gap-6">
+              <div className="flex items-center gap-2 bg-surface-card rounded-input shadow-soft px-3 py-2 transition-shadow duration-200 ease-in-out hover:shadow-[0_4px_16px_rgba(58,90,254,0.10)]">
+                <Star className="h-4 w-4 text-status-warning" />
+                <div className="flex items-center gap-1">
+                  <span className="font-heading text-base font-bold text-primary">
+                    {viewModel.summary.sentInterestCount}
+                  </span>
+                  <p className="font-body text-[11px] font-medium text-text-body leading-none">
+                    New Matches
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2 bg-surface-card rounded-input shadow-soft px-3 py-2 transition-shadow duration-200 ease-in-out hover:shadow-[0_4px_16px_rgba(58,90,254,0.10)]">
+                <Bookmark className="h-4 w-4 text-accent" />
+                <div className="flex items-center gap-1"> 
+                  <span className="font-heading text-base font-bold text-primary">
+                    {viewModel.summary.savedCount}
+                  </span>
+                  <p className="font-body text-[11px] font-medium text-text-body leading-none">
+                    Saved
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Hero Banner */}
+          <div
+            className="rounded-card px-6 py-4 text-white shadow-[0_4px_24px_rgba(58,90,254,0.18)] transition-shadow duration-200 ease-in-out"
+            style={{
+              background:
+                "linear-gradient(135deg, #3a5afe 0%, #7c4dff 100%)",
+            }}
+          >
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <h2 className="font-heading text-base font-bold text-white">
+                  Find Your Perfect Startup
+                </h2>
+                <p className="font-body text-sm text-white/85 mt-1 max-w-xl">
+                  Discover startups that match your skills, interests, and
+                  career goals. Connect with founders and join exciting teams.
+                </p>
+              </div>
+              <Button
+                onClick={() => onNavigate?.("team-matching")}
+                className="shrink-0 bg-white/15 hover:bg-white/25 text-white font-body font-semibold gap-2 rounded-input px-4 backdrop-blur-[4px] border-[1.5px] border-white/40 transition-colors duration-200 ease-in-out"
+                size="sm"
+              >
+                <Search className="h-4 w-4" />
+                Browse Startups
+                <ArrowRight className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+
+          {/* Top Matches Section */}
+          <div>
+            <div className="flex items-center gap-2 mb-0.5">
+              <Star className="h-4 w-4 text-status-warning" />
+              <h2 className="font-heading text-base font-bold text-text-heading">
+                Top Matches for You
+              </h2>
+            </div>
+            <p className="font-body text-sm text-text-body mb-5">
+              Startups looking for your skills
+            </p>
+
+            {isLoading && topMatches.length === 0 && (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+                {[1, 2, 3].map((n) => (
+                  <div
+                    key={n}
+                    className="rounded-xl border border-border bg-card p-5 space-y-4 animate-pulse"
+                  >
+                    <div className="flex gap-3">
+                      <div className="h-10 w-10 bg-muted rounded-lg shrink-0" />
+                      <div className="flex-1 space-y-2">
+                        <div className="h-4 bg-muted rounded w-3/4" />
+                        <div className="h-3 bg-muted rounded w-1/2" />
+                      </div>
+                    </div>
+                    <div className="h-14 bg-muted rounded" />
+                    <div className="h-8 bg-muted rounded" />
+                    <div className="grid grid-cols-2 gap-2">
+                      {[1, 2, 3, 4].map((i) => (
+                        <div key={i} className="h-3 bg-muted rounded" />
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {!isLoading && topMatches.length === 0 && (
+              <div className="rounded-card bg-surface-card shadow-soft px-6 py-12 text-center transition-shadow duration-200 ease-in-out border border-border/60">
+                <Sparkles className="h-8 w-8 text-accent mx-auto mb-3" />
+                <p className="font-heading text-sm font-semibold text-text-heading">
+                  No matches yet
+                </p>
+                <p className="font-body text-xs text-text-muted mt-1 max-w-md mx-auto leading-relaxed">
+                  Complete your profile to unlock personalized startup matches.
+                </p>
+                {!visibleToFoundersInBrowse && (
+                  <div className="mt-6 mx-auto max-w-md rounded-xl border border-primary/15 bg-gradient-to-br from-[#3a5afe]/[0.07] via-background to-[#7c4dff]/[0.06] px-4 py-3.5 text-left shadow-[0_1px_0_0_rgba(255,255,255,0.65)_inset] dark:shadow-none dark:from-[#3a5afe]/10 dark:to-background">
+                    <div className="flex gap-3">
+                      <div
+                        className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-white shadow-md"
+                        style={{
+                          background:
+                            "linear-gradient(145deg, #3a5afe 0%, #7c4dff 100%)",
+                        }}
+                        aria-hidden
+                      >
+                        <Eye className="h-[18px] w-[18px]" strokeWidth={2} />
+                      </div>
+                      <div className="min-w-0 pt-0.5">
+                        <p className="font-heading text-[12px] font-semibold text-text-heading tracking-tight">
+                          Founder discovery
+                        </p>
+                        <p className="font-body text-[11px] text-text-muted mt-1 leading-relaxed">
+                          Reach{" "}
+                          <span className="font-semibold text-primary tabular-nums">
+                            {TALENT_BROWSE_MIN_COMPLETION}%
+                          </span>{" "}
+                          profile completion to appear in{" "}
+                          <span className="font-medium text-foreground/90">
+                            Browse Talent
+                          </span>{" "}
+                          when founders search for teammates.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="mt-5 rounded-input border-[1.5px] border-primary bg-surface-card text-primary font-body font-semibold hover:bg-primary hover:text-white transition-colors duration-200 ease-in-out"
+                  onClick={handleCompleteProfileClick}
+                >
+                  Complete Profile
+                </Button>
+              </div>
+            )}
+
+            {topMatches.length > 0 && (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {topMatches.map((row) => (
+                  <div
+                    key={row.id}
+                    className="rounded-xl border border-border bg-card hover:shadow-md transition-shadow cursor-pointer p-5 flex flex-col gap-3"
+                    onClick={() => setSelectedStartup(row.startup)}
+                  >
+                    {/* Card Header: avatar + title + match badge */}
+                    <div className="flex items-start gap-3">
+                      <Avatar className="h-10 w-10 rounded-lg flex-shrink-0">
+                        <AvatarFallback
+                          className={`rounded-lg text-[13px] font-bold ${row.avatarTone}`}
+                        >
+                          {getInitials(row.title)}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-[13px] font-semibold leading-tight">
+                          {row.title}
+                        </p>
+                        <p className="text-[12px] text-muted-foreground mt-0.5">
+                          by {row.founder}
+                        </p>
+                      </div>
+                      <div
+                        className={`shrink-0 text-center rounded-lg px-2.5 py-1.5 min-w-[52px] ${getMatchStyle(row.matchScore)}`}
+                      >
+                        <p className="text-[14px] font-bold leading-none">
+                          {row.matchScore}%
+                        </p>
+                        <p className="text-[10px] leading-none mt-0.5 opacity-80">
+                          Match
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Description */}
+                    <p className="text-[12px] text-muted-foreground leading-relaxed line-clamp-3">
+                      {row.startup?.description || row.shortDescription}
+                    </p>
+
+                    {/* Role chips */}
+                    {row.startup?.lookingFor?.length > 0 && (
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <Users className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                        <div className="flex items-center gap-1 flex-wrap">
+                          {row.startup.lookingFor.slice(0, 4).map((role, i) => (
+                            <span
+                              key={i}
+                              className="inline-flex items-center rounded-full border border-border bg-background px-2 py-0.5 text-[11px] text-foreground"
+                            >
+                              {role}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Industry tag */}
+                    {(row.startup?.industry || row.startup?.industryFocus) && (
+                      <p className="text-[11px] text-muted-foreground -mt-1">
+                        {row.startup.industry || row.startup.industryFocus}
+                      </p>
+                    )}
+
+                    {/* Meta Grid: 2 cols, icon + label left, value right */}
+                    <div className="grid grid-cols-2 gap-x-6 gap-y-2 text-[12px]">
+                      <div>
+                        <div className="flex items-center gap-1 text-muted-foreground mb-0.5">
+                          <TrendingUp className="h-3 w-3 shrink-0" />
+                          <span>Stage</span>
+                        </div>
+                        <p className="font-medium text-foreground">
+                          {row.stage}
+                        </p>
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-1 text-muted-foreground mb-0.5">
+                          <DollarSign className="h-3 w-3 shrink-0" />
+                          <span>Funding</span>
+                        </div>
+                        <p className="font-medium text-foreground">
+                          {row.funding}
+                        </p>
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-1 text-muted-foreground mb-0.5">
+                          <Users className="h-3 w-3 shrink-0" />
+                          <span>Team Size</span>
+                        </div>
+                        <p className="font-medium text-foreground">
+                          {row.teamSize > 0 ? `${row.teamSize} members` : "—"}
+                        </p>
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-1 text-muted-foreground mb-0.5">
+                          <MapPin className="h-3 w-3 shrink-0" />
+                          <span>Location</span>
+                        </div>
+                        <p className="font-medium text-foreground">
+                          {row.location}
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Footer: Equity + Commitment */}
+                    <div className="grid grid-cols-2 gap-4 pt-3 mt-auto border-t border-border">
+                      <div>
+                        <div className="flex items-center gap-1 text-muted-foreground mb-0.5">
+                          <DollarSign className="h-3 w-3 text-green-600 shrink-0" />
+                          <span className="text-[11px]">Equity Offer</span>
+                        </div>
+                        <p className="text-[13px] font-semibold text-green-600">
+                          {row.equityRange ? row.equityRange.label : "N/A"}
+                        </p>
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-1 text-muted-foreground mb-0.5">
+                          <Clock className="h-3 w-3 text-blue-500 shrink-0" />
+                          <span className="text-[11px]">Commitment</span>
+                        </div>
+                        <p className="text-[13px] font-semibold text-blue-600">
+                          {row.commitment}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {topMatches.length > 0 && sortedRows.length > 6 && (
+              <div className="mt-5 text-center">
+                <Button
+                  variant="outline"
+                  onClick={() => onNavigate?.("team-matching")}
+                  className="gap-2"
+                >
+                  View all {sortedRows.length} matches
+                  <ArrowRight className="h-4 w-4" />
+                </Button>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Complete Your Profile floating badge */}
+        {talentCompletion < 100 && (
+          <button
+            type="button"
+            className="fixed bottom-6 right-6 z-50 flex max-w-[min(300px,calc(100vw-2rem))] cursor-pointer flex-col gap-2.5 rounded-card border border-primary/10 bg-surface-card px-4 py-3.5 text-left shadow-[0_8px_32px_rgba(58,90,254,0.14)] transition-shadow duration-200 ease-in-out hover:border-primary/18 hover:shadow-[0_12px_40px_rgba(58,90,254,0.18)]"
+            onClick={handleCompleteProfileClick}
+          >
+            <div className="flex items-center gap-3">
+              <div
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-input"
+                style={{
+                  background: "linear-gradient(135deg, #ffb300, #ff6b00)",
+                }}
+              >
+                <Sparkles className="h-4 w-4 text-white" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="mb-1 flex items-center justify-between gap-2">
+                  <p className="font-heading text-[12px] font-semibold leading-tight text-text-heading">
+                    Complete Your Profile
+                  </p>
+                  <ArrowRight className="h-3 w-3 shrink-0 text-primary" />
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <Progress
+                    value={talentCompletion}
+                    className="h-1.5 flex-1 rounded-pill border-0 bg-surface-border [&>[data-slot=progress-indicator]]:!bg-[linear-gradient(90deg,#3a5afe,#7c4dff)]"
+                  />
+                  <span className="shrink-0 font-body text-[11px] font-bold tabular-nums text-primary">
+                    {talentCompletion}%
+                  </span>
+                </div>
+              </div>
+            </div>
+            {!visibleToFoundersInBrowse ? (
+              <div className="rounded-xl border border-primary/12 bg-gradient-to-br from-[#3a5afe]/[0.06] via-transparent to-[#7c4dff]/[0.07] px-3 py-2.5">
+                <div className="flex gap-2">
+                  <Eye className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+                  <div className="min-w-0">
+                    <p className="font-heading text-[11px] font-semibold text-text-heading">
+                      Visible to founders at {TALENT_BROWSE_MIN_COMPLETION}%
+                    </p>
+                    <p className="mt-0.5 font-body text-[10px] leading-relaxed text-text-muted">
+                      Until then, your profile stays out of Browse Talent so
+                      founders only see ready candidates.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <p className="flex items-center gap-1.5 px-0.5 font-body text-[10px] font-medium text-emerald-700 dark:text-emerald-400/90">
+                <CheckCircle2 className="h-3.5 w-3.5 shrink-0" />
+                You appear in founder Browse Talent
+              </p>
+            )}
+          </button>
+        )}
+
+        {/* Detail Dialog (shared with browse view) */}
+        <Dialog
+          open={selectedStartup !== null}
+          onOpenChange={() => {
+            setSelectedStartup(null);
+            setInterestMessage("");
+          }}
+        >
+          <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto overflow-x-hidden">
+            {selectedStartup && (
+              <>
+                <DialogHeader>
+                  <div className="flex items-start gap-4 pr-8">
+                    <Avatar className="w-16 h-16 flex-shrink-0">
+                      <AvatarFallback className="bg-primary/10 text-primary text-lg">
+                        {selectedStartup.title
+                          .split(" ")
+                          .map((w) => w[0])
+                          .join("")
+                          .slice(0, 2)}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="flex-1 min-w-0">
+                      <DialogTitle className="text-2xl mb-2 pr-0">
+                        {selectedStartup.title}
+                      </DialogTitle>
+                      <DialogDescription className="text-base">
+                        {"by "}
+                        {selectedStartup.founder}
+                        {" • "}
+                        {selectedStartup.posted}
+                      </DialogDescription>
+                      <div className="flex flex-wrap items-center gap-2 mt-3">
+                        <div className="flex items-center gap-1 bg-yellow-50 dark:bg-yellow-950/20 px-3 py-1.5 rounded-full">
+                          <Star className="w-4 h-4 text-yellow-500 fill-yellow-500" />
+                          <span className="text-lg font-semibold text-primary">
+                            {selectedStartup.match}%
+                          </span>
+                          <span className="text-sm text-muted-foreground">
+                            Match
+                          </span>
+                        </div>
+                        <Badge variant="outline">
+                          {selectedStartup.industry}
+                        </Badge>
+                      </div>
+                    </div>
+                  </div>
+                </DialogHeader>
+                <div className="space-y-6 mt-6">
+                  <div className="pb-4 border-b">
+                    <p className="text-muted-foreground leading-relaxed">
+                      {selectedStartup.description}
+                    </p>
+                  </div>
+                  <div>
+                    <div className="flex flex-wrap gap-2">
+                      {(selectedStartup.tags || []).map((tag, idx) => (
+                        <Badge
+                          key={idx}
+                          variant="secondary"
+                          className="text-xs"
+                        >
+                          {tag}
+                        </Badge>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="flex items-start gap-2 min-w-0">
+                      <TrendingUp className="w-4 h-4 text-muted-foreground flex-shrink-0 mt-1" />
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm text-muted-foreground">Stage</p>
+                        <p className="font-medium break-words">
+                          {selectedStartup.stage}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-start gap-2 min-w-0">
+                      <MapPin className="w-4 h-4 text-muted-foreground flex-shrink-0 mt-1" />
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm text-muted-foreground">
+                          Location
+                        </p>
+                        <p className="font-medium break-words">
+                          {selectedStartup.location}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-start gap-2 min-w-0">
+                      <Clock className="w-4 h-4 text-muted-foreground flex-shrink-0 mt-1" />
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm text-muted-foreground">
+                          Commitment
+                        </p>
+                        <p className="font-medium break-words">
+                          {selectedStartup.commitment}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-start gap-2 min-w-0">
+                      <Users className="w-4 h-4 text-muted-foreground flex-shrink-0 mt-1" />
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm text-muted-foreground">
+                          Interested
+                        </p>
+                        <p className="font-medium">
+                          {selectedStartup.interested}
+                          {" people"}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground mb-2">
+                      Looking for:
+                    </p>
+                    <div className="flex flex-wrap gap-2">
+                      {(selectedStartup.lookingFor || []).map((role, idx) => (
+                        <Badge key={idx} className="text-sm py-1.5 px-3">
+                          {role}
+                        </Badge>
+                      ))}
+                    </div>
+                  </div>
+                  {selectedStartup.offer && (
+                    <div className="w-full overflow-hidden">
+                      <OfferDisplay offer={selectedStartup.offer} />
+                    </div>
+                  )}
+                  {!hasExpressedInterest(selectedStartup) && (
+                    <div className="pt-4 border-t space-y-3">
+                      <div>
+                        <p className="text-sm font-medium mb-2">
+                          Why are you interested?
+                        </p>
+                        <Textarea
+                          placeholder={`Tell ${selectedStartup.founder} about your background, what excites you about this idea, and what value you can bring to the team...`}
+                          rows={5}
+                          value={interestMessage}
+                          onChange={(e) => setInterestMessage(e.target.value)}
+                          className="resize-none"
+                        />
+                      </div>
+                      <Button
+                        className="w-full"
+                        size="lg"
+                        onClick={handleExpressInterest}
+                        disabled={
+                          !interestMessage.trim() || isSubmittingApplication
+                        }
+                      >
+                        <Send className="w-5 h-5 mr-2" />
+                        {isSubmittingApplication
+                          ? "Sending..."
+                          : "Send Interest"}
+                      </Button>
+                    </div>
+                  )}
+                  {hasExpressedInterest(selectedStartup) && (
+                    <div className="pt-4 border-t">
+                      <Button className="w-full" size="lg" disabled={true}>
+                        <Target className="w-5 h-5 mr-2" />
+                        Interest Expressed
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              </>
+            )}
+          </DialogContent>
+        </Dialog>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-3 p-3">
-      {showProfileModal && (
-        <ProfileCompletionModal
-          role={user.role}
-          user={user}
-          onUpdateUser={onUpdateUser}
-          onComplete={handleProfileComplete}
-          onClose={() => setShowProfileModal(false)}
-        />
-      )}
       {showProfileBanner && (
         <div className="rounded-md border border-blue-200 bg-blue-50 px-4 py-3">
           <div className="flex items-start gap-3">
@@ -396,6 +957,20 @@ export default function TalentDashboard({
                     Reach {TALENT_ACTIONS_MIN_COMPLETION}% profile strength to
                     unlock browsing and applications.
                   </p>
+                  {!visibleToFoundersInBrowse ? (
+                    <p className="mt-2 text-[11px] leading-snug text-blue-900/90 border-l-2 border-indigo-400 pl-2">
+                      Founders only see profiles at{" "}
+                      <span className="font-semibold tabular-nums">
+                        {TALENT_BROWSE_MIN_COMPLETION}%+
+                      </span>{" "}
+                      in Browse Talent—bring yours up to get discovered.
+                    </p>
+                  ) : (
+                    <p className="mt-2 text-[11px] leading-snug text-emerald-800 dark:text-emerald-600 flex items-center gap-1">
+                      <CheckCircle2 className="h-3.5 w-3.5 shrink-0" />
+                      Your profile is listed for founders in Browse Talent.
+                    </p>
+                  )}
                 </div>
                 <button
                   type="button"
@@ -418,7 +993,7 @@ export default function TalentDashboard({
                   size="sm"
                   variant="outline"
                   className="h-7 rounded-[4px] border-blue-300 px-3 text-[12px] hover:border-indigo-500"
-                  onClick={() => setShowProfileModal(true)}
+                  onClick={handleCompleteProfileClick}
                 >
                   Continue profile
                 </Button>
@@ -436,14 +1011,17 @@ export default function TalentDashboard({
             <p className="text-[12px] uppercase tracking-[0.04em] text-muted-foreground">
               {card.label}
             </p>
-            <p className="text-[20px] font-semibold text-foreground">{card.value}</p>
+            <p className="text-[20px] font-semibold text-foreground">
+              {card.value}
+            </p>
             <p className="text-[12px] text-muted-foreground">{card.hint}</p>
           </article>
         ))}
       </div>
       {viewModel.fallbackUsed && (
         <div className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-[12px] text-amber-800">
-          Some sections are using cached fallback data while backend sync recovers.
+          Some sections are using cached fallback data while backend sync
+          recovers.
         </div>
       )}
       <div className="grid grid-cols-1 gap-3 lg:grid-cols-[280px_minmax(0,1fr)]">
@@ -596,7 +1174,9 @@ export default function TalentDashboard({
                     </Avatar>
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2">
-                        <p className="truncate text-[14px] font-medium">{row.title}</p>
+                        <p className="truncate text-[14px] font-medium">
+                          {row.title}
+                        </p>
                         <span
                           aria-label={`${row.matchScore}% match score`}
                           className={`inline-flex h-[22px] items-center rounded-[4px] px-2 text-[11px] font-semibold uppercase tracking-[0.03em] ${getMatchStyle(row.matchScore)}`}
@@ -631,7 +1211,9 @@ export default function TalentDashboard({
                         variant="ghost"
                         size="icon"
                         className="h-7 w-7"
-                        onClick={(event) => handleToggleSave(row.startup, event)}
+                        onClick={(event) =>
+                          handleToggleSave(row.startup, event)
+                        }
                         disabled={savingItems.has(String(row.id))}
                         aria-label={`Save ${row.title}`}
                         aria-pressed={isSaved(row.id, row.startupId)}
@@ -686,7 +1268,9 @@ export default function TalentDashboard({
                     </Avatar>
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2">
-                        <p className="truncate text-[14px] font-medium">{row.title}</p>
+                        <p className="truncate text-[14px] font-medium">
+                          {row.title}
+                        </p>
                         <span
                           aria-label={`${row.matchScore}% match score`}
                           className={`inline-flex h-[22px] items-center rounded-[4px] px-2 text-[11px] font-semibold uppercase tracking-[0.03em] ${getMatchStyle(row.matchScore)}`}

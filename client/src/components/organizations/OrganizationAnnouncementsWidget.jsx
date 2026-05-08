@@ -22,10 +22,17 @@ import {
   CheckCircle,
   ExternalLink,
 } from "lucide-react";
-import { getAccessToken } from "../../app/session";
 import { unwrapData } from "../../utils/apiEnvelope";
 
 const API_BASE = API_BASE_URL;
+
+// Default fetch options for cookie-based auth
+const defaultOptions = {
+  credentials: "include",
+  headers: {
+    "Content-Type": "application/json",
+  },
+};
 
 export default function OrganizationAnnouncementsWidget({ founderId }) {
   const [announcements, setAnnouncements] = useState([]);
@@ -36,14 +43,9 @@ export default function OrganizationAnnouncementsWidget({ founderId }) {
   const loadFounderAnnouncements = async () => {
     try {
       setLoading(true);
-      const token = getAccessToken();
       const response = await fetch(
         `${API_BASE}/founder/${founderId}/announcements`,
-        {
-          headers: {
-            ...(token ? { Authorization: `Bearer ${token}` } : {}),
-          },
-        },
+        defaultOptions,
       );
       if (!response.ok) {
         console.error("Failed to fetch founder announcements");
@@ -62,15 +64,11 @@ export default function OrganizationAnnouncementsWidget({ founderId }) {
   };
   const markAsRead = async (announcementId) => {
     try {
-      const token = getAccessToken();
       const response = await fetch(
         `${API_BASE}/announcements/${announcementId}/mark-read`,
         {
+          ...defaultOptions,
           method: "POST",
-          headers: {
-            ...(token ? { Authorization: `Bearer ${token}` } : {}),
-            "Content-Type": "application/json",
-          },
           body: JSON.stringify({
             userId: founderId,
           }),
@@ -136,10 +134,11 @@ export default function OrganizationAnnouncementsWidget({ founderId }) {
       day: "numeric",
     });
   };
+  const cardSurface = "border-primary/18 shadow-[var(--shadow-soft)]";
   const unreadCount = announcements.filter(isUnread).length;
   if (loading) {
     return (
-      <Card>
+      <Card className={cardSurface}>
         <CardHeader className="pb-3">
           <CardTitle className="text-sm flex items-center gap-2">
             <Bell className="w-4 h-4" />
@@ -161,7 +160,7 @@ export default function OrganizationAnnouncementsWidget({ founderId }) {
   }
   if (announcements.length === 0) {
     return (
-      <Card>
+      <Card className={cardSurface}>
         <CardHeader className="pb-3">
           <CardTitle className="text-sm flex items-center gap-2">
             <Bell className="w-4 h-4" />
@@ -177,7 +176,7 @@ export default function OrganizationAnnouncementsWidget({ founderId }) {
     );
   }
   return (
-    <Card>
+    <Card className={cardSurface}>
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between">
           <CardTitle className="text-sm flex items-center gap-2">

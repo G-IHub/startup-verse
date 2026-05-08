@@ -29,6 +29,50 @@ export async function getFounderTasks(founderId) {
   return tasks.map(normalizeTask).filter(Boolean);
 }
 
+export async function getFounderMilestones(founderId) {
+  const payload = await request(`/founders/${founderId}/milestones`, { method: "GET" });
+  const data = payload?.data || payload || [];
+  const rows = Array.isArray(data) ? data : Array.isArray(data?.milestones) ? data.milestones : [];
+  return rows.map((row) => ({
+    ...row,
+    id: String(row.id || row._id || ""),
+    title: String(row.title || "Milestone"),
+    description: String(row.description || ""),
+    totalTasks: Number(row.totalTasks || 0),
+    tasksCompleted: Number(row.tasksCompleted || 0),
+    weeklyOutcomeId: row.weeklyOutcomeId ? String(row.weeklyOutcomeId) : "",
+  }));
+}
+
+export async function getFounderWeeklyOutcomes(founderId) {
+  const payload = await request(`/founders/${founderId}/weekly-outcomes`, { method: "GET" });
+  const data = payload?.data || payload || [];
+  const rows = Array.isArray(data) ? data : Array.isArray(data?.outcomes) ? data.outcomes : [];
+  return rows.map((row) => ({
+    ...row,
+    id: String(row.id || row._id || ""),
+    status: String(row.status || "").toLowerCase(),
+    weekOf: row.weekOf || null,
+  }));
+}
+
+export async function createFounderMilestone(founderId, milestone) {
+  const payload = await request(`/founders/${founderId}/milestones`, {
+    method: "POST",
+    body: JSON.stringify({ milestone }),
+  });
+  const row = payload?.data || payload?.milestone || milestone;
+  return {
+    ...row,
+    id: String(row.id || row._id || ""),
+    title: String(row.title || "Milestone"),
+    description: String(row.description || ""),
+    totalTasks: Number(row.totalTasks || 0),
+    tasksCompleted: Number(row.tasksCompleted || 0),
+    weeklyOutcomeId: row.weeklyOutcomeId ? String(row.weeklyOutcomeId) : "",
+  };
+}
+
 /**
  * Get tasks assigned to a team member
  */

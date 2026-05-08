@@ -14,13 +14,14 @@
  */
 
 export function getStartupId(user) {
+  const resolvedId = user._id ?? user.id;
   if (user.role === "founder") {
     // Founders ARE the startup - use their ID
-    return user.id;
+    return resolvedId;
   }
 
   // Team members, talent, etc. - use their startup/founder reference
-  return user.startupId || user.founderId || user.id;
+  return user.startupId || user.founderId || resolvedId;
 }
 
 /**

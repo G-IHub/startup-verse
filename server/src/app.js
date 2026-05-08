@@ -1,3 +1,4 @@
+import cookieParser from "cookie-parser";
 import cors from "cors";
 import express from "express";
 import { corsOptions } from "./config/cors.js";
@@ -10,6 +11,7 @@ import { success as apiSuccess } from "./utils/apiResponse.js";
 const app = express();
 
 app.use(cors(corsOptions));
+app.use(cookieParser());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(requestId);

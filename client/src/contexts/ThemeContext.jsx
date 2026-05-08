@@ -1,41 +1,84 @@
-import React, { createContext, useContext, useState, useEffect } from "react";
+import React, { createContext, useContext, useState, useEffect, useCallback } from "react";
+import {
+  fetchClientPreferences,
+  mergeClientPreferencesPatch,
+} from "../utils/api/clientPreferencesApi";
+
 const ThemeContext = createContext(undefined);
-export function ThemeProvider({ children }) {
+
+export function ThemeProvider({ children, userId, authReady = true }) {
   const [theme, setThemeState] = useState("light");
   const [mounted, setMounted] = useState(false);
+
   useEffect(() => {
-    // Get theme from localStorage or default to light
-    const savedTheme = localStorage.getItem("startupverse_theme");
-    const initialTheme = savedTheme || "light";
-    setThemeState(initialTheme);
+    if (!authReady) return;
 
-    // Apply theme class to document
-    if (initialTheme === "dark") {
-      document.documentElement.classList.add("dark");
-    } else {
-      document.documentElement.classList.remove("dark");
-    }
-    setMounted(true);
-  }, []);
-  const setTheme = (newTheme) => {
-    setThemeState(newTheme);
-    localStorage.setItem("startupverse_theme", newTheme);
+    let cancelled = false;
 
-    // Update document class
-    if (newTheme === "dark") {
-      document.documentElement.classList.add("dark");
-    } else {
-      document.documentElement.classList.remove("dark");
-    }
-  };
-  const toggleTheme = () => {
-    setTheme(theme === "light" ? "dark" : "light");
-  };
+    const apply = (t) => {
+      const next = t === "dark" ? "dark" : "light";
+      setThemeState(next);
+      document.documentElement.classList.toggle("dark", next === "dark");
+    };
 
-  // Prevent flash of wrong theme
+    const run = async () => {
+      let initial = "light";
+      if (userId) {
+        try {
+          const prefs = await fetchClientPreferences(userId);
+          const t = prefs?.startupverse_theme;
+          if (t === "dark" || t === "light") initial = t;
+        } catch {
+          /* keep default */
+        }
+      }
+      if (!cancelled) {
+        apply(initial);
+        setMounted(true);
+      }
+    };
+
+    run();
+    return () => {
+      cancelled = true;
+    };
+  }, [userId, authReady]);
+
+  const setTheme = useCallback(
+    async (newTheme) => {
+      const next = newTheme === "dark" ? "dark" : "light";
+      setThemeState(next);
+      document.documentElement.classList.toggle("dark", next === "dark");
+      if (userId) {
+        try {
+          await mergeClientPreferencesPatch(userId, {
+            startupverse_theme: next,
+          });
+        } catch {
+          /* non-fatal */
+        }
+      }
+    },
+    [userId],
+  );
+
+  const toggleTheme = useCallback(() => {
+    setThemeState((prev) => {
+      const next = prev === "light" ? "dark" : "light";
+      document.documentElement.classList.toggle("dark", next === "dark");
+      if (userId) {
+        mergeClientPreferencesPatch(userId, {
+          startupverse_theme: next,
+        }).catch(() => {});
+      }
+      return next;
+    });
+  }, [userId]);
+
   if (!mounted) {
     return null;
   }
+
   return (
     <ThemeContext.Provider
       value={{
@@ -48,6 +91,7 @@ export function ThemeProvider({ children }) {
     </ThemeContext.Provider>
   );
 }
+
 export function useTheme() {
   const context = useContext(ThemeContext);
   if (context === undefined) {

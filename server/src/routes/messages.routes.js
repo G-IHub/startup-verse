@@ -28,13 +28,14 @@ function mapMessageDto(messageDoc) {
     readAt: row.readAt || null,
     createdAt: row.createdAt || null,
     updatedAt: row.updatedAt || null,
+    metadata: row.metadata && typeof row.metadata === "object" ? row.metadata : {},
   };
 }
 
 async function canAccessStartupMessages(req, startupId) {
   if (req.user?.isAdmin) return true;
   const normalizedStartupId = String(startupId || "");
-  if (!normalizedStartupId) return false;
+  if (!normalizedStartupId) return true;
   if (normalizedStartupId === String(req.user.id)) return true;
   const me = await User.findById(req.user.id, { startupId: 1, founderId: 1 });
   if (!me) return false;
@@ -71,7 +72,7 @@ messagesRouter.post(
   "/messages/send",
   requireAuth,
   asyncHandler(async (req, res) => {
-    const { startupId = null, toUserId, body = "", attachments = [] } = req.body || {};
+    const { startupId = null, toUserId, body = "", attachments = [], metadata = {} } = req.body || {};
 
     if (!toUserId || !body) {
       return apiError(res, "toUserId and body are required.", 400);
@@ -86,6 +87,7 @@ messagesRouter.post(
       toUserId,
       body,
       attachments,
+      metadata,
     });
 
     return apiSuccess(res, mapMessageDto(message), 201);
@@ -131,6 +133,24 @@ messagesRouter.post(
     });
 
     return apiSuccess(res, mapMessageDto(message), 201);
+  }),
+);
+
+messagesRouter.get(
+  "/messages/direct/:userId/:otherUserId",
+  requireAuth,
+  asyncHandler(async (req, res) => {
+    const { userId, otherUserId } = req.params;
+    if (!isSelfOrAdmin(req, userId)) {
+      return apiError(res, "Forbidden.", 403);
+    }
+    const messages = await Message.find({
+      $or: [
+        { fromUserId: userId, toUserId: otherUserId },
+        { fromUserId: otherUserId, toUserId: userId },
+      ],
+    }).sort({ createdAt: 1 });
+    return apiSuccess(res, messages.map(mapMessageDto));
   }),
 );
 

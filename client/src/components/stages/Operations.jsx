@@ -1,10 +1,14 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "../ui/card";
 import { Button } from "../ui/button";
 import { Textarea } from "../ui/textarea";
 import { Label } from "../ui/label";
 import { Target, ArrowLeft, CheckCircle2 } from "lucide-react";
 import { toast } from "sonner";
+import {
+  useHydrateStageDraft,
+  persistStageDraft,
+} from "../../hooks/useStageDraftFromJourney";
 export default function Operations({ user, onBack }) {
   const [operationsPlan, setOperationsPlan] = useState({
     processes: "",
@@ -12,17 +16,14 @@ export default function Operations({ user, onBack }) {
     growthGoals: "",
   });
 
-  // Load saved data
-  useEffect(() => {
-    const savedData = localStorage.getItem("operations_plan");
-    if (savedData) {
-      setOperationsPlan(JSON.parse(savedData));
-    }
-  }, []);
+  useHydrateStageDraft(user, "operations_plan", (raw) => {
+    if (!raw || typeof raw !== "object") return;
+    setOperationsPlan((prev) => ({ ...prev, ...raw }));
+  });
 
   // Save and complete journey
   const saveAndComplete = () => {
-    localStorage.setItem("operations_plan", JSON.stringify(operationsPlan));
+    persistStageDraft("operations_plan", operationsPlan);
     toast.success("🎉 Journey completed! All stages saved.");
     setTimeout(() => onBack(), 500);
   };

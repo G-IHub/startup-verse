@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import { Button } from "../ui/button";
 import { Card, CardContent } from "../ui/card";
 import { Avatar, AvatarFallback } from "../ui/avatar";
@@ -20,7 +20,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "../ui/dialog";
-import { Separator } from "../ui/separator";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -44,6 +43,7 @@ import {
   MoreVertical,
   Trash2,
   PlayCircle,
+  GripHorizontal,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -60,7 +60,7 @@ import {
 import * as teamMemberApi from "../../utils/api/teamMemberApi";
 import * as taskApi from "../../utils/api/taskApi";
 import { subscribeToTasks } from "../../utils/socketIoRealtime";
-import { STORAGE_KEYS } from "../../app/session";
+import { useWeeklyLoopStore } from "../../state/useWeeklyLoopStore";
 
 export function TaskManagementPanel({
   open,
@@ -73,10 +73,12 @@ export function TaskManagementPanel({
   startupId,
   founderIdOverride,
   onTasksSynced,
+  onNavigate,
 }) {
   const [localTasks, setLocalTasks] = useState([]);
   const [teamMembers, setTeamMembers] = useState([]);
   const [founderId, setFounderId] = useState("");
+  const [activeTab, setActiveTab] = useState("my-tasks");
   const [showCreateDialog, setShowCreateDialog] = useState(
     openAddDialog || false,
   );
@@ -87,13 +89,56 @@ export function TaskManagementPanel({
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
   const [taskNotFound, setTaskNotFound] = useState(false);
+  const [milestones, setMilestones] = useState([]);
+  const [activeOutcomeId, setActiveOutcomeId] = useState("");
+  const [showMilestoneDialog, setShowMilestoneDialog] = useState(false);
+  const [newMilestone, setNewMilestone] = useState({ title: "", description: "" });
 
-  const normalizeTask = (task) => ({
-    ...task,
-    id: String(task?.id || task?._id || ""),
-    blockerReason: task?.blockerReason || task?.blockedReason || "",
-    blockerNote: task?.blockerNote || task?.blockedNote || "",
-  });
+  const defaultKanbanHeight = () =>
+    Math.round(Math.min(window.innerHeight * 0.5, 420));
+
+  const [kanbanHeight, setKanbanHeight] = useState(defaultKanbanHeight);
+  const kanbanHeightRef = useRef(kanbanHeight);
+  const isDraggingHandle = useRef(false);
+  const panelRef = useRef(null);
+  const normalizedUserId = String(user?._id ?? user?.id ?? "");
+
+  const clampKanbanHeight = useCallback((raw) => {
+    const maxH = Math.round(window.innerHeight * 0.7);
+    return Math.max(180, Math.min(maxH, raw));
+  }, []);
+
+  const onHandlePointerDown = useCallback((e) => {
+    isDraggingHandle.current = true;
+    e.currentTarget.setPointerCapture(e.pointerId);
+    e.preventDefault();
+  }, []);
+
+  const onHandlePointerMove = useCallback((e) => {
+    if (!isDraggingHandle.current) return;
+    const next = clampKanbanHeight(window.innerHeight - e.clientY);
+    kanbanHeightRef.current = next;
+    setKanbanHeight(next);
+  }, [clampKanbanHeight]);
+
+  const onHandlePointerUp = useCallback(() => {
+    isDraggingHandle.current = false;
+  }, []);
+
+  const normalizeTask = (task) => {
+    const at = task?.assignedTo ?? task?.assigneeId;
+    const assignedTo =
+      at != null && at !== ""
+        ? String(typeof at === "object" ? at._id || at.id || "" : at)
+        : "";
+    return {
+      ...task,
+      id: String(task?.id || task?._id || ""),
+      assignedTo,
+      blockerReason: task?.blockerReason || task?.blockedReason || "",
+      blockerNote: task?.blockerNote || task?.blockedNote || "",
+    };
+  };
 
   // Sync openAddDialog from props
   useEffect(() => {
@@ -105,12 +150,9 @@ export function TaskManagementPanel({
   // Load tasks and team members
   useEffect(() => {
     if (!open) return;
+    if (!founderIdOverride && user.role === "founder" && !normalizedUserId) return;
     const loadData = async () => {
       setLoading(true);
-
-      const allUsers = strictMode
-        ? []
-        : JSON.parse(localStorage.getItem(STORAGE_KEYS.teamMembers) || "[]");
 
       // Determine the founder ID (we don't need the full founder object)
       let founderIdValue = "";
@@ -118,14 +160,12 @@ export function TaskManagementPanel({
         founderIdValue = founderIdOverride;
         setFounderId(founderIdOverride);
       } else if (user.role === "founder") {
-        founderIdValue = user.id;
-        setFounderId(user.id);
+        founderIdValue = normalizedUserId;
+        setFounderId(normalizedUserId);
       } else if (user.role === "team-member" && user.startupId) {
-        // For team members, startupId should be the founder's ID
         founderIdValue = user.startupId;
         setFounderId(user.startupId);
       } else if (user.role === "team" && user.founderId) {
-        // Handle team member with founderId
         founderIdValue = user.founderId;
         setFounderId(user.founderId);
       }
@@ -138,6 +178,27 @@ export function TaskManagementPanel({
         return;
       }
 
+      if (user.role === "founder") {
+        try {
+          const [milestoneRows, outcomeRows] = await Promise.all([
+            taskApi.getFounderMilestones(founderIdValue),
+            taskApi.getFounderWeeklyOutcomes(founderIdValue),
+          ]);
+          setMilestones(milestoneRows || []);
+          const active = (outcomeRows || []).find((row) => row.status === "active");
+          setActiveOutcomeId(active?.id || "");
+        } catch (error) {
+          setMilestones([]);
+          setActiveOutcomeId("");
+          if (process.env.NODE_ENV === "development") {
+            console.debug("Failed to load milestones/outcomes:", error?.message || error);
+          }
+        }
+      } else {
+        setMilestones([]);
+        setActiveOutcomeId("");
+      }
+
       // Load tasks for the founder - BACKEND FIRST
       try {
         setLoadError("");
@@ -148,7 +209,7 @@ export function TaskManagementPanel({
           tasks = backendTasks || [];
         } else if (user.role === "team-member" || user.role === "team") {
           // Load team member's assigned tasks from backend
-          const backendTasks = await taskApi.getTeamMemberTasks(user.id);
+          const backendTasks = await taskApi.getTeamMemberTasks(normalizedUserId);
           tasks = backendTasks || [];
         }
         setLocalTasks((tasks || []).map(normalizeTask));
@@ -166,7 +227,7 @@ export function TaskManagementPanel({
           let filteredTasks = allTasks;
           if (user.role === "team-member" || user.role === "team") {
             filteredTasks = allTasks.filter(
-              (t) => t.assignedTo === user.id || t.assigneeId === user.id,
+              (t) => t.assignedTo === normalizedUserId || t.assigneeId === normalizedUserId,
             );
           }
           setLoadError("Could not sync tasks from server. Showing cached tasks.");
@@ -174,7 +235,7 @@ export function TaskManagementPanel({
         }
       }
 
-      // Load team members (for task assignment) - FROM BACKEND
+      // Load team members (for task assignment) from backend only
       try {
         const resolvedStartupId = startupId || founderIdValue;
         console.log(
@@ -182,45 +243,28 @@ export function TaskManagementPanel({
           resolvedStartupId,
         );
 
-        // Load from localStorage first
-        // 🔒 SECURITY FIX: Use startupId/founderId ONLY, removed companyId matching
-        const localTeam = allUsers.filter(
-          (u) =>
-            (u.startupId === founderIdValue ||
-              u.founderId === founderIdValue) &&
-            (u.role === "team-member" || u.role === "team"),
-        );
-        setTeamMembers(localTeam);
-        console.log(
-          "📊 [TaskPanel] Team members from localStorage:",
-          localTeam.length,
-        );
-
-        // Then fetch from backend
+        setTeamMembers([]);
         const backendTeamMembers =
           await teamMemberApi.getStartupTeamMembers(resolvedStartupId);
-        if (backendTeamMembers && backendTeamMembers.length > 0) {
-          // Map backend data to consistent format
-          const mappedMembers = backendTeamMembers
-            .filter((m) => m.id !== founderIdValue && m.role !== "founder") // Exclude founder
-            .map((member) => ({
-              id: member.id,
-              name: member.name || member.talentName || "Unknown User",
-              role: member.role || member.talentArea || "Team Member",
-              email: member.email,
-              avatar: member.avatar,
-              title:
-                member.title || member.talentArea || member.professionalTitle,
-              skills: member.skills || member.talentSkills || [],
-            }));
-          setTeamMembers(mappedMembers);
-          console.log(
-            "✅ [TaskPanel] Team members updated from backend:",
-            mappedMembers.length,
-          );
-        }
+        const mappedMembers = (backendTeamMembers || [])
+          .filter((m) => m.id !== founderIdValue && m.role !== "founder")
+          .map((member) => ({
+            id: member.id,
+            name: member.name || member.talentName || "Unknown User",
+            role: member.role || member.talentArea || "Team Member",
+            email: member.email,
+            avatar: member.avatar,
+            title:
+              member.title || member.talentArea || member.professionalTitle,
+            skills: member.skills || member.talentSkills || [],
+          }));
+        setTeamMembers(mappedMembers);
+        console.log(
+          "✅ [TaskPanel] Team members from backend:",
+          mappedMembers.length,
+        );
       } catch (error) {
-        // Silently fail - localStorage data is already displayed
+        setTeamMembers([]);
         if (process.env.NODE_ENV === "development") {
           console.debug(
             "Failed to load team members from backend:",
@@ -233,7 +277,7 @@ export function TaskManagementPanel({
     loadData();
 
     // ✅ REALTIME: Removed task/team polling (was every 10s) - using real-time subscription
-  }, [open, user.id, user.role, user.startupId, user.founderId, founderIdOverride, startupId, strictMode]);
+  }, [open, normalizedUserId, user.role, user.startupId, user.founderId, founderIdOverride, startupId, strictMode]);
 
   useEffect(() => {
     if (!open || !founderId) return;
@@ -254,11 +298,11 @@ export function TaskManagementPanel({
       {
         role: user.role === "founder" ? "founder" : "team-member",
         founderId,
-        userId: user.id,
+        userId: normalizedUserId,
       },
     );
     return () => unsubscribe?.();
-  }, [open, founderId, user.id, user.role]);
+  }, [open, founderId, normalizedUserId, user.role]);
 
   // Handle initialTaskId - scroll to and highlight the task
   useEffect(() => {
@@ -305,13 +349,20 @@ export function TaskManagementPanel({
       toast.error("No founder found");
       return;
     }
+    if (user.role === "founder" && !newTask.milestoneId) {
+      toast.error("Select a milestone before creating a task");
+      return;
+    }
     const assignee = teamMembers.find((m) => m.id === newTask.assigneeId);
     const task = {
       id: `task-${Date.now()}`,
       title: newTask.title,
       description: newTask.description,
       status: "pending",
-      milestoneId: newTask.milestoneId || "general",
+      milestoneId: newTask.milestoneId || null,
+      milestoneName:
+        milestones.find((m) => String(m.id) === String(newTask.milestoneId))
+          ?.title || "",
       assignedTo: assignee?.id,
       assignedToName: assignee?.name,
       createdAt: new Date().toISOString(),
@@ -347,6 +398,31 @@ export function TaskManagementPanel({
     onPlaySound?.();
     createTaskAssignedNotification(task, assignee?.name || "Unassigned");
   };
+  const handleCreateMilestone = async () => {
+    if (!newMilestone.title.trim()) {
+      toast.error("Please enter a milestone title");
+      return;
+    }
+    if (!founderId) {
+      toast.error("No founder found");
+      return;
+    }
+    try {
+      const created = await taskApi.createFounderMilestone(founderId, {
+        title: newMilestone.title.trim(),
+        description: newMilestone.description.trim(),
+        weeklyOutcomeId: activeOutcomeId || undefined,
+      });
+      setMilestones((prev) => [...prev, created]);
+      setNewTask((prev) => ({ ...prev, milestoneId: created.id }));
+      setShowMilestoneDialog(false);
+      setNewMilestone({ title: "", description: "" });
+      toast.success("Milestone created");
+      onTasksSynced?.();
+    } catch (error) {
+      toast.error(error?.message || "Failed to create milestone");
+    }
+  };
   const handleToggleTask = async (taskId) => {
     if (!founderId) return;
     let task = null;
@@ -374,9 +450,10 @@ export function TaskManagementPanel({
       }
     } else {
       const updatedTasks = toggleTask(founderId, taskId);
+      const resolvedUid = String(user?._id ?? user?.id ?? "");
       setLocalTasks(
         updatedTasks.filter(
-          (t) => user.role === "founder" || t.assignedTo === user.id,
+          (t) => user.role === "founder" || t.assignedTo === resolvedUid,
         ),
       );
       task = updatedTasks.find((t) => t.id === taskId);
@@ -386,16 +463,16 @@ export function TaskManagementPanel({
     if (task && (user.role === "team-member" || user.role === "team")) {
       console.log(`🔔 [NOTIFICATION V2] Team member toggling task ${taskId}`);
       console.log(
-        `🔔 [NOTIFICATION V2] User: ${user.name} (${user.id}), Status: ${task.status}`,
+        `🔔 [NOTIFICATION V2] User: ${user.name} (${normalizedUserId}), Status: ${task.status}`,
       );
       console.log(`🔔 [NOTIFICATION V2] Founder ID: ${founderId}`);
       teamMemberApi
-        .updateTaskStatus(user.id, taskId, {
+        .updateTaskStatus(normalizedUserId, taskId, {
           status: task.status,
           completedAt:
             task.status === "completed" ? new Date().toISOString() : undefined,
           founderId: founderId,
-          completedBy: user.id,
+          completedBy: normalizedUserId,
           completedByName: user.name,
         })
         .then(() => {
@@ -415,6 +492,7 @@ export function TaskManagementPanel({
       toast.success("Task marked as pending");
     }
     onTasksSynced?.();
+    useWeeklyLoopStore.getState().refresh(founderId || undefined);
     onPlaySound?.();
   };
   const handleDeleteTask = async (taskId) => {
@@ -462,6 +540,7 @@ export function TaskManagementPanel({
         syncTasksToMilestones(founderId);
       }
       onTasksSynced?.();
+      useWeeklyLoopStore.getState().refresh(founderId || undefined);
       setLoadError("");
       const statusLabel =
         newStatus === "in-progress"
@@ -487,12 +566,12 @@ export function TaskManagementPanel({
         `🔔 [TaskManagementPanel.handleStatusChange] User role: ${user.role}, New status: ${newStatus}`,
       );
       teamMemberApi
-        .updateTaskStatus(user.id, taskId, {
+        .updateTaskStatus(normalizedUserId, taskId, {
           status: newStatus,
           completedAt:
             newStatus === "completed" ? new Date().toISOString() : undefined,
           founderId: founderId,
-          completedBy: user.id,
+          completedBy: normalizedUserId,
           completedByName: user.name,
         })
         .then(() =>
@@ -549,12 +628,12 @@ export function TaskManagementPanel({
 
     if (user.role === "team-member" || user.role === "team") {
       teamMemberApi
-        .updateTaskStatus(user.id, taskId, {
+        .updateTaskStatus(normalizedUserId, taskId, {
           status: "blocked",
           blockerReason: reason,
           blockerNote: note,
           founderId: founderId,
-          completedBy: user.id,
+          completedBy: normalizedUserId,
           completedByName: user.name,
         })
         .then(() =>
@@ -598,15 +677,24 @@ export function TaskManagementPanel({
           : t,
       );
       setLocalTasks(updatedTasks);
-      if (!strictMode) {
+      if (strictMode) {
+        taskApi
+          .updateTaskStatus(founderId, draggedTask.id, status, {
+            completedAt: status === "completed" ? new Date().toISOString() : null,
+          })
+          .then(() => {
+            onTasksSynced?.();
+            useWeeklyLoopStore.getState().refresh(founderId || undefined);
+          })
+          .catch((error) => {
+            setLocalTasks(localTasks);
+            setLoadError(error?.message || "Task status update failed.");
+          });
+      } else {
         saveTasks(founderId, updatedTasks);
-      }
-
-      // 🚀 Sync tasks to milestones when status changes
-      if (!strictMode) {
         syncTasksToMilestones(founderId);
+        onTasksSynced?.();
       }
-      onTasksSynced?.();
       setDraggedTask(null);
       const statusLabel =
         status === "in-progress"
@@ -627,30 +715,51 @@ export function TaskManagementPanel({
   const getStatusIcon = (status) => {
     switch (status) {
       case "completed":
-        return <CheckCircle2 className="w-3.5 h-3.5 text-green-600" />;
+        return <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />;
       case "in-progress":
-        return <Clock className="w-3.5 h-3.5 text-blue-600" />;
+        return <Clock className="h-3.5 w-3.5 text-primary" />;
       case "blocked":
-        return <Ban className="w-3.5 h-3.5 text-red-600" />;
+        return <Ban className="h-3.5 w-3.5 text-orange-600" />;
+      case "pending":
+        return <Circle className="h-3.5 w-3.5 text-muted-foreground/60" />;
       default:
-        return <Circle className="w-3.5 h-3.5 text-gray-400" />;
+        return <Circle className="h-3.5 w-3.5 text-muted-foreground/60" />;
     }
   };
   const getStatusColor = (status) => {
     switch (status) {
       case "completed":
-        return "border-l-green-500";
+        return "border-l-emerald-500";
       case "in-progress":
-        return "border-l-blue-500";
+        return "border-l-primary";
       case "blocked":
-        return "border-l-red-500";
+        return "border-l-orange-500";
       default:
-        return "border-l-gray-400";
+        return "border-l-muted-foreground/35";
     }
   };
 
-  // Filter tasks
-  const filteredTasks = localTasks.filter((task) => {
+  // Filter tasks — scoped to active tab
+  const resolvedCurrentUserId = String(user?._id ?? user?.id ?? "");
+  const tabScopedTasks = localTasks.filter((task) => {
+    if (user.role !== "founder") {
+      // Team member: only tasks explicitly assigned to this user
+      return (
+        task.assignedTo === resolvedCurrentUserId ||
+        task.assigneeId === resolvedCurrentUserId
+      );
+    }
+    // Founder — guard: if founderId not yet resolved, treat unassigned as mine only
+    const fid = founderId || resolvedCurrentUserId;
+    if (activeTab === "team-tasks") {
+      // Only tasks explicitly assigned to someone who is NOT the founder
+      return Boolean(task.assignedTo) && task.assignedTo !== fid;
+    }
+    // My Tasks: only tasks explicitly assigned to the founder (unassigned → Office Home)
+    return Boolean(task.assignedTo) && task.assignedTo === fid;
+  });
+
+  const filteredTasks = tabScopedTasks.filter((task) => {
     const matchesSearch =
       task.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
       (task.description || "")
@@ -660,40 +769,68 @@ export function TaskManagementPanel({
       filterStatus === "all" || task.status === filterStatus;
     return matchesSearch && matchesStatus;
   });
+
+  const canEditTask = user.role === "founder";
+
+  // Group team tasks by assignee (for Team Tasks tab)
+  const teamTasksByAssignee = (() => {
+    const groups = new Map();
+    filteredTasks.forEach((task) => {
+      const key = task.assignedTo || "unassigned";
+      const name = task.assignedToName || "Unassigned";
+      if (!groups.has(key)) groups.set(key, { id: key, name, tasks: [] });
+      groups.get(key).tasks.push(task);
+    });
+    return Array.from(groups.values());
+  })();
   const pendingTasks = filteredTasks.filter((t) => t.status === "pending");
   const inProgressTasks = filteredTasks.filter(
     (t) => t.status === "in-progress",
   );
   const completedTasks = filteredTasks.filter((t) => t.status === "completed");
   const blockedTasks = filteredTasks.filter((t) => t.status === "blocked");
+  const milestoneProgressRows = milestones.map((milestone) => {
+    const related = localTasks.filter(
+      (task) => String(task.milestoneId || "") === String(milestone.id || ""),
+    );
+    const total = related.length || Number(milestone.totalTasks || 0);
+    const done =
+      related.filter((task) => String(task.status || "") === "completed").length ||
+      Number(milestone.tasksCompleted || 0);
+    return {
+      id: String(milestone.id || ""),
+      title: milestone.title || "Milestone",
+      total,
+      done,
+    };
+  });
   const columns = [
     {
       id: "pending",
       title: "To Do",
       tasks: pendingTasks,
-      color: "bg-slate-100 dark:bg-slate-800",
+      headerClass: "bg-[#e8ebff] text-[#1a237e]",
     },
     {
       id: "in-progress",
       title: "In Progress",
       tasks: inProgressTasks,
-      color: "bg-blue-50 dark:bg-blue-900/20",
+      headerClass: "bg-[#ede7f6] text-[#4527a0]",
     },
     {
       id: "completed",
       title: "Done",
       tasks: completedTasks,
-      color: "bg-green-50 dark:bg-green-900/20",
+      headerClass: "bg-[#d1fae5] text-[#065f46]",
     },
   ];
 
-  // Add blocked column if there are blocked tasks
   if (blockedTasks.length > 0) {
     columns.push({
       id: "blocked",
       title: "Blocked",
       tasks: blockedTasks,
-      color: "bg-red-50 dark:bg-red-900/20",
+      headerClass: "bg-[#ffedd5] text-[#9a3412]",
     });
   }
   return (
@@ -712,7 +849,7 @@ export function TaskManagementPanel({
                 opacity: 0,
               }}
               onClick={onClose}
-              className="fixed inset-0 bg-black/20 z-[65]"
+              className="fixed inset-0 z-[65] bg-[var(--modal-overlay)]"
             />
             <motion.div
               initial={{
@@ -729,35 +866,84 @@ export function TaskManagementPanel({
                 damping: 28,
                 stiffness: 260,
               }}
-              className="fixed right-0 top-0 h-full w-full md:w-[900px] office-panel office-panel-shell office-motion-soft z-[70] flex flex-col rounded-none md:rounded-l-xl"
+              ref={panelRef}
+              className="office-motion-soft fixed right-0 top-0 z-[70] flex h-full w-full flex-col overflow-hidden rounded-none border-y border-l border-primary/15 bg-white text-[#4a4a5a] shadow-modal md:w-[min(900px,92vw)] md:rounded-l-[14px]"
             >
-              <div className="p-3 office-panel-header">
-                <div className="flex items-center justify-between mb-3">
-                  <div className="flex items-center gap-2">
-                    <Target className="w-4 h-4 text-slate-700 dark:text-slate-300" />
-                    <h3 className="text-base font-semibold">Task Management</h3>
-                    {user.role === "team-member" && (
-                      <Badge variant="outline" className="text-xs">
-                        Your Tasks Only
-                      </Badge>
-                    )}
+              <div className="min-h-0 flex-1 overflow-y-auto bg-white">
+              <div className="border-b border-primary/12 bg-[#fafbff] px-3 pb-3 pt-3">
+                <div className="mb-3 flex items-center justify-between gap-2">
+                  <div className="flex min-w-0 items-center gap-2">
+                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary/[0.09] text-primary">
+                      <Target className="h-4 w-4" aria-hidden />
+                    </span>
+                    <div className="min-w-0">
+                      <h3 className="truncate font-heading text-[15px] font-semibold tracking-tight text-[#0d0d0d] md:text-base">
+                        Task management
+                      </h3>
+                      {user.role === "team-member" && (
+                        <Badge
+                          variant="outline"
+                          className="mt-0.5 border-primary/22 text-[10px] font-medium text-[#4a4a5a]"
+                        >
+                          Your tasks only
+                        </Badge>
+                      )}
+                    </div>
                   </div>
                   <Button
                     variant="ghost"
                     size="sm"
+                    type="button"
                     onClick={onClose}
-                    className="h-7 w-7 p-0"
+                    className="h-8 w-8 shrink-0 rounded-md text-muted-foreground hover:bg-transparent hover:text-foreground"
+                    aria-label="Close"
                   >
-                    <X className="w-3.5 h-3.5" />
+                    <X className="h-4 w-4" />
                   </Button>
                 </div>
-                <p className="text-xs text-muted-foreground">
-                  {localTasks.length}
-                  {" total task"}
-                  {localTasks.length !== 1 ? "s" : ""}
+
+                {user.role === "founder" && (
+                  <div className="mb-1 flex items-center gap-1 rounded-lg bg-primary/[0.06] p-1">
+                    <button
+                      type="button"
+                      onClick={() => setActiveTab("my-tasks")}
+                      className={`flex-1 rounded-md px-3 py-2 text-xs font-semibold transition-colors ${
+                        activeTab === "my-tasks"
+                          ? "bg-white text-primary shadow-sm ring-1 ring-primary/15"
+                          : "text-muted-foreground hover:text-foreground"
+                      }`}
+                    >
+                      My tasks
+                      {(() => { const fid = founderId || resolvedCurrentUserId; const n = localTasks.filter((t) => Boolean(t.assignedTo) && t.assignedTo === fid).length; return n > 0 ? <span className="ml-1.5 rounded-full bg-primary/12 px-1.5 py-0.5 text-[10px] tabular-nums text-[#1a237e]">{n}</span> : null; })()}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setActiveTab("team-tasks")}
+                      className={`flex-1 rounded-md px-3 py-2 text-xs font-semibold transition-colors ${
+                        activeTab === "team-tasks"
+                          ? "bg-white text-primary shadow-sm ring-1 ring-primary/15"
+                          : "text-muted-foreground hover:text-foreground"
+                      }`}
+                    >
+                      Team tasks
+                      {(() => { const fid = founderId || resolvedCurrentUserId; const n = localTasks.filter((t) => Boolean(t.assignedTo) && t.assignedTo !== fid).length; return n > 0 ? <span className="ml-1.5 rounded-full bg-primary/12 px-1.5 py-0.5 text-[10px] tabular-nums text-[#1a237e]">{n}</span> : null; })()}
+                    </button>
+                  </div>
+                )}
+
+                <p className="text-xs text-text-muted">
+                  {(() => {
+                    const fid = founderId || resolvedCurrentUserId;
+                    if (activeTab === "team-tasks") {
+                      const n = localTasks.filter((t) => Boolean(t.assignedTo) && t.assignedTo !== fid).length;
+                      return `${n} task${n !== 1 ? "s" : ""} assigned to teammates`;
+                    }
+                    const n = localTasks.filter((t) => Boolean(t.assignedTo) && t.assignedTo === fid).length;
+                    return `${n} task${n !== 1 ? "s" : ""} assigned to you`;
+                  })()}
                 </p>
               </div>
-              <div className="p-4 border-b border-border bg-surface-container-low space-y-3">
+              <div className="space-y-3 border-b border-primary/12 bg-[#f4f5ff] px-3 py-4 md:px-4">
                 {loadError ? (
                   <div className="text-xs text-red-600 bg-red-50 border border-red-200 rounded p-2">
                     {loadError}
@@ -768,18 +954,39 @@ export function TaskManagementPanel({
                     The linked task could not be found. It may have been deleted or moved.
                   </div>
                 ) : null}
+
+                {user.role === "founder" && (
+                  <div className="flex items-start gap-2.5 rounded-lg border border-primary/20 bg-[#e8ebff]/95 px-3 py-2.5">
+                    <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-primary" aria-hidden />
+                    <p className="flex-1 text-[12px] font-medium leading-snug text-[#1a237e]">
+                      Tasks come from your weekly milestones on the founder dashboard.
+                    </p>
+                    {onNavigate && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="h-8 shrink-0 px-2 text-xs font-semibold text-[#1a237e] hover:bg-primary/10"
+                        onClick={() => { onClose?.(); onNavigate("dashboard"); }}
+                      >
+                        Open dashboard
+                      </Button>
+                    )}
+                  </div>
+                )}
+
                 <div className="flex items-center gap-2">
                   <div className="relative flex-1">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                     <Input
-                      placeholder="Search tasks..."
+                      placeholder="Search tasks…"
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
-                      className="pl-9 h-9"
+                      className="h-9 border-primary/18 bg-white pl-9 hover:border-primary/28 focus-visible:border-primary"
                     />
                   </div>
                   <Select value={filterStatus} onValueChange={setFilterStatus}>
-                    <SelectTrigger className="w-32 h-9">
+                    <SelectTrigger className="h-9 w-[8.5rem] border-primary/18 bg-white hover:border-primary/30">
                       <Filter className="w-3.5 h-3.5 mr-1" />
                       <SelectValue placeholder="Status" />
                     </SelectTrigger>
@@ -791,42 +998,95 @@ export function TaskManagementPanel({
                       <SelectItem value="blocked">Blocked</SelectItem>
                     </SelectContent>
                   </Select>
-                  {user.role === "founder" && (
-                    <Button
-                      onClick={() => setShowCreateDialog(true)}
-                      className="bg-blue-600 hover:bg-blue-700 h-9"
-                    >
-                      <Plus className="w-4 h-4 mr-1" />
-                      New Task
-                    </Button>
-                  )}
                 </div>
-                <div className="flex items-center gap-4 text-xs">
+                {milestoneProgressRows.length > 0 && (
+                  <div className="overflow-hidden rounded-xl border border-primary/18 bg-white shadow-sm">
+                    <div className="flex items-center justify-between border-b border-primary/12 bg-[#eef1fc] px-3 py-2.5 md:px-4 md:py-3">
+                      <div className="flex items-center gap-2">
+                        <Target className="h-3.5 w-3.5 text-primary" aria-hidden />
+                        <span className="text-[11px] font-semibold uppercase tracking-wide text-[#4a4a5a] md:text-xs">
+                          Weekly milestones
+                        </span>
+                      </div>
+                      <span className="text-[10px] font-medium tabular-nums text-text-muted">
+                        {milestoneProgressRows.filter((r) => r.total > 0 && r.done >= r.total).length}/{milestoneProgressRows.length} complete
+                      </span>
+                    </div>
+                    <div className="divide-y divide-primary/12 bg-white">
+                      {milestoneProgressRows.map((row) => {
+                        const pct =
+                          row.total > 0
+                            ? Math.max(0, Math.min(100, Math.round((row.done / row.total) * 100)))
+                            : 0;
+                        const isDone = row.total > 0 && row.done >= row.total;
+                        const isPartial = row.done > 0 && !isDone;
+                        const barColor = isDone
+                          ? "from-emerald-500 to-emerald-400"
+                          : isPartial
+                          ? "from-primary to-primary-hover"
+                          : "from-muted-foreground/25 to-muted-foreground/15";
+                        const pillStyle = isDone
+                          ? "border border-emerald-200/80 bg-emerald-50 text-emerald-800"
+                          : isPartial
+                          ? "border border-primary/22 bg-primary/[0.08] text-[#1a237e]"
+                          : "border border-border/90 bg-muted/40 text-muted-foreground";
+                        return (
+                          <div
+                            key={row.id}
+                            className="space-y-2 bg-white px-3 py-2.5 md:px-4 md:py-3"
+                          >
+                            <div className="flex items-start justify-between gap-3">
+                              <div className="flex min-w-0 items-center gap-2">
+                                <div className={`mt-0.5 h-2 w-2 shrink-0 rounded-full ${isDone ? "bg-emerald-500" : isPartial ? "bg-primary" : "bg-muted-foreground/35"}`} />
+                                <span className="truncate text-xs font-medium leading-tight text-[#0d0d0d]">{row.title}</span>
+                              </div>
+                              <div className="flex items-center gap-2 flex-shrink-0">
+                                <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${pillStyle}`}>
+                                  {pct}%
+                                </span>
+                                <span className="text-[10px] text-muted-foreground tabular-nums">
+                                  {row.done}/{row.total}
+                                </span>
+                              </div>
+                            </div>
+                            <div className="h-1 w-full overflow-hidden rounded-full bg-primary/10">
+                              <div
+                                className={`h-full rounded-full bg-gradient-to-r transition-all duration-500 ${barColor}`}
+                                style={{ width: `${pct}%` }}
+                              />
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+                <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs">
                   <div className="flex items-center gap-1.5">
-                    <Circle className="w-3 h-3 text-gray-400" />
-                    <span className="text-muted-foreground">
+                    <Circle className="h-3 w-3 text-muted-foreground/70" />
+                    <span className="font-medium text-text-muted">
                       {pendingTasks.length}
-                      {" To Do"}
+                      {" To do"}
                     </span>
                   </div>
                   <div className="flex items-center gap-1.5">
-                    <Clock className="w-3 h-3 text-blue-600" />
-                    <span className="text-muted-foreground">
+                    <Clock className="h-3 w-3 text-primary" />
+                    <span className="font-medium text-text-muted">
                       {inProgressTasks.length}
-                      {" In Progress"}
+                      {" In progress"}
                     </span>
                   </div>
                   <div className="flex items-center gap-1.5">
-                    <CheckCircle2 className="w-3 h-3 text-green-600" />
-                    <span className="text-muted-foreground">
+                    <CheckCircle2 className="h-3 w-3 text-emerald-600" />
+                    <span className="font-medium text-text-muted">
                       {completedTasks.length}
                       {" Done"}
                     </span>
                   </div>
                   {blockedTasks.length > 0 && (
                     <div className="flex items-center gap-1.5">
-                      <Ban className="w-3 h-3 text-red-600" />
-                      <span className="text-muted-foreground">
+                      <Ban className="h-3 w-3 text-orange-600" />
+                      <span className="font-medium text-text-muted">
                         {blockedTasks.length}
                         {" Blocked"}
                       </span>
@@ -834,8 +1094,29 @@ export function TaskManagementPanel({
                   )}
                 </div>
               </div>
+              </div>
+              <div
+                role="separator"
+                aria-label="Drag up to expand task board"
+                onPointerDown={onHandlePointerDown}
+                onPointerMove={onHandlePointerMove}
+                onPointerUp={onHandlePointerUp}
+                onPointerCancel={onHandlePointerUp}
+                className="group relative flex h-8 w-full shrink-0 cursor-ns-resize select-none items-center justify-center border-y border-primary/12 bg-[#fafbff] transition-colors hover:bg-[#eef1fc] active:bg-primary/10"
+              >
+                <div className="flex items-center gap-1.5 rounded-full border border-primary/18 bg-white px-3 py-1 shadow-sm transition-all group-hover:border-primary/30 group-hover:shadow-card">
+                  <GripHorizontal className="h-3.5 w-3.5 text-muted-foreground transition-colors group-hover:text-primary" aria-hidden />
+                  <span className="select-none text-[10px] font-semibold text-muted-foreground transition-colors group-hover:text-primary">
+                    Drag to resize board
+                  </span>
+                </div>
+              </div>
+              <div
+                className="shrink-0 overflow-hidden bg-[#f4f5ff]"
+                style={{ height: kanbanHeight }}
+              >
               {loading ? (
-                <div className="flex-1 flex items-center justify-center">
+                <div className="flex h-full items-center justify-center">
                   <div className="text-center space-y-3">
                     <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto" />
                     <p className="text-sm text-muted-foreground">
@@ -844,49 +1125,125 @@ export function TaskManagementPanel({
                   </div>
                 </div>
               ) : filteredTasks.length === 0 ? (
-                <div className="flex-1 flex items-center justify-center">
+                <div className="flex h-full items-center justify-center">
                   <div className="text-center space-y-3 p-8">
                     <Target className="w-16 h-16 mx-auto text-muted-foreground opacity-20" />
                     <p className="text-lg font-medium text-muted-foreground">
                       No tasks found
                     </p>
                     <p className="text-sm text-muted-foreground max-w-sm">
-                      {user.role === "founder"
-                        ? "Create your first task to get started"
+                      {user.role === "founder" && activeTab === "team-tasks"
+                        ? "No tasks have been assigned to teammates yet"
+                        : user.role === "founder"
+                        ? "Tasks you add to milestones will appear here"
                         : "No tasks have been assigned to you yet"}
                     </p>
                   </div>
                 </div>
+              ) : activeTab === "team-tasks" ? (
+                <div className="h-full space-y-6 overflow-y-auto bg-[#f4f5ff] p-4">
+                  {teamTasksByAssignee.map((group) => (
+                    <div key={group.id}>
+                      <div className="mb-2 flex items-center gap-2">
+                        <div className="flex h-8 w-8 items-center justify-center rounded-full border border-primary/18 bg-primary/[0.08] text-[11px] font-semibold text-[#1a237e]">
+                          {group.name.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase()}
+                        </div>
+                        <span className="text-sm font-semibold text-[#0d0d0d]">{group.name}</span>
+                        <Badge variant="secondary" className="h-5 border border-primary/15 bg-white px-1.5 text-[10px] font-semibold">
+                          {group.tasks.length} task{group.tasks.length !== 1 ? "s" : ""}
+                        </Badge>
+                      </div>
+                      <div className="space-y-2 pl-9">
+                        {group.tasks.map((task) => (
+                          <Card
+                            key={task.id}
+                            className={`rounded-xl border border-primary/18 bg-white shadow-sm transition-all hover:border-primary/30 hover:shadow-card border-l-[3px] ${getStatusColor(task.status)}`}
+                          >
+                            <CardContent className="space-y-2 p-3">
+                              <div className="flex items-start justify-between gap-2">
+                                <h4 className="flex-1 text-xs font-semibold leading-snug text-[#0d0d0d]">{task.title}</h4>
+                                <div className="flex items-center gap-1.5 shrink-0">
+                                  <Badge variant={task.status === "completed" ? "default" : task.status === "blocked" ? "destructive" : "secondary"} className="text-[10px] h-5">
+                                    {task.status === "in-progress" ? "In Progress" : task.status === "pending" ? "To Do" : task.status.charAt(0).toUpperCase() + task.status.slice(1)}
+                                  </Badge>
+                                  {canEditTask && (
+                                    <DropdownMenu>
+                                      <DropdownMenuTrigger asChild={true}>
+                                        <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={(e) => e.stopPropagation()}>
+                                          <MoreVertical className="w-3.5 h-3.5" />
+                                        </Button>
+                                      </DropdownMenuTrigger>
+                                      <DropdownMenuContent align="end" className="w-40 z-[75]">
+                                        <DropdownMenuItem onClick={() => handleStatusChange(task.id, "pending")}>
+                                          <Circle className="w-3.5 h-3.5 mr-2 text-gray-400" />Mark as To Do
+                                        </DropdownMenuItem>
+                                        <DropdownMenuItem onClick={() => handleStatusChange(task.id, "in-progress")}>
+                                          <PlayCircle className="w-3.5 h-3.5 mr-2 text-blue-600" />Start Progress
+                                        </DropdownMenuItem>
+                                        <DropdownMenuItem onClick={() => handleStatusChange(task.id, "completed")}>
+                                          <CheckCircle2 className="w-3.5 h-3.5 mr-2 text-green-600" />Mark Complete
+                                        </DropdownMenuItem>
+                                        <DropdownMenuSeparator />
+                                        <DropdownMenuItem onClick={() => handleDeleteTask(task.id)} className="text-red-600 focus:text-red-600">
+                                          <Trash2 className="w-3.5 h-3.5 mr-2" />Delete Task
+                                        </DropdownMenuItem>
+                                      </DropdownMenuContent>
+                                    </DropdownMenu>
+                                  )}
+                                </div>
+                              </div>
+                              {task.description && (
+                                <p className="text-[10px] text-muted-foreground line-clamp-2">{task.description}</p>
+                              )}
+                              {task.status === "blocked" && task.blockerNote && (
+                                <div className="p-2 bg-red-50 border border-red-200 rounded text-[10px]">
+                                  <div className="flex items-center gap-1 text-red-700 font-medium mb-1">
+                                    <AlertCircle className="w-3 h-3" />
+                                    <span>Blocked: {task.blockerNote}</span>
+                                  </div>
+                                </div>
+                              )}
+                              <div className="flex items-center justify-between gap-2 border-t border-primary/10 pt-2 text-[11px] text-[#4a4a5a]">
+                                <span className="min-w-0 truncate">{task.milestoneName || "No milestone"}</span>
+                                {task.dueDate && <span>Due {new Date(task.dueDate).toLocaleDateString()}</span>}
+                              </div>
+                            </CardContent>
+                          </Card>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
               ) : (
-                <div className="flex-1 overflow-hidden p-4 flex flex-col">
-                  <div className="md:hidden flex-1 overflow-x-auto snap-x snap-mandatory flex gap-4">
+                <div className="flex h-full flex-col overflow-hidden bg-[#f4f5ff] p-3 md:p-4">
+                  <div className="flex flex-1 snap-x snap-mandatory gap-3 overflow-x-auto md:hidden">
                     {columns.map((column) => (
                       <div
                         key={column.id}
-                        className="flex-shrink-0 w-[70vw] snap-start flex flex-col min-h-0"
+                        className="flex min-h-0 w-[72vw] shrink-0 snap-start flex-col overflow-hidden rounded-xl border border-primary/18 bg-white shadow-sm"
                         onDragOver={handleDragOver}
                         onDrop={() => handleDrop(column.id)}
                       >
                         <div
-                          className={`${column.color} rounded-t-lg p-2.5 border-b-2 border-blue-200 dark:border-blue-800 flex-shrink-0`}
+                          className={`flex shrink-0 items-center border-b border-primary/12 px-3 py-2.5 ${column.headerClass}`}
                         >
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-2">
+                          <div className="flex w-full items-center justify-between gap-2">
+                            <div className="flex min-w-0 items-center gap-2">
                               {getStatusIcon(column.id)}
-                              <span className="text-xs font-medium">
+                              <span className="truncate text-xs font-semibold">
                                 {column.title}
                               </span>
                             </div>
                             <Badge
                               variant="secondary"
-                              className="h-5 px-1.5 text-[10px]"
+                              className="h-5 shrink-0 border border-primary/15 bg-white/90 px-1.5 text-[10px] font-semibold tabular-nums text-[#4a4a5a]"
                             >
                               {column.tasks.length}
                             </Badge>
                           </div>
                         </div>
-                        <div className="flex-1 bg-slate-50/50 dark:bg-slate-900/50 rounded-b-lg border border-t-0 overflow-y-auto min-h-0">
-                          <div className="space-y-2 p-2">
+                        <div className="min-h-0 flex-1 overflow-y-auto bg-[#fafbff] p-2">
+                          <div className="space-y-2">
                             {column.tasks.map((task) => (
                               <TaskCard
                                 key={task.id}
@@ -946,9 +1303,9 @@ export function TaskManagementPanel({
                               />
                             ))}
                             {column.tasks.length === 0 && (
-                              <div className="text-center py-8 text-muted-foreground text-xs">
-                                <Circle className="w-8 h-8 mx-auto mb-2 opacity-20" />
-                                <p>No tasks</p>
+                              <div className="rounded-lg border border-dashed border-primary/22 bg-white py-8 text-center text-xs text-muted-foreground">
+                                <Circle className="mx-auto mb-2 h-8 w-8 text-primary/25" aria-hidden />
+                                <p className="font-medium">No tasks</p>
                               </div>
                             )}
                           </div>
@@ -957,35 +1314,35 @@ export function TaskManagementPanel({
                     ))}
                   </div>
                   <div
-                    className={`hidden md:grid gap-4 flex-1 min-h-0 ${columns.length === 4 ? "grid-cols-4" : "grid-cols-3"}`}
+                    className={`hidden min-h-0 flex-1 gap-3 md:grid ${columns.length === 4 ? "grid-cols-4" : "grid-cols-3"}`}
                   >
                     {columns.map((column) => (
                       <div
                         key={column.id}
-                        className="flex flex-col min-h-0"
+                        className="flex min-h-0 flex-col overflow-hidden rounded-xl border border-primary/18 bg-white shadow-sm"
                         onDragOver={handleDragOver}
                         onDrop={() => handleDrop(column.id)}
                       >
                         <div
-                          className={`${column.color} rounded-t-lg p-2.5 border-b-2 border-blue-200 dark:border-blue-800 flex-shrink-0`}
+                          className={`flex shrink-0 items-center border-b border-primary/12 px-3 py-2.5 ${column.headerClass}`}
                         >
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-2">
+                          <div className="flex w-full items-center justify-between gap-2">
+                            <div className="flex min-w-0 items-center gap-2">
                               {getStatusIcon(column.id)}
-                              <span className="text-xs font-medium">
+                              <span className="truncate text-xs font-semibold">
                                 {column.title}
                               </span>
                             </div>
                             <Badge
                               variant="secondary"
-                              className="h-5 px-1.5 text-[10px]"
+                              className="h-5 shrink-0 border border-primary/15 bg-white/90 px-1.5 text-[10px] font-semibold tabular-nums text-[#4a4a5a]"
                             >
                               {column.tasks.length}
                             </Badge>
                           </div>
                         </div>
-                        <div className="flex-1 bg-slate-50/50 dark:bg-slate-900/50 rounded-b-lg border border-t-0 overflow-y-auto min-h-0">
-                          <div className="space-y-2 p-2">
+                        <div className="min-h-0 flex-1 overflow-y-auto bg-[#fafbff] p-2">
+                          <div className="space-y-2">
                             {column.tasks.map((task) => (
                               <TaskCard
                                 key={task.id}
@@ -1045,9 +1402,9 @@ export function TaskManagementPanel({
                               />
                             ))}
                             {column.tasks.length === 0 && (
-                              <div className="text-center py-8 text-muted-foreground text-xs">
-                                <Circle className="w-8 h-8 mx-auto mb-2 opacity-20" />
-                                <p>No tasks</p>
+                              <div className="rounded-lg border border-dashed border-primary/22 bg-white py-8 text-center text-xs text-muted-foreground">
+                                <Circle className="mx-auto mb-2 h-8 w-8 text-primary/25" aria-hidden />
+                                <p className="font-medium">No tasks</p>
                               </div>
                             )}
                           </div>
@@ -1057,11 +1414,12 @@ export function TaskManagementPanel({
                   </div>
                 </div>
               )}
+              </div>
             </motion.div>
           </>
         )}
       </AnimatePresence>
-      {user.role === "founder" && (
+      {false && user.role === "founder" && (
         <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
           <DialogContent className="max-w-md z-[75] office-dialog-panel">
             <DialogHeader>
@@ -1098,6 +1456,29 @@ export function TaskManagementPanel({
                   }
                   className="mt-1 h-20"
                 />
+              </div>
+              <div>
+                <Label className="text-xs">Milestone *</Label>
+                <Select
+                  value={newTask.milestoneId}
+                  onValueChange={(v) =>
+                    setNewTask({
+                      ...newTask,
+                      milestoneId: v,
+                    })
+                  }
+                >
+                  <SelectTrigger className="mt-1">
+                    <SelectValue placeholder="Select milestone..." />
+                  </SelectTrigger>
+                  <SelectContent className="z-[80]">
+                    {milestones.map((milestone) => (
+                      <SelectItem key={milestone.id} value={milestone.id}>
+                        {milestone.title}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
               <div>
                 <Label className="text-xs">Assign To</Label>
@@ -1145,6 +1526,57 @@ export function TaskManagementPanel({
                   className="flex-1 bg-blue-600 hover:bg-blue-700"
                 >
                   Create Task
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
+      {false && user.role === "founder" && (
+        <Dialog open={showMilestoneDialog} onOpenChange={setShowMilestoneDialog}>
+          <DialogContent className="max-w-md z-[75] office-dialog-panel">
+            <DialogHeader>
+              <DialogTitle>Create Milestone</DialogTitle>
+              <DialogDescription>
+                Milestones organize weekly tasks and progress.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div>
+                <Label className="text-xs">Milestone Title *</Label>
+                <Input
+                  placeholder="Enter milestone title..."
+                  value={newMilestone.title}
+                  onChange={(e) =>
+                    setNewMilestone((prev) => ({ ...prev, title: e.target.value }))
+                  }
+                  className="mt-1"
+                />
+              </div>
+              <div>
+                <Label className="text-xs">Description</Label>
+                <Textarea
+                  placeholder="Describe this milestone..."
+                  value={newMilestone.description}
+                  onChange={(e) =>
+                    setNewMilestone((prev) => ({ ...prev, description: e.target.value }))
+                  }
+                  className="mt-1 h-20"
+                />
+              </div>
+              <div className="flex gap-2 pt-2">
+                <Button
+                  variant="outline"
+                  onClick={() => setShowMilestoneDialog(false)}
+                  className="flex-1"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={handleCreateMilestone}
+                  className="flex-1 bg-blue-600 hover:bg-blue-700"
+                >
+                  Create Milestone
                 </Button>
               </div>
             </div>
@@ -1229,11 +1661,11 @@ function TaskCard({
         className="cursor-move group"
       >
         <Card
-          className={`hover:shadow-md transition-shadow border-l-4 ${getStatusColor(task.status)}`}
+          className={`rounded-xl border border-primary/18 bg-white shadow-sm transition-all hover:border-primary/30 hover:shadow-card border-l-[3px] ${getStatusColor(task.status)}`}
         >
-          <CardContent className="p-3 space-y-2">
+          <CardContent className="space-y-2 p-3">
             <div className="flex items-start justify-between gap-2">
-              <h4 className="text-xs leading-tight flex-1 font-medium">
+              <h4 className="flex-1 text-xs font-semibold leading-snug text-[#0d0d0d]">
                 {task.title}
               </h4>
               <div className="flex items-center gap-1">
@@ -1334,37 +1766,41 @@ function TaskCard({
               </p>
             )}
             {task.status === "blocked" && task.blockerNote && (
-              <div className="p-2 bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-800 rounded text-[10px]">
-                <div className="flex items-center gap-1 text-red-700 dark:text-red-300 font-medium mb-1">
+              <div className="p-2 bg-red-50 border border-red-200 rounded text-[10px]">
+                <div className="flex items-center gap-1 text-red-700 font-medium mb-1">
                   <AlertCircle className="w-3 h-3" />
                   <span>Blocked</span>
                 </div>
-                <p className="text-red-600 dark:text-red-400">
+                <p className="text-red-600">
                   {task.blockerNote}
                 </p>
               </div>
             )}
-            <Separator />
-            <div className="flex items-center justify-between text-[10px]">
+            <div className="flex items-center justify-between gap-2 border-t border-primary/10 pt-2 text-[11px]">
               {task.assignedToName ? (
-                <div className="flex items-center gap-1.5">
-                  <Avatar className="w-5 h-5">
-                    <AvatarFallback className="text-[8px]">
+                <div className="flex min-w-0 items-center gap-1.5">
+                  <Avatar className="h-6 w-6 border border-primary/12">
+                    <AvatarFallback className="bg-primary/[0.08] text-[8px] font-semibold text-[#1a237e]">
                       {task.assignedToName
                         .split(" ")
                         .map((n) => n[0])
                         .join("")}
                     </AvatarFallback>
                   </Avatar>
-                  <span className="text-muted-foreground truncate max-w-[100px]">
+                  <span className="max-w-[120px] truncate font-medium text-[#4a4a5a]">
                     {task.assignedToName}
                   </span>
                 </div>
               ) : (
-                <span className="text-muted-foreground italic">Unassigned</span>
+                <span className="font-body font-medium not-italic text-muted-foreground">
+                  Unassigned
+                </span>
               )}
               {task.milestoneName && (
-                <Badge variant="outline" className="text-[9px] h-4 px-1">
+                <Badge
+                  variant="outline"
+                  className="h-5 max-w-[46%] shrink-0 truncate border-primary/20 px-1.5 text-[9px] font-medium text-[#4a4a5a]"
+                >
                   {task.milestoneName}
                 </Badge>
               )}
@@ -1395,7 +1831,7 @@ function TaskCard({
                 </SelectTrigger>
                 <SelectContent className="z-[85]">
                   <SelectItem value="unassigned">
-                    <span className="italic text-muted-foreground">
+                    <span className="font-medium text-muted-foreground">
                       Unassigned
                     </span>
                   </SelectItem>

@@ -6,6 +6,9 @@ const mentorProfileSchema = new mongoose.Schema(
     organizationId: { type: mongoose.Schema.Types.ObjectId, ref: "Organization", index: true },
     expertise: { type: [String], default: [] },
     assignedFounders: { type: [String], default: [] },
+    /** Per-mentor magic-link token used by the mentor onboarding flow. */
+    token: { type: String, index: true, sparse: true, unique: false },
+    tokenIssuedAt: { type: Date, default: null },
   },
   { timestamps: true },
 );

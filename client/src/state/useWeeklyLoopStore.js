@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { apiGet, apiPost, apiPut, apiDelete } from "../utils/apiClient.js";
 import { mapFounderWeeklyLoop } from "../domains/founder/mappers/founderWeeklyLoopMapper.js";
+import { validateWeeklyPlanMilestones } from "../domains/founder/mappers/weeklyPlanPayload.js";
 
 /**
  * Weekly execution loop store.
@@ -24,6 +25,15 @@ function normalizeListPayload(payload, key) {
     if (Array.isArray(payload.items)) return payload.items;
   }
   return [];
+}
+
+/** Avoid stale GET responses after POST (browser / proxy caches). */
+function noStoreGetConfig(bustCache) {
+  if (!bustCache) return {};
+  return {
+    params: { _: Date.now() },
+    headers: { "Cache-Control": "no-cache", Pragma: "no-cache" },
+  };
 }
 
 const initialState = {
@@ -50,12 +60,15 @@ export const useWeeklyLoopStore = create((set, get) => ({
    * Load outcomes, milestones, tasks, and execution score in parallel.
    * Skips when no founderId is provided. When `options.silent === true`
    * only `refreshing` is toggled (used for background refreshes).
+   * When `options.bustCache === true`, add no-store headers + cache-bust query
+   * so the UI updates immediately after mutations (e.g. weekly plan create).
    */
   async load(founderId, options = {}) {
     const id = founderId || get().founderId;
     if (!id) return null;
 
     const silent = options.silent === true;
+    const bustCache = options.bustCache === true;
     if (silent) {
       set({ refreshing: true });
     } else {
@@ -63,17 +76,18 @@ export const useWeeklyLoopStore = create((set, get) => ({
     }
 
     try {
+      const getCfg = noStoreGetConfig(bustCache);
       const [outcomes, milestones, tasks, executionScore] = await Promise.all([
-        apiGet(`/founders/${id}/weekly-outcomes`)
+        apiGet(`/founders/${id}/weekly-outcomes`, getCfg)
           .then((data) => normalizeListPayload(data, "outcomes"))
           .catch(() => []),
-        apiGet(`/founders/${id}/milestones`)
+        apiGet(`/founders/${id}/milestones`, getCfg)
           .then((data) => normalizeListPayload(data, "milestones"))
           .catch(() => []),
-        apiGet(`/founders/${id}/tasks`)
+        apiGet(`/founders/${id}/tasks`, getCfg)
           .then((data) => normalizeListPayload(data, "tasks"))
           .catch(() => []),
-        apiGet(`/execution-score/${id}`).catch(() => null),
+        apiGet(`/execution-score/${id}`, getCfg).catch(() => null),
       ]);
 
       const viewModel = mapFounderWeeklyLoop({
@@ -103,8 +117,10 @@ export const useWeeklyLoopStore = create((set, get) => ({
     }
   },
 
-  async refresh() {
-    return get().load(get().founderId, { silent: true });
+  async refresh(founderIdOverride) {
+    const id = founderIdOverride || get().founderId;
+    if (!id) return null;
+    return get().load(id, { silent: true, bustCache: true });
   },
 
   async saveWeeklyOutcome(outcome) {
@@ -116,38 +132,110 @@ export const useWeeklyLoopStore = create((set, get) => ({
 
   /**
    * Atomically create weekly outcome + milestones + tasks (server orchestration).
+   * @param {object} plan
+   * @param {string} [founderIdOverride] Logged-in founder id when store has not hydrated yet.
    */
-  async saveWeeklyPlan(plan) {
-    const id = get().founderId;
-    if (!id || !plan) return null;
-    await apiPost(`/founders/${id}/weekly-plan`, { plan });
-    return get().refresh();
+  async saveWeeklyPlan(plan, founderIdOverride) {
+    const id = founderIdOverride || get().founderId;
+    if (!id || !plan) {
+      throw new Error("Missing founder or plan.");
+    }
+    const milestoneCheck = validateWeeklyPlanMilestones(plan.milestones);
+    if (!milestoneCheck.ok) {
+      throw new Error(milestoneCheck.message);
+    }
+    const data = await apiPost(`/founders/${id}/weekly-plan`, { plan });
+    set({ founderId: id });
+
+    const outcome = data?.outcome;
+    const createdMilestones = asList(data?.milestones);
+    if (outcome) {
+      const prevOutcomes = asList(get().outcomes);
+      const oid = String(outcome._id || outcome.id);
+      const nextOutcomes = [
+        outcome,
+        ...prevOutcomes.filter((o) => String(o._id || o.id) !== oid),
+      ];
+      let nextMilestones = asList(get().milestones);
+      if (createdMilestones.length) {
+        const newIds = new Set(
+          createdMilestones.map((m) => String(m._id || m.id)),
+        );
+        nextMilestones = [
+          ...createdMilestones,
+          ...nextMilestones.filter((m) => !newIds.has(String(m._id || m.id))),
+        ];
+      }
+      const nextTasks = asList(get().tasks);
+      const viewModel = mapFounderWeeklyLoop({
+        outcomes: nextOutcomes,
+        milestones: nextMilestones,
+        tasks: nextTasks,
+        executionScore: get().executionScore,
+      });
+      set({
+        outcomes: nextOutcomes,
+        milestones: nextMilestones,
+        viewModel,
+        lastLoadedAt: new Date().toISOString(),
+      });
+    }
+
+    return get().refresh(id);
   },
 
-  async saveMilestone(milestone) {
+  async saveMilestone(milestone, options = {}) {
     const id = get().founderId;
     if (!id || !milestone) return null;
-    await apiPost(`/founders/${id}/milestones`, { milestone });
-    return get().refresh();
+    const created = await apiPost(`/founders/${id}/milestones`, { milestone });
+    if (!options.skipRefresh) await get().refresh();
+    return created;
   },
 
-  async saveTask(task) {
+  async updateMilestone(milestoneId, patch, options = {}) {
+    const id = get().founderId;
+    if (!id || !milestoneId) return null;
+    const updated = await apiPut(`/founders/${id}/milestones/${milestoneId}`, {
+      milestone: patch || {},
+    });
+    if (!options.skipRefresh) await get().refresh();
+    return updated;
+  },
+
+  async saveTask(task, options = {}) {
     const id = get().founderId;
     if (!id || !task) return null;
-    await apiPost(`/founders/${id}/tasks`, { task });
-    return get().refresh();
+    const created = await apiPost(`/founders/${id}/tasks`, { task });
+    if (!options.skipRefresh) await get().refresh();
+    return created;
   },
 
-  async saveTasks(tasks = []) {
+  async saveTasks(tasks = [], options = {}) {
     const id = get().founderId;
     if (!id || !tasks.length) return null;
     await Promise.all(
       tasks.map((task) => apiPost(`/founders/${id}/tasks`, { task })),
     );
-    return get().refresh();
+    if (!options.skipRefresh) return get().refresh();
+    return null;
   },
 
-  async updateTaskStatus(taskId, status, extra = {}) {
+  /** Partial task update (e.g. title/description) without touching status transitions. */
+  async updateTaskPatch(taskId, patch, options = {}) {
+    const id = get().founderId;
+    if (!id || !taskId || !patch || typeof patch !== "object") return null;
+    const allowed = {};
+    if (patch.title != null) allowed.title = String(patch.title).trim().slice(0, 500);
+    if (patch.description != null) {
+      allowed.description = String(patch.description).trim().slice(0, 5000);
+    }
+    if (!Object.keys(allowed).length) return null;
+    await apiPut(`/founders/${id}/tasks/${taskId}`, { task: allowed });
+    if (!options.skipRefresh) return get().refresh();
+    return null;
+  },
+
+  async updateTaskStatus(taskId, status, extra = {}, options = {}) {
     const id = get().founderId;
     if (!id || !taskId) return null;
     await apiPut(`/founders/${id}/tasks/${taskId}/status`, {
@@ -155,45 +243,208 @@ export const useWeeklyLoopStore = create((set, get) => ({
       ...extra,
       updatedAt: new Date().toISOString(),
     });
+    if (options.skipRefresh) return null;
     return get().refresh();
+  },
+
+  /**
+   * Apply a target status from a known current status using server rules
+   * (see server/src/domain/weeklyLoopRules.js — e.g. pending cannot jump to completed).
+   */
+  async applyTaskStatusTransition(taskId, fromStatus, toStatus, options = {}) {
+    const id = get().founderId;
+    if (!id || !taskId) return null;
+    const skipOpt = options.skipRefresh === true ? { skipRefresh: true } : {};
+    let cur = String(fromStatus || "pending").toLowerCase();
+    const target = String(toStatus || "pending").toLowerCase();
+
+    const put = async (st, extra = {}) => {
+      await get().updateTaskStatus(taskId, st, extra, skipOpt);
+      cur = st;
+    };
+
+    if (cur === target) return null;
+
+    if (target === "completed") {
+      if (cur === "pending") {
+        await put("in-progress");
+        await put("completed", { completedAt: new Date().toISOString() });
+        return null;
+      }
+      if (cur === "blocked") {
+        await put("in-progress");
+        await put("completed", { completedAt: new Date().toISOString() });
+        return null;
+      }
+      if (cur === "in-progress") {
+        await put("completed", { completedAt: new Date().toISOString() });
+        return null;
+      }
+    }
+
+    if (target === "in-progress") {
+      if (cur === "pending") {
+        await put("in-progress");
+        return null;
+      }
+      if (cur === "blocked") {
+        await put("in-progress");
+        return null;
+      }
+    }
+
+    if (target === "pending") {
+      if (cur === "completed") {
+        await put("pending", { completedAt: null });
+        return null;
+      }
+      if (cur === "in-progress") {
+        await put("pending", { completedAt: null });
+        return null;
+      }
+      if (cur === "blocked") {
+        await get().unblockTask(taskId, skipOpt);
+        return null;
+      }
+    }
+
+    await put(
+      target,
+      target === "completed"
+        ? { completedAt: new Date().toISOString() }
+        : { completedAt: null },
+    );
+    return null;
   },
 
   async toggleTask(taskId) {
     const id = get().founderId;
     if (!id || !taskId) return null;
-    const current = asList(get().tasks).find(
+    const tasks = asList(get().tasks);
+    const idx = tasks.findIndex(
       (task) => String(task.id || task._id) === String(taskId),
     );
+    if (idx === -1) return null;
+    const current = tasks[idx];
     const nextStatus =
       current && (current.status === "completed" || current.completed)
         ? "pending"
         : "completed";
-    return get().updateTaskStatus(taskId, nextStatus, {
-      completedAt: nextStatus === "completed" ? new Date().toISOString() : null,
+    const prevSnapshot = tasks.map((t) => ({ ...t }));
+    const nextTasks = tasks.map((task, i) =>
+      i === idx
+        ? {
+            ...task,
+            status: nextStatus,
+            completedAt:
+              nextStatus === "completed" ? new Date().toISOString() : null,
+            completed: nextStatus === "completed",
+          }
+        : task,
+    );
+    const vmNext = mapFounderWeeklyLoop({
+      outcomes: asList(get().outcomes),
+      milestones: asList(get().milestones),
+      tasks: nextTasks,
+      executionScore: get().executionScore,
     });
+    set({ tasks: nextTasks, viewModel: vmNext });
+    try {
+      const from = String(current?.status || "pending").toLowerCase();
+      await get().applyTaskStatusTransition(taskId, from, nextStatus, {
+        skipRefresh: true,
+      });
+      return get().refresh();
+    } catch (error) {
+      const vmPrev = mapFounderWeeklyLoop({
+        outcomes: asList(get().outcomes),
+        milestones: asList(get().milestones),
+        tasks: prevSnapshot,
+        executionScore: get().executionScore,
+      });
+      set({ tasks: prevSnapshot, viewModel: vmPrev });
+      throw error;
+    }
   },
 
-  async blockTask(taskId, reason, note) {
-    return get().updateTaskStatus(taskId, "blocked", {
-      blockedReason: reason,
-      blockerReason: reason,
-      blockedNote: note,
-      blockerNote: note,
-      blockedAt: new Date().toISOString(),
+  async setTaskPriority(taskId, priority, options = {}) {
+    const id = get().founderId;
+    if (!id || !taskId || priority == null || priority === "") return null;
+    const p = String(priority).toLowerCase();
+    if (!["low", "medium", "high"].includes(p)) return null;
+    const tasks = asList(get().tasks);
+    const idx = tasks.findIndex(
+      (task) => String(task.id || task._id) === String(taskId),
+    );
+    if (idx === -1) return null;
+    const prevSnapshot = tasks.map((t) => ({ ...t }));
+    const nextTasks = tasks.map((task, i) =>
+      i === idx ? { ...task, priority: p } : task,
+    );
+    const vmNext = mapFounderWeeklyLoop({
+      outcomes: asList(get().outcomes),
+      milestones: asList(get().milestones),
+      tasks: nextTasks,
+      executionScore: get().executionScore,
     });
+    if (!options.skipRefresh) {
+      set({ tasks: nextTasks, viewModel: vmNext });
+    }
+    try {
+      await apiPut(`/founders/${id}/tasks/${taskId}`, { task: { priority: p } });
+      if (options.skipRefresh) return null;
+      return get().refresh();
+    } catch (error) {
+      if (!options.skipRefresh) {
+        const vmPrev = mapFounderWeeklyLoop({
+          outcomes: asList(get().outcomes),
+          milestones: asList(get().milestones),
+          tasks: prevSnapshot,
+          executionScore: get().executionScore,
+        });
+        set({ tasks: prevSnapshot, viewModel: vmPrev });
+      }
+      throw error;
+    }
   },
 
-  async unblockTask(taskId) {
-    return get().updateTaskStatus(taskId, "pending", {
-      blockedReason: null,
-      blockerReason: null,
-      blockedNote: null,
-      blockerNote: null,
-      unblockedAt: new Date().toISOString(),
-    });
+  async blockTask(taskId, reason, note, options = {}) {
+    return get().updateTaskStatus(
+      taskId,
+      "blocked",
+      {
+        blockedReason: reason,
+        blockerReason: reason,
+        blockedNote: note,
+        blockerNote: note,
+        blockedAt: new Date().toISOString(),
+      },
+      options,
+    );
   },
 
-  async assignTask(taskId, assigneeId, assigneeName) {
+  async unblockTask(taskId, options = {}) {
+    return get().updateTaskStatus(
+      taskId,
+      "pending",
+      {
+        blockedReason: null,
+        blockerReason: null,
+        blockedNote: null,
+        blockerNote: null,
+        unblockedAt: new Date().toISOString(),
+      },
+      options,
+    );
+  },
+
+  async assignTask(
+    taskId,
+    assigneeId,
+    assigneeName,
+    assigneeAvatar = "",
+    options = {},
+  ) {
     const id = get().founderId;
     if (!id || !taskId) return null;
     await apiPut(`/founders/${id}/tasks/${taskId}/assign`, {
@@ -201,31 +452,38 @@ export const useWeeklyLoopStore = create((set, get) => ({
       assigneeName,
       assignedTo: assigneeId,
       assignedToName: assigneeName,
+      assignedToAvatar: assigneeAvatar || "",
     });
+    if (options.skipRefresh) return null;
     return get().refresh();
   },
 
   async setTaskIncentive(taskId, incentive) {
     const id = get().founderId;
     if (!id || !taskId) return null;
-    const current = asList(get().tasks).find(
-      (task) => String(task.id || task._id) === String(taskId),
-    );
-    if (!current) return null;
-    const updated = {
-      ...current,
-      incentive,
-      incentiveSetAt: new Date().toISOString(),
-    };
-    await apiPost(`/founders/${id}/tasks`, { task: updated });
+    await apiPut(`/founders/${id}/tasks/${taskId}`, {
+      task: {
+        incentive,
+        incentiveSetAt: new Date().toISOString(),
+      },
+    });
     return get().refresh();
   },
 
-  async deleteTask(taskId) {
+  async deleteTask(taskId, options = {}) {
     const id = get().founderId;
     if (!id || !taskId) return null;
     await apiDelete(`/founders/${id}/tasks/${taskId}`);
-    return get().refresh();
+    if (!options.skipRefresh) return get().refresh();
+    return null;
+  },
+
+  async deleteMilestone(milestoneId, options = {}) {
+    const fid = get().founderId;
+    if (!fid || !milestoneId) return null;
+    await apiDelete(`/founders/${fid}/milestones/${milestoneId}`);
+    if (!options.skipRefresh) return get().refresh();
+    return null;
   },
 
   /**

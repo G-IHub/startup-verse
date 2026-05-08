@@ -7,7 +7,7 @@ import {
   CardTitle,
 } from "./ui/card";
 import { Button } from "./ui/button";
-import { Input } from "./ui/input";
+import { PasswordInput } from "./ui/password-input";
 import { Alert, AlertDescription, AlertTitle } from "./ui/alert";
 import { Mail, CheckCircle2, AlertCircle, ExternalLink } from "lucide-react";
 import { post } from "../utils/backendClient.js";
@@ -123,9 +123,9 @@ export default function EmailSetupPrompt() {
               <label className="text-sm font-medium mb-2 block">
                 Resend API Key (for reference)
               </label>
-              <Input
-                type="password"
-                placeholder="re_..."
+              <PasswordInput
+                autoComplete="off"
+                placeholder="Paste your Resend API key (starts with re_)"
                 value={apiKey}
                 onChange={(e) => setApiKey(e.target.value)}
                 className="font-mono text-sm"

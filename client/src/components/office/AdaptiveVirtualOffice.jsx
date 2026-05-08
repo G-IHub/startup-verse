@@ -19,7 +19,7 @@ export default function AdaptiveVirtualOffice({
   onWinOpened,
 }) {
   return (
-    <div className="h-full flex flex-col bg-background">
+    <div className="flex h-full flex-col bg-background font-body">
       <div className="flex-1 overflow-auto">
         {view === "workspace" && (
           <VirtualStartupOfficeV2
@@ -37,7 +37,10 @@ export default function AdaptiveVirtualOffice({
           />
         )}
         {view === "journey" && (
-          <JourneyRoadmap onNavigateToStage={(stage) => onNavigate(stage)} />
+          <JourneyRoadmap
+            user={user}
+            onNavigateToStage={(stage) => onNavigate(stage)}
+          />
         )}
         {view === "matching" && (
           user?.role === "talent" ? (
@@ -52,9 +55,9 @@ export default function AdaptiveVirtualOffice({
               <div className="mt-4">
                 <Button
                   type="button"
-                  onClick={() => onNavigate("dashboard", { mode: "opportunities" })}
+                  onClick={() => onNavigate("team-matching")}
                 >
-                  Open Talent Home
+                  Open Browse
                 </Button>
               </div>
             </div>

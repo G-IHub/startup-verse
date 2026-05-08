@@ -32,6 +32,8 @@ async function main() {
   const foundersController = await read("controllers/founders.controller.js");
   const invitationsController = await read("controllers/invitations.controller.js");
   const notificationsRoutes = await read("routes/notifications.routes.js");
+  const debugRoutes = await read("routes/debug.routes.js");
+  const adminRoutes = await read("routes/admin.routes.js");
 
   assertContains(usersController, "sanitizeUser", "users controller sanitizes user payloads", failures);
   assertContains(orgRoutes, "requireOrgAdmin", "organizations routes use org admin guard", failures);
@@ -58,6 +60,21 @@ async function main() {
     notificationsRoutes,
     /\/notifications\/streak-at-risk[\s\S]*?const targetUserId = req\.body\?\.userId \|\| req\.user\.id;[\s\S]*?if \(!isSelfOrAdmin\(req, targetUserId\)\) \{[\s\S]*?return apiError\(res, "Forbidden\.", 403\);[\s\S]*?\}[\s\S]*?userId: targetUserId,/,
     "streak-at-risk route enforces ownership and uses targetUserId",
+    failures,
+  );
+  // Debug routes must require admin
+  assertContains(debugRoutes, "requireRole(\"admin\")", "debug routes admin-only", failures);
+  assertMatches(
+    debugRoutes,
+    /\/debug\/leave-startup\/:userId[\s\S]*?requireAuth[\s\S]*?requireRole\("admin"\)/,
+    "debug leave-startup admin-guarded",
+    failures,
+  );
+  // Admin destructive endpoints must require admin
+  assertMatches(
+    adminRoutes,
+    /\/admin\/clear-all-data[\s\S]*?requireRole\("admin"\)/,
+    "admin clear-all-data admin-guarded",
     failures,
   );
 

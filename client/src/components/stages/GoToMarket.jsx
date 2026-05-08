@@ -1,10 +1,14 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "../ui/card";
 import { Button } from "../ui/button";
 import { Textarea } from "../ui/textarea";
 import { Label } from "../ui/label";
 import { TrendingUp, ArrowLeft, ArrowRight } from "lucide-react";
 import { toast } from "sonner";
+import {
+  useHydrateStageDraft,
+  persistStageDraft,
+} from "../../hooks/useStageDraftFromJourney";
 export default function GoToMarket({ user, onBack }) {
   const [launchStrategy, setLaunchStrategy] = useState({
     targetCustomers: "",
@@ -13,17 +17,14 @@ export default function GoToMarket({ user, onBack }) {
     launchPlan: "",
   });
 
-  // Load saved data
-  useEffect(() => {
-    const savedData = localStorage.getItem("launch_strategy");
-    if (savedData) {
-      setLaunchStrategy(JSON.parse(savedData));
-    }
-  }, []);
+  useHydrateStageDraft(user, "launch_strategy", (raw) => {
+    if (!raw || typeof raw !== "object") return;
+    setLaunchStrategy((prev) => ({ ...prev, ...raw }));
+  });
 
   // Save and continue to next stage
   const saveAndContinue = () => {
-    localStorage.setItem("launch_strategy", JSON.stringify(launchStrategy));
+    persistStageDraft("launch_strategy", launchStrategy);
     toast.success("Progress saved! Moving to next stage...");
     setTimeout(() => onBack(), 500);
   };

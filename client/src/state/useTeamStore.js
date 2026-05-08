@@ -35,7 +35,13 @@ function mapMember(raw, fallbackStartupId) {
     name: raw.name || raw.talentName || raw.userName || "Team member",
     role: raw.role || raw.talentArea || "team-member",
     email: raw.email || "",
-    avatar: raw.avatar || null,
+    avatar:
+      raw.avatar ||
+      raw.profileImage ||
+      raw.profilePicture ||
+      raw.photoURL ||
+      raw.image ||
+      null,
     title: raw.title || raw.talentArea || raw.professionalTitle || "",
     skills: Array.isArray(raw.skills)
       ? raw.skills

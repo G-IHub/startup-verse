@@ -19,7 +19,6 @@ import {
   Cell,
   XAxis,
   YAxis,
-  CartesianGrid,
   Tooltip,
   Legend,
   ResponsiveContainer,
@@ -41,16 +40,22 @@ import {
   RefreshCw,
   Download,
 } from "lucide-react";
-import { getAccessToken } from "../../app/session";
 import { unwrapData } from "../../utils/apiEnvelope";
 
 const API_BASE = API_BASE_URL;
 
+// Default fetch options for cookie-based auth
+
+const defaultOptions = {
+  credentials: "include",
+  headers: { "Content-Type": "application/json" },
+};
+
 const COLORS = {
-  primary: "#3A5AFE",
-  success: "#2ECC71",
+  primary: "#3a5afe",
+  success: "#00c896",
   warning: "#F39C12",
-  danger: "#E74C3C",
+  danger: "#ff4f6b",
   info: "#3498DB",
   purple: "#9B59B6",
 };
@@ -62,31 +67,39 @@ export default function AnalyticsDashboard({ founderId, founderName }) {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [lastUpdated, setLastUpdated] = useState(null);
   const fetchAnalytics = async (isManualRefresh = false) => {
+    if (!founderId) {
+      console.error("❌ [Analytics] No founderId provided");
+      setError("User ID not available");
+      setLoading(false);
+      return;
+    }
     try {
       if (isManualRefresh) {
         setIsRefreshing(true);
       } else {
         setLoading(true);
       }
-      setError(null);
-      const token = getAccessToken();
+      setError(null);      console.log("🔍 [Analytics] Fetching for founderId:", founderId);
       const response = await fetch(`${API_BASE}/founders/${founderId}/analytics`, {
+        ...defaultOptions,
         method: "GET",
-        headers: {
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-          "Content-Type": "application/json",
-        },
       });
       if (!response.ok) {
-        throw new Error("Failed to fetch analytics");
+        const errorText = await response.text();
+        console.error("❌ [Analytics] API error:", response.status, errorText);
+        throw new Error(`Failed to fetch analytics: ${response.status}`);
       }
       const data = unwrapData(await response.json());
       setAnalytics(data);
       setLastUpdated(new Date());
       console.log("✅ Analytics data loaded from backend:", data);
     } catch (err) {
-      console.error("Error fetching analytics:", err);
-      setError("Failed to load analytics data");
+      console.error("❌ [Analytics] Error fetching analytics:", {
+        error: err.message,
+        founderId,
+        timestamp: new Date().toISOString(),
+      });
+      setError(`Failed to load analytics data: ${err.message}`);
     } finally {
       setLoading(false);
       setIsRefreshing(false);
@@ -248,17 +261,17 @@ ${new Date().toISOString()}
   };
   if (loading) {
     return (
-      <div className="p-8 text-center">
-        <Activity className="w-12 h-12 text-muted-foreground mx-auto mb-3 animate-pulse" />
-        <p className="text-muted-foreground">Loading analytics...</p>
+      <div className="min-h-full bg-surface-page p-8 text-center font-body">
+        <Activity className="mx-auto mb-3 h-12 w-12 animate-pulse text-text-muted" />
+        <p className="font-body text-text-muted">Loading analytics...</p>
       </div>
     );
   }
   if (error || !analytics) {
     return (
-      <div className="p-8 text-center">
-        <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-3" />
-        <p className="text-red-500">{error || "Failed to load analytics"}</p>
+      <div className="min-h-full bg-surface-page p-8 text-center font-body">
+        <AlertCircle className="mx-auto mb-3 h-12 w-12 text-status-error" />
+        <p className="font-body text-status-error">{error || "Failed to load analytics"}</p>
       </div>
     );
   }
@@ -304,11 +317,13 @@ ${new Date().toISOString()}
     },
   ].filter((d) => d.value > 0);
   return (
-    <div className="p-3 space-y-4">
+    <div className="min-h-full space-y-4 bg-surface-page p-3 font-body">
       <div className="flex items-start justify-between">
         <div>
-          <h1 className="mb-1 text-xl">📊 Analytics & Insights</h1>
-          <p className="text-sm text-muted-foreground">
+          <h1 className="mb-1 font-heading text-xl font-bold text-text-heading">
+            📊 Analytics & Insights
+          </h1>
+          <p className="font-body text-sm text-text-body">
             Data-driven insights to optimize your team's performance
           </p>
         </div>
@@ -318,9 +333,9 @@ ${new Date().toISOString()}
               variant="outline"
               size="sm"
               onClick={handleDownloadReport}
-              className="h-8"
+              className="h-8 rounded-input border border-surface-border bg-surface-card font-body font-semibold text-text-body shadow-none transition-colors duration-200 ease-in-out hover:border-primary hover:bg-surface-card hover:text-primary [&_svg]:text-text-body hover:[&_svg]:text-primary"
             >
-              <Download className="w-3 h-3 mr-2" />
+              <Download className="mr-2 h-3 w-3" />
               Download Report
             </Button>
             <Button
@@ -328,16 +343,16 @@ ${new Date().toISOString()}
               size="sm"
               onClick={handleManualRefresh}
               disabled={isRefreshing}
-              className="h-8"
+              className="h-8 rounded-input border border-surface-border bg-surface-card font-body font-semibold text-text-body shadow-none transition-colors duration-200 ease-in-out hover:border-primary hover:bg-surface-card hover:text-primary [&_svg]:text-text-body hover:[&_svg]:text-primary"
             >
               <RefreshCw
-                className={`w-3 h-3 mr-2 ${isRefreshing ? "animate-spin" : ""}`}
+                className={`mr-2 h-3 w-3 ${isRefreshing ? "animate-spin" : ""}`}
               />
               {isRefreshing ? "Refreshing..." : "Refresh"}
             </Button>
           </div>
           {lastUpdated && (
-            <p className="text-xs text-muted-foreground">
+            <p className="font-body text-xs text-text-muted">
               {"Updated "}
               {lastUpdated.toLocaleTimeString()}
             </p>
@@ -345,91 +360,95 @@ ${new Date().toISOString()}
         </div>
       </div>
       {isRefreshing && (
-        <div className="bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-900 rounded-lg p-2 flex items-center gap-2">
-          <Activity className="w-4 h-4 text-blue-600 animate-pulse" />
-          <p className="text-xs text-blue-900 dark:text-blue-100">
+        <div className="flex items-center gap-2 rounded-input border border-surface-border bg-primary-tint p-2">
+          <Activity className="h-4 w-4 animate-pulse text-primary" />
+          <p className="font-body text-xs text-text-body">
             Syncing with live data from Core Engine...
           </p>
         </div>
       )}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-1 pt-3 px-3">
-            <CardTitle className="text-xs font-medium">Team Velocity</CardTitle>
-            <Zap className="w-3 h-3 text-primary" />
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-4">
+        <Card className="border-0 bg-surface-card shadow-soft rounded-card">
+          <CardHeader className="flex flex-row items-center justify-between px-3 pb-1 pt-3">
+            <CardTitle className="font-body text-xs font-medium text-text-body">
+              Team Velocity
+            </CardTitle>
+            <Zap className="h-3 w-3 text-primary" />
           </CardHeader>
           <CardContent className="px-3 pb-3">
-            <div className="text-xl font-bold">{avgVelocity.toFixed(1)}</div>
-            <p className="text-xs text-muted-foreground">tasks/week avg</p>
+            <div className="font-heading text-xl font-extrabold text-text-heading">
+              {avgVelocity.toFixed(1)}
+            </div>
+            <p className="font-body text-xs text-text-muted">tasks/week avg</p>
             {velocityTrend !== 0 && (
               <div
-                className={`flex items-center gap-1 mt-1 text-xs ${velocityTrend > 0 ? "text-green-600" : "text-red-600"}`}
+                className={`mt-1 flex items-center gap-1 font-body text-xs ${velocityTrend > 0 ? "text-status-success" : "text-status-error"}`}
               >
                 {velocityTrend > 0 ? (
-                  <TrendingUp className="w-3 h-3" />
+                  <TrendingUp className="h-3 w-3" />
                 ) : (
-                  <TrendingDown className="w-3 h-3" />
+                  <TrendingDown className="h-3 w-3" />
                 )}
                 <span>{Math.abs(velocityTrend).toFixed(1)}% vs last week</span>
               </div>
             )}
           </CardContent>
         </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-1 pt-3 px-3">
-            <CardTitle className="text-xs font-medium">
+        <Card className="border-0 bg-surface-card shadow-soft rounded-card">
+          <CardHeader className="flex flex-row items-center justify-between px-3 pb-1 pt-3">
+            <CardTitle className="font-body text-xs font-medium text-text-body">
               Achievement Rate
             </CardTitle>
-            <Target className="w-3 h-3 text-green-600" />
+            <Target className="h-3 w-3 text-status-success" />
           </CardHeader>
           <CardContent className="px-3 pb-3">
-            <div className="text-xl font-bold">
+            <div className="font-heading text-xl font-extrabold text-text-heading">
               {outcomeMetrics.achievementRate.toFixed(0)}%
             </div>
-            <p className="text-xs text-muted-foreground">
+            <p className="font-body text-xs text-text-muted">
               outcomes fully completed
             </p>
-            <div className="flex items-center gap-2 mt-1">
-              <Badge variant="secondary" className="text-xs px-1.5 py-0">
+            <div className="mt-1 flex items-center gap-2">
+              <span className="inline-flex items-center rounded-pill bg-primary-tint px-2.5 py-0.5 font-body text-xs font-semibold text-primary">
                 {outcomeMetrics.completedOutcomes}
                 {" completed"}
-              </Badge>
+              </span>
             </div>
           </CardContent>
         </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-1 pt-3 px-3">
-            <CardTitle className="text-xs font-medium">
+        <Card className="border-0 bg-surface-card shadow-soft rounded-card">
+          <CardHeader className="flex flex-row items-center justify-between px-3 pb-1 pt-3">
+            <CardTitle className="font-body text-xs font-medium text-text-body">
               Current Streak
             </CardTitle>
-            <Flame className="w-3 h-3 text-orange-600" />
+            <Flame className="h-3 w-3" />
           </CardHeader>
           <CardContent className="px-3 pb-3">
-            <div className="text-xl font-bold">
+            <div className="font-heading text-xl font-extrabold text-text-heading">
               {outcomeMetrics.currentStreak}
             </div>
-            <p className="text-xs text-muted-foreground">weeks strong 🔥</p>
-            <div className="text-xs text-muted-foreground mt-1">
+            <p className="font-body text-xs text-text-muted">weeks strong 🔥</p>
+            <div className="mt-1 font-body text-xs text-text-muted">
               {"Best: "}
               {outcomeMetrics.longestStreak}
               {" weeks"}
             </div>
           </CardContent>
         </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-1 pt-3 px-3">
-            <CardTitle className="text-xs font-medium">
+        <Card className="border-0 bg-surface-card shadow-soft rounded-card">
+          <CardHeader className="flex flex-row items-center justify-between px-3 pb-1 pt-3">
+            <CardTitle className="font-body text-xs font-medium text-text-body">
               Active Blockers
             </CardTitle>
-            <AlertCircle className="w-3 h-3 text-red-600" />
+            <AlertCircle className="h-3 w-3 text-status-error" />
           </CardHeader>
           <CardContent className="px-3 pb-3">
-            <div className="text-xl font-bold">
+            <div className="font-heading text-xl font-extrabold text-text-heading">
               {blockerPatterns.reduce((sum, bp) => sum + bp.count, 0)}
             </div>
-            <p className="text-xs text-muted-foreground">tasks blocked</p>
+            <p className="font-body text-xs text-text-muted">tasks blocked</p>
             {blockerPatterns.length > 0 && (
-              <div className="text-xs text-muted-foreground mt-1">
+              <div className="mt-1 font-body text-xs text-text-muted">
                 {"Top: "}
                 {blockerPatterns[0].reason}
               </div>
@@ -438,18 +457,40 @@ ${new Date().toISOString()}
         </Card>
       </div>
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-4">
-          <TabsTrigger value="overview">Overview</TabsTrigger>
-          <TabsTrigger value="velocity">Velocity</TabsTrigger>
-          <TabsTrigger value="blockers">Blockers</TabsTrigger>
-          <TabsTrigger value="team">Team</TabsTrigger>
+        <TabsList className="grid h-auto min-h-10 w-full grid-cols-4 gap-0 rounded-none border-0 border-b border-surface-border bg-transparent p-0">
+          <TabsTrigger
+            value="overview"
+            className="rounded-none border-0 border-b-2 border-transparent bg-transparent font-body font-medium text-text-body shadow-none transition-colors duration-200 ease-in-out hover:text-primary data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:font-semibold data-[state=active]:text-primary data-[state=active]:shadow-none"
+          >
+            Overview
+          </TabsTrigger>
+          <TabsTrigger
+            value="velocity"
+            className="rounded-none border-0 border-b-2 border-transparent bg-transparent font-body font-medium text-text-body shadow-none transition-colors duration-200 ease-in-out hover:text-primary data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:font-semibold data-[state=active]:text-primary data-[state=active]:shadow-none"
+          >
+            Velocity
+          </TabsTrigger>
+          <TabsTrigger
+            value="blockers"
+            className="rounded-none border-0 border-b-2 border-transparent bg-transparent font-body font-medium text-text-body shadow-none transition-colors duration-200 ease-in-out hover:text-primary data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:font-semibold data-[state=active]:text-primary data-[state=active]:shadow-none"
+          >
+            Blockers
+          </TabsTrigger>
+          <TabsTrigger
+            value="team"
+            className="rounded-none border-0 border-b-2 border-transparent bg-transparent font-body font-medium text-text-body shadow-none transition-colors duration-200 ease-in-out hover:text-primary data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:font-semibold data-[state=active]:text-primary data-[state=active]:shadow-none"
+          >
+            Team
+          </TabsTrigger>
         </TabsList>
         <TabsContent value="overview" className="space-y-3">
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
-            <Card>
-              <CardHeader className="pb-2 pt-3 px-3">
-                <CardTitle className="text-sm">Stage Progression</CardTitle>
-                <CardDescription className="text-xs">
+          <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
+            <Card className="border-0 bg-surface-card shadow-soft rounded-card">
+              <CardHeader className="px-3 pb-2 pt-3">
+                <CardTitle className="font-heading text-sm font-semibold text-text-heading">
+                  Stage Progression
+                </CardTitle>
+                <CardDescription className="font-body text-xs text-text-body">
                   Your journey through startup stages
                 </CardDescription>
               </CardHeader>
@@ -459,7 +500,7 @@ ${new Date().toISOString()}
                     <div key={stage.stageId} className="space-y-1">
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
-                          <p className="text-xs font-medium">
+                          <p className="font-body text-xs font-medium">
                             {stage.stageName}
                           </p>
                           <Badge
@@ -470,18 +511,18 @@ ${new Date().toISOString()}
                                   ? "secondary"
                                   : "outline"
                             }
-                            className="text-xs px-1.5 py-0"
+                            className="px-1.5 py-0 text-xs"
                           >
                             {stage.status}
                           </Badge>
                         </div>
-                        <p className="text-xs font-semibold">
+                        <p className="font-body text-xs font-semibold">
                           {Math.round(stage.completionRate)}%
                         </p>
                       </div>
-                      <div className="w-full bg-muted rounded-full h-1.5">
+                      <div className="h-1.5 w-full rounded-full bg-surface-page">
                         <div
-                          className={`h-1.5 rounded-full transition-all ${stage.status === "completed" ? "bg-green-600" : stage.status === "current" ? "bg-primary" : "bg-muted-foreground/30"}`}
+                          className={`h-1.5 rounded-full transition-all duration-200 ease-in-out ${stage.status === "completed" ? "bg-status-success" : stage.status === "current" ? "bg-primary" : "bg-text-muted/30"}`}
                           style={{
                             width: `${stage.completionRate}%`,
                           }}
@@ -492,10 +533,12 @@ ${new Date().toISOString()}
                 </div>
               </CardContent>
             </Card>
-            <Card>
-              <CardHeader className="pb-2 pt-3 px-3">
-                <CardTitle className="text-sm">Outcome Distribution</CardTitle>
-                <CardDescription className="text-xs">
+            <Card className="border-0 bg-surface-card shadow-soft rounded-card">
+              <CardHeader className="px-3 pb-2 pt-3">
+                <CardTitle className="font-heading text-sm font-semibold text-text-heading">
+                  Outcome Distribution
+                </CardTitle>
+                <CardDescription className="font-body text-xs text-text-body">
                   {outcomeMetrics.totalOutcomes}
                   {" total weekly outcomes"}
                 </CardDescription>
@@ -524,26 +567,29 @@ ${new Date().toISOString()}
                     </PieChart>
                   </ResponsiveContainer>
                 ) : (
-                  <div className="h-[200px] flex items-center justify-center text-muted-foreground">
+                  <div className="flex h-[200px] items-center justify-center">
                     <div className="text-center">
-                      <Target className="w-8 h-8 mx-auto mb-2 opacity-30" />
-                      <p className="text-xs">No outcome data yet</p>
+                      <Target className="mx-auto mb-2 h-8 w-8 text-surface-border" />
+                      <p className="font-body text-xs text-text-muted">
+                        No outcome data yet
+                      </p>
                     </div>
                   </div>
                 )}
               </CardContent>
             </Card>
-            <Card>
-              <CardHeader className="pb-2 pt-3 px-3">
-                <CardTitle className="text-sm">Productivity Trends</CardTitle>
-                <CardDescription className="text-xs">
+            <Card className="border-0 bg-surface-card shadow-soft rounded-card">
+              <CardHeader className="px-3 pb-2 pt-3">
+                <CardTitle className="font-heading text-sm font-semibold text-text-heading">
+                  Productivity Trends
+                </CardTitle>
+                <CardDescription className="font-body text-xs text-text-body">
                   Tasks completed over time
                 </CardDescription>
               </CardHeader>
               <CardContent className="px-3 pb-3">
                 <ResponsiveContainer width="100%" height={200}>
                   <AreaChart data={productivityTrends}>
-                    <CartesianGrid strokeDasharray="3 3" />
                     <XAxis
                       dataKey="period"
                       tick={{
@@ -571,17 +617,18 @@ ${new Date().toISOString()}
           </div>
         </TabsContent>
         <TabsContent value="velocity" className="space-y-4">
-          <Card>
+          <Card className="border-0 bg-surface-card shadow-soft rounded-card">
             <CardHeader>
-              <CardTitle>Team Velocity Over Time</CardTitle>
-              <CardDescription>
+              <CardTitle className="font-heading font-semibold text-text-heading">
+                Team Velocity Over Time
+              </CardTitle>
+              <CardDescription className="font-body text-text-body">
                 Tasks completed per week with completion rates
               </CardDescription>
             </CardHeader>
             <CardContent>
               <ResponsiveContainer width="100%" height={400}>
                 <BarChart data={teamVelocity}>
-                  <CartesianGrid strokeDasharray="3 3" />
                   <XAxis dataKey="weekLabel" />
                   <YAxis />
                   <Tooltip />
@@ -600,39 +647,45 @@ ${new Date().toISOString()}
               </ResponsiveContainer>
             </CardContent>
           </Card>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <Card>
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+            <Card className="border-0 bg-surface-card shadow-soft rounded-card">
               <CardHeader className="pb-3">
-                <CardTitle className="text-sm">Average Velocity</CardTitle>
+                <CardTitle className="font-heading text-sm font-semibold text-text-heading">
+                  Average Velocity
+                </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="text-3xl font-bold">
+                <div className="font-heading text-3xl font-extrabold text-text-heading">
                   {avgVelocity.toFixed(1)}
                 </div>
-                <p className="text-xs text-muted-foreground mt-1">
+                <p className="mt-1 font-body text-xs text-text-muted">
                   tasks per week
                 </p>
               </CardContent>
             </Card>
-            <Card>
+            <Card className="border-0 bg-surface-card shadow-soft rounded-card">
               <CardHeader className="pb-3">
-                <CardTitle className="text-sm">Best Week</CardTitle>
+                <CardTitle className="font-heading text-sm font-semibold text-text-heading">
+                  Best Week
+                </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="text-3xl font-bold">
+                <div className="font-heading text-3xl font-extrabold text-text-heading">
                   {Math.max(...teamVelocity.map((v) => v.tasksCompleted), 0)}
                 </div>
-                <p className="text-xs text-muted-foreground mt-1">
+                <p className="mt-1 font-body text-xs text-text-muted">
                   tasks completed
                 </p>
               </CardContent>
             </Card>
-            <Card>
+            <Card className="border-0 bg-surface-card shadow-soft rounded-card">
               <CardHeader className="pb-3">
-                <CardTitle className="text-sm">Avg Completion Time</CardTitle>
+                <CardTitle className="font-heading text-sm font-semibold text-text-heading">
+                  Avg Completion Time
+                </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="text-3xl font-bold">
+                <div className="font-heading text-3xl font-extrabold text-text-heading">
                   {(
                     teamVelocity.reduce(
                       (sum, v) => sum + v.averageCompletionTime,
@@ -640,7 +693,7 @@ ${new Date().toISOString()}
                     ) / Math.max(teamVelocity.length, 1)
                   ).toFixed(1)}
                 </div>
-                <p className="text-xs text-muted-foreground mt-1">
+                <p className="mt-1 font-body text-xs text-text-muted">
                   days per task
                 </p>
               </CardContent>
@@ -648,10 +701,12 @@ ${new Date().toISOString()}
           </div>
         </TabsContent>
         <TabsContent value="blockers" className="space-y-4">
-          <Card>
+          <Card className="border-0 bg-surface-card shadow-soft rounded-card">
             <CardHeader>
-              <CardTitle>Blocker Patterns</CardTitle>
-              <CardDescription>
+              <CardTitle className="font-heading font-semibold text-text-heading">
+                Blocker Patterns
+              </CardTitle>
+              <CardDescription className="font-body text-text-body">
                 Understanding what's slowing your team down
               </CardDescription>
             </CardHeader>
@@ -661,7 +716,7 @@ ${new Date().toISOString()}
                   {blockerPatterns.map((pattern, index) => (
                     <div
                       key={pattern.reason}
-                      className="p-4 border rounded-lg hover:bg-muted/50 transition-colors"
+                      className="rounded-input border-0 bg-surface-page p-4 transition-colors duration-200 ease-in-out hover:bg-surface-page/80"
                     >
                       <div className="flex items-start justify-between mb-2">
                         <div className="flex items-center gap-3">
@@ -728,10 +783,12 @@ ${new Date().toISOString()}
                   ))}
                 </div>
               ) : (
-                <div className="text-center py-12">
-                  <CheckCircle2 className="w-12 h-12 text-green-600 mx-auto mb-3" />
-                  <p className="font-medium">No blockers! 🎉</p>
-                  <p className="text-sm text-muted-foreground mt-1">
+                <div className="py-12 text-center">
+                  <CheckCircle2 className="mx-auto mb-3 h-12 w-12 text-status-success" />
+                  <p className="font-body font-medium text-text-heading">
+                    No blockers! 🎉
+                  </p>
+                  <p className="mt-1 font-body text-sm text-text-muted">
                     Your team is executing smoothly
                   </p>
                 </div>
@@ -740,11 +797,13 @@ ${new Date().toISOString()}
           </Card>
         </TabsContent>
         <TabsContent value="team" className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <Card>
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+            <Card className="border-0 bg-surface-card shadow-soft rounded-card">
               <CardHeader>
-                <CardTitle>Team Performance</CardTitle>
-                <CardDescription>
+                <CardTitle className="font-heading font-semibold text-text-heading">
+                  Team Performance
+                </CardTitle>
+                <CardDescription className="font-body text-text-body">
                   {teamPerformance.activeMembers}
                   {" of "}
                   {teamPerformance.totalMembers}
@@ -784,9 +843,9 @@ ${new Date().toISOString()}
                           {" tasks completed"}
                         </p>
                       </div>
-                      <div className="w-24 bg-muted rounded-full h-2">
+                      <div className="h-2 w-24 rounded-full bg-surface-page">
                         <div
-                          className="bg-primary h-2 rounded-full"
+                          className="h-2 rounded-full bg-primary"
                           style={{
                             width: `${Math.min((member.tasksCompleted / Math.max(...teamPerformance.topPerformers.map((m) => m.tasksCompleted))) * 100, 100)}%`,
                           }}
@@ -795,30 +854,36 @@ ${new Date().toISOString()}
                     </div>
                   ))}
                   {teamPerformance.topPerformers.length === 0 && (
-                    <div className="text-center py-8 text-muted-foreground">
-                      <Users className="w-12 h-12 mx-auto mb-3 opacity-30" />
-                      <p>No team activity yet</p>
+                    <div className="py-8 text-center">
+                      <Users className="mx-auto mb-3 h-12 w-12 text-surface-border" />
+                      <p className="font-body text-text-muted">
+                        No team activity yet
+                      </p>
                     </div>
                   )}
                 </div>
               </CardContent>
             </Card>
-            <Card>
+            <Card className="border-0 bg-surface-card shadow-soft rounded-card">
               <CardHeader>
-                <CardTitle>Key Insights</CardTitle>
-                <CardDescription>Actionable recommendations</CardDescription>
+                <CardTitle className="font-heading font-semibold text-text-heading">
+                  Key Insights
+                </CardTitle>
+                <CardDescription className="font-body text-text-body">
+                  Actionable recommendations
+                </CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="space-y-3">
                   {velocityTrend > 10 && (
-                    <div className="p-3 bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-900 rounded-lg">
+                    <div className="rounded-input border-0 bg-primary-tint/60 p-3 transition-colors duration-200 ease-in-out">
                       <div className="flex items-start gap-2">
-                        <TrendingUp className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" />
+                        <TrendingUp className="mt-0.5 h-5 w-5 shrink-0 text-status-success" />
                         <div>
-                          <p className="font-medium text-sm text-green-900 dark:text-green-100">
+                          <p className="font-body text-sm font-medium text-text-heading">
                             Velocity Improving!
                           </p>
-                          <p className="text-xs text-green-700 dark:text-green-300 mt-1">
+                          <p className="mt-1 font-body text-xs text-text-body">
                             {"Your team's pace is up "}
                             {velocityTrend.toFixed(0)}% this week. Keep the
                             momentum!
@@ -828,14 +893,14 @@ ${new Date().toISOString()}
                     </div>
                   )}
                   {blockerPatterns.length > 2 && (
-                    <div className="p-3 bg-orange-50 dark:bg-orange-950/20 border border-orange-200 dark:border-orange-900 rounded-lg">
+                    <div className="rounded-input border-0 bg-status-warning/15 p-3 transition-colors duration-200 ease-in-out">
                       <div className="flex items-start gap-2">
-                        <AlertCircle className="w-5 h-5 text-orange-600 flex-shrink-0 mt-0.5" />
+                        <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-status-warning" />
                         <div>
-                          <p className="font-medium text-sm text-orange-900 dark:text-orange-100">
+                          <p className="font-body text-sm font-medium text-text-heading">
                             Multiple Blockers Detected
                           </p>
-                          <p className="text-xs text-orange-700 dark:text-orange-300 mt-1">
+                          <p className="mt-1 font-body text-xs text-text-body">
                             Focus on resolving "{blockerPatterns[0].reason}
                             {'" affecting '}
                             {blockerPatterns[0].count}
@@ -846,14 +911,14 @@ ${new Date().toISOString()}
                     </div>
                   )}
                   {outcomeMetrics.achievementRate >= 80 && (
-                    <div className="p-3 bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-900 rounded-lg">
+                    <div className="rounded-input border-0 bg-primary-tint p-3 transition-colors duration-200 ease-in-out">
                       <div className="flex items-start gap-2">
-                        <Trophy className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
+                        <Trophy className="mt-0.5 h-5 w-5 shrink-0 text-primary" />
                         <div>
-                          <p className="font-medium text-sm text-blue-900 dark:text-blue-100">
+                          <p className="font-body text-sm font-medium text-text-heading">
                             Outstanding Execution!
                           </p>
-                          <p className="text-xs text-blue-700 dark:text-blue-300 mt-1">
+                          <p className="mt-1 font-body text-xs text-text-body">
                             {outcomeMetrics.achievementRate.toFixed(0)}%
                             achievement rate - you're crushing it!
                           </p>
@@ -864,14 +929,14 @@ ${new Date().toISOString()}
                   {teamPerformance.activeMembers <
                     teamPerformance.totalMembers / 2 &&
                     teamPerformance.totalMembers > 1 && (
-                      <div className="p-3 bg-yellow-50 dark:bg-yellow-950/20 border border-yellow-200 dark:border-yellow-900 rounded-lg">
+                      <div className="rounded-input border-0 bg-status-warning/15 p-3 transition-colors duration-200 ease-in-out">
                         <div className="flex items-start gap-2">
-                          <Users className="w-5 h-5 text-yellow-600 flex-shrink-0 mt-0.5" />
+                          <Users className="mt-0.5 h-5 w-5 shrink-0 text-status-warning" />
                           <div>
-                            <p className="font-medium text-sm text-yellow-900 dark:text-yellow-100">
+                            <p className="font-body text-sm font-medium text-text-heading">
                               Low Team Engagement
                             </p>
-                            <p className="text-xs text-yellow-700 dark:text-yellow-300 mt-1">
+                            <p className="mt-1 font-body text-xs text-text-body">
                               {"Only "}
                               {teamPerformance.activeMembers}/
                               {teamPerformance.totalMembers}
@@ -882,14 +947,14 @@ ${new Date().toISOString()}
                       </div>
                     )}
                   {outcomeMetrics.currentStreak >= 4 && (
-                    <div className="p-3 bg-purple-50 dark:bg-purple-950/20 border border-purple-200 dark:border-purple-900 rounded-lg">
+                    <div className="rounded-input border-0 bg-accent-tint/80 p-3 transition-colors duration-200 ease-in-out">
                       <div className="flex items-start gap-2">
-                        <Flame className="w-5 h-5 text-purple-600 flex-shrink-0 mt-0.5" />
+                        <Flame className="mt-0.5 h-5 w-5 shrink-0 text-accent" />
                         <div>
-                          <p className="font-medium text-sm text-purple-900 dark:text-purple-100">
+                          <p className="font-body text-sm font-medium text-text-heading">
                             Streak Momentum!
                           </p>
-                          <p className="text-xs text-purple-700 dark:text-purple-300 mt-1">
+                          <p className="mt-1 font-body text-xs text-text-body">
                             {outcomeMetrics.currentStreak}
                             {" weeks strong! Don't break the chain 🔥"}
                           </p>

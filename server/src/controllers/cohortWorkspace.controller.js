@@ -12,6 +12,7 @@ import TeamMemberProfile from "../models/TeamMemberProfile.js";
 import Startup from "../models/Startup.js";
 import User from "../models/User.js";
 import { success as apiSuccess } from "../utils/apiResponse.js";
+import { broadcastNotification } from "../services/notificationService.js";
 
 function mapEvent(e) {
   const o = e.toObject ? e.toObject() : e;
@@ -58,13 +59,35 @@ export const listCohortAnnouncements = async (req, res) => {
 
 export const createCohortAnnouncement = async (req, res) => {
   const body = req.body || {};
+  const cohortId = req.params.cohortId || body.cohortId;
   const announcement = await Announcement.create({
-    cohortId: req.params.cohortId || body.cohortId,
+    cohortId,
     founderId: body.founderId || null,
     organizationId: body.organizationId || null,
     title: body.title || "Announcement",
     body: body.body || body.message || "",
   });
+
+  // Notify every founder in the cohort.
+  try {
+    const memberships = await CohortMembership.find({ cohortId }, { founderId: 1 }).lean();
+    const recipients = memberships.map((m) => m.founderId).filter(Boolean);
+    if (recipients.length) {
+      await broadcastNotification(recipients, {
+        type: "cohort-announcement",
+        title: announcement.title || "Cohort announcement",
+        message: announcement.body || "",
+        actionUrl: `/?view=virtual-office&tab=announcements&cohortId=${cohortId}`,
+        metadata: {
+          announcementId: String(announcement._id),
+          cohortId: String(cohortId),
+        },
+      });
+    }
+  } catch (err) {
+    console.error("[createCohortAnnouncement] notify failed:", err.message);
+  }
+
   const o = announcement.toObject();
   return apiSuccess(res, { announcement: { ...o, id: String(o._id) } }, 201);
 };
@@ -94,10 +117,17 @@ export const createCohortResource = async (req, res) => {
 
 export const getCohortAnalyticsOverview = async (req, res) => {
   const cohortId = req.params.cohortId;
-  const members = await CohortMembership.find({ cohortId });
-  const founderIds = members.map((m) => m.founderId).filter(Boolean);
-  const startupIds = members.map((m) => m.startupId).filter(Boolean);
-  const cohortSize = members.length;
+  const members = await CohortMembership.find({ cohortId }).lean();
+  const activeMembers = members.filter(
+    (m) => !m.status || m.status === "active",
+  );
+  const founderIds = activeMembers.map((m) => m.founderId).filter(Boolean);
+  const startupIds = activeMembers.map((m) => m.startupId).filter(Boolean);
+  const cohortSize = activeMembers.length;
+  const thirtyDaysAgo = Date.now() - 30 * 86400000;
+  const recentJoins = activeMembers.filter(
+    (m) => m.joinedAt && new Date(m.joinedAt).getTime() >= thirtyDaysAgo,
+  ).length;
 
   const [
     totalTeamMembers,
@@ -136,6 +166,7 @@ export const getCohortAnalyticsOverview = async (req, res) => {
 
   const analytics = {
     cohortSize,
+    recentJoinsLast30Days: recentJoins,
     aggregateMetrics: {
       totalTeamMembers,
       avgTeamSize: cohortSize === 0 ? 0 : Math.round((totalTeamMembers / cohortSize) * 10) / 10,

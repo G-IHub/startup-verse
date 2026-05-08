@@ -2,24 +2,22 @@ import React from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "../ui/card";
 import { Badge } from "../ui/badge";
 import { getTasks } from "../../utils/executionEngine";
-import { STORAGE_KEYS } from "../../app/session";
 
 export default function Phase4Debug({ user }) {
-  // Get all users to find founder
-  const allUsers = JSON.parse(
-    localStorage.getItem(STORAGE_KEYS.teamMembers) || "[]",
-  );
-  const founder = allUsers.find(
-    (u) => u.id === user.startupId && u.role === "founder",
-  );
+  const founderScopeId =
+    user.role === "founder" ? user.id : user.startupId || null;
+  const founder =
+    user.role === "founder"
+      ? { id: user.id, name: user.name }
+      : founderScopeId
+        ? {
+            id: founderScopeId,
+            name: "Linked startup / founder scope",
+          }
+        : null;
 
-  // Get tasks if founder exists
-  let tasks = [];
-  let myTasks = [];
-  if (founder) {
-    tasks = getTasks(founder.id);
-    myTasks = tasks.filter((t) => t.assignedTo === user.id);
-  }
+  const tasks = founderScopeId ? getTasks(founderScopeId) : [];
+  const myTasks = tasks.filter((t) => t.assignedTo === user.id);
   return (
     <Card className="border-4 border-yellow-400 bg-yellow-50 dark:bg-yellow-950/20">
       <CardHeader>

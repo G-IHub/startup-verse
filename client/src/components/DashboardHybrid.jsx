@@ -2,14 +2,16 @@
  * DashboardHybrid - Main dashboard router component
  * Handles routing between different views based on user role
  */
-import React, { useState, lazy, Suspense, useCallback } from "react";
+import React, { useState, lazy, Suspense, useCallback, useMemo } from "react";
+import { useLocation, useNavigate, Navigate } from "react-router-dom";
+import {
+  pathToDashboardState,
+  dashboardStateToPath,
+} from "../app/dashboardPaths";
 import AppLayoutHybrid from "./layout/AppLayoutHybrid";
 import AdaptiveVirtualOffice from "./office/AdaptiveVirtualOffice";
-import { featureFlags } from "../config/featureFlags";
-
 // ⚡ LAZY LOAD HEAVY COMPONENTS - Only load when navigating to them
 const FounderDashboard = lazy(() => import("./dashboards/FounderDashboard"));
-const FounderHomeV2 = lazy(() => import("./founder/FounderHomeV2"));
 const TeamMemberDashboard = lazy(
   () => import("./dashboards/TeamMemberDashboard"),
 );
@@ -47,6 +49,20 @@ const AdminDebugIndicator = lazy(() =>
 const FounderDeliverablesView = lazy(
   () => import("./founders/FounderDeliverablesView"),
 );
+const TalentChatPage = lazy(() => import("./talent/TalentChatPage"));
+const FounderChatPage = lazy(() => import("./office/FounderChatPage"));
+const TalentProfilePage = lazy(() => import("./TalentProfilePage"));
+
+// Startup Pages - redesigned separate pages
+const PostStartupPage = lazy(() => import("./founders/PostStartupPage"));
+const BrowseStartupsPage = lazy(() => import("./founders/BrowseStartupsPage"));
+const StartupDetailPage = lazy(() => import("./founders/StartupDetailPage"));
+
+// API and realtime imports
+import * as inboxApi from "../utils/api/inboxApi";
+import * as founderApi from "../utils/api/founderApi";
+import { broadcastMessageUpdate } from "../utils/realtimeSubscriptions";
+import { toast } from "sonner";
 
 // ⚡ LOADING FALLBACK - Minimal spinner for fast perceived performance
 const PageLoadingFallback = () => (
@@ -57,71 +73,173 @@ const PageLoadingFallback = () => (
     </div>
   </div>
 );
+
+const showCompensationDemo =
+  import.meta.env.DEV ||
+  import.meta.env.VITE_INCLUDE_COMPENSATION_DEMO === "true";
+
 export default function DashboardHybrid({ user, onLogout, onUpdateUser }) {
-  // For founders and talent, default to 'dashboard' (homepage)
-  // For team members, also default to 'dashboard' (team member home)
-  const getDefaultPage = () => {
-    return "dashboard"; // All roles start at their respective dashboard
-  };
-  const [currentPage, setCurrentPage] = useState(getDefaultPage());
-  const [virtualOfficeView, setVirtualOfficeView] = useState("workspace");
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  const validPages = useMemo(
+    () =>
+      new Set([
+        "dashboard",
+        "startup-office",
+        "inbox",
+        "inbox:received",
+        "inbox:sent",
+        "analytics",
+        "settings",
+        "profile",
+        "my-performance",
+        "founder-chat",
+        "talent-chat",
+        "team-matching",
+        "documents",
+        "journey",
+        "ideation",
+        "formation",
+        "team-building",
+        "product-dev",
+        "go-to-market",
+        "operations",
+        "post-startup",
+        "browse-startups",
+        "startup-detail",
+        "talent-profile",
+        "compensation-demo",
+      ]),
+    [],
+  );
+
+  const derivedNav = useMemo(
+    () =>
+      pathToDashboardState(
+        location.pathname,
+        location.search,
+        user.role,
+      ),
+    [location.pathname, location.search, user.role],
+  );
+
   const [taskToOpen, setTaskToOpen] = useState(null);
   const [announcementToOpen, setAnnouncementToOpen] = useState(null);
   const [messageUserToOpen, setMessageUserToOpen] = useState(null);
   const [winToOpen, setWinToOpen] = useState(null);
-  const [talentDashboardMode, setTalentDashboardMode] = useState("overview");
+  const [selectedTalent, setSelectedTalent] = useState(null);
+  const [selectedStartup, setSelectedStartup] = useState(null);
 
   const handleVirtualOfficeViewChange = useCallback(
     (view) => {
-      setVirtualOfficeView(view);
+      navigate(
+        dashboardStateToPath({
+          currentPage: "startup-office",
+          virtualOfficeView: view,
+        }),
+        { replace: true },
+      );
     },
-    [],
+    [navigate],
   );
 
-  // Wrapper for setCurrentPage with logging
   const handleNavigate = (page, options) => {
-    console.log(
-      "🧭 [DashboardHybrid] handleNavigate called with:",
-      page,
-      options,
-    );
-    console.log("🧭 [DashboardHybrid] Current page:", currentPage);
-
-    // Handle task opening from notifications
     if (options?.taskId) {
-      console.log("📋 [DashboardHybrid] Task ID received:", options.taskId);
       setTaskToOpen(options.taskId);
-      // Navigate to startup-office (virtual office) with workspace view
-      setCurrentPage("startup-office");
-      setVirtualOfficeView("workspace");
-    }
-    // Handle announcement opening from notifications
-    else if (options?.announcementId) {
-      console.log(
-        "📢 [DashboardHybrid] Announcement ID received:",
-        options.announcementId,
+      navigate(
+        dashboardStateToPath({
+          currentPage: "startup-office",
+          virtualOfficeView: "workspace",
+        }),
       );
+      return;
+    }
+    if (options?.announcementId) {
       setAnnouncementToOpen(options.announcementId);
-      // Navigate to startup-office (virtual office) with workspace view
-      setCurrentPage("startup-office");
-      setVirtualOfficeView("workspace");
-    } else if (options?.openTeamHub || options?.messageUserId) {
-      if (options?.messageUserId) {
-        setMessageUserToOpen(options.messageUserId);
+      navigate(
+        dashboardStateToPath({
+          currentPage: "startup-office",
+          virtualOfficeView: "workspace",
+        }),
+      );
+      return;
+    }
+    if (options?.messageUserId) {
+      setMessageUserToOpen(options.messageUserId);
+      if (page === "founder-chat" || page === "talent-chat") {
+        const targetPath = dashboardStateToPath({ currentPage: page });
+        navigate(targetPath);
+        return;
       }
+    }
+    if (options?.openTeamHub) {
       if (options?.winId) {
         setWinToOpen(options.winId);
       }
-      setCurrentPage("startup-office");
-      setVirtualOfficeView("workspace");
-    } else {
-      if (page === "dashboard" && user.role === "talent") {
-        setTalentDashboardMode(options?.mode || "overview");
-      }
-      setCurrentPage(page);
+      navigate(
+        dashboardStateToPath({
+          currentPage: "startup-office",
+          virtualOfficeView: "workspace",
+        }),
+      );
+      return;
     }
-    console.log("✅ [DashboardHybrid] Page navigation triggered to:", page);
+
+    if (page === "talent-profile" && options?.talent) {
+      setSelectedTalent(options.talent);
+      navigate("/talent-profile");
+      return;
+    }
+    if (
+      page === "startup-detail" &&
+      (options?.startup || options?.startupId)
+    ) {
+      setSelectedStartup(options?.startup || { id: options.startupId });
+      navigate("/startup-detail");
+      return;
+    }
+
+    if (page === "profile") {
+      navigate("/settings?editProfile=1");
+      return;
+    }
+
+    const officeViewForPath =
+      page === "startup-office"
+        ? options?.officeView ??
+          (derivedNav?.virtualOfficeView || "workspace")
+        : undefined;
+
+    const talentModeForPath =
+      page === "dashboard" && user.role === "talent"
+        ? options?.mode ??
+          (derivedNav?.talentDashboardMode || "overview")
+        : undefined;
+
+    navigate(
+      dashboardStateToPath({
+        currentPage: page,
+        virtualOfficeView: officeViewForPath,
+        talentDashboardMode: talentModeForPath,
+        initialProfileEditing:
+          page === "settings"
+            ? Boolean(options?.editProfile)
+            : false,
+      }),
+    );
   };
+
+  if (!derivedNav || !validPages.has(derivedNav.currentPage)) {
+    return <Navigate to="/home" replace />;
+  }
+
+  const {
+    currentPage,
+    virtualOfficeView = "workspace",
+    talentDashboardMode = "overview",
+    initialProfileEditing = false,
+  } = derivedNav;
 
   const renderPageContent = () => {
     // Only render pages outside Virtual Office when explicitly navigated to
@@ -132,21 +250,13 @@ export default function DashboardHybrid({ user, onLogout, onUpdateUser }) {
           case "founder":
             return (
               <Suspense fallback={<PageLoadingFallback />}>
-                {featureFlags.redesignedFounderHome ? (
-                  <FounderHomeV2
-                    user={user}
-                    onNavigate={handleNavigate}
-                    onVirtualOfficeViewChange={setVirtualOfficeView}
-                  />
-                ) : (
-                  <FounderDashboard
-                    user={user}
-                    onLogout={onLogout}
-                    onUpdateUser={onUpdateUser}
-                    onNavigate={handleNavigate}
-                    onVirtualOfficeViewChange={setVirtualOfficeView}
-                  />
-                )}
+                <FounderDashboard
+                  user={user}
+                  onLogout={onLogout}
+                  onUpdateUser={onUpdateUser}
+                  onNavigate={handleNavigate}
+                  onVirtualOfficeViewChange={handleVirtualOfficeViewChange}
+                />
               </Suspense>
             );
           case "team-member":
@@ -194,15 +304,21 @@ export default function DashboardHybrid({ user, onLogout, onUpdateUser }) {
       case "settings":
         return (
           <Suspense fallback={<PageLoadingFallback />}>
-            <SettingsPage user={user} onUpdateUser={onUpdateUser} />
+            <SettingsPage
+              user={user}
+              onUpdateUser={onUpdateUser}
+              initialProfileEditing={initialProfileEditing}
+            />
           </Suspense>
         );
       case "profile":
-        // Redirect to settings (profile is now inside settings)
-        handleNavigate("settings");
         return (
           <Suspense fallback={<PageLoadingFallback />}>
-            <SettingsPage user={user} onUpdateUser={onUpdateUser} />
+            <SettingsPage
+              user={user}
+              onUpdateUser={onUpdateUser}
+              initialProfileEditing={true}
+            />
           </Suspense>
         );
       // Placeholder for now
@@ -289,22 +405,180 @@ export default function DashboardHybrid({ user, onLogout, onUpdateUser }) {
 
       // Team Matching
       case "team-matching":
-        if (user.role === "talent") {
-          return (
-            <Suspense fallback={<PageLoadingFallback />}>
-              <TalentDashboard
-                user={user}
-                onLogout={onLogout}
-                onUpdateUser={onUpdateUser}
-                onNavigate={handleNavigate}
-                entryMode="opportunities"
-              />
-            </Suspense>
-          );
-        }
         return (
           <Suspense fallback={<PageLoadingFallback />}>
             <TeamMatching user={user} onNavigate={handleNavigate} />
+          </Suspense>
+        );
+
+      // Talent Profile
+      case "talent-profile":
+        return (
+          <Suspense fallback={<PageLoadingFallback />}>
+            <TalentProfilePage
+              talent={selectedTalent}
+              currentUser={user}
+              onBack={() => {
+                setSelectedTalent(null);
+                handleNavigate("team-matching");
+              }}
+              onSendInvitation={async (message) => {
+                if (!selectedTalent || !user) return;
+
+                const founderId = String(user._id ?? user.id ?? "");
+                const talentId = String(
+                  selectedTalent.userId?._id ??
+                  selectedTalent.userId ??
+                  selectedTalent.user?._id ??
+                  selectedTalent.user?.id ??
+                  selectedTalent._id ??
+                  selectedTalent.id ??
+                  "",
+                );
+                if (!talentId) {
+                  toast.error("Unable to identify this talent profile. Please refresh and try again.");
+                  return;
+                }
+
+                let founderStartup = null;
+                try {
+                  const postsRes = await founderApi.getAllPosts();
+                  if (postsRes?.success && Array.isArray(postsRes.posts)) {
+                    founderStartup = postsRes.posts.find(
+                      (post) => String(post.founderId ?? "") === founderId,
+                    );
+                  }
+                } catch (error) {
+                  console.error("Failed to verify founder startup before invitation:", error);
+                }
+
+                if (!founderStartup) {
+                  toast.error("Please launch your startup before browsing talent or sending invites.");
+                  handleNavigate("post-startup");
+                  return;
+                }
+
+                const startupId =
+                  String(founderStartup._id ?? founderStartup.id ?? "") ||
+                  String(user.startupId ?? user.companyId ?? "");
+                const startupTitle = String(
+                  founderStartup.title ||
+                    founderStartup.startupTitle ||
+                    founderStartup.companyName ||
+                    user.startupName ||
+                    user.companyName ||
+                    "",
+                ).trim();
+
+                if (!startupTitle) {
+                  toast.error("Please complete your startup post title before sending invitations.");
+                  handleNavigate("post-startup");
+                  return;
+                }
+
+                const invitation = {
+                  id: `inv_${Date.now()}_${founderId}`,
+                  startupId,
+                  startupTitle,
+                  founderId,
+                  founderName: user.name,
+                  talentId,
+                  talentName: selectedTalent.fullName || selectedTalent.name,
+                  message,
+                  role: selectedTalent.professionalTitle || "Team Member",
+                  sentAt: new Date().toISOString(),
+                  status: "pending",
+                };
+
+                try {
+                  await inboxApi.sendInvitation(invitation);
+
+                  // 🔥 REALTIME: Broadcast to talent that new chat connection is available
+                  await broadcastMessageUpdate(null, "new_conversation", {
+                    type: "invitation",
+                    founderId,
+                    founderName: user.name,
+                    talentId,
+                    startupId,
+                    startupTitle,
+                    message: `New invitation from ${user.name} at ${startupTitle}`,
+                  });
+
+                  toast.success(`Invitation sent to ${invitation.talentName}!`);
+                } catch (err) {
+                  console.error("Failed to send invitation:", err);
+                  const msg = String(err?.message || "");
+                  if (msg.toLowerCase().includes("already sent")) {
+                    toast.error(msg);
+                  } else {
+                    toast.error("Failed to send invitation. Please try again.");
+                  }
+                }
+              }}
+            />
+          </Suspense>
+        );
+
+      // Founder/Team Chat — full-page two-pane chat for founders and team members
+      case "founder-chat":
+        return (
+          <Suspense fallback={<PageLoadingFallback />}>
+            <FounderChatPage
+              user={user}
+              onNavigate={handleNavigate}
+              initialSelectedUserId={messageUserToOpen}
+              onInitialSelectionApplied={() => setMessageUserToOpen(null)}
+            />
+          </Suspense>
+        );
+
+      // Talent Chat — real-time chat with founders the talent expressed interest in
+      case "talent-chat":
+        return (
+          <Suspense fallback={<PageLoadingFallback />}>
+            <TalentChatPage
+              user={user}
+              onNavigate={handleNavigate}
+              initialSelectedUserId={messageUserToOpen}
+              onInitialSelectionApplied={() => setMessageUserToOpen(null)}
+            />
+          </Suspense>
+        );
+
+      // Startup Pages — redesigned separate pages
+      case "post-startup":
+        return (
+          <Suspense fallback={<PageLoadingFallback />}>
+            <PostStartupPage
+              user={user}
+              onNavigate={handleNavigate}
+            />
+          </Suspense>
+        );
+
+      case "browse-startups":
+        return (
+          <Suspense fallback={<PageLoadingFallback />}>
+            <BrowseStartupsPage
+              user={user}
+              onNavigate={handleNavigate}
+              onViewStartup={(startup) => {
+                setSelectedStartup(startup);
+                handleNavigate("startup-detail");
+              }}
+            />
+          </Suspense>
+        );
+
+      case "startup-detail":
+        return (
+          <Suspense fallback={<PageLoadingFallback />}>
+            <StartupDetailPage
+              user={user}
+              startup={selectedStartup}
+              startupId={selectedStartup?.id || selectedStartup?._id || ""}
+              onNavigate={handleNavigate}
+            />
           </Suspense>
         );
 
@@ -321,6 +595,7 @@ export default function DashboardHybrid({ user, onLogout, onUpdateUser }) {
               user={user}
               onBack={() => handleNavigate("dashboard")}
               initialTab={initialTab}
+              onNavigate={handleNavigate}
             />
           </Suspense>
         );
@@ -329,7 +604,10 @@ export default function DashboardHybrid({ user, onLogout, onUpdateUser }) {
       case "analytics":
         return (
           <Suspense fallback={<PageLoadingFallback />}>
-            <AnalyticsDashboard founderId={user.id} founderName={user.name} />
+            <AnalyticsDashboard
+              founderId={user._id || user.id}
+              founderName={user?.name || "Founder"}
+            />
           </Suspense>
         );
 
@@ -341,8 +619,15 @@ export default function DashboardHybrid({ user, onLogout, onUpdateUser }) {
           </Suspense>
         );
 
-      // Compensation Demo (for testing)
       case "compensation-demo":
+        if (!showCompensationDemo) {
+          return (
+            <div className="flex min-h-[320px] items-center justify-center p-6 text-center text-sm text-muted-foreground">
+              Compensation demo is disabled. Set VITE_INCLUDE_COMPENSATION_DEMO=true
+              for staging, or use a development build.
+            </div>
+          );
+        }
         return (
           <Suspense fallback={<PageLoadingFallback />}>
             <CompensationDemoPage user={user} />

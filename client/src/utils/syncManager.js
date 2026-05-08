@@ -1,18 +1,21 @@
 /**
  * Sync Manager for offline actions
  * Queues actions when offline and syncs when back online
+ * Uses cookie-based authentication (no need to store tokens)
  */
 
-import { getAccessToken } from "../app/session";
 import { API_BASE_URL } from "../config/apiBase.js";
 import { offlineStorage } from "./offlineStorage";
 
 const API_BASE = API_BASE_URL;
 
-function getAuthHeaderValue() {
-  const token = getAccessToken();
-  return `Bearer ${token}`;
-}
+// Default fetch options for cookie-based auth
+const defaultOptions = {
+  credentials: "include",
+  headers: {
+    "Content-Type": "application/json",
+  },
+};
 
 class SyncManager {
   isSyncing = false;
@@ -28,10 +31,7 @@ class SyncManager {
       type: action.type,
       endpoint: action.endpoint,
       method: action.method,
-      data: {
-        ...action.data,
-        authorization: getAuthHeaderValue(),
-      },
+      data: action.data,
     });
 
     console.log(`✅ Action queued: ${action.type}`);
@@ -44,11 +44,8 @@ class SyncManager {
     console.log(`🚀 Executing action: ${action.type}`);
 
     const response = await fetch(action.endpoint, {
+      ...defaultOptions,
       method: action.method,
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${getAccessToken()}`,
-      },
       body: action.method !== "GET" ? JSON.stringify(action.data) : undefined,
     });
 
@@ -95,11 +92,8 @@ class SyncManager {
           console.log(`🔄 Syncing action ${action.id}: ${action.type}`);
 
           const response = await fetch(action.endpoint, {
+            ...defaultOptions,
             method: action.method,
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: action.data.authorization || getAuthHeaderValue(),
-            },
             body: JSON.stringify(action.data),
           });
 
