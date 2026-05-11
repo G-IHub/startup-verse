@@ -15,6 +15,7 @@ const teamMemberProfileSchema = new mongoose.Schema(
       default: "",
       maxlength: [2000, "Bio cannot exceed 2000 characters"]
     },
+    compensation: { type: mongoose.Schema.Types.Mixed, default: null },
   },
   { timestamps: true },
 );

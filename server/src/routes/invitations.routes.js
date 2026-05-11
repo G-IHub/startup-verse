@@ -16,6 +16,7 @@ invitationsRouter.get("/invitations/sent/:founderId", requireAuth, asyncHandler(
 invitationsRouter.get("/invitations/received/:talentId", requireAuth, asyncHandler(invitationsController.getReceivedFounderTalentInvitations));
 invitationsRouter.put("/invitations/:invitationId/status", requireAuth, asyncHandler(invitationsController.updateFounderTalentInvitationStatus));
 invitationsRouter.post("/invitations/:invitationId/messages", requireAuth, asyncHandler(invitationsController.addMessageToFounderTalentInvitation));
+invitationsRouter.post("/invitations/:invitationId/onboard", requireAuth, asyncHandler(invitationsController.onboardFounderTalentInvitation));
 
 invitationsRouter.post("/interests/send", requireAuth, asyncHandler(invitationsController.createInterest));
 invitationsRouter.get("/interests/received/:founderId", requireAuth, asyncHandler(invitationsController.getReceivedInterests));

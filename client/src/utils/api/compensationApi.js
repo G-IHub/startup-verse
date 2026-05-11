@@ -138,9 +138,8 @@ export async function getStartupCompensationContracts(startupId) {
 }
 
 /**
- * Unified onboarding: persists via `POST /interests/:interestId/onboard` only.
- * `compensationConfig` is accepted for UI compatibility; compensation contracts
- * are handled separately when those routes exist.
+ * Unified onboarding from a talent-initiated interest:
+ * persists via `POST /interests/:interestId/onboard`.
  */
 export async function convertTalentToTeamMember(
   talentId,
@@ -178,6 +177,47 @@ export async function convertTalentToTeamMember(
     return data;
   } catch (error) {
     console.error("Error converting talent to team member:", error);
+    throw error;
+  }
+}
+
+/**
+ * Onboard a team member from a founder-initiated invitation that has been
+ * accepted by the talent. Persists via `POST /invitations/:invitationId/onboard`.
+ */
+export async function onboardInvitation(
+  invitationId,
+  { talentId, founderId, startupId, compensationConfig } = {},
+) {
+  if (!invitationId) {
+    throw new Error("invitationId is required to onboard from an invitation.");
+  }
+  try {
+    const response = await fetch(
+      `${BASE_URL}/invitations/${encodeURIComponent(invitationId)}/onboard`,
+      {
+        method: "POST",
+        ...defaultOptions,
+        body: JSON.stringify({
+          talentId,
+          founderId,
+          startupId,
+          compensationConfig,
+        }),
+      },
+    );
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(
+        data.message || data.error || "Failed to onboard team member",
+      );
+    }
+
+    return data;
+  } catch (error) {
+    console.error("Error onboarding invitation:", error);
     throw error;
   }
 }

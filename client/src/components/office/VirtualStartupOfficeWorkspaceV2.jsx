@@ -558,33 +558,47 @@ export default function VirtualStartupOfficeWorkspaceV2({
             </div>
           ) : (
             <div className="grid grid-cols-1 gap-3">
-              {roster.map((member) => (
-                <div
-                  key={member.id}
-                  className="h-fit rounded-[12px] border border-surface-border bg-surface-page p-4"
-                >
-                  <div className="mb-2 flex items-center gap-2.5">
-                    <div className="relative flex h-[38px] w-[38px] flex-shrink-0 items-center justify-center rounded-[10px] bg-primary font-heading text-[13px] font-bold text-white">
-                      {getInitials(member.name)}
-                      {member.isOnline && (
-                        <span className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border-2 border-surface-card bg-status-success" />
-                      )}
+              {roster.map((member) => {
+                const isOnline = Boolean(member.isOnline);
+                const statusLabel = isOnline
+                  ? member.statusText || "In workspace"
+                  : "Offline";
+                return (
+                  <div
+                    key={member.id}
+                    className="h-fit rounded-[12px] border border-surface-border bg-surface-page p-4"
+                  >
+                    <div className="mb-2 flex items-center gap-2.5">
+                      <div className="relative flex h-[38px] w-[38px] flex-shrink-0 items-center justify-center rounded-[10px] bg-primary font-heading text-[13px] font-bold text-white">
+                        {getInitials(member.name)}
+                        {isOnline && (
+                          <span className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border-2 border-surface-card bg-status-success" />
+                        )}
+                      </div>
+                      <div className="min-w-0">
+                        <p className="truncate font-heading text-sm font-semibold text-text-heading">{member.name}</p>
+                        <p className="truncate font-body text-xs text-text-body">
+                          {member.title || member.role}
+                        </p>
+                      </div>
                     </div>
-                    <div className="min-w-0">
-                      <p className="truncate font-heading text-sm font-semibold text-text-heading">{member.name}</p>
-                      <p className="truncate font-body text-xs text-text-body">
-                        {member.title || member.role}
+                    <div className="flex items-center gap-1.5">
+                      <span
+                        className={`inline-block h-1.5 w-1.5 rounded-full ${
+                          isOnline ? "bg-status-success" : "bg-text-muted/60"
+                        }`}
+                      />
+                      <p
+                        className={`truncate font-body text-[11px] font-medium ${
+                          isOnline ? "text-text-body" : "text-text-muted"
+                        }`}
+                      >
+                        {statusLabel}
                       </p>
                     </div>
                   </div>
-                  <div className="flex items-center gap-1.5">
-                    <span className="inline-block h-1.5 w-1.5 rounded-full bg-status-success" />
-                    <p className="truncate font-body text-[11px] font-medium text-text-body">
-                      {member.statusText || "In workspace"}
-                    </p>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </OfficePanelCard>

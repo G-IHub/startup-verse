@@ -34,6 +34,7 @@ const founderTalentInvitationSchema = new mongoose.Schema(
       index: true 
     },
     kind: { type: String, default: "founder-talent" },
+    onboarded: { type: Boolean, default: false, index: true },
     metadata: { type: mongoose.Schema.Types.Mixed, default: {} },
   },
   { timestamps: true },

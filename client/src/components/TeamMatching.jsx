@@ -302,6 +302,7 @@ export default function TeamMatching({ user, onNavigate }) {
 
       for (const inv of sentInvitations) {
         if (inv.status !== "accepted") continue;
+        if (inv.onboarded === true) continue;
         const tid = String(inv.talentId || "");
         if (!tid || interestTalentIds.has(tid)) continue;
         pending.push({
@@ -641,11 +642,14 @@ export default function TeamMatching({ user, onNavigate }) {
           selectedOnboardingTalent.interestId,
         );
       } else if (selectedOnboardingTalent.invitationId) {
-        await compensationApi.createCompensationContract(
-          founderId,
-          selectedOnboardingTalent.talentId,
-          startupId,
-          compensationConfig,
+        await compensationApi.onboardInvitation(
+          selectedOnboardingTalent.invitationId,
+          {
+            talentId: selectedOnboardingTalent.talentId,
+            founderId,
+            startupId,
+            compensationConfig,
+          },
         );
       } else {
         toast.error(
@@ -937,68 +941,71 @@ export default function TeamMatching({ user, onNavigate }) {
             <>
               {pendingOnboarding.length > 0 && (
                 <div className="mb-6">
-                  <Card className="rounded-card border border-surface-border bg-gradient-to-br from-green-50 to-emerald-50 shadow-soft dark:from-green-950/20 dark:to-emerald-950/20">
+                  <Card className="rounded-card border border-emerald-200 bg-white shadow-soft">
                     <CardHeader className="pb-3">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <UserPlus className="w-5 h-5 text-green-600" />
-                          <CardTitle className="text-lg">
-                            Pending Onboarding
-                          </CardTitle>
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="flex items-center gap-3">
+                          <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg bg-emerald-100">
+                            <UserPlus className="h-4 w-4 text-emerald-600" />
+                          </div>
+                          <div>
+                            <CardTitle className="font-heading text-base font-bold leading-tight text-text-heading">
+                              Pending Onboarding
+                            </CardTitle>
+                            <p className="mt-0.5 text-xs text-text-body">
+                              These talents accepted your invitation and are
+                              ready to be onboarded
+                            </p>
+                          </div>
                         </div>
                         <Badge
                           variant="secondary"
-                          className="text-xs bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300"
+                          className="flex-shrink-0 rounded-pill border-emerald-200 bg-emerald-100 px-2.5 py-1 text-xs font-semibold text-emerald-700"
                         >
                           {pendingOnboarding.length}{" "}
                           {pendingOnboarding.length === 1 ? "person" : "people"}
                         </Badge>
                       </div>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        These talents accepted your invitation and are ready to
-                        be onboarded
-                      </p>
                     </CardHeader>
                     <CardContent>
-                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                      <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3">
                         {pendingOnboarding.map((talent) => (
                           <Card
                             key={talent.id}
-                            className="rounded-card border border-surface-border bg-surface-card shadow-soft dark:border-surface-border"
+                            className="rounded-card border border-surface-border bg-surface-card shadow-soft transition-shadow duration-200 hover:shadow-card"
                           >
                             <CardContent className="p-4">
-                              <div className="flex items-start justify-between mb-3">
-                                <div className="flex items-center gap-3">
-                                  <Avatar className="w-10 h-10">
-                                    <AvatarFallback className="bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300">
-                                      {talent.talentName?.substring(0, 2) ||
-                                        "??"}
-                                    </AvatarFallback>
-                                  </Avatar>
-                                  <div>
-                                    <h4 className="font-semibold text-sm">
-                                      {talent.talentName}
-                                    </h4>
-                                    <p className="text-xs text-muted-foreground">
-                                      {"Accepted "}
-                                      {new Date(
-                                        talent.respondedAt || talent.sentAt,
-                                      ).toLocaleDateString()}
-                                    </p>
-                                  </div>
+                              <div className="mb-3 flex items-start gap-3">
+                                <Avatar className="h-10 w-10 flex-shrink-0">
+                                  <AvatarFallback className="bg-emerald-100 font-semibold text-emerald-700">
+                                    {talent.talentName
+                                      ?.substring(0, 2)
+                                      ?.toUpperCase() || "??"}
+                                  </AvatarFallback>
+                                </Avatar>
+                                <div className="min-w-0 flex-1">
+                                  <h4 className="truncate text-sm font-semibold text-text-heading">
+                                    {talent.talentName}
+                                  </h4>
+                                  <p className="mt-0.5 text-xs text-text-muted">
+                                    Accepted{" "}
+                                    {new Date(
+                                      talent.respondedAt || talent.sentAt,
+                                    ).toLocaleDateString()}
+                                  </p>
                                 </div>
-                                <CheckCircle2 className="w-5 h-5 text-green-600 flex-shrink-0" />
+                                <CheckCircle2 className="h-5 w-5 flex-shrink-0 text-emerald-500" />
                               </div>
                               {talent.response && (
-                                <p className="text-xs text-muted-foreground mb-3 line-clamp-2 italic">
+                                <p className="mb-3 line-clamp-2 text-xs italic text-text-body">
                                   "{talent.response}"
                                 </p>
                               )}
                               <Button
                                 onClick={() => handleStartOnboarding(talent)}
-                                className="w-full bg-green-600 hover:bg-green-700 text-white text-xs h-8"
+                                className="h-9 w-full rounded-lg bg-emerald-600 text-xs font-semibold text-white shadow-sm hover:bg-emerald-700"
                               >
-                                <DollarSign className="w-3.5 h-3.5 mr-1.5" />
+                                <DollarSign className="mr-1.5 h-3.5 w-3.5" />
                                 Onboard Team
                               </Button>
                             </CardContent>

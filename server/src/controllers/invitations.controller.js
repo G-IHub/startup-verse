@@ -1072,6 +1072,153 @@ export const addMessageToInterest = async (req, res) => {
   );
 };
 
+export const onboardFounderTalentInvitation = async (req, res) => {
+  const session = await mongoose.startSession();
+  try {
+    let responsePayload = null;
+    let activityEvent = null;
+    const compensationConfig = req.body?.compensationConfig ?? null;
+
+    await session.withTransaction(async () => {
+      const invitation = await FounderTalentInvitation.findById(
+        req.params.invitationId,
+      ).session(session);
+      if (!invitation) {
+        throw new Error("Invitation not found.");
+      }
+      if (!canAccessInvitation(req, invitation)) {
+        const forbidden = new Error("Forbidden.");
+        forbidden.statusCode = 403;
+        throw forbidden;
+      }
+      if (String(req.user?.id || "") !== String(invitation.founderId || "")
+          && !isAdmin(req)) {
+        const forbidden = new Error("Only the founder can onboard from this invitation.");
+        forbidden.statusCode = 403;
+        throw forbidden;
+      }
+      if (!invitation.talentId) {
+        const unprocessable = new Error("Invitation has no talent linked yet.");
+        unprocessable.statusCode = 422;
+        throw unprocessable;
+      }
+
+      const startupId = invitation.startupId || invitation.founderId;
+
+      const talent = await User.findById(invitation.talentId).session(session);
+      if (!talent) {
+        throw new Error("Talent user not found.");
+      }
+
+      invitation.status = "accepted";
+      invitation.onboarded = true;
+      await invitation.save({ session });
+
+      talent.role = "team-member";
+      talent.startupId = startupId;
+      talent.founderId = invitation.founderId;
+      talent.onboardingComplete = true;
+      await talent.save({ session });
+
+      await TeamMemberProfile.findOneAndUpdate(
+        { userId: talent._id },
+        {
+          userId: talent._id,
+          founderId: invitation.founderId,
+          startupId,
+          ...(compensationConfig ? { compensation: compensationConfig } : {}),
+        },
+        { upsert: true, new: true, runValidators: true, session },
+      );
+
+      await Presence.findOneAndUpdate(
+        { startupId: String(startupId), userId: String(talent._id) },
+        {
+          startupId: String(startupId),
+          userId: String(talent._id),
+          userName: talent.name || "",
+          role: "team-member",
+          isOnline: false,
+          lastSeenAt: new Date(),
+          expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
+          metadata: { source: "invitation-onboarding" },
+        },
+        { upsert: true, new: true, runValidators: true, session },
+      );
+
+      const createdActivity = await Activity.create(
+        [{
+          startupId,
+          userId: talent._id,
+          type: "join",
+          text: "Team member onboarded from accepted invitation.",
+          metadata: {
+            invitationId: invitation._id,
+            founderId: invitation.founderId,
+            userName: talent.name || "",
+            icon: "👋",
+          },
+        }],
+        { session },
+      );
+      activityEvent = mapActivityToDto(createdActivity?.[0]);
+
+      responsePayload = { onboarded: true, invitation };
+    });
+
+    if (activityEvent?.startupId) {
+      emitRealtime(SOCKET_EVENTS.ACTIVITY_CREATED, activityEvent, [startupRoom(activityEvent.startupId)]);
+    }
+
+    try {
+      const onboardedInvitation = responsePayload?.invitation;
+      if (onboardedInvitation?.talentId) {
+        await Promise.all([
+          createNotification({
+            userId: onboardedInvitation.founderId,
+            type: "team-member-joined",
+            title: "Team member joined",
+            message: "A new team member has been onboarded to your startup.",
+            actionUrl: `/?view=virtual-office&tab=team`,
+            metadata: {
+              invitationId: String(onboardedInvitation._id),
+              talentId: String(onboardedInvitation.talentId || ""),
+            },
+          }).catch(() => null),
+          createNotification({
+            userId: onboardedInvitation.talentId,
+            type: "team-member-onboarded",
+            title: "Welcome to the team",
+            message: "You've been onboarded. Open the Virtual Office to begin.",
+            actionUrl: `/?view=virtual-office`,
+            metadata: { invitationId: String(onboardedInvitation._id) },
+          }).catch(() => null),
+        ]);
+      }
+    } catch (err) {
+      console.error("[onboardFounderTalentInvitation] notify failed:", err.message);
+    }
+
+    return apiSuccess(res, responsePayload);
+  } catch (error) {
+    if (error.message === "Invitation not found.") {
+      return apiError(res, "Invitation not found.", 404);
+    }
+    if (error.message === "Talent user not found.") {
+      return apiError(res, "Talent user not found.", 404);
+    }
+    if (error.statusCode === 403) {
+      return apiError(res, error.message || "Forbidden.", 403);
+    }
+    if (error.statusCode === 422) {
+      return apiError(res, error.message, 422);
+    }
+    return apiError(res, "Unable to onboard invitation atomically.", 500, [error.message]);
+  } finally {
+    await session.endSession();
+  }
+};
+
 export const onboardInterest = async (req, res) => {
   const session = await mongoose.startSession();
   try {
