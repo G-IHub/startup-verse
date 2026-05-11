@@ -8,10 +8,15 @@
  */
 
 // Test configuration — point at your Express API (`VITE_API_URL`) and a valid JWT.
+const VITE_API_URL =
+  (typeof import.meta !== "undefined" && import.meta.env?.VITE_API_URL) || "";
+if (!VITE_API_URL) {
+  throw new Error(
+    "VITE_API_URL is not set. Define it in `client/.env.local` (dev) or your hosting provider's environment variables before running this test script.",
+  );
+}
 const TEST_CONFIG = {
-  apiBase:
-    (typeof import.meta !== "undefined" && import.meta.env?.VITE_API_URL) ||
-    "http://localhost:5000/api/v1",
+  apiBase: VITE_API_URL,
   accessToken: "PASTE_JWT_FROM_SESSION",
 
   founderId: "test-founder-id",

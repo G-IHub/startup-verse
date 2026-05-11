@@ -4,7 +4,7 @@
 # Set @baseUrl to your Express API (same as VITE_API_URL) and @authToken to a valid JWT.
 ###
 
-@baseUrl = http://localhost:5000/api/v1
+@baseUrl = {{$dotenv VITE_API_URL}}
 @authToken = Bearer YOUR_JWT
 
 ### ============================================

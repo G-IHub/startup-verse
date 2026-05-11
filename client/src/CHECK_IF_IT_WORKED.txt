@@ -1,5 +1,5 @@
 Open `client/src/check-backend-status.html` in a browser (file:// or static host).
 
-Default API base is `http://localhost:5000/api/v1`. Override with `?api=https://your-host/api/v1`.
+Pass the API base via the `?api=` query string, e.g. `?api=https://api.example.com/api/v1`.
 
 You should see a successful `/health` response when the server is running.

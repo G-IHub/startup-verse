@@ -80,7 +80,7 @@
     </div>
 
     <div class="info">
-      <p><strong>API base</strong> (override with <code>?api=https://host/api/v1</code>):</p>
+      <p><strong>API base</strong> (override with <code>?api=https://host/</code>):</p>
       <div class="endpoint" id="apiDisplay"></div>
       <p class="text-sm text-muted-foreground">Run the Express server from <code>/server</code> and align the client <code>VITE_API_URL</code> with this base.</p>
     </div>
@@ -90,7 +90,13 @@
   <script>
     const API_BASE = (() => {
       const q = new URLSearchParams(window.location.search).get("api");
-      return (q && q.trim()) || "http://localhost:5000/api/v1";
+      const value = (q && q.trim()) || "";
+      if (!value) {
+        throw new Error(
+          "Pass the API base via the `?api=` query string (e.g. `?api=https://api.example.com/api/v1`).",
+        );
+      }
+      return value;
     })().replace(/\/$/, "");
 
     document.getElementById("apiDisplay").textContent = API_BASE;
