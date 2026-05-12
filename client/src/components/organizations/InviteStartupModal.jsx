@@ -15,6 +15,12 @@ import {
   createInvitation,
   searchUserByEmail,
 } from "../../utils/organizationHelpersBackend";
+
+const PRIMARY_BUTTON =
+  "h-9 rounded-input bg-primary font-body text-[13px] font-semibold text-white shadow-[0_4px_16px_rgba(58,90,254,0.25)] hover:bg-primary-hover";
+const OUTLINE_BUTTON =
+  "h-9 rounded-input border border-surface-border bg-white font-body text-[13px] font-medium text-text-body hover:bg-primary-tint hover:text-primary";
+
 export default function InviteStartupModal({
   isOpen,
   onClose,
@@ -30,11 +36,11 @@ export default function InviteStartupModal({
   const [message, setMessage] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSearching, setIsSearching] = useState(false);
+
   const handleSearch = async () => {
     setIsSearching(true);
     setSelectedFounder(null);
     try {
-      // Search backend for founders by email
       const user = await searchUserByEmail(searchEmail);
       if (user && user.role === "founder") {
         setSelectedFounder(user);
@@ -43,10 +49,8 @@ export default function InviteStartupModal({
         );
         return;
       }
-
-      // Not found in directory / API
       alert(
-        `No founder found with email "${searchEmail}".\n\nThe founder must have a StartupVerse account first.\n\n✅ Ask them to sign up at StartupVerse\n✅ They should select "Founder" as their role\n✅ After they complete signup, you can search for them here`,
+        `No founder found with email "${searchEmail}".\n\nThe founder must have a StartupVerse account first.\n\nAsk them to sign up at StartupVerse\nThey should select "Founder" as their role\nAfter they complete signup, you can search for them here`,
       );
     } catch (error) {
       console.error("Error searching for founder:", error);
@@ -55,18 +59,11 @@ export default function InviteStartupModal({
       setIsSearching(false);
     }
   };
+
   const handleSendInvitation = async () => {
     if (!selectedFounder) return;
     setIsSubmitting(true);
     try {
-      console.log("📧 Sending invitation to:", {
-        founderId: selectedFounder.id,
-        founderEmail: selectedFounder.email,
-        founderName: selectedFounder.name,
-        startup: selectedFounder.startupName || selectedFounder.companyName,
-        cohortId,
-        organizationId,
-      });
       await createInvitation(
         cohortId,
         organizationId,
@@ -79,21 +76,13 @@ export default function InviteStartupModal({
         userId,
         message.trim() || undefined,
       );
-      console.log("✅ Invitation sent successfully!");
-      console.log(
-        "💡 Founder should refresh their dashboard to see the invitation",
-      );
-      if (onSuccess) {
-        onSuccess();
-      }
-
-      // Reset form
+      if (onSuccess) onSuccess();
       setSearchEmail("");
       setSelectedFounder(null);
       setMessage("");
       onClose();
     } catch (error) {
-      console.error("❌ Failed to send invitation:", error);
+      console.error("Failed to send invitation:", error);
       alert(
         "Failed to send invitation. Please ensure the backend is deployed.",
       );
@@ -101,30 +90,33 @@ export default function InviteStartupModal({
       setIsSubmitting(false);
     }
   };
+
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-md">
         <DialogHeader>
-          <DialogTitle className="text-[10px] flex items-center gap-2">
-            <Send className="w-4 h-4 text-primary" />
-            {"Invite Startup to "}
-            {cohortName}
+          <DialogTitle className="flex items-center gap-2 font-heading text-[18px] font-bold text-text-heading">
+            <Send className="h-5 w-5 text-primary" />
+            Invite Startup to {cohortName}
           </DialogTitle>
-          <DialogDescription className="text-[10px]">
+          <DialogDescription className="font-body text-[13px] text-text-body">
             Search for a founder by email and send them an invitation
           </DialogDescription>
         </DialogHeader>
-        <div className="space-y-3 mt-2">
+
+        <div className="mt-2 space-y-3 font-body">
           {!selectedFounder && (
             <div>
-              <Label className="text-[10px]">Founder Email *</Label>
-              <div className="flex gap-2 mt-1">
+              <Label className="font-body text-[13px] font-medium text-text-heading">
+                Founder Email *
+              </Label>
+              <div className="mt-1 flex gap-2">
                 <Input
                   value={searchEmail}
                   onChange={(e) => setSearchEmail(e.target.value)}
                   placeholder="founder@startup.com"
                   type="email"
-                  className="flex-1 h-7 text-[10px]"
+                  className="flex-1 font-body text-[13px]"
                   onKeyDown={(e) =>
                     e.key === "Enter" && !isSearching && handleSearch()
                   }
@@ -132,83 +124,81 @@ export default function InviteStartupModal({
                 />
                 <Button
                   onClick={handleSearch}
-                  variant="outline"
-                  className="h-7 text-[10px]"
+                  className={OUTLINE_BUTTON}
                   disabled={isSearching || !searchEmail.trim()}
                 >
-                  {isSearching ? "..." : <Search className="w-3 h-3" />}
+                  {isSearching ? "..." : <Search className="h-4 w-4" />}
                 </Button>
               </div>
-              <p className="text-[9px] text-muted-foreground mt-1">
+              <p className="mt-1 font-body text-[12px] text-text-muted">
                 {isSearching
                   ? "Searching..."
                   : "Enter the founder's email address to search"}
               </p>
             </div>
           )}
+
           {selectedFounder && (
             <>
-              <div className="p-2.5 bg-primary/5 border border-primary/20 rounded-lg">
-                <div className="flex items-start justify-between">
+              <div className="rounded-input border border-primary/20 bg-primary-tint p-3">
+                <div className="flex items-start justify-between gap-2">
                   <div>
-                    <p className="font-semibold text-[10px]">
+                    <p className="font-heading text-[14px] font-semibold text-text-heading">
                       {selectedFounder.startupName ||
                         selectedFounder.companyName ||
                         "Unnamed Startup"}
                     </p>
-                    <p className="text-[9px] text-muted-foreground">
+                    <p className="font-body text-[12px] text-text-body">
                       {selectedFounder.name}
                     </p>
-                    <p className="text-[9px] text-muted-foreground">
+                    <p className="font-body text-[12px] text-text-muted">
                       {selectedFounder.email}
                     </p>
                   </div>
                   <Button
-                    variant="ghost"
                     size="sm"
                     onClick={() => {
                       setSelectedFounder(null);
                       setSearchEmail("");
                     }}
-                    className="h-6 text-[9px]"
+                    className="h-7 rounded-input bg-white px-3 font-body text-[12px] font-medium text-primary hover:bg-white/70"
                   >
                     Change
                   </Button>
                 </div>
               </div>
+
               <div>
-                <Label className="text-[10px]">
+                <Label className="font-body text-[13px] font-medium text-text-heading">
                   Personal Message (Optional)
                 </Label>
                 <Textarea
                   value={message}
                   onChange={(e) => setMessage(e.target.value)}
                   placeholder="Add a personal message to your invitation..."
-                  className="mt-1 min-h-[70px] text-[10px]"
+                  className="mt-1 min-h-[70px] font-body text-[13px]"
                 />
               </div>
-              <div className="p-2 bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-900 rounded-lg">
-                <p className="text-[10px] text-blue-900 dark:text-blue-100">
-                  <strong>What the founder will see:</strong>
+
+              <div className="rounded-input border border-primary/20 bg-primary-tint p-3">
+                <p className="font-body text-[13px] font-semibold text-primary">
+                  What the founder will see:
                 </p>
-                <ul className="mt-1 space-y-0.5 text-[9px] text-blue-700 dark:text-blue-300">
-                  <li>
-                    {"✓ Invitation to join "}
-                    {cohortName}
-                  </li>
-                  <li>✓ Read-only access to execution progress</li>
-                  <li>✓ Option to accept or decline</li>
-                  <li>✓ Can leave the cohort at any time</li>
+                <ul className="mt-1 space-y-0.5 font-body text-[12px] text-text-body">
+                  <li>Invitation to join {cohortName}</li>
+                  <li>Read-only access to execution progress</li>
+                  <li>Option to accept or decline</li>
+                  <li>Can leave the cohort at any time</li>
                 </ul>
               </div>
             </>
           )}
-          <div className="flex gap-2 pt-2 border-t">
+
+          <div className="flex gap-2 border-t border-surface-border pt-3">
             <Button
               type="button"
-              variant="outline"
               onClick={onClose}
-              className="flex-1 h-7 text-[10px]"
+              className={`flex-1 ${OUTLINE_BUTTON}`}
               disabled={isSubmitting}
             >
               Cancel
@@ -216,10 +206,10 @@ export default function InviteStartupModal({
             {selectedFounder && (
               <Button
                 onClick={handleSendInvitation}
-                className="flex-1 h-7 text-[10px]"
+                className={`flex-1 ${PRIMARY_BUTTON}`}
                 disabled={isSubmitting}
               >
-                <Send className="w-3 h-3 mr-1.5" />
+                <Send className="mr-2 h-4 w-4" />
                 Send Invitation
               </Button>
             )}

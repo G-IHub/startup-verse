@@ -3,15 +3,7 @@
  */
 import React, { useState, useEffect } from "react";
 import { API_BASE_URL } from "../../config/apiBase.js";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "../ui/card";
 import { Button } from "../ui/button";
-import { Badge } from "../ui/badge";
 import { Input } from "../ui/input";
 import {
   Users,
@@ -29,16 +21,25 @@ import {
 import { toast } from "sonner";
 import { Dialog, DialogContent } from "../ui/dialog";
 import { unwrapData } from "../../utils/apiEnvelope";
+import {
+  SectionCard,
+  SectionHeader,
+  StatusBadge,
+  EmptyStateBlock,
+} from "./_primitives";
+import { cn } from "../ui/utils";
 
 const API_BASE = API_BASE_URL;
 
-// Default fetch options for cookie-based auth
 const defaultOptions = {
   credentials: "include",
-  headers: {
-    "Content-Type": "application/json",
-  },
+  headers: { "Content-Type": "application/json" },
 };
+
+const PRIMARY_BUTTON =
+  "h-9 rounded-input bg-primary font-body text-[13px] font-semibold text-white shadow-[0_4px_16px_rgba(58,90,254,0.25)] hover:bg-primary-hover";
+const OUTLINE_BUTTON =
+  "h-9 rounded-input border border-surface-border bg-white font-body text-[13px] font-medium text-text-body hover:bg-primary-tint hover:text-primary";
 
 export default function MentorAssignmentManager({
   cohortId,
@@ -57,28 +58,28 @@ export default function MentorAssignmentManager({
   const [inviteEmail, setInviteEmail] = useState("");
   const [inviteName, setInviteName] = useState("");
   const [inviting, setInviting] = useState(false);
-  const [mentorshipTypes, setMentorshipTypes] = useState({});
   const [showJoinMeetingDialog, setShowJoinMeetingDialog] = useState(false);
   const [meetingToJoin, setMeetingToJoin] = useState(null);
+
   useEffect(() => {
     loadData();
   }, [cohortId, organizationId]);
 
-  // Generate unique meeting room for each mentor
   const generateMentorRoomLink = (mentorId) => {
     const roomName = `Mentor-${mentorId}`;
     return `${window.location.origin}/join/${roomName}`;
   };
+
   const copyMeetingLink = (mentorId) => {
     const link = generateMentorRoomLink(mentorId);
     navigator.clipboard.writeText(link);
     toast.success("Meeting link copied to clipboard!");
   };
+
   const loadData = async () => {
     try {
       setLoading(true);
 
-      // Load mentors for organization
       const mentorsRes = await fetch(
         `${API_BASE}/organizations/${organizationId}/mentors`,
         defaultOptions,
@@ -87,8 +88,8 @@ export default function MentorAssignmentManager({
       const mentorList = mentorsInner.mentors || [];
       setMentors(mentorList);
 
-      // Load founders in cohort - FIXED URL
-      const foundersRes = await fetch(`${API_BASE}/cohorts/${cohortId}/members`,
+      const foundersRes = await fetch(
+        `${API_BASE}/cohorts/${cohortId}/members`,
         defaultOptions,
       );
       const foundersRaw = unwrapData(await foundersRes.json());
@@ -96,28 +97,26 @@ export default function MentorAssignmentManager({
         ? foundersRaw
         : foundersRaw.members || [];
 
-      // Transform members data to founders format
-      const transformedFounders = memberRows.map(
-        (member) => ({
-          id: member.founderId,
-          name: member.founderName || member.name,
-          email: member.founderEmail || member.email,
-          startupName: member.startupName || "Unknown Startup",
-          startupStage: member.currentStage || "ideation",
-        }),
-      );
+      const transformedFounders = memberRows.map((member) => ({
+        id: member.founderId,
+        name: member.founderName || member.name,
+        email: member.founderEmail || member.email,
+        startupName: member.startupName || "Unknown Startup",
+        startupStage: member.currentStage || "ideation",
+      }));
       setFounders(transformedFounders);
 
-      // Load assignments for each mentor
       const assignmentsMap = {};
       for (const mentor of mentorList) {
         const mid = mentor.id || mentor._id;
         const assignRes = await fetch(
           `${API_BASE}/mentors/${mid}/assigned-founders`,
-          { headers: { ...auth } },
+          defaultOptions,
         );
         const assignInner = unwrapData(await assignRes.json());
-        const ids = assignInner.founderIds || (assignInner.founders || []).map((f) => f.id);
+        const ids =
+          assignInner.founderIds ||
+          (assignInner.founders || []).map((f) => f.id);
         assignmentsMap[mid] = ids || [];
       }
       setAssignments(assignmentsMap);
@@ -128,43 +127,37 @@ export default function MentorAssignmentManager({
       setLoading(false);
     }
   };
+
   const handleAssignFounder = async (mentorId, founderId) => {
     try {
       setAssigning(true);
-      console.log(
-        `📌 [Frontend] Assigning founder ${founderId} to mentor ${mentorId}`,
-      );
       const response = await fetch(
         `${API_BASE}/mentors/${mentorId}/assign-founder`,
         {
           ...defaultOptions,
           method: "POST",
-          body: JSON.stringify({
-            founderId,
-            cohortId,
-          }),
+          body: JSON.stringify({ founderId, cohortId }),
         },
       );
       const data = await response.json();
-      console.log("📋 [Frontend] Assignment response:", data);
       if (!response.ok) {
-        throw new Error(data.message || data.error || "Failed to assign founder");
+        throw new Error(
+          data.message || data.error || "Failed to assign founder",
+        );
       }
-
-      // Update local state
       setAssignments((prev) => ({
         ...prev,
         [mentorId]: [...(prev[mentorId] || []), founderId],
       }));
-      console.log("✅ [Frontend] Assignment successful, state updated");
       toast.success("Founder assigned successfully!");
     } catch (error) {
-      console.error("❌ [Frontend] Error assigning founder:", error);
+      console.error("Error assigning founder:", error);
       toast.error(`Failed to assign founder: ${error.message}`);
     } finally {
       setAssigning(false);
     }
   };
+
   const handleUnassignFounder = async (mentorId, founderId) => {
     try {
       setAssigning(true);
@@ -176,8 +169,6 @@ export default function MentorAssignmentManager({
         },
       );
       if (!response.ok) throw new Error("Failed to unassign founder");
-
-      // Update local state
       setAssignments((prev) => ({
         ...prev,
         [mentorId]: (prev[mentorId] || []).filter((id) => id !== founderId),
@@ -190,9 +181,10 @@ export default function MentorAssignmentManager({
       setAssigning(false);
     }
   };
-  const isAssigned = (mentorId, founderId) => {
-    return assignments[mentorId]?.includes(founderId) || false;
-  };
+
+  const isAssigned = (mentorId, founderId) =>
+    assignments[mentorId]?.includes(founderId) || false;
+
   const filteredFounders = founders.filter(
     (f) =>
       f.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -200,16 +192,14 @@ export default function MentorAssignmentManager({
       f.startupName?.toLowerCase().includes(searchQuery.toLowerCase()),
   );
 
-  // Sort mentors: active first, then invited
   const sortedMentors = [...mentors].sort((a, b) => {
     if (a.status === "active" && b.status !== "active") return -1;
     if (a.status !== "active" && b.status === "active") return 1;
     return 0;
   });
-
-  // Group mentors by status
   const activeMentors = sortedMentors.filter((m) => m.status === "active");
   const invitedMentors = sortedMentors.filter((m) => m.status !== "active");
+
   const handleInviteMentor = async () => {
     try {
       setInviting(true);
@@ -218,21 +208,17 @@ export default function MentorAssignmentManager({
         {
           ...defaultOptions,
           method: "POST",
-          body: JSON.stringify({
-            email: inviteEmail,
-            name: inviteName,
-          }),
+          body: JSON.stringify({ email: inviteEmail, name: inviteName }),
         },
       );
       const payload = await response.json();
-      console.log("📋 [Frontend] Invite response:", payload);
       if (!response.ok) {
-        throw new Error(payload.message || payload.error || "Failed to invite mentor");
+        throw new Error(
+          payload.message || payload.error || "Failed to invite mentor",
+        );
       }
       const inner = unwrapData(payload);
       const m = inner.mentor || inner;
-
-      // Update local state
       setMentors((prev) => [
         ...prev,
         {
@@ -243,286 +229,304 @@ export default function MentorAssignmentManager({
           status: "pending",
         },
       ]);
-      console.log("✅ [Frontend] Invite successful, state updated");
       toast.success("Mentor invited successfully!");
     } catch (error) {
-      console.error("❌ [Frontend] Error inviting mentor:", error);
+      console.error("Error inviting mentor:", error);
       toast.error(`Failed to invite mentor: ${error.message}`);
     } finally {
       setInviting(false);
       setShowInviteForm(false);
+      setInviteName("");
+      setInviteEmail("");
     }
   };
+
   if (loading) {
     return (
-      <Card>
-        <CardContent className="p-8 text-center">
-          <div className="animate-pulse text-[10px]">
+      <SectionCard>
+        <SectionCard.Body className="p-8 text-center">
+          <div className="animate-pulse font-body text-[13px] text-text-muted">
             Loading assignments...
           </div>
-        </CardContent>
-      </Card>
+        </SectionCard.Body>
+      </SectionCard>
     );
   }
+
   if (mentors.length === 0) {
     return (
-      <Card>
-        <CardContent className="p-8 text-center">
-          <Users className="w-12 h-12 text-muted-foreground mx-auto mb-2" />
-          <p className="text-[10px] text-muted-foreground">
-            No mentors available. Invite mentors first.
-          </p>
-          {isAdmin && (
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => setShowInviteForm(true)}
-              className="mt-2"
-            >
-              Invite Mentor
-            </Button>
-          )}
-        </CardContent>
-      </Card>
-    );
-  }
-  return (
-    <div className="space-y-4">
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-sm flex items-center gap-2">
-            <Users className="w-4 h-4" />
-            Mentor Assignment
-          </CardTitle>
-          <CardDescription className="text-xs">
-            Assign founders to mentors individually or organize into
-            collaborative groups
-          </CardDescription>
-        </CardHeader>
-      </Card>
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <Card>
-          <CardHeader className="pb-3">
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-xs">Select a Mentor</CardTitle>
-              {isAdmin && (
+      <SectionCard>
+        <SectionCard.Body className="p-0">
+          <EmptyStateBlock
+            variant="centered"
+            icon={Users}
+            tone="info"
+            title="No mentors available"
+            description="Invite mentors first to start assigning founders"
+            action={
+              isAdmin ? (
                 <Button
                   size="sm"
-                  variant="outline"
-                  onClick={() => setShowInviteForm(!showInviteForm)}
-                  className="h-7 text-[9px] gap-1"
+                  onClick={() => setShowInviteForm(true)}
+                  className={PRIMARY_BUTTON}
                 >
-                  <Mail className="w-3 h-3" />
+                  <UserPlus className="mr-2 h-4 w-4" />
                   Invite Mentor
                 </Button>
-              )}
-            </div>
-          </CardHeader>
-          <CardContent className="space-y-2">
+              ) : null
+            }
+          />
+        </SectionCard.Body>
+      </SectionCard>
+    );
+  }
+
+  return (
+    <div className="space-y-4 font-body">
+      <SectionHeader
+        icon={Users}
+        title="Mentor Assignment"
+        description="Assign founders to mentors individually or organize into collaborative groups"
+      />
+
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+        <SectionCard>
+          <SectionCard.Header
+            title="Select a Mentor"
+            description="Choose a mentor to manage their group"
+            action={
+              isAdmin ? (
+                <Button
+                  size="sm"
+                  onClick={() => setShowInviteForm(!showInviteForm)}
+                  className={OUTLINE_BUTTON}
+                >
+                  <Mail className="mr-2 h-4 w-4" />
+                  Invite Mentor
+                </Button>
+              ) : null
+            }
+          />
+          <SectionCard.Body className="space-y-2">
             {showInviteForm && (
-              <div className="p-3 rounded-lg border bg-muted/50 space-y-2 mb-2">
-                <p className="text-[9px] font-medium">Invite New Mentor</p>
+              <div className="space-y-2 rounded-input bg-surface-page p-3">
+                <p className="font-heading text-[13px] font-semibold text-text-heading">
+                  Invite New Mentor
+                </p>
                 <Input
                   value={inviteName}
                   onChange={(e) => setInviteName(e.target.value)}
                   placeholder="Mentor Name"
-                  className="h-7 text-[10px]"
+                  className="font-body text-[13px]"
                 />
                 <Input
                   value={inviteEmail}
                   onChange={(e) => setInviteEmail(e.target.value)}
                   placeholder="Mentor Email"
-                  className="h-7 text-[10px]"
+                  className="font-body text-[13px]"
                 />
                 <div className="flex gap-2">
                   <Button
                     size="sm"
                     onClick={handleInviteMentor}
                     disabled={inviting || !inviteName || !inviteEmail}
-                    className="h-7 text-[9px] flex-1"
+                    className={`flex-1 ${PRIMARY_BUTTON}`}
                   >
                     {inviting ? "Inviting..." : "Send Invite"}
                   </Button>
                   <Button
                     size="sm"
-                    variant="outline"
                     onClick={() => {
                       setShowInviteForm(false);
                       setInviteName("");
                       setInviteEmail("");
                     }}
-                    className="h-7 text-[9px]"
+                    className={OUTLINE_BUTTON}
                   >
                     Cancel
                   </Button>
                 </div>
               </div>
             )}
+
             {activeMentors.length > 0 && (
               <>
                 <div className="flex items-center gap-2 px-1 py-1">
-                  <div className="w-2 h-2 rounded-full bg-green-500" />
-                  <p className="text-[8px] font-semibold text-muted-foreground uppercase tracking-wide">
+                  <span className="inline-block h-2 w-2 rounded-full bg-[#00c896]" />
+                  <p className="font-body text-[12px] font-semibold uppercase tracking-wide text-text-muted">
                     Active ({activeMentors.length})
                   </p>
                 </div>
-                {activeMentors.map((mentor) => (
-                  <div
-                    key={mentor.id}
-                    onClick={() => setSelectedMentor(mentor.id)}
-                    className={`p-3 rounded-lg border cursor-pointer transition-all ${selectedMentor === mentor.id ? "bg-primary/5 border-primary" : "hover:bg-muted border-border"}`}
-                  >
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1 min-w-0">
-                        <h3 className="text-[11px] font-semibold truncate">
-                          {mentor.name}
-                        </h3>
-                        <p className="text-[9px] text-muted-foreground truncate">
-                          {mentor.email}
+                {activeMentors.map((mentor) => {
+                  const selected = selectedMentor === mentor.id;
+                  return (
+                    <button
+                      type="button"
+                      key={mentor.id}
+                      onClick={() => setSelectedMentor(mentor.id)}
+                      className={cn(
+                        "w-full rounded-card border bg-white p-3 text-left transition-all",
+                        selected
+                          ? "border-primary shadow-[0_0_0_3px_rgba(58,90,254,0.10)]"
+                          : "border-surface-border hover:border-primary/40 hover:shadow-soft",
+                      )}
+                    >
+                      <h3 className="truncate font-heading text-[14px] font-semibold text-text-heading">
+                        {mentor.name}
+                      </h3>
+                      <p className="truncate font-body text-[12px] text-text-muted">
+                        {mentor.email}
+                      </p>
+                      {mentor.expertise && (
+                        <p className="mt-1 font-body text-[12px] text-text-muted">
+                          {mentor.expertise}
                         </p>
-                        {mentor.expertise && (
-                          <p className="text-[8px] text-muted-foreground mt-1">
-                            {mentor.expertise}
-                          </p>
-                        )}
-                        <div className="flex items-center gap-1 mt-1.5">
-                          <UsersRound className="w-2.5 h-2.5 text-primary" />
-                          <span className="text-[8px] font-medium text-primary">
-                            {assignments[mentor.id]?.length || 0}
-                            {" founders in group"}
-                          </span>
-                        </div>
+                      )}
+                      <div className="mt-1.5 flex items-center gap-1">
+                        <UsersRound className="h-3 w-3 text-primary" />
+                        <span className="font-body text-[12px] font-medium text-primary">
+                          {assignments[mentor.id]?.length || 0} founders in group
+                        </span>
                       </div>
-                    </div>
-                  </div>
-                ))}
+                    </button>
+                  );
+                })}
               </>
             )}
+
             {invitedMentors.length > 0 && (
               <>
-                <div className="flex items-center gap-2 px-1 py-1 mt-3">
-                  <div className="w-2 h-2 rounded-full bg-yellow-500" />
-                  <p className="text-[8px] font-semibold text-muted-foreground uppercase tracking-wide">
+                <div className="mt-3 flex items-center gap-2 px-1 py-1">
+                  <span className="inline-block h-2 w-2 rounded-full bg-[#ffb300]" />
+                  <p className="font-body text-[12px] font-semibold uppercase tracking-wide text-text-muted">
                     Pending Invite ({invitedMentors.length})
                   </p>
                 </div>
-                {invitedMentors.map((mentor) => (
-                  <div
-                    key={mentor.id}
-                    onClick={() => setSelectedMentor(mentor.id)}
-                    className={`p-3 rounded-lg border cursor-pointer transition-all opacity-60 ${selectedMentor === mentor.id ? "bg-primary/5 border-primary opacity-100" : "hover:bg-muted border-dashed border-border hover:opacity-80"}`}
-                  >
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
-                          <h3 className="text-[11px] font-semibold truncate">
-                            {mentor.name}
-                          </h3>
-                          <Badge
-                            variant="secondary"
-                            className="text-[7px] bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200"
-                          >
-                            Invited
-                          </Badge>
-                        </div>
-                        <p className="text-[9px] text-muted-foreground truncate">
-                          {mentor.email}
-                        </p>
-                        {mentor.expertise && (
-                          <p className="text-[8px] text-muted-foreground mt-1">
-                            {mentor.expertise}
+                {invitedMentors.map((mentor) => {
+                  const selected = selectedMentor === mentor.id;
+                  return (
+                    <button
+                      type="button"
+                      key={mentor.id}
+                      onClick={() => setSelectedMentor(mentor.id)}
+                      className={cn(
+                        "w-full rounded-card border border-dashed bg-white p-3 text-left transition-all",
+                        selected
+                          ? "border-primary opacity-100 shadow-[0_0_0_3px_rgba(58,90,254,0.10)]"
+                          : "border-surface-border opacity-70 hover:border-primary/40 hover:opacity-100",
+                      )}
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-2">
+                            <h3 className="truncate font-heading text-[14px] font-semibold text-text-heading">
+                              {mentor.name}
+                            </h3>
+                            <StatusBadge status="invited" />
+                          </div>
+                          <p className="truncate font-body text-[12px] text-text-muted">
+                            {mentor.email}
                           </p>
-                        )}
+                          {mentor.expertise && (
+                            <p className="mt-1 font-body text-[12px] text-text-muted">
+                              {mentor.expertise}
+                            </p>
+                          )}
+                        </div>
+                        <StatusBadge
+                          tone="info"
+                          label={`${assignments[mentor.id]?.length || 0} assigned`}
+                        />
                       </div>
-                      <Badge variant="outline" className="text-[7px] ml-2">
-                        {assignments[mentor.id]?.length || 0}
-                        {" assigned"}
-                      </Badge>
-                    </div>
-                  </div>
-                ))}
+                    </button>
+                  );
+                })}
               </>
             )}
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-3">
-            {selectedMentor ? (
-              <>
-                <div className="flex items-center justify-between">
-                  <CardTitle className="text-xs flex items-center gap-2">
-                    <UsersRound className="w-3.5 h-3.5 text-primary" />
-                    {mentors.find((m) => m.id === selectedMentor)?.name}'s Group
-                  </CardTitle>
-                  <Badge variant="secondary" className="text-[8px]">
-                    {assignments[selectedMentor]?.length || 0}
-                    {" members"}
-                  </Badge>
-                </div>
-                <CardDescription className="text-[9px] mt-1">
-                  Manage group membership by adding or removing founders
-                </CardDescription>
-                <div className="relative mt-2">
-                  <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-muted-foreground" />
-                  <Input
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    placeholder="Search founders..."
-                    className="pl-7 h-7 text-[10px]"
-                  />
-                </div>
-              </>
-            ) : (
-              <CardTitle className="text-xs">
-                Select a mentor to manage their group
-              </CardTitle>
+          </SectionCard.Body>
+        </SectionCard>
+
+        <SectionCard>
+          {selectedMentor ? (
+            <SectionCard.Header
+              title={
+                <span className="inline-flex items-center gap-2">
+                  <UsersRound className="h-4 w-4 text-primary" />
+                  {mentors.find((m) => m.id === selectedMentor)?.name}'s Group
+                </span>
+              }
+              description="Manage group membership by adding or removing founders"
+              action={
+                <StatusBadge
+                  tone="info"
+                  label={`${assignments[selectedMentor]?.length || 0} members`}
+                />
+              }
+            />
+          ) : (
+            <SectionCard.Header
+              title="Select a mentor"
+              description="Pick a mentor from the list to manage their group"
+            />
+          )}
+          <SectionCard.Body className="max-h-[500px] space-y-2 overflow-y-auto">
+            {selectedMentor && (
+              <div className="relative mb-2">
+                <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-text-muted" />
+                <Input
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Search founders..."
+                  className="pl-8 font-body text-[13px]"
+                />
+              </div>
             )}
-          </CardHeader>
-          <CardContent className="space-y-2 max-h-[500px] overflow-y-auto">
+
             {!selectedMentor ? (
-              <div className="text-center py-8">
-                <UsersRound className="w-12 h-12 text-muted-foreground mx-auto mb-2" />
-                <p className="text-[10px] text-muted-foreground">
-                  Select a mentor from the left to view and manage their
-                  mentorship group
-                </p>
-              </div>
+              <EmptyStateBlock
+                variant="centered"
+                icon={UsersRound}
+                tone="info"
+                title="No mentor selected"
+                description="Select a mentor from the left to view and manage their mentorship group"
+              />
             ) : filteredFounders.length === 0 ? (
-              <div className="text-center py-8">
-                <p className="text-[10px] text-muted-foreground">
-                  No founders found
-                </p>
-              </div>
+              <EmptyStateBlock
+                variant="compact"
+                icon={Search}
+                tone="info"
+                title="No founders found"
+                description="Try a different search term"
+              />
             ) : (
               <>
-                <div className="p-3 rounded-lg bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-950/20 dark:to-purple-950/20 border border-blue-200 dark:border-blue-800 mb-3">
+                <div className="rounded-input border border-primary/20 bg-primary-tint p-3">
                   <div className="flex items-start gap-2">
-                    <Video className="w-4 h-4 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" />
-                    <div className="flex-1 min-w-0">
-                      <p className="text-[9px] font-semibold text-blue-900 dark:text-blue-100 mb-1">
+                    <Video className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+                    <div className="min-w-0 flex-1">
+                      <p className="mb-1 font-heading text-[13px] font-semibold text-primary">
                         Unique Meeting Room
                       </p>
-                      <p className="text-[8px] text-blue-700 dark:text-blue-300 mb-2">
+                      <p className="mb-2 font-body text-[12px] text-text-body">
                         {assignments[selectedMentor]?.length === 1
                           ? "This is a 1-on-1 mentorship session link"
                           : `All ${assignments[selectedMentor]?.length || 0} founders join the same meeting room`}
                       </p>
                       <div className="flex items-center gap-2">
-                        <div className="flex-1 min-w-0 bg-white dark:bg-gray-900 rounded px-2 py-1.5 border border-blue-200 dark:border-blue-700">
-                          <p className="text-[9px] font-mono text-blue-900 dark:text-blue-100 truncate">
+                        <div className="min-w-0 flex-1 rounded-input border border-primary/20 bg-white px-2 py-1.5">
+                          <p className="truncate font-mono text-[12px] text-primary">
                             {generateMentorRoomLink(selectedMentor)}
                           </p>
                         </div>
                         <Button
                           size="sm"
-                          variant="outline"
                           onClick={(e) => {
                             e.stopPropagation();
                             copyMeetingLink(selectedMentor);
                           }}
-                          className="h-7 text-[9px] gap-1 bg-white dark:bg-gray-900 hover:bg-blue-50 dark:hover:bg-blue-950/50 border-blue-200 dark:border-blue-700"
+                          className={OUTLINE_BUTTON}
                         >
-                          <Copy className="w-3 h-3" />
+                          <Copy className="mr-1 h-3.5 w-3.5" />
                           Copy
                         </Button>
                         <Button
@@ -537,56 +541,61 @@ export default function MentorAssignmentManager({
                             });
                             setShowJoinMeetingDialog(true);
                           }}
-                          className="h-7 text-[9px] gap-1"
+                          className={PRIMARY_BUTTON}
                         >
-                          <ExternalLink className="w-3 h-3" />
+                          <ExternalLink className="mr-1 h-3.5 w-3.5" />
                           Join
                         </Button>
                       </div>
                     </div>
                   </div>
                 </div>
+
                 {assignments[selectedMentor]?.length > 0 && (
-                  <div className="mb-3 pb-3 border-b">
-                    <p className="text-[8px] font-semibold text-muted-foreground uppercase tracking-wide mb-2">
-                      Current Group Members (
-                      {assignments[selectedMentor].length})
+                  <div className="border-b border-surface-border pb-2">
+                    <p className="font-body text-[12px] font-semibold uppercase tracking-wide text-text-muted">
+                      Current Group Members ({assignments[selectedMentor].length})
                     </p>
                   </div>
                 )}
+
                 {filteredFounders.map((founder) => {
                   const assigned = isAssigned(selectedMentor, founder.id);
                   return (
                     <div
                       key={founder.id}
-                      className={`p-3 rounded-lg border hover:shadow-sm transition-all ${assigned ? "bg-primary/5 border-primary" : ""}`}
+                      className={cn(
+                        "rounded-input border bg-white p-3 transition-all",
+                        assigned
+                          ? "border-primary bg-primary-tint/40"
+                          : "border-surface-border hover:shadow-soft",
+                      )}
                     >
                       <div className="flex items-start justify-between gap-2">
-                        <div className="flex items-start gap-2 flex-1 min-w-0">
-                          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-purple-500 flex items-center justify-center text-white text-[10px] font-bold flex-shrink-0">
+                        <div className="flex min-w-0 flex-1 items-start gap-2">
+                          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[linear-gradient(135deg,#3a5afe_0%,#7c4dff_100%)] font-heading text-[13px] font-bold text-white">
                             {founder.name.charAt(0).toUpperCase()}
                           </div>
-                          <div className="flex-1 min-w-0">
+                          <div className="min-w-0 flex-1">
                             <div className="flex items-center gap-1.5">
-                              <h4 className="text-[10px] font-semibold truncate">
+                              <h4 className="truncate font-heading text-[14px] font-semibold text-text-heading">
                                 {founder.name}
                               </h4>
                               {assigned && (
-                                <Badge
-                                  variant="outline"
-                                  className="text-[7px] bg-green-50 text-green-700 border-green-200 dark:bg-green-900/20 dark:text-green-400 dark:border-green-800"
-                                >
-                                  In Group
-                                </Badge>
+                                <StatusBadge
+                                  tone="success"
+                                  label="In Group"
+                                  icon={Check}
+                                />
                               )}
                             </div>
-                            <p className="text-[9px] text-muted-foreground truncate">
+                            <p className="truncate font-body text-[12px] text-text-muted">
                               {founder.email}
                             </p>
                             {founder.startupName && (
-                              <div className="flex items-center gap-1 mt-1">
-                                <Rocket className="w-2 h-2 text-muted-foreground" />
-                                <p className="text-[8px] text-muted-foreground truncate">
+                              <div className="mt-1 flex items-center gap-1">
+                                <Rocket className="h-3 w-3 text-text-muted" />
+                                <p className="truncate font-body text-[12px] text-text-muted">
                                   {founder.startupName}
                                 </p>
                               </div>
@@ -595,7 +604,6 @@ export default function MentorAssignmentManager({
                         </div>
                         <Button
                           size="sm"
-                          variant={assigned ? "outline" : "default"}
                           onClick={() =>
                             assigned
                               ? handleUnassignFounder(
@@ -605,16 +613,21 @@ export default function MentorAssignmentManager({
                               : handleAssignFounder(selectedMentor, founder.id)
                           }
                           disabled={assigning}
-                          className={`h-7 text-[9px] gap-1 flex-shrink-0 ${assigned ? "text-destructive hover:bg-destructive hover:text-white" : ""}`}
+                          className={cn(
+                            "shrink-0",
+                            assigned
+                              ? "h-9 rounded-input border border-surface-border bg-white font-body text-[13px] font-medium text-[#ff4f6b] hover:bg-[#fff1f2]"
+                              : PRIMARY_BUTTON,
+                          )}
                         >
                           {assigned ? (
                             <>
-                              <UserMinus className="w-3 h-3" />
+                              <UserMinus className="mr-1 h-3.5 w-3.5" />
                               <span className="hidden sm:inline">Remove</span>
                             </>
                           ) : (
                             <>
-                              <UserPlus className="w-3 h-3" />
+                              <UserPlus className="mr-1 h-3.5 w-3.5" />
                               <span className="hidden sm:inline">Add</span>
                             </>
                           )}
@@ -625,49 +638,50 @@ export default function MentorAssignmentManager({
                 })}
               </>
             )}
-          </CardContent>
-        </Card>
+          </SectionCard.Body>
+        </SectionCard>
       </div>
+
       <Dialog
         open={showJoinMeetingDialog}
         onOpenChange={setShowJoinMeetingDialog}
       >
         <DialogContent className="sm:max-w-[500px] p-8">
-          <div className="flex flex-col items-center text-center space-y-6">
-            <div className="w-20 h-20 rounded-full bg-[#3A5AFE]/10 dark:bg-[#3A5AFE]/20 flex items-center justify-center">
-              <Video className="w-10 h-10 text-[#3A5AFE]" />
+          <div className="flex flex-col items-center space-y-6 text-center">
+            <div className="flex h-20 w-20 items-center justify-center rounded-full bg-primary/10 dark:bg-primary/20">
+              <Video className="h-10 w-10 text-primary" />
             </div>
             <div>
-              <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
+              <h2 className="mb-2 font-heading text-[22px] font-bold text-text-heading">
                 Mentorship Session
               </h2>
-              <p className="text-gray-600 dark:text-gray-400">
+              <p className="font-body text-[14px] text-text-body">
                 You're about to join this meeting
               </p>
             </div>
             <div className="w-full space-y-3">
               <div className="flex items-center gap-3 text-left">
-                <div className="w-5 h-5 rounded-full bg-[#2ECC71] flex items-center justify-center flex-shrink-0">
-                  <Check className="w-3 h-3 text-white" />
+                <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[#00c896]">
+                  <Check className="h-3 w-3 text-white" />
                 </div>
-                <span className="text-gray-900 dark:text-white">
+                <span className="font-body text-[14px] text-text-heading">
                   Camera and microphone ready
                 </span>
               </div>
               <div className="flex items-center gap-3 text-left">
-                <div className="w-5 h-5 rounded-full bg-[#2ECC71] flex items-center justify-center flex-shrink-0">
-                  <Check className="w-3 h-3 text-white" />
+                <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[#00c896]">
+                  <Check className="h-3 w-3 text-white" />
                 </div>
-                <span className="text-gray-900 dark:text-white">
-                  {"Joining as: "}
+                <span className="font-body text-[14px] text-text-heading">
+                  Joining as:{" "}
                   <strong>{meetingToJoin?.mentorName || "Mentor"}</strong>
                 </span>
               </div>
               <div className="flex items-center gap-3 text-left">
-                <div className="w-5 h-5 rounded-full bg-[#2ECC71] flex items-center justify-center flex-shrink-0">
-                  <Check className="w-3 h-3 text-white" />
+                <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[#00c896]">
+                  <Check className="h-3 w-3 text-white" />
                 </div>
-                <span className="text-gray-900 dark:text-white">
+                <span className="font-body text-[14px] text-text-heading">
                   High-quality video enabled
                 </span>
               </div>
@@ -680,12 +694,12 @@ export default function MentorAssignmentManager({
                 );
                 setShowJoinMeetingDialog(false);
               }}
-              className="w-full h-12 text-base bg-[#3A5AFE] hover:bg-[#3A5AFE]/90 gap-2"
+              className="h-12 w-full gap-2 rounded-input bg-primary font-body text-[15px] font-semibold text-white shadow-[0_4px_16px_rgba(58,90,254,0.25)] hover:bg-primary-hover"
             >
-              <Video className="w-5 h-5" />
+              <Video className="h-5 w-5" />
               Join Meeting Now
             </Button>
-            <p className="text-xs text-gray-500 dark:text-gray-400">
+            <p className="font-body text-[12px] text-text-muted">
               By joining, you agree to allow StartupVerse to use your camera and
               microphone
             </p>

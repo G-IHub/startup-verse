@@ -4,23 +4,29 @@
 import React, { useState, useEffect } from "react";
 import { API_BASE_URL } from "../../config/apiBase.js";
 import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "../ui/card";
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "../ui/dialog";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { Textarea } from "../ui/textarea";
-import { Badge } from "../ui/badge";
+import { Checkbox } from "../ui/checkbox";
+import {
+  Select,
+  SelectTrigger,
+  SelectValue,
+  SelectContent,
+  SelectItem,
+} from "../ui/select";
 import {
   Plus,
   Calendar as CalendarIcon,
   Clock,
   MapPin,
   Video,
-  XCircle,
   FileText,
   Target,
 } from "lucide-react";
@@ -29,16 +35,73 @@ import { toast } from "sonner";
 import MiniCalendar from "../calendar/MiniCalendar";
 import { getOrganizationCalendarEvents } from "../../utils/calendarIntegration";
 import { unwrapData } from "../../utils/apiEnvelope";
+import {
+  SectionCard,
+  SectionHeader,
+  CollapsibleFormCard,
+  EmptyStateBlock,
+} from "./_primitives";
+import { cn } from "../ui/utils";
 
 const API_BASE = API_BASE_URL;
 
-// Default fetch options for cookie-based auth
 const defaultOptions = {
   credentials: "include",
-  headers: {
-    "Content-Type": "application/json",
+  headers: { "Content-Type": "application/json" },
+};
+
+const EVENT_TYPE_OPTIONS = [
+  { value: "workshop", label: "Workshop" },
+  { value: "demo-day", label: "Demo Day" },
+  { value: "office-hours", label: "Office Hours" },
+  { value: "networking", label: "Networking" },
+  { value: "other", label: "Other" },
+];
+
+const AGENDA_TYPE_TONE = {
+  event: {
+    badge: "bg-[#e8ebff] text-[#3a5afe]",
+    disc: "bg-[#e8ebff] text-[#3a5afe]",
+    icon: CalendarIcon,
+  },
+  deliverable: {
+    badge: "bg-[#fef3c7] text-[#ffb300]",
+    disc: "bg-[#fef3c7] text-[#ffb300]",
+    icon: FileText,
+  },
+  milestone: {
+    badge: "bg-[#f3e8ff] text-[#7c4dff]",
+    disc: "bg-[#f3e8ff] text-[#7c4dff]",
+    icon: Target,
+  },
+  other: {
+    badge: "bg-surface-page text-text-muted",
+    disc: "bg-surface-page text-text-muted",
+    icon: CalendarIcon,
   },
 };
+
+const PRIMARY_BUTTON =
+  "h-9 rounded-input bg-primary font-body text-[13px] font-semibold text-white shadow-[0_4px_16px_rgba(58,90,254,0.25)] hover:bg-primary-hover";
+const OUTLINE_BUTTON =
+  "h-9 rounded-input border border-surface-border bg-white font-body text-[13px] font-medium text-text-body hover:bg-primary-tint hover:text-primary";
+
+function FilterPill({ active, onClick, children }) {
+  return (
+    <Button
+      size="sm"
+      onClick={onClick}
+      className={cn(
+        "h-8 rounded-input px-3 font-body text-[12px] font-medium transition-colors",
+        active
+          ? "bg-primary text-white shadow-[0_4px_16px_rgba(58,90,254,0.25)] hover:bg-primary-hover"
+          : "border border-surface-border bg-white text-text-body hover:bg-primary-tint hover:text-primary",
+      )}
+    >
+      {children}
+    </Button>
+  );
+}
 
 export default function EventManager({
   cohortId,
@@ -63,19 +126,21 @@ export default function EventManager({
     meetingUrl: "",
     capacity: "",
   });
+
   useEffect(() => {
     loadEvents();
     loadAllCalendarItems();
   }, [cohortId, organizationId]);
+
   const loadAllCalendarItems = async () => {
     try {
       const items = await getOrganizationCalendarEvents(organizationId);
       setAllCalendarItems(items);
-      console.log("📅 Loaded all calendar items:", items.length);
     } catch (error) {
       console.error("Error loading calendar items:", error);
     }
   };
+
   const loadEvents = async () => {
     try {
       setLoading(true);
@@ -92,14 +157,13 @@ export default function EventManager({
       setLoading(false);
     }
   };
+
   const handleCreateEvent = async (e) => {
     e.preventDefault();
     try {
-      // Auto-generate Jitsi meeting link for virtual events
       let meetingUrl = formData.meetingUrl;
-      let eventId = `event-${cohortId.slice(0, 8)}-${Date.now()}`;
+      const eventId = `event-${cohortId.slice(0, 8)}-${Date.now()}`;
       if (formData.isVirtual && !meetingUrl) {
-        // Generate Jitsi meeting room
         meetingUrl = `${window.location.origin}/join/Event-${eventId}`;
       }
       const response = await fetch(`${API_BASE}/cohorts/${cohortId}/events`, {
@@ -123,7 +187,6 @@ export default function EventManager({
       const created = unwrapData(await response.json());
       const event = created.event;
 
-      // Send notifications to all cohort members
       await notifyEventCreated(cohortId, organizationId, {
         id: event?.id || event?._id,
         title: formData.title,
@@ -134,7 +197,6 @@ export default function EventManager({
         createdBy: userId,
       });
 
-      // Reset form and reload
       setFormData({
         title: "",
         description: "",
@@ -154,486 +216,399 @@ export default function EventManager({
       alert("Failed to create event");
     }
   };
-  const getEventTypeColor = (type) => {
-    switch (type) {
-      case "demo-day":
-        return "bg-purple-500/10 text-purple-700 dark:text-purple-400 border-purple-500/20";
-      case "workshop":
-        return "bg-blue-500/10 text-blue-700 dark:text-blue-400 border-blue-500/20";
-      case "office-hours":
-        return "bg-green-500/10 text-green-700 dark:text-green-400 border-green-500/20";
-      case "networking":
-        return "bg-orange-500/10 text-orange-700 dark:text-orange-400 border-orange-500/20";
-      default:
-        return "bg-gray-500/10 text-gray-700 dark:text-gray-400 border-gray-500/20";
-    }
-  };
-  const isUpcoming = (startTime) => {
-    return new Date(startTime) > new Date();
-  };
-  const sortedEvents = [...events].sort(
-    (a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime(),
-  );
-  const upcomingEvents = sortedEvents.filter((e) => isUpcoming(e.startTime));
-  const pastEvents = sortedEvents.filter((e) => !isUpcoming(e.startTime));
+
+  const isUpcoming = (startTime) => new Date(startTime) > new Date();
+
+  const upcomingCalendarCount = (type) =>
+    allCalendarItems.filter(
+      (i) =>
+        (type === "all" || i.type === type) &&
+        new Date(i.startDate) > new Date(),
+    ).length;
+
+  const upcomingItems = allCalendarItems
+    .filter((item) => new Date(item.startDate) > new Date())
+    .filter(
+      (item) => agendaFilter === "all" || item.type === agendaFilter,
+    )
+    .sort((a, b) => {
+      if (a.type === "event" && b.type !== "event") return -1;
+      if (a.type !== "event" && b.type === "event") return 1;
+      return (
+        new Date(a.startDate).getTime() - new Date(b.startDate).getTime()
+      );
+    })
+    .slice(0, 10);
+
+  const agendaTone = selectedAgenda
+    ? AGENDA_TYPE_TONE[selectedAgenda.type] || AGENDA_TYPE_TONE.other
+    : null;
+  const AgendaIcon = agendaTone?.icon;
+
   return (
-    <div className="space-y-4">
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <div className="flex-1">
-              <CardTitle className="text-sm flex items-center gap-2">
-                <CalendarIcon className="w-4 h-4" />
-                Cohort Agenda
-              </CardTitle>
-              <CardDescription className="text-xs mt-1">
-                Schedule meetings, workshops, and events for your cohort
-              </CardDescription>
+    <div className="space-y-4 font-body">
+      <SectionHeader
+        icon={CalendarIcon}
+        title="Cohort Agenda"
+        description="Schedule meetings, workshops, and events for your cohort"
+      />
+
+      {isAdmin && (
+        <CollapsibleFormCard
+          title="Schedule Meeting"
+          description="Create a new event for the cohort"
+          triggerLabel="Schedule Meeting"
+          isOpen={showCreateForm}
+          onToggle={setShowCreateForm}
+        >
+          <form onSubmit={handleCreateEvent} className="space-y-3">
+            <div>
+              <label className="mb-2 block font-body text-[13px] font-medium text-text-heading">
+                Event Title
+              </label>
+              <Input
+                value={formData.title}
+                onChange={(e) =>
+                  setFormData({ ...formData, title: e.target.value })
+                }
+                placeholder="e.g., Demo Day Rehearsal"
+                required={true}
+                className="font-body text-[13px]"
+              />
             </div>
-            {isAdmin && (
-              <Button
-                size="sm"
-                onClick={() => setShowCreateForm(!showCreateForm)}
-                className="gap-2"
-                variant={showCreateForm ? "outline" : "default"}
-              >
-                {showCreateForm ? (
-                  <XCircle className="w-4 h-4" />
-                ) : (
-                  <Plus className="w-4 h-4" />
-                )}
-                {showCreateForm ? "Cancel" : "Schedule Meeting"}
-              </Button>
-            )}
-          </div>
-        </CardHeader>
-        {showCreateForm && (
-          <CardContent className="border-t">
-            <form onSubmit={handleCreateEvent} className="space-y-3 pt-3">
+            <div>
+              <label className="mb-2 block font-body text-[13px] font-medium text-text-heading">
+                Description
+              </label>
+              <Textarea
+                value={formData.description}
+                onChange={(e) =>
+                  setFormData({ ...formData, description: e.target.value })
+                }
+                placeholder="What's this event about?"
+                className="min-h-[60px] font-body text-[13px]"
+              />
+            </div>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <div>
-                <label className="text-[9px] text-muted-foreground">
-                  Event Title
+                <label className="mb-2 block font-body text-[13px] font-medium text-text-heading">
+                  Event Type
+                </label>
+                <Select
+                  value={formData.eventType}
+                  onValueChange={(value) =>
+                    setFormData({ ...formData, eventType: value })
+                  }
+                >
+                  <SelectTrigger className="font-body text-[13px]">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {EVENT_TYPE_OPTIONS.map((option) => (
+                      <SelectItem
+                        key={option.value}
+                        value={option.value}
+                        className="font-body text-[13px]"
+                      >
+                        {option.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <label className="mb-2 block font-body text-[13px] font-medium text-text-heading">
+                  Capacity (optional)
                 </label>
                 <Input
-                  value={formData.title}
+                  type="number"
+                  value={formData.capacity}
                   onChange={(e) =>
-                    setFormData({
-                      ...formData,
-                      title: e.target.value,
-                    })
+                    setFormData({ ...formData, capacity: e.target.value })
                   }
-                  placeholder="e.g., Demo Day Rehearsal"
+                  placeholder="Max attendees"
+                  className="font-body text-[13px]"
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <div>
+                <label className="mb-2 block font-body text-[13px] font-medium text-text-heading">
+                  Start Time
+                </label>
+                <Input
+                  type="datetime-local"
+                  value={formData.startTime}
+                  onChange={(e) =>
+                    setFormData({ ...formData, startTime: e.target.value })
+                  }
                   required={true}
-                  className="h-7 text-[10px]"
+                  className="font-body text-[13px]"
                 />
               </div>
               <div>
-                <label className="text-[9px] text-muted-foreground">
-                  Description
+                <label className="mb-2 block font-body text-[13px] font-medium text-text-heading">
+                  End Time (optional)
                 </label>
-                <Textarea
-                  value={formData.description}
+                <Input
+                  type="datetime-local"
+                  value={formData.endTime}
                   onChange={(e) =>
-                    setFormData({
-                      ...formData,
-                      description: e.target.value,
-                    })
+                    setFormData({ ...formData, endTime: e.target.value })
                   }
-                  placeholder="What's this event about?"
-                  className="text-[10px] min-h-[60px]"
+                  className="font-body text-[13px]"
                 />
               </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="text-[9px] text-muted-foreground">
-                    Event Type
-                  </label>
-                  <select
-                    value={formData.eventType}
-                    onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        eventType: e.target.value,
-                      })
-                    }
-                    className="w-full h-7 text-[10px] rounded-md border border-input bg-background px-2"
-                  >
-                    <option value="workshop">Workshop</option>
-                    <option value="demo-day">Demo Day</option>
-                    <option value="office-hours">Office Hours</option>
-                    <option value="networking">Networking</option>
-                    <option value="other">Other</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="text-[9px] text-muted-foreground">
-                    Capacity (optional)
-                  </label>
-                  <Input
-                    type="number"
-                    value={formData.capacity}
-                    onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        capacity: e.target.value,
-                      })
-                    }
-                    placeholder="Max attendees"
-                    className="h-7 text-[10px]"
-                  />
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="text-[9px] text-muted-foreground">
-                    Start Time
-                  </label>
-                  <Input
-                    type="datetime-local"
-                    value={formData.startTime}
-                    onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        startTime: e.target.value,
-                      })
-                    }
-                    required={true}
-                    className="h-7 text-[10px]"
-                  />
-                </div>
-                <div>
-                  <label className="text-[9px] text-muted-foreground">
-                    End Time (optional)
-                  </label>
-                  <Input
-                    type="datetime-local"
-                    value={formData.endTime}
-                    onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        endTime: e.target.value,
-                      })
-                    }
-                    className="h-7 text-[10px]"
-                  />
-                </div>
-              </div>
-              <div className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  id="isVirtual"
-                  checked={formData.isVirtual}
-                  onChange={(e) =>
-                    setFormData({
-                      ...formData,
-                      isVirtual: e.target.checked,
-                    })
-                  }
-                  className="w-4 h-4"
-                />
-                <label htmlFor="isVirtual" className="text-[10px]">
-                  Virtual Event
+            </div>
+            <div className="flex items-center gap-2">
+              <Checkbox
+                id="isVirtual"
+                checked={formData.isVirtual}
+                onCheckedChange={(checked) =>
+                  setFormData({ ...formData, isVirtual: Boolean(checked) })
+                }
+              />
+              <label
+                htmlFor="isVirtual"
+                className="font-body text-[13px] text-text-heading"
+              >
+                Virtual Event
+              </label>
+            </div>
+            {formData.isVirtual ? (
+              <div>
+                <label className="mb-2 block font-body text-[13px] font-medium text-text-heading">
+                  Meeting URL (optional)
                 </label>
+                <Input
+                  value={formData.meetingUrl}
+                  onChange={(e) =>
+                    setFormData({ ...formData, meetingUrl: e.target.value })
+                  }
+                  placeholder="Leave blank to auto-generate Jitsi link"
+                  type="url"
+                  className="font-body text-[13px]"
+                />
+                <p className="mt-1 font-body text-[12px] text-text-muted">
+                  Tip: A Jitsi video conference link will be auto-generated if
+                  left blank
+                </p>
               </div>
-              {formData.isVirtual ? (
-                <div>
-                  <label className="text-[9px] text-muted-foreground">
-                    Meeting URL (optional)
-                  </label>
-                  <Input
-                    value={formData.meetingUrl}
-                    onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        meetingUrl: e.target.value,
-                      })
-                    }
-                    placeholder="Leave blank to auto-generate Jitsi link"
-                    type="url"
-                    className="h-7 text-[10px]"
-                  />
-                  <p className="text-[8px] text-muted-foreground mt-1">
-                    💡 A Jitsi video conference link will be auto-generated if
-                    left blank
-                  </p>
-                </div>
-              ) : (
-                <div>
-                  <label className="text-[9px] text-muted-foreground">
-                    Location
-                  </label>
-                  <Input
-                    value={formData.location}
-                    onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        location: e.target.value,
-                      })
-                    }
-                    placeholder="e.g., Conference Room A"
-                    className="h-7 text-[10px]"
-                  />
-                </div>
-              )}
-              <Button type="submit" size="sm" className="h-6 text-[9px]">
-                Create Event
-              </Button>
-            </form>
-          </CardContent>
-        )}
-      </Card>
-      {loading ? (
-        <Card>
-          <CardContent className="p-6 text-center">
-            <div className="animate-pulse text-[10px]">Loading events...</div>
-          </CardContent>
-        </Card>
-      ) : events.length === 0 ? (
-        <Card>
-          <CardContent className="p-8 text-center">
-            <CalendarIcon className="w-12 h-12 text-muted-foreground mx-auto mb-2" />
-            <p className="text-[10px] text-muted-foreground">
-              No events scheduled yet
-            </p>
-            {isAdmin && (
-              <p className="text-[9px] text-muted-foreground mt-1">
-                Create events to bring your cohort together
-              </p>
+            ) : (
+              <div>
+                <label className="mb-2 block font-body text-[13px] font-medium text-text-heading">
+                  Location
+                </label>
+                <Input
+                  value={formData.location}
+                  onChange={(e) =>
+                    setFormData({ ...formData, location: e.target.value })
+                  }
+                  placeholder="e.g., Conference Room A"
+                  className="font-body text-[13px]"
+                />
+              </div>
             )}
-          </CardContent>
-        </Card>
+            <Button type="submit" size="sm" className={PRIMARY_BUTTON}>
+              <Plus className="mr-2 h-4 w-4" />
+              Create Event
+            </Button>
+          </form>
+        </CollapsibleFormCard>
+      )}
+
+      {loading ? (
+        <SectionCard>
+          <SectionCard.Body className="p-8 text-center">
+            <div className="font-body text-[13px] text-text-muted animate-pulse">
+              Loading events...
+            </div>
+          </SectionCard.Body>
+        </SectionCard>
+      ) : events.length === 0 ? (
+        <SectionCard>
+          <SectionCard.Body className="p-0">
+            <EmptyStateBlock
+              variant="centered"
+              icon={CalendarIcon}
+              tone="info"
+              title="No events scheduled yet"
+              description={
+                isAdmin
+                  ? "Create events to bring your cohort together"
+                  : "Your organization hasn't scheduled any events yet"
+              }
+              action={
+                isAdmin ? (
+                  <Button
+                    size="sm"
+                    onClick={() => setShowCreateForm(true)}
+                    className={PRIMARY_BUTTON}
+                  >
+                    <Plus className="mr-2 h-4 w-4" />
+                    Schedule Meeting
+                  </Button>
+                ) : null
+              }
+            />
+          </SectionCard.Body>
+        </SectionCard>
       ) : (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
           <div className="lg:col-span-2">
             <MiniCalendar organizationId={organizationId} events={events} />
           </div>
+
           <div className="space-y-3">
-            <Card>
-              <CardContent className="p-3">
-                <h3 className="text-[10px] font-medium mb-2">
+            <SectionCard>
+              <SectionCard.Body className="p-3">
+                <h3 className="mb-2 font-heading text-[14px] font-bold text-text-heading">
                   Upcoming Agendas
                 </h3>
-                <div className="flex flex-wrap gap-1">
-                  <Button
-                    size="sm"
-                    variant={agendaFilter === "all" ? "default" : "outline"}
+                <div className="flex flex-wrap gap-1.5">
+                  <FilterPill
+                    active={agendaFilter === "all"}
                     onClick={() => setAgendaFilter("all")}
-                    className="h-6 text-[8px] px-2"
                   >
-                    All (
-                    {
-                      allCalendarItems.filter(
-                        (i) => new Date(i.startDate) > new Date(),
-                      ).length
-                    }
-                    )
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant={agendaFilter === "event" ? "default" : "outline"}
+                    All ({upcomingCalendarCount("all")})
+                  </FilterPill>
+                  <FilterPill
+                    active={agendaFilter === "event"}
                     onClick={() => setAgendaFilter("event")}
-                    className="h-6 text-[8px] px-2"
                   >
-                    Events (
-                    {
-                      allCalendarItems.filter(
-                        (i) =>
-                          i.type === "event" &&
-                          new Date(i.startDate) > new Date(),
-                      ).length
-                    }
-                    )
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant={
-                      agendaFilter === "deliverable" ? "default" : "outline"
-                    }
+                    Events ({upcomingCalendarCount("event")})
+                  </FilterPill>
+                  <FilterPill
+                    active={agendaFilter === "deliverable"}
                     onClick={() => setAgendaFilter("deliverable")}
-                    className="h-6 text-[8px] px-2"
                   >
-                    Deliverables (
-                    {
-                      allCalendarItems.filter(
-                        (i) =>
-                          i.type === "deliverable" &&
-                          new Date(i.startDate) > new Date(),
-                      ).length
-                    }
-                    )
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant={
-                      agendaFilter === "milestone" ? "default" : "outline"
-                    }
+                    Deliverables ({upcomingCalendarCount("deliverable")})
+                  </FilterPill>
+                  <FilterPill
+                    active={agendaFilter === "milestone"}
                     onClick={() => setAgendaFilter("milestone")}
-                    className="h-6 text-[8px] px-2"
                   >
-                    Milestones (
-                    {
-                      allCalendarItems.filter(
-                        (i) =>
-                          i.type === "milestone" &&
-                          new Date(i.startDate) > new Date(),
-                      ).length
-                    }
-                    )
-                  </Button>
+                    Milestones ({upcomingCalendarCount("milestone")})
+                  </FilterPill>
                 </div>
-              </CardContent>
-            </Card>
+              </SectionCard.Body>
+            </SectionCard>
+
             <div className="space-y-2">
-              {(() => {
-                const upcomingItems = allCalendarItems
-                  .filter((item) => new Date(item.startDate) > new Date())
-                  .filter(
-                    (item) =>
-                      agendaFilter === "all" || item.type === agendaFilter,
-                  )
-                  .sort((a, b) => {
-                    // Sort by type (events first), then by date
-                    if (a.type === "event" && b.type !== "event") return -1;
-                    if (a.type !== "event" && b.type === "event") return 1;
-                    return (
-                      new Date(a.startDate).getTime() -
-                      new Date(b.startDate).getTime()
-                    );
-                  })
-                  .slice(0, 10);
-                if (upcomingItems.length === 0) {
+              {upcomingItems.length === 0 ? (
+                <SectionCard>
+                  <SectionCard.Body className="p-0">
+                    <EmptyStateBlock
+                      variant="compact"
+                      icon={CalendarIcon}
+                      tone="info"
+                      title={`No upcoming ${agendaFilter === "all" ? "items" : agendaFilter + "s"}`}
+                      description="Items you schedule will appear here"
+                    />
+                  </SectionCard.Body>
+                </SectionCard>
+              ) : (
+                upcomingItems.map((item) => {
+                  const tone =
+                    AGENDA_TYPE_TONE[item.type] || AGENDA_TYPE_TONE.other;
+                  const ItemIcon = tone.icon;
                   return (
-                    <Card>
-                      <CardContent className="p-4 text-center">
-                        <p className="text-[9px] text-muted-foreground">
-                          {"No upcoming "}
-                          {agendaFilter === "all"
-                            ? "items"
-                            : agendaFilter + "s"}
-                        </p>
-                      </CardContent>
-                    </Card>
-                  );
-                }
-                return upcomingItems.map((item) => (
-                  <Card
-                    key={item.id}
-                    className="hover:bg-accent/50 transition-colors cursor-pointer"
-                    onClick={() => setSelectedAgenda(item)}
-                  >
-                    <CardContent className="p-2">
-                      <div className="flex items-start gap-2">
+                    <button
+                      type="button"
+                      key={item.id}
+                      onClick={() => setSelectedAgenda(item)}
+                      className="group w-full rounded-card border border-surface-border bg-white p-3 text-left transition-all hover:border-primary/40 hover:shadow-soft"
+                    >
+                      <div className="flex items-start gap-2.5">
                         <div
-                          className={`w-6 h-6 rounded flex items-center justify-center flex-shrink-0 ${item.type === "event" ? "bg-blue-500/10" : item.type === "deliverable" ? "bg-orange-500/10" : item.type === "milestone" ? "bg-purple-500/10" : "bg-gray-500/10"}`}
+                          className={cn(
+                            "flex h-9 w-9 shrink-0 items-center justify-center rounded-input",
+                            tone.disc,
+                          )}
                         >
-                          {item.type === "event" && (
-                            <CalendarIcon className="w-3 h-3 text-blue-500" />
-                          )}
-                          {item.type === "deliverable" && (
-                            <FileText className="w-3 h-3 text-orange-500" />
-                          )}
-                          {item.type === "milestone" && (
-                            <Target className="w-3 h-3 text-purple-500" />
-                          )}
+                          <ItemIcon className="h-4 w-4" />
                         </div>
-                        <div className="flex-1 min-w-0">
-                          <h4 className="text-[9px] font-medium truncate">
+                        <div className="min-w-0 flex-1">
+                          <h4 className="truncate font-heading text-[13px] font-semibold text-text-heading">
                             {item.title}
                           </h4>
-                          <div className="flex items-center gap-2 mt-1 text-[8px] text-muted-foreground">
-                            <Clock className="w-2.5 h-2.5" />
+                          <div className="mt-1 flex items-center gap-2 font-body text-[12px] text-text-muted">
+                            <Clock className="h-3 w-3" />
                             {new Date(item.startDate).toLocaleDateString()}
                           </div>
                           {item.isVirtual && (
-                            <Badge
-                              variant="outline"
-                              className="text-[7px] mt-1"
-                            >
-                              <Video className="w-2 h-2 mr-1" />
+                            <span className="mt-1 inline-flex items-center gap-1 rounded-full bg-primary-tint px-[10px] py-[2px] font-body text-[11px] font-semibold text-primary">
+                              <Video className="h-3 w-3" />
                               Virtual
-                            </Badge>
+                            </span>
                           )}
                         </div>
-                        <Badge
-                          variant="outline"
-                          className={`text-[7px] ${item.type === "event" ? "bg-blue-500/10 text-blue-700 border-blue-500/20" : item.type === "deliverable" ? "bg-orange-500/10 text-orange-700 border-orange-500/20" : item.type === "milestone" ? "bg-purple-500/10 text-purple-700 border-purple-500/20" : "bg-gray-500/10 text-gray-700 border-gray-500/20"}`}
+                        <span
+                          className={cn(
+                            "inline-flex items-center rounded-full border-0 px-[10px] py-[2px] font-body text-[11px] font-semibold capitalize",
+                            tone.badge,
+                          )}
                         >
                           {item.type}
-                        </Badge>
+                        </span>
                       </div>
-                    </CardContent>
-                  </Card>
-                ));
-              })()}
+                    </button>
+                  );
+                })
+              )}
             </div>
           </div>
         </div>
       )}
-      {selectedAgenda && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 sv-modal-backdrop"
-          onClick={() => setSelectedAgenda(null)}
-        >
-          <Card
-            className="sv-modal-panel w-full max-w-xl rounded-[16px] border-0 shadow-modal"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <CardContent className="p-6">
-              <div className="flex items-start justify-between mb-4">
-                <div className="flex items-start gap-3 flex-1">
-                  <div
-                    className={`w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 ${selectedAgenda.type === "event" ? "bg-blue-500/10" : selectedAgenda.type === "deliverable" ? "bg-orange-500/10" : selectedAgenda.type === "milestone" ? "bg-purple-500/10" : "bg-gray-500/10"}`}
-                  >
+
+      <Dialog
+        open={Boolean(selectedAgenda)}
+        onOpenChange={(open) => {
+          if (!open) setSelectedAgenda(null);
+        }}
+      >
+        <DialogContent className="max-w-xl">
+          {selectedAgenda && (
+            <>
+              <DialogHeader className="text-left">
+                <div className="flex items-start gap-3">
+                  {AgendaIcon && agendaTone && (
                     <div
-                      className={
-                        selectedAgenda.type === "event"
-                          ? "text-blue-500"
-                          : selectedAgenda.type === "deliverable"
-                            ? "text-orange-500"
-                            : selectedAgenda.type === "milestone"
-                              ? "text-purple-500"
-                              : "text-gray-500"
-                      }
+                      className={cn(
+                        "flex h-10 w-10 shrink-0 items-center justify-center rounded-input",
+                        agendaTone.disc,
+                      )}
                     >
-                      {selectedAgenda.type === "event" && (
-                        <CalendarIcon className="w-5 h-5" />
-                      )}
-                      {selectedAgenda.type === "deliverable" && (
-                        <FileText className="w-5 h-5" />
-                      )}
-                      {selectedAgenda.type === "milestone" && (
-                        <Target className="w-5 h-5" />
-                      )}
+                      <AgendaIcon className="h-5 w-5" />
                     </div>
-                  </div>
-                  <div className="flex-1">
-                    <h3 className="text-base font-semibold">
+                  )}
+                  <div className="min-w-0 flex-1">
+                    <DialogTitle className="font-heading text-[18px] font-bold text-text-heading">
                       {selectedAgenda.title}
-                    </h3>
-                    <Badge variant="outline" className="text-[8px] mt-1">
-                      {selectedAgenda.type.toUpperCase()}
-                    </Badge>
+                    </DialogTitle>
+                    {agendaTone && (
+                      <span
+                        className={cn(
+                          "mt-1 inline-flex items-center rounded-full border-0 px-[10px] py-[2px] font-body text-[11px] font-semibold capitalize",
+                          agendaTone.badge,
+                        )}
+                      >
+                        {selectedAgenda.type}
+                      </span>
+                    )}
                   </div>
                 </div>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  onClick={() => setSelectedAgenda(null)}
-                  className="h-7 w-7 p-0"
-                >
-                  <XCircle className="w-4 h-4" />
-                </Button>
-              </div>
+              </DialogHeader>
+
               {selectedAgenda.description && (
-                <div className="mb-4">
-                  <p className="text-[11px] text-muted-foreground">
-                    {selectedAgenda.description}
-                  </p>
-                </div>
+                <p className="font-body text-[13px] text-text-body">
+                  {selectedAgenda.description}
+                </p>
               )}
-              <div className="space-y-3 mb-4">
-                <div className="flex items-center gap-2 text-[11px]">
-                  <CalendarIcon className="w-4 h-4 text-muted-foreground" />
+
+              <div className="space-y-3">
+                <div className="flex items-center gap-2 font-body text-[13px] text-text-body">
+                  <CalendarIcon className="h-4 w-4 text-text-muted" />
                   <span>
                     {new Date(selectedAgenda.startDate).toLocaleDateString(
                       "en-US",
@@ -646,112 +621,102 @@ export default function EventManager({
                     )}
                   </span>
                 </div>
-                <div className="flex items-center gap-2 text-[11px]">
-                  <Clock className="w-4 h-4 text-muted-foreground" />
+                <div className="flex items-center gap-2 font-body text-[13px] text-text-body">
+                  <Clock className="h-4 w-4 text-text-muted" />
                   <span>
                     {new Date(selectedAgenda.startDate).toLocaleTimeString(
                       "en-US",
-                      {
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      },
+                      { hour: "2-digit", minute: "2-digit" },
                     )}
                   </span>
                   {selectedAgenda.endDate && (
-                    <span className="text-muted-foreground">
-                      {"- "}
+                    <span className="font-body text-[13px] text-text-muted">
+                      -{" "}
                       {new Date(selectedAgenda.endDate).toLocaleTimeString(
                         "en-US",
-                        {
-                          hour: "2-digit",
-                          minute: "2-digit",
-                        },
+                        { hour: "2-digit", minute: "2-digit" },
                       )}
                     </span>
                   )}
                 </div>
                 {selectedAgenda.location && !selectedAgenda.isVirtual && (
-                  <div className="flex items-center gap-2 text-[11px]">
-                    <MapPin className="w-4 h-4 text-muted-foreground" />
+                  <div className="flex items-center gap-2 font-body text-[13px] text-text-body">
+                    <MapPin className="h-4 w-4 text-text-muted" />
                     <span>{selectedAgenda.location}</span>
                   </div>
                 )}
                 {selectedAgenda.isVirtual && (
-                  <div className="flex items-center gap-2 text-[11px]">
-                    <Video className="w-4 h-4 text-muted-foreground" />
+                  <div className="flex items-center gap-2 font-body text-[13px] text-text-body">
+                    <Video className="h-4 w-4 text-text-muted" />
                     <span>Virtual Event</span>
                   </div>
                 )}
               </div>
-              <div className="flex gap-2 pt-4 border-t">
+
+              {selectedAgenda.metadata && (
+                <div className="border-t border-surface-border pt-3 font-body text-[12px] text-text-muted">
+                  {selectedAgenda.metadata.cohortName &&
+                    `Cohort: ${selectedAgenda.metadata.cohortName}`}
+                  {selectedAgenda.metadata.organizationName &&
+                    ` • ${selectedAgenda.metadata.organizationName}`}
+                  {selectedAgenda.metadata.eventType &&
+                    ` • ${selectedAgenda.metadata.eventType}`}
+                </div>
+              )}
+
+              <DialogFooter className="sm:justify-start">
                 {selectedAgenda.meetingUrl &&
                   selectedAgenda.type === "event" && (
                     <Button
                       size="sm"
-                      className="gap-2 flex-1"
                       onClick={() => {
                         window.open(selectedAgenda.meetingUrl, "_blank");
                         toast.success("Opening meeting...");
                       }}
+                      className={`flex-1 ${PRIMARY_BUTTON}`}
                     >
-                      <Video className="w-4 h-4" />
+                      <Video className="mr-2 h-4 w-4" />
                       Join Meeting
                     </Button>
                   )}
                 {selectedAgenda.type === "deliverable" && (
                   <Button
                     size="sm"
-                    variant="outline"
-                    className="gap-2 flex-1"
                     onClick={() => {
                       toast.info("Navigating to deliverable...");
                       setSelectedAgenda(null);
-                      // TODO: Navigate to deliverables page
                     }}
+                    className={`flex-1 ${OUTLINE_BUTTON}`}
                   >
-                    <FileText className="w-4 h-4" />
+                    <FileText className="mr-2 h-4 w-4" />
                     View Deliverable
                   </Button>
                 )}
                 {selectedAgenda.type === "milestone" && (
                   <Button
                     size="sm"
-                    variant="outline"
-                    className="gap-2 flex-1"
                     onClick={() => {
                       toast.info("Navigating to milestone...");
                       setSelectedAgenda(null);
-                      // TODO: Navigate to milestones page
                     }}
+                    className={`flex-1 ${OUTLINE_BUTTON}`}
                   >
-                    <Target className="w-4 h-4" />
+                    <Target className="mr-2 h-4 w-4" />
                     View Milestone
                   </Button>
                 )}
                 <Button
                   size="sm"
-                  variant="ghost"
                   onClick={() => setSelectedAgenda(null)}
+                  className={OUTLINE_BUTTON}
                 >
                   Close
                 </Button>
-              </div>
-              {selectedAgenda.metadata && (
-                <div className="mt-4 pt-4 border-t">
-                  <p className="text-[9px] text-muted-foreground">
-                    {selectedAgenda.metadata.cohortName &&
-                      `Cohort: ${selectedAgenda.metadata.cohortName}`}
-                    {selectedAgenda.metadata.organizationName &&
-                      ` • ${selectedAgenda.metadata.organizationName}`}
-                    {selectedAgenda.metadata.eventType &&
-                      ` • ${selectedAgenda.metadata.eventType}`}
-                  </p>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </div>
-      )}
+              </DialogFooter>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

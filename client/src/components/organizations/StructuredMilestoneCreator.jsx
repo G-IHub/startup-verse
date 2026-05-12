@@ -5,16 +5,24 @@
  */
 import React, { useState } from "react";
 import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "../ui/card";
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "../ui/dialog";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { Textarea } from "../ui/textarea";
 import { Badge } from "../ui/badge";
+import {
+  Select,
+  SelectTrigger,
+  SelectValue,
+  SelectContent,
+  SelectItem,
+} from "../ui/select";
 import {
   Sparkles,
   Target,
@@ -25,6 +33,24 @@ import {
   Lightbulb,
   X,
 } from "lucide-react";
+import { SectionCard } from "./_primitives";
+
+const CATEGORY_OPTIONS = [
+  { value: "general", label: "General" },
+  { value: "deliverable", label: "Deliverable" },
+  { value: "checkpoint", label: "Checkpoint" },
+  { value: "validation", label: "Validation" },
+  { value: "customer-research", label: "Customer Research" },
+  { value: "product", label: "Product Development" },
+  { value: "marketing", label: "Marketing" },
+  { value: "sales", label: "Sales" },
+];
+
+const PRIMARY_BUTTON =
+  "h-10 rounded-input bg-primary font-body text-[13px] font-semibold text-white shadow-[0_4px_16px_rgba(58,90,254,0.25)] hover:bg-primary-hover";
+const OUTLINE_BUTTON =
+  "h-10 rounded-input border border-surface-border bg-white font-body text-[13px] font-medium text-text-body hover:bg-primary-tint hover:text-primary";
+
 export default function StructuredMilestoneCreator({
   isOpen,
   onClose,
@@ -40,27 +66,37 @@ export default function StructuredMilestoneCreator({
     category: type === "deliverable" ? "deliverable" : "general",
   });
   const [milestones, setMilestones] = useState([
-    {
-      title: "",
-      tasks: ["", "", ""],
-    },
-    {
-      title: "",
-      tasks: ["", "", ""],
-    },
-    {
-      title: "",
-      tasks: ["", "", ""],
-    },
+    { title: "", tasks: ["", "", ""] },
+    { title: "", tasks: ["", "", ""] },
+    { title: "", tasks: ["", "", ""] },
   ]);
   const [isGenerating, setIsGenerating] = useState(false);
-  if (!isOpen) return null;
+
+  const resetState = () => {
+    setStep("input");
+    setFormData({
+      title: "",
+      description: "",
+      dueDate: "",
+      week: "",
+      category: type === "deliverable" ? "deliverable" : "general",
+    });
+    setMilestones([
+      { title: "", tasks: ["", "", ""] },
+      { title: "", tasks: ["", "", ""] },
+      { title: "", tasks: ["", "", ""] },
+    ]);
+  };
+
+  const handleOpenChange = (open) => {
+    if (!open) {
+      onClose && onClose();
+    }
+  };
+
   const handleGenerateStructure = () => {
     setIsGenerating(true);
-
-    // Simulate AI processing
     setTimeout(() => {
-      // Generate intelligent structure based on title and description
       const generated = generateMilestoneStructure(
         formData.title,
         formData.description,
@@ -70,33 +106,33 @@ export default function StructuredMilestoneCreator({
       setStep("structure");
     }, 800);
   };
+
   const handleAddTask = (milestoneIndex) => {
     const updated = [...milestones];
     updated[milestoneIndex].tasks.push("");
     setMilestones(updated);
   };
+
   const handleRemoveTask = (milestoneIndex, taskIndex) => {
     const updated = [...milestones];
     updated[milestoneIndex].tasks.splice(taskIndex, 1);
     setMilestones(updated);
   };
+
   const handleAddMilestone = () => {
     setMilestones([
       ...milestones,
-      {
-        title: "",
-        tasks: ["", "", ""],
-      },
+      { title: "", tasks: ["", "", ""] },
     ]);
   };
+
   const handleRemoveMilestone = (index) => {
     if (milestones.length > 1) {
-      const updated = milestones.filter((_, i) => i !== index);
-      setMilestones(updated);
+      setMilestones(milestones.filter((_, i) => i !== index));
     }
   };
+
   const handleSubmit = async () => {
-    // Validate
     if (!formData.title || !formData.dueDate) {
       alert("Please fill in title and due date");
       return;
@@ -117,229 +153,196 @@ export default function StructuredMilestoneCreator({
       week: formData.week ? parseInt(formData.week) : null,
       milestones: validMilestones,
     });
-
-    // Reset
-    setStep("input");
-    setFormData({
-      title: "",
-      description: "",
-      dueDate: "",
-      week: "",
-      category: type === "deliverable" ? "deliverable" : "general",
-    });
-    setMilestones([
-      {
-        title: "",
-        tasks: ["", "", ""],
-      },
-      {
-        title: "",
-        tasks: ["", "", ""],
-      },
-      {
-        title: "",
-        tasks: ["", "", ""],
-      },
-    ]);
+    resetState();
   };
+
   const totalTasks = milestones.reduce(
     (sum, m) => sum + m.tasks.filter((t) => t.trim()).length,
     0,
   );
+
+  const titleLabel = type === "deliverable" ? "Deliverable" : "Program Milestone";
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sv-modal-backdrop">
-      <Card className="sv-modal-panel max-h-[90vh] w-full max-w-4xl overflow-y-auto rounded-[16px] border-0 shadow-modal">
-        <CardHeader className="border-b pb-3">
-          <div className="flex items-start justify-between">
-            <div className="flex-1">
-              <CardTitle className="text-lg flex items-center gap-2">
-                <Sparkles className="w-5 h-5 text-primary" />
-                {"Create "}
-                {type === "deliverable" ? "Deliverable" : "Program Milestone"}
-              </CardTitle>
-              <CardDescription className="text-xs mt-1">
-                {step === "input" &&
-                  "Define what you want startups to accomplish"}
-                {step === "structure" &&
-                  "AI-generated structure - customize as needed"}
-                {step === "review" && "Review and confirm"}
-              </CardDescription>
+    <Dialog open={isOpen} onOpenChange={handleOpenChange}>
+      <DialogContent className="max-h-[90vh] w-full max-w-4xl overflow-y-auto p-0 sm:max-w-4xl">
+        <div className="px-6 pt-6">
+          <DialogHeader className="border-b border-surface-border pb-4 text-left">
+            <DialogTitle className="flex items-center gap-2 font-heading text-[18px] font-bold text-text-heading">
+              <Sparkles className="h-5 w-5 text-primary" />
+              Create {titleLabel}
+            </DialogTitle>
+            <DialogDescription className="font-body text-[13px] text-text-body">
+              {step === "input" &&
+                "Define what you want startups to accomplish"}
+              {step === "structure" &&
+                "AI-generated structure - customize as needed"}
+              {step === "review" && "Review and confirm"}
+            </DialogDescription>
+            <div className="mt-3 flex items-center gap-2">
+              <div
+                className={`h-1.5 flex-1 rounded-full ${step === "input" || step === "structure" || step === "review" ? "bg-primary" : "bg-surface-border"}`}
+              />
+              <div
+                className={`h-1.5 flex-1 rounded-full ${step === "structure" || step === "review" ? "bg-primary" : "bg-surface-border"}`}
+              />
+              <div
+                className={`h-1.5 flex-1 rounded-full ${step === "review" ? "bg-primary" : "bg-surface-border"}`}
+              />
             </div>
-            <Button variant="ghost" size="sm" onClick={onClose}>
-              <X className="w-5 h-5" />
-            </Button>
-          </div>
-          <div className="flex items-center gap-2 mt-3">
-            <div
-              className={`flex-1 h-1 rounded ${step === "input" || step === "structure" || step === "review" ? "bg-primary" : "bg-muted"}`}
-            />
-            <div
-              className={`flex-1 h-1 rounded ${step === "structure" || step === "review" ? "bg-primary" : "bg-muted"}`}
-            />
-            <div
-              className={`flex-1 h-1 rounded ${step === "review" ? "bg-primary" : "bg-muted"}`}
-            />
-          </div>
-        </CardHeader>
-        <CardContent className="space-y-6 pt-4">
+          </DialogHeader>
+        </div>
+
+        <div className="space-y-5 px-6 pb-6 font-body">
           {step === "input" && (
             <>
-              <div className="p-4 bg-gradient-to-r from-primary/10 to-purple-50 dark:from-primary/20 dark:to-purple-950/20 rounded-lg border border-primary/20">
-                <div className="flex gap-3">
-                  <Lightbulb className="w-5 h-5 text-primary flex-shrink-0 mt-0.5" />
-                  <div className="text-sm">
-                    <p className="font-medium text-primary mb-1">
-                      Create Structured Goals for Your Cohort
-                    </p>
-                    <p className="text-muted-foreground text-xs">
-                      This will be automatically converted into a weekly outcome
-                      with milestones and tasks for all founders in your cohort.
-                    </p>
-                  </div>
+              <div className="flex gap-3 rounded-input border border-primary/20 bg-primary-tint p-4">
+                <Lightbulb className="mt-0.5 h-5 w-5 shrink-0 text-primary" />
+                <div>
+                  <p className="font-heading text-[14px] font-semibold text-primary">
+                    Create Structured Goals for Your Cohort
+                  </p>
+                  <p className="mt-1 font-body text-[13px] text-text-body">
+                    This will be automatically converted into a weekly outcome
+                    with milestones and tasks for all founders in your cohort.
+                  </p>
                 </div>
               </div>
+
               <div>
-                <label className="text-sm font-medium mb-2 block">
-                  {type === "deliverable" ? "Deliverable" : "Milestone"}
-                  {" Title *"}
+                <label className="mb-2 block font-body text-[13px] font-medium text-text-heading">
+                  {titleLabel} Title *
                 </label>
                 <Input
                   value={formData.title}
                   onChange={(e) =>
-                    setFormData({
-                      ...formData,
-                      title: e.target.value,
-                    })
+                    setFormData({ ...formData, title: e.target.value })
                   }
                   placeholder="e.g., Complete Customer Discovery & Validation"
-                  className="text-sm"
+                  className="font-body text-[13px]"
                 />
               </div>
+
               <div>
-                <label className="text-sm font-medium mb-2 block">
+                <label className="mb-2 block font-body text-[13px] font-medium text-text-heading">
                   Description
                 </label>
                 <Textarea
                   value={formData.description}
                   onChange={(e) =>
-                    setFormData({
-                      ...formData,
-                      description: e.target.value,
-                    })
+                    setFormData({ ...formData, description: e.target.value })
                   }
                   placeholder="What should founders accomplish? Be specific about deliverables and success criteria..."
-                  className="text-sm min-h-[100px]"
+                  className="min-h-[100px] font-body text-[13px]"
                 />
-                <p className="text-xs text-muted-foreground mt-2">
-                  💡 Be specific - this helps generate better milestone
+                <p className="mt-2 font-body text-[12px] text-text-muted">
+                  Tip: Be specific - this helps generate a better milestone
                   structure
                 </p>
               </div>
-              <div className="grid grid-cols-2 gap-4">
+
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div>
-                  <label className="text-sm font-medium mb-2 block">
+                  <label className="mb-2 block font-body text-[13px] font-medium text-text-heading">
                     Due Date *
                   </label>
                   <Input
                     type="date"
                     value={formData.dueDate}
                     onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        dueDate: e.target.value,
-                      })
+                      setFormData({ ...formData, dueDate: e.target.value })
                     }
-                    className="text-sm"
+                    className="font-body text-[13px]"
                   />
                 </div>
                 <div>
-                  <label className="text-sm font-medium mb-2 block">
+                  <label className="mb-2 block font-body text-[13px] font-medium text-text-heading">
                     Week Number (optional)
                   </label>
                   <Input
                     type="number"
                     value={formData.week}
                     onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        week: e.target.value,
-                      })
+                      setFormData({ ...formData, week: e.target.value })
                     }
                     placeholder="e.g., 1"
-                    className="text-sm"
+                    className="font-body text-[13px]"
                   />
                 </div>
               </div>
+
               <div>
-                <label className="text-sm font-medium mb-2 block">
+                <label className="mb-2 block font-body text-[13px] font-medium text-text-heading">
                   Category
                 </label>
-                <select
+                <Select
                   value={formData.category}
-                  onChange={(e) =>
-                    setFormData({
-                      ...formData,
-                      category: e.target.value,
-                    })
+                  onValueChange={(value) =>
+                    setFormData({ ...formData, category: value })
                   }
-                  className="w-full h-9 text-sm rounded-md border border-input bg-background px-3"
                 >
-                  <option value="general">General</option>
-                  <option value="deliverable">Deliverable</option>
-                  <option value="checkpoint">Checkpoint</option>
-                  <option value="validation">Validation</option>
-                  <option value="customer-research">Customer Research</option>
-                  <option value="product">Product Development</option>
-                  <option value="marketing">Marketing</option>
-                  <option value="sales">Sales</option>
-                </select>
+                  <SelectTrigger className="font-body text-[13px]">
+                    <SelectValue placeholder="Select a category" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {CATEGORY_OPTIONS.map((option) => (
+                      <SelectItem
+                        key={option.value}
+                        value={option.value}
+                        className="font-body text-[13px]"
+                      >
+                        {option.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
-              <div className="flex gap-2 pt-4 border-t">
+
+              <DialogFooter className="border-t border-surface-border pt-4 sm:justify-start">
                 <Button
                   onClick={handleGenerateStructure}
                   disabled={
                     !formData.title || !formData.dueDate || isGenerating
                   }
-                  className="gap-2"
+                  className={PRIMARY_BUTTON}
                 >
-                  <Wand2 className="w-4 h-4" />
+                  <Wand2 className="mr-2 h-4 w-4" />
                   {isGenerating
                     ? "Generating Structure..."
                     : "Generate Milestone Structure"}
                 </Button>
-                <Button variant="outline" onClick={onClose}>
+                <Button onClick={onClose} className={OUTLINE_BUTTON}>
                   Cancel
                 </Button>
-              </div>
+              </DialogFooter>
             </>
           )}
+
           {step === "structure" && (
             <>
-              <div className="p-4 bg-blue-50 dark:bg-blue-950/20 rounded-lg border border-blue-200 dark:border-blue-900">
-                <div className="flex gap-3">
-                  <Target className="w-5 h-5 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" />
-                  <div className="text-sm">
-                    <p className="font-medium text-blue-900 dark:text-blue-100 mb-1">
-                      {formData.title}
-                    </p>
-                    <p className="text-blue-700 dark:text-blue-300 text-xs">
-                      {milestones.filter((m) => m.title.trim()).length}
-                      {" milestones • "}
-                      {totalTasks}
-                      {" tasks"}
-                    </p>
-                  </div>
+              <div className="flex gap-3 rounded-input border border-primary/20 bg-primary-tint p-4">
+                <Target className="mt-0.5 h-5 w-5 shrink-0 text-primary" />
+                <div>
+                  <p className="font-heading text-[14px] font-semibold text-text-heading">
+                    {formData.title}
+                  </p>
+                  <p className="mt-1 font-body text-[12px] text-text-muted">
+                    {milestones.filter((m) => m.title.trim()).length} milestones
+                    {" · "}
+                    {totalTasks} tasks
+                  </p>
                 </div>
               </div>
+
               <div className="space-y-4">
                 {milestones.map((milestone, mIndex) => (
-                  <Card key={mIndex} className="border-2">
-                    <CardHeader className="pb-3">
+                  <SectionCard key={mIndex}>
+                    <SectionCard.Body>
                       <div className="flex items-start gap-3">
-                        <div className="flex items-center justify-center w-8 h-8 rounded-full bg-primary/10 text-primary font-semibold text-sm flex-shrink-0">
+                        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary-tint font-heading text-[14px] font-semibold text-primary">
                           {mIndex + 1}
                         </div>
-                        <div className="flex-1 min-w-0">
+                        <div className="min-w-0 flex-1">
                           <Input
                             value={milestone.title}
                             onChange={(e) => {
@@ -348,172 +351,193 @@ export default function StructuredMilestoneCreator({
                               setMilestones(updated);
                             }}
                             placeholder="Milestone title..."
-                            className="text-sm font-medium"
+                            className="font-body text-[13px] font-medium"
                           />
                         </div>
                         {milestones.length > 1 && (
                           <Button
-                            variant="ghost"
                             size="sm"
                             onClick={() => handleRemoveMilestone(mIndex)}
-                            className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                            className="h-9 w-9 rounded-input p-0 text-[#ff4f6b] hover:bg-[#fff1f2]"
                           >
-                            <Trash2 className="w-4 h-4" />
+                            <Trash2 className="h-4 w-4" />
                           </Button>
                         )}
                       </div>
-                    </CardHeader>
-                    <CardContent className="space-y-2">
-                      {milestone.tasks.map((task, tIndex) => (
-                        <div key={tIndex} className="flex items-center gap-2">
-                          <CheckCircle2 className="w-4 h-4 text-muted-foreground flex-shrink-0" />
-                          <Input
-                            value={task}
-                            onChange={(e) => {
-                              const updated = [...milestones];
-                              updated[mIndex].tasks[tIndex] = e.target.value;
-                              setMilestones(updated);
-                            }}
-                            placeholder="Task description..."
-                            className="text-xs"
-                          />
-                          {milestone.tasks.length > 1 && (
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleRemoveTask(mIndex, tIndex)}
-                              className="text-red-600 hover:text-red-700"
-                            >
-                              <X className="w-3 h-3" />
-                            </Button>
-                          )}
-                        </div>
-                      ))}
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleAddTask(mIndex)}
-                        className="w-full text-xs mt-2"
-                      >
-                        <Plus className="w-3 h-3 mr-1" />
-                        Add Task
-                      </Button>
-                    </CardContent>
-                  </Card>
+
+                      <div className="mt-3 space-y-2">
+                        {milestone.tasks.map((task, tIndex) => (
+                          <div key={tIndex} className="flex items-center gap-2">
+                            <CheckCircle2 className="h-4 w-4 shrink-0 text-text-muted" />
+                            <Input
+                              value={task}
+                              onChange={(e) => {
+                                const updated = [...milestones];
+                                updated[mIndex].tasks[tIndex] = e.target.value;
+                                setMilestones(updated);
+                              }}
+                              placeholder="Task description..."
+                              className="font-body text-[13px]"
+                            />
+                            {milestone.tasks.length > 1 && (
+                              <Button
+                                size="sm"
+                                onClick={() => handleRemoveTask(mIndex, tIndex)}
+                                className="h-9 w-9 rounded-input p-0 text-[#ff4f6b] hover:bg-[#fff1f2]"
+                              >
+                                <X className="h-3.5 w-3.5" />
+                              </Button>
+                            )}
+                          </div>
+                        ))}
+                        <Button
+                          size="sm"
+                          onClick={() => handleAddTask(mIndex)}
+                          className={`mt-1 w-full ${OUTLINE_BUTTON}`}
+                        >
+                          <Plus className="mr-2 h-4 w-4" />
+                          Add Task
+                        </Button>
+                      </div>
+                    </SectionCard.Body>
+                  </SectionCard>
                 ))}
               </div>
+
               <Button
-                variant="outline"
                 onClick={handleAddMilestone}
-                className="w-full gap-2"
+                className={`w-full ${OUTLINE_BUTTON}`}
               >
-                <Plus className="w-4 h-4" />
+                <Plus className="mr-2 h-4 w-4" />
                 Add Milestone
               </Button>
-              <div className="flex gap-2 pt-4 border-t">
-                <Button onClick={() => setStep("review")} className="gap-2">
+
+              <DialogFooter className="border-t border-surface-border pt-4 sm:justify-start">
+                <Button
+                  onClick={() => setStep("review")}
+                  className={PRIMARY_BUTTON}
+                >
                   Continue to Review
-                  <CheckCircle2 className="w-4 h-4" />
+                  <CheckCircle2 className="ml-2 h-4 w-4" />
                 </Button>
-                <Button variant="outline" onClick={() => setStep("input")}>
+                <Button
+                  onClick={() => setStep("input")}
+                  className={OUTLINE_BUTTON}
+                >
                   Back
                 </Button>
-              </div>
+              </DialogFooter>
             </>
           )}
+
           {step === "review" && (
             <>
-              <div className="p-4 bg-green-50 dark:bg-green-950/20 rounded-lg border border-green-200 dark:border-green-900">
-                <div className="flex gap-3">
-                  <CheckCircle2 className="w-5 h-5 text-green-600 dark:text-green-400 flex-shrink-0 mt-0.5" />
-                  <div className="text-sm">
-                    <p className="font-medium text-green-900 dark:text-green-100 mb-1">
-                      Ready to Deploy
-                    </p>
-                    <p className="text-green-700 dark:text-green-300 text-xs">
-                      This will create a structured weekly outcome for all
-                      founders in your cohort
-                    </p>
-                  </div>
+              <div className="flex gap-3 rounded-input border border-[#d1fae5] bg-[#ecfdf5] p-4">
+                <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-[#00c896]" />
+                <div>
+                  <p className="font-heading text-[14px] font-semibold text-text-heading">
+                    Ready to Deploy
+                  </p>
+                  <p className="mt-1 font-body text-[13px] text-text-body">
+                    This will create a structured weekly outcome for all
+                    founders in your cohort
+                  </p>
                 </div>
               </div>
+
               <div className="space-y-3">
                 <div>
-                  <p className="text-xs text-muted-foreground mb-1">Title</p>
-                  <p className="text-sm font-medium">{formData.title}</p>
+                  <p className="mb-1 font-body text-[12px] text-text-muted">
+                    Title
+                  </p>
+                  <p className="font-heading text-[14px] font-semibold text-text-heading">
+                    {formData.title}
+                  </p>
                 </div>
                 {formData.description && (
                   <div>
-                    <p className="text-xs text-muted-foreground mb-1">
+                    <p className="mb-1 font-body text-[12px] text-text-muted">
                       Description
                     </p>
-                    <p className="text-sm">{formData.description}</p>
+                    <p className="font-body text-[13px] text-text-body">
+                      {formData.description}
+                    </p>
                   </div>
                 )}
-                <div className="grid grid-cols-3 gap-3">
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                   <div>
-                    <p className="text-xs text-muted-foreground mb-1">
+                    <p className="mb-1 font-body text-[12px] text-text-muted">
                       Due Date
                     </p>
-                    <p className="text-sm">
+                    <p className="font-body text-[13px] text-text-body">
                       {new Date(formData.dueDate).toLocaleDateString()}
                     </p>
                   </div>
                   {formData.week && (
                     <div>
-                      <p className="text-xs text-muted-foreground mb-1">Week</p>
-                      <p className="text-sm">
-                        {"Week "}
-                        {formData.week}
+                      <p className="mb-1 font-body text-[12px] text-text-muted">
+                        Week
+                      </p>
+                      <p className="font-body text-[13px] text-text-body">
+                        Week {formData.week}
                       </p>
                     </div>
                   )}
                   <div>
-                    <p className="text-xs text-muted-foreground mb-1">
+                    <p className="mb-1 font-body text-[12px] text-text-muted">
                       Category
                     </p>
-                    <Badge variant="outline" className="text-xs">
+                    <Badge
+                      variant="outline"
+                      className="rounded-full border-0 bg-primary-tint px-[10px] py-[2px] font-body text-[11px] font-semibold capitalize text-primary"
+                    >
                       {formData.category}
                     </Badge>
                   </div>
                 </div>
-                <div className="border-t pt-3">
-                  <p className="text-xs text-muted-foreground mb-3">
+
+                <div className="border-t border-surface-border pt-3">
+                  <p className="mb-3 font-body text-[12px] text-text-muted">
                     Structure Summary
                   </p>
                   <div className="space-y-2">
                     {milestones
                       .filter((m) => m.title.trim())
                       .map((milestone, idx) => (
-                        <div key={idx} className="p-2 bg-muted rounded-md">
-                          <p className="text-xs font-medium">
-                            {idx + 1}
-                            {". "}
-                            {milestone.title}
+                        <div
+                          key={idx}
+                          className="rounded-input bg-surface-page p-3"
+                        >
+                          <p className="font-heading text-[13px] font-semibold text-text-heading">
+                            {idx + 1}. {milestone.title}
                           </p>
-                          <p className="text-xs text-muted-foreground ml-4">
-                            {milestone.tasks.filter((t) => t.trim()).length}
-                            {" tasks"}
+                          <p className="ml-4 font-body text-[12px] text-text-muted">
+                            {milestone.tasks.filter((t) => t.trim()).length}{" "}
+                            tasks
                           </p>
                         </div>
                       ))}
                   </div>
                 </div>
               </div>
-              <div className="flex gap-2 pt-4 border-t">
-                <Button onClick={handleSubmit} className="gap-2">
-                  <CheckCircle2 className="w-4 h-4" />
-                  Create & Deploy to Cohort
+
+              <DialogFooter className="border-t border-surface-border pt-4 sm:justify-start">
+                <Button onClick={handleSubmit} className={PRIMARY_BUTTON}>
+                  <CheckCircle2 className="mr-2 h-4 w-4" />
+                  Create &amp; Deploy to Cohort
                 </Button>
-                <Button variant="outline" onClick={() => setStep("structure")}>
+                <Button
+                  onClick={() => setStep("structure")}
+                  className={OUTLINE_BUTTON}
+                >
                   Back to Edit
                 </Button>
-              </div>
+              </DialogFooter>
             </>
           )}
-        </CardContent>
-      </Card>
-    </div>
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -526,7 +550,6 @@ function generateMilestoneStructure(title, description) {
   const lowerDesc = description.toLowerCase();
   const combined = `${lowerTitle} ${lowerDesc}`;
 
-  // Customer Research / Validation
   if (
     combined.includes("customer") ||
     combined.includes("interview") ||
@@ -564,7 +587,6 @@ function generateMilestoneStructure(title, description) {
     ];
   }
 
-  // Product Development / MVP
   if (
     combined.includes("product") ||
     combined.includes("build") ||
@@ -603,7 +625,6 @@ function generateMilestoneStructure(title, description) {
     ];
   }
 
-  // Marketing / Launch Campaign
   if (
     combined.includes("marketing") ||
     combined.includes("campaign") ||
@@ -641,7 +662,6 @@ function generateMilestoneStructure(title, description) {
     ];
   }
 
-  // Sales / Customer Acquisition
   if (
     combined.includes("sales") ||
     combined.includes("customer") ||
@@ -679,7 +699,6 @@ function generateMilestoneStructure(title, description) {
     ];
   }
 
-  // Fundraising
   if (
     combined.includes("fundrais") ||
     combined.includes("investor") ||
@@ -717,7 +736,6 @@ function generateMilestoneStructure(title, description) {
     ];
   }
 
-  // Generic structure for everything else
   return [
     {
       title: "Planning & Setup",

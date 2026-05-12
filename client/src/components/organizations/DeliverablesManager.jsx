@@ -3,17 +3,16 @@
  */
 import React, { useState, useEffect } from "react";
 import { API_BASE_URL } from "../../config/apiBase.js";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "../ui/card";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { Textarea } from "../ui/textarea";
-import { Badge } from "../ui/badge";
+import {
+  Select,
+  SelectTrigger,
+  SelectValue,
+  SelectContent,
+  SelectItem,
+} from "../ui/select";
 import {
   Plus,
   FileText,
@@ -23,18 +22,46 @@ import {
   ExternalLink,
   MessageSquare,
   Users,
+  CheckCircle2,
+  Inbox,
 } from "lucide-react";
 import { unwrapData } from "../../utils/apiEnvelope";
+import {
+  SectionCard,
+  SectionHeader,
+  StatusBadge,
+  EmptyStateBlock,
+  CollapsibleFormCard,
+} from "./_primitives";
+import { cn } from "../ui/utils";
 
 const API_BASE = API_BASE_URL;
 
-// Default fetch options for cookie-based auth
 const defaultOptions = {
   credentials: "include",
-  headers: {
-    "Content-Type": "application/json",
-  },
+  headers: { "Content-Type": "application/json" },
 };
+
+const REVIEW_STATUS_OPTIONS = [
+  { value: "approved", label: "Approved" },
+  { value: "revision_requested", label: "Needs revision" },
+  { value: "rejected", label: "Rejected" },
+  { value: "reviewed", label: "Reviewed" },
+];
+
+const SUBMISSION_STATUS_ICON = {
+  approved: CheckCircle2,
+  rejected: AlertCircle,
+  revision_requested: AlertCircle,
+  "needs-revision": AlertCircle,
+  reviewed: CheckCircle2,
+  submitted: Inbox,
+};
+
+const PRIMARY_BUTTON =
+  "h-9 rounded-input bg-primary font-body text-[13px] font-semibold text-white shadow-[0_4px_16px_rgba(58,90,254,0.25)] hover:bg-primary-hover";
+const OUTLINE_BUTTON =
+  "h-9 rounded-input border border-surface-border bg-white font-body text-[13px] font-medium text-text-body hover:bg-primary-tint hover:text-primary";
 
 function asDeliverableList(inner) {
   if (Array.isArray(inner)) return inner;
@@ -63,21 +90,25 @@ export default function DeliverablesManager({
     status: "approved",
     feedback: "",
   });
+
   useEffect(() => {
     loadDeliverables();
   }, [cohortId]);
+
   useEffect(() => {
     if (selectedDeliverable) {
       const sid = selectedDeliverable.id || selectedDeliverable._id;
       if (sid) loadSubmissions(sid);
     }
   }, [selectedDeliverable]);
+
   const loadDeliverables = async () => {
     try {
       setLoading(true);
-      const response = await fetch(`${API_BASE}/cohorts/${cohortId}/deliverables`, {
-        ...defaultOptions,
-      });
+      const response = await fetch(
+        `${API_BASE}/cohorts/${cohortId}/deliverables`,
+        { ...defaultOptions },
+      );
       if (!response.ok) throw new Error("Failed to fetch deliverables");
       const list = asDeliverableList(unwrapData(await response.json()));
       const normalized = list.map((d) => ({
@@ -85,8 +116,6 @@ export default function DeliverablesManager({
         id: d.id || d._id,
       }));
       setDeliverables(normalized);
-
-      // Auto-select first deliverable
       if (normalized.length > 0 && !selectedDeliverable) {
         setSelectedDeliverable(normalized[0]);
       }
@@ -96,6 +125,7 @@ export default function DeliverablesManager({
       setLoading(false);
     }
   };
+
   const loadSubmissions = async (deliverableId) => {
     try {
       const response = await fetch(
@@ -116,6 +146,7 @@ export default function DeliverablesManager({
       console.error("Error loading submissions:", error);
     }
   };
+
   const handleCreateDeliverable = async (e) => {
     e.preventDefault();
     try {
@@ -123,21 +154,22 @@ export default function DeliverablesManager({
         .split("\n")
         .filter((r) => r.trim())
         .map((r) => r.trim());
-      const response = await fetch(`${API_BASE}/cohorts/${cohortId}/deliverables`, {
-        ...defaultOptions,
-        method: "POST",
-        body: JSON.stringify({
-          organizationId,
-          title: formData.title,
-          description: formData.description,
-          dueDate: formData.dueDate,
-          requirements,
-          createdBy: userId,
-        }),
-      });
+      const response = await fetch(
+        `${API_BASE}/cohorts/${cohortId}/deliverables`,
+        {
+          ...defaultOptions,
+          method: "POST",
+          body: JSON.stringify({
+            organizationId,
+            title: formData.title,
+            description: formData.description,
+            dueDate: formData.dueDate,
+            requirements,
+            createdBy: userId,
+          }),
+        },
+      );
       if (!response.ok) throw new Error("Failed to create deliverable");
-
-      // Reset form and reload
       setFormData({
         title: "",
         description: "",
@@ -151,6 +183,7 @@ export default function DeliverablesManager({
       alert("Failed to create deliverable");
     }
   };
+
   const handleReviewSubmission = async (submissionId) => {
     try {
       const response = await fetch(
@@ -166,13 +199,8 @@ export default function DeliverablesManager({
         },
       );
       if (!response.ok) throw new Error("Failed to review submission");
-
-      // Reset and reload
       setReviewingSubmission(null);
-      setReviewData({
-        status: "approved",
-        feedback: "",
-      });
+      setReviewData({ status: "approved", feedback: "" });
       if (selectedDeliverable) {
         const sid = selectedDeliverable.id || selectedDeliverable._id;
         if (sid) loadSubmissions(sid);
@@ -182,333 +210,329 @@ export default function DeliverablesManager({
       alert("Failed to review submission");
     }
   };
-  const getStatusColor = (status) => {
-    switch (status) {
-      case "approved":
-        return "bg-green-500/10 text-green-700 dark:text-green-400 border-green-500/20";
-      case "revision_requested":
-      case "needs-revision":
-        return "bg-yellow-500/10 text-yellow-700 dark:text-yellow-400 border-yellow-500/20";
-      case "rejected":
-        return "bg-red-500/10 text-red-700 dark:text-red-400 border-red-500/20";
-      case "reviewed":
-        return "bg-blue-500/10 text-blue-700 dark:text-blue-400 border-blue-500/20";
-      case "submitted":
-        return "bg-purple-500/10 text-purple-700 dark:text-purple-400 border-purple-500/20";
-      default:
-        return "bg-gray-500/10 text-gray-700 dark:text-gray-400 border-gray-500/20";
-    }
-  };
-  const isPastDue = (dueDate) => {
-    return new Date(dueDate) < new Date();
-  };
-  const getDaysUntilDue = (dueDate) => {
-    const days = Math.ceil(
+
+  const isPastDue = (dueDate) => new Date(dueDate) < new Date();
+  const getDaysUntilDue = (dueDate) =>
+    Math.ceil(
       (new Date(dueDate).getTime() - new Date().getTime()) /
         (1000 * 60 * 60 * 24),
     );
-    return days;
-  };
+
   return (
-    <div className="space-y-4">
-      <Card>
-        <CardHeader className="pb-3">
-          <div className="flex items-start justify-between">
+    <div className="space-y-4 font-body">
+      <SectionHeader
+        icon={FileText}
+        title="Deliverables"
+        description="Track startup submissions and provide feedback"
+      />
+
+      {isAdmin && (
+        <CollapsibleFormCard
+          title="Create Deliverable"
+          description="Add a new deliverable for the cohort"
+          triggerLabel="New Deliverable"
+          isOpen={showCreateForm}
+          onToggle={setShowCreateForm}
+        >
+          <form onSubmit={handleCreateDeliverable} className="space-y-3">
             <div>
-              <CardTitle className="text-[11px]">Deliverables</CardTitle>
-              <CardDescription className="text-[9px]">
-                Track startup submissions and provide feedback
-              </CardDescription>
+              <label className="mb-2 block font-body text-[13px] font-medium text-text-heading">
+                Title
+              </label>
+              <Input
+                value={formData.title}
+                onChange={(e) =>
+                  setFormData({ ...formData, title: e.target.value })
+                }
+                placeholder="e.g., Pitch Deck v1.0"
+                required={true}
+                className="font-body text-[13px]"
+              />
             </div>
-            {isAdmin && (
-              <Button
-                size="sm"
-                onClick={() => setShowCreateForm(!showCreateForm)}
-                className="h-6 text-[9px]"
-              >
-                <Plus className="w-3 h-3 mr-1" />
-                {showCreateForm ? "Cancel" : "New Deliverable"}
-              </Button>
-            )}
-          </div>
-        </CardHeader>
-        {showCreateForm && (
-          <CardContent className="border-t">
-            <form onSubmit={handleCreateDeliverable} className="space-y-3 pt-3">
-              <div>
-                <label className="text-[9px] text-muted-foreground">
-                  Title
-                </label>
-                <Input
-                  value={formData.title}
-                  onChange={(e) =>
-                    setFormData({
-                      ...formData,
-                      title: e.target.value,
-                    })
-                  }
-                  placeholder="e.g., Pitch Deck v1.0"
-                  required={true}
-                  className="h-7 text-[10px]"
-                />
-              </div>
-              <div>
-                <label className="text-[9px] text-muted-foreground">
-                  Description
-                </label>
-                <Textarea
-                  value={formData.description}
-                  onChange={(e) =>
-                    setFormData({
-                      ...formData,
-                      description: e.target.value,
-                    })
-                  }
-                  placeholder="What should startups deliver?"
-                  className="text-[10px] min-h-[60px]"
-                />
-              </div>
-              <div>
-                <label className="text-[9px] text-muted-foreground">
-                  Due Date
-                </label>
-                <Input
-                  type="date"
-                  value={formData.dueDate}
-                  onChange={(e) =>
-                    setFormData({
-                      ...formData,
-                      dueDate: e.target.value,
-                    })
-                  }
-                  required={true}
-                  className="h-7 text-[10px]"
-                />
-              </div>
-              <div>
-                <label className="text-[9px] text-muted-foreground">
-                  Requirements (one per line)
-                </label>
-                <Textarea
-                  value={formData.requirements}
-                  onChange={(e) =>
-                    setFormData({
-                      ...formData,
-                      requirements: e.target.value,
-                    })
-                  }
-                  placeholder="10-15 slides\nInclude financial projections\nProblem, solution, market size"
-                  className="text-[10px] min-h-[80px]"
-                />
-              </div>
-              <Button type="submit" size="sm" className="h-6 text-[9px]">
-                Create Deliverable
-              </Button>
-            </form>
-          </CardContent>
-        )}
-      </Card>
+            <div>
+              <label className="mb-2 block font-body text-[13px] font-medium text-text-heading">
+                Description
+              </label>
+              <Textarea
+                value={formData.description}
+                onChange={(e) =>
+                  setFormData({ ...formData, description: e.target.value })
+                }
+                placeholder="What should startups deliver?"
+                className="min-h-[60px] font-body text-[13px]"
+              />
+            </div>
+            <div>
+              <label className="mb-2 block font-body text-[13px] font-medium text-text-heading">
+                Due Date
+              </label>
+              <Input
+                type="date"
+                value={formData.dueDate}
+                onChange={(e) =>
+                  setFormData({ ...formData, dueDate: e.target.value })
+                }
+                required={true}
+                className="font-body text-[13px]"
+              />
+            </div>
+            <div>
+              <label className="mb-2 block font-body text-[13px] font-medium text-text-heading">
+                Requirements (one per line)
+              </label>
+              <Textarea
+                value={formData.requirements}
+                onChange={(e) =>
+                  setFormData({ ...formData, requirements: e.target.value })
+                }
+                placeholder={"10-15 slides\nInclude financial projections\nProblem, solution, market size"}
+                className="min-h-[80px] font-body text-[13px]"
+              />
+            </div>
+            <Button type="submit" size="sm" className={PRIMARY_BUTTON}>
+              <Plus className="mr-2 h-4 w-4" />
+              Create Deliverable
+            </Button>
+          </form>
+        </CollapsibleFormCard>
+      )}
+
       {loading ? (
-        <Card>
-          <CardContent className="p-6 text-center">
-            <div className="animate-pulse text-[10px]">
+        <SectionCard>
+          <SectionCard.Body className="p-8 text-center">
+            <div className="font-body text-[13px] text-text-muted animate-pulse">
               Loading deliverables...
             </div>
-          </CardContent>
-        </Card>
+          </SectionCard.Body>
+        </SectionCard>
       ) : deliverables.length === 0 ? (
-        <Card>
-          <CardContent className="p-8 text-center">
-            <FileText className="w-12 h-12 text-muted-foreground mx-auto mb-2" />
-            <p className="text-[10px] text-muted-foreground">
-              No deliverables yet
-            </p>
-            {isAdmin && (
-              <p className="text-[9px] text-muted-foreground mt-1">
-                Create deliverables to collect work from startups
-              </p>
-            )}
-          </CardContent>
-        </Card>
+        <SectionCard>
+          <SectionCard.Body className="p-0">
+            <EmptyStateBlock
+              variant="centered"
+              icon={FileText}
+              tone="info"
+              title="No deliverables yet"
+              description={
+                isAdmin
+                  ? "Create deliverables to collect work from startups"
+                  : "Your organization hasn't published any deliverables yet"
+              }
+              action={
+                isAdmin ? (
+                  <Button
+                    size="sm"
+                    onClick={() => setShowCreateForm(true)}
+                    className={PRIMARY_BUTTON}
+                  >
+                    <Plus className="mr-2 h-4 w-4" />
+                    New Deliverable
+                  </Button>
+                ) : null
+              }
+            />
+          </SectionCard.Body>
+        </SectionCard>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
           <div className="space-y-2">
             {deliverables.map((deliverable) => {
               const daysUntil = getDaysUntilDue(deliverable.dueDate);
               const pastDue = isPastDue(deliverable.dueDate);
+              const isSelected =
+                String(
+                  selectedDeliverable?.id || selectedDeliverable?._id,
+                ) === String(deliverable.id || deliverable._id);
               return (
-                <Card
+                <button
+                  type="button"
                   key={deliverable.id || deliverable._id}
-                  className={`cursor-pointer transition-all ${String(selectedDeliverable?.id || selectedDeliverable?._id) === String(deliverable.id || deliverable._id) ? "ring-2 ring-primary" : "hover:shadow-md"}`}
                   onClick={() => setSelectedDeliverable(deliverable)}
+                  className={cn(
+                    "w-full rounded-card border bg-white p-3 text-left transition-all",
+                    isSelected
+                      ? "border-primary shadow-[0_0_0_3px_rgba(58,90,254,0.10)]"
+                      : "border-surface-border hover:border-primary/40 hover:shadow-soft",
+                  )}
                 >
-                  <CardContent className="p-3">
-                    <h3 className="text-[10px] font-medium mb-1 truncate">
-                      {deliverable.title}
-                    </h3>
-                    <div className="flex items-center gap-1.5 text-[9px] text-muted-foreground">
-                      <Calendar className="w-3 h-3" />
-                      {new Date(deliverable.dueDate).toLocaleDateString()}
-                    </div>
+                  <h3 className="mb-1 truncate font-heading text-[14px] font-semibold text-text-heading">
+                    {deliverable.title}
+                  </h3>
+                  <div className="flex items-center gap-1.5 font-body text-[12px] text-text-muted">
+                    <Calendar className="h-3.5 w-3.5" />
+                    {new Date(deliverable.dueDate).toLocaleDateString()}
+                  </div>
+                  <div className="mt-2">
                     {pastDue ? (
-                      <Badge
-                        variant="outline"
-                        className="text-[7px] mt-1.5 bg-red-500/10 text-red-700 dark:text-red-400 border-red-500/20"
-                      >
-                        <AlertCircle className="w-2.5 h-2.5 mr-1" />
-                        Past Due
-                      </Badge>
+                      <StatusBadge
+                        tone="danger"
+                        label="Past Due"
+                        icon={AlertCircle}
+                      />
                     ) : daysUntil <= 3 ? (
-                      <Badge
-                        variant="outline"
-                        className="text-[7px] mt-1.5 bg-yellow-500/10 text-yellow-700 dark:text-yellow-400 border-yellow-500/20"
-                      >
-                        <Clock className="w-2.5 h-2.5 mr-1" />
-                        {daysUntil}
-                        {" days left"}
-                      </Badge>
+                      <StatusBadge
+                        tone="warning"
+                        label={`${daysUntil} day${daysUntil === 1 ? "" : "s"} left`}
+                        icon={Clock}
+                      />
                     ) : (
-                      <Badge variant="outline" className="text-[7px] mt-1.5">
-                        {daysUntil}
-                        {" days left"}
-                      </Badge>
+                      <StatusBadge
+                        tone="info"
+                        label={`${daysUntil} day${daysUntil === 1 ? "" : "s"} left`}
+                        icon={Clock}
+                      />
                     )}
-                  </CardContent>
-                </Card>
+                  </div>
+                </button>
               );
             })}
           </div>
+
           <div className="md:col-span-2">
             {selectedDeliverable && (
-              <Card>
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-[10px]">
-                    {selectedDeliverable.title}
-                  </CardTitle>
-                  <CardDescription className="text-[9px]">
-                    {selectedDeliverable.description}
-                  </CardDescription>
+              <SectionCard>
+                <SectionCard.Header
+                  title={selectedDeliverable.title}
+                  description={selectedDeliverable.description}
+                />
+                <SectionCard.Body>
                   {(selectedDeliverable.requirements || []).length > 0 && (
-                    <div className="mt-2 space-y-1">
-                      <p className="text-[8px] text-muted-foreground font-medium">
-                        Requirements:
+                    <div className="rounded-input bg-surface-page p-3">
+                      <p className="mb-2 font-body text-[12px] font-semibold text-text-muted">
+                        Requirements
                       </p>
-                      <ul className="text-[8px] text-muted-foreground space-y-0.5">
-                        {(selectedDeliverable.requirements || []).map((req, idx) => (
-                          <li key={idx} className="flex items-start gap-1">
-                            <span className="text-primary">•</span>
-                            <span>{req}</span>
-                          </li>
-                        ))}
+                      <ul className="space-y-1">
+                        {(selectedDeliverable.requirements || []).map(
+                          (req, idx) => (
+                            <li
+                              key={idx}
+                              className="flex items-start gap-2 font-body text-[13px] text-text-body"
+                            >
+                              <span className="mt-0.5 text-primary">•</span>
+                              <span>{req}</span>
+                            </li>
+                          ),
+                        )}
                       </ul>
                     </div>
                   )}
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between mb-2">
-                      <h4 className="text-[9px] font-medium flex items-center gap-1.5">
-                        <Users className="w-3 h-3" />
-                        Submissions ({submissions.length})
-                      </h4>
-                    </div>
+
+                  <div className="mt-3">
+                    <h4 className="mb-2 flex items-center gap-1.5 font-heading text-[14px] font-bold text-text-heading">
+                      <Users className="h-4 w-4 text-primary" />
+                      Submissions ({submissions.length})
+                    </h4>
+
                     {submissions.length === 0 ? (
-                      <div className="p-6 text-center bg-muted/30 rounded-lg">
-                        <FileText className="w-8 h-8 text-muted-foreground mx-auto mb-2" />
-                        <p className="text-[9px] text-muted-foreground">
-                          No submissions yet
-                        </p>
-                      </div>
+                      <EmptyStateBlock
+                        variant="compact"
+                        icon={Inbox}
+                        tone="info"
+                        title="No submissions yet"
+                        description="Founders haven't submitted work for this deliverable"
+                      />
                     ) : (
                       <div className="space-y-2">
-                        {submissions.map((submission) => (
-                          <Card key={submission.id}>
-                            <CardContent className="p-3">
-                              <div className="flex items-start justify-between gap-2 mb-2">
-                                <div className="flex-1 min-w-0">
-                                  <h5 className="text-[9px] font-medium truncate">
+                        {submissions.map((submission) => {
+                          const statusIcon =
+                            SUBMISSION_STATUS_ICON[submission.status];
+                          const isReviewing =
+                            reviewingSubmission?.id === submission.id;
+                          return (
+                            <div
+                              key={submission.id}
+                              className="rounded-input bg-surface-page p-3"
+                            >
+                              <div className="mb-2 flex items-start justify-between gap-2">
+                                <div className="min-w-0 flex-1">
+                                  <h5 className="truncate font-heading text-[14px] font-semibold text-text-heading">
                                     {submission.founder?.startupName ||
                                       "Unknown Startup"}
                                   </h5>
-                                  <p className="text-[8px] text-muted-foreground truncate">
+                                  <p className="truncate font-body text-[12px] text-text-muted">
                                     {submission.founder?.name}
                                   </p>
                                 </div>
-                                <Badge
-                                  variant="outline"
-                                  className={`text-[7px] ${getStatusColor(submission.status)}`}
-                                >
-                                  {submission.status}
-                                </Badge>
+                                <StatusBadge
+                                  status={submission.status}
+                                  icon={statusIcon}
+                                />
                               </div>
+
                               {submission.notes && (
-                                <p className="text-[8px] text-muted-foreground mb-2">
+                                <p className="mb-2 font-body text-[13px] text-text-body">
                                   {submission.notes}
                                 </p>
                               )}
+
                               <div className="flex items-center gap-2">
                                 <a
                                   href={submission.submissionUrl}
                                   target="_blank"
                                   rel="noopener noreferrer"
-                                  className="flex items-center gap-1 text-[8px] text-primary hover:underline"
+                                  className="inline-flex items-center gap-1 font-body text-[12px] font-medium text-primary hover:underline"
                                 >
-                                  <ExternalLink className="w-3 h-3" />
+                                  <ExternalLink className="h-3.5 w-3.5" />
                                   View Submission
                                 </a>
-                                <span className="text-[8px] text-muted-foreground">
+                                <span className="font-body text-[12px] text-text-muted">
                                   •
                                 </span>
-                                <span className="text-[8px] text-muted-foreground">
+                                <span className="font-body text-[12px] text-text-muted">
                                   {new Date(
                                     submission.submittedAt,
                                   ).toLocaleDateString()}
                                 </span>
                               </div>
+
                               {submission.feedback && (
-                                <div className="mt-2 p-2 bg-muted/50 rounded border">
-                                  <p className="text-[8px] text-muted-foreground mb-0.5">
-                                    Feedback:
+                                <div className="mt-2 rounded-input border border-surface-border bg-white p-2">
+                                  <p className="mb-0.5 font-body text-[12px] font-semibold text-text-muted">
+                                    Feedback
                                   </p>
-                                  <p className="text-[8px]">
+                                  <p className="font-body text-[13px] text-text-body">
                                     {submission.feedback}
                                   </p>
                                 </div>
                               )}
+
                               {isAdmin && submission.status === "submitted" && (
                                 <div className="mt-2">
-                                  {reviewingSubmission?.id === submission.id ? (
-                                    <div className="space-y-2 p-2 bg-muted/30 rounded">
+                                  {isReviewing ? (
+                                    <div className="space-y-2 rounded-input bg-white p-3">
                                       <div>
-                                        <label className="text-[8px] text-muted-foreground">
+                                        <label className="mb-1 block font-body text-[12px] font-semibold text-text-muted">
                                           Status
                                         </label>
-                                        <select
+                                        <Select
                                           value={reviewData.status}
-                                          onChange={(e) =>
+                                          onValueChange={(value) =>
                                             setReviewData({
                                               ...reviewData,
-                                              status: e.target.value,
+                                              status: value,
                                             })
                                           }
-                                          className="w-full h-6 text-[9px] rounded-md border border-input bg-background px-2 mt-1"
                                         >
-                                          <option value="approved">
-                                            Approved
-                                          </option>
-                                          <option value="revision_requested">
-                                            Needs revision
-                                          </option>
-                                          <option value="rejected">
-                                            Rejected
-                                          </option>
-                                          <option value="reviewed">
-                                            Reviewed
-                                          </option>
-                                        </select>
+                                          <SelectTrigger className="font-body text-[13px]">
+                                            <SelectValue />
+                                          </SelectTrigger>
+                                          <SelectContent>
+                                            {REVIEW_STATUS_OPTIONS.map(
+                                              (option) => (
+                                                <SelectItem
+                                                  key={option.value}
+                                                  value={option.value}
+                                                  className="font-body text-[13px]"
+                                                >
+                                                  {option.label}
+                                                </SelectItem>
+                                              ),
+                                            )}
+                                          </SelectContent>
+                                        </Select>
                                       </div>
                                       <div>
-                                        <label className="text-[8px] text-muted-foreground">
+                                        <label className="mb-1 block font-body text-[12px] font-semibold text-text-muted">
                                           Feedback
                                         </label>
                                         <Textarea
@@ -520,7 +544,7 @@ export default function DeliverablesManager({
                                             })
                                           }
                                           placeholder="Provide feedback..."
-                                          className="text-[9px] min-h-[50px] mt-1"
+                                          className="min-h-[50px] font-body text-[13px]"
                                         />
                                       </div>
                                       <div className="flex gap-2">
@@ -531,12 +555,11 @@ export default function DeliverablesManager({
                                               submission.id,
                                             )
                                           }
-                                          className="h-6 text-[8px]"
+                                          className={PRIMARY_BUTTON}
                                         >
                                           Submit Review
                                         </Button>
                                         <Button
-                                          variant="outline"
                                           size="sm"
                                           onClick={() => {
                                             setReviewingSubmission(null);
@@ -545,7 +568,7 @@ export default function DeliverablesManager({
                                               feedback: "",
                                             });
                                           }}
-                                          className="h-6 text-[8px]"
+                                          className={OUTLINE_BUTTON}
                                         >
                                           Cancel
                                         </Button>
@@ -553,27 +576,26 @@ export default function DeliverablesManager({
                                     </div>
                                   ) : (
                                     <Button
-                                      variant="outline"
                                       size="sm"
                                       onClick={() =>
                                         setReviewingSubmission(submission)
                                       }
-                                      className="h-6 text-[8px] w-full"
+                                      className={`w-full ${OUTLINE_BUTTON}`}
                                     >
-                                      <MessageSquare className="w-3 h-3 mr-1" />
+                                      <MessageSquare className="mr-2 h-4 w-4" />
                                       Review
                                     </Button>
                                   )}
                                 </div>
                               )}
-                            </CardContent>
-                          </Card>
-                        ))}
+                            </div>
+                          );
+                        })}
                       </div>
                     )}
                   </div>
-                </CardContent>
-              </Card>
+                </SectionCard.Body>
+              </SectionCard>
             )}
           </div>
         </div>

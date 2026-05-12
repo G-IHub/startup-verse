@@ -1,13 +1,14 @@
 /**
  * ORGANIZATION SIDEBAR NAVIGATION
- * Clean vertical sidebar matching founder dashboard style
- * Compact icon-based navigation with labels
- * Mobile-responsive with drawer pattern
+ * Narrow icon-rail sidebar styled to match the Talent/Founder/Team-mate
+ * design language (brand gradient logo disc, primary-tint hover, primary
+ * accent bar + ring on the active item, soft right-edge shadow).
+ *
+ * Mobile-responsive with drawer pattern. Prop API is unchanged.
  */
 import React from "react";
 import { Button } from "../ui/button";
-import { Badge } from "../ui/badge";
-import { Separator } from "../ui/separator";
+import { cn } from "../ui/utils";
 import {
   Home,
   Activity,
@@ -20,10 +21,10 @@ import {
   BookOpen,
   Users,
   Settings,
-  LogOut,
   X,
   Sparkles,
 } from "lucide-react";
+
 export default function OrganizationSidebar({
   currentPage,
   onPageChange,
@@ -37,105 +38,59 @@ export default function OrganizationSidebar({
 }) {
   const handleNavClick = (page) => {
     onPageChange(page);
-    // Auto-close on mobile after navigation
     if (onClose && window.innerWidth < 768) {
       onClose();
     }
   };
 
-  // Primary navigation items
   const primaryNavItems = [
-    {
-      id: "home",
-      label: "Home",
-      icon: Home,
-    },
-    {
-      id: "portfolio",
-      label: "Portfolio",
-      icon: Activity,
-    },
-    {
-      id: "analytics",
-      label: "Analytics",
-      icon: BarChart3,
-    },
+    { id: "home", label: "Home", icon: Home },
+    { id: "portfolio", label: "Portfolio", icon: Activity },
+    { id: "analytics", label: "Analytics", icon: BarChart3 },
   ];
 
-  // Secondary navigation items
   const secondaryNavItems = [
-    {
-      id: "milestones",
-      label: "Milestones",
-      icon: Target,
-    },
-    {
-      id: "deliverables",
-      label: "Deliverables",
-      icon: FileText,
-    },
-    {
-      id: "events",
-      label: "Agenda",
-      icon: Calendar,
-    },
-    {
-      id: "communication",
-      label: "Communication",
-      icon: Bell,
-    },
-    {
-      id: "mentors",
-      label: "Mentors",
-      icon: UserPlus,
-    },
-    {
-      id: "resources",
-      label: "Library",
-      icon: BookOpen,
-    },
-    {
-      id: "members",
-      label: "Members",
-      icon: Users,
-      badge: stats?.totalStartups,
-    },
+    { id: "milestones", label: "Milestones", icon: Target },
+    { id: "deliverables", label: "Deliverables", icon: FileText },
+    { id: "events", label: "Agenda", icon: Calendar },
+    { id: "communication", label: "Communication", icon: Bell },
+    { id: "mentors", label: "Mentors", icon: UserPlus },
+    { id: "resources", label: "Library", icon: BookOpen },
+    { id: "members", label: "Members", icon: Users, badge: stats?.totalStartups },
   ];
 
-  // Utility navigation items
-  const utilityNavItems = [
-    {
-      id: "settings",
-      label: "Settings",
-      icon: Settings,
-    },
-  ];
+  const utilityNavItems = [{ id: "settings", label: "Settings", icon: Settings }];
+
   const NavButton = ({ item }) => {
     const Icon = item.icon;
     const active = currentPage === item.id;
     return (
       <button
-        className={`w-full flex flex-col items-center justify-center py-3 px-2 rounded-lg transition-all duration-200 relative group ${active ? "bg-primary/10 text-primary" : "text-muted-foreground hover:bg-muted/50 hover:text-foreground"}`}
+        type="button"
         onClick={() => handleNavClick(item.id)}
+        className={cn(
+          "relative w-full flex flex-col items-center justify-center gap-0.5 py-2 px-2 rounded-input transition-all duration-200 ease-in-out",
+          active
+            ? "bg-[rgba(58,90,254,0.15)] text-primary"
+            : "text-white/45 hover:bg-white/[0.06] hover:text-white/85",
+        )}
       >
         {active && (
-          <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-8 bg-primary rounded-r-full" />
+          <span className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-7 bg-primary rounded-r-pill" />
         )}
-        <Icon className={`w-5 h-5 mb-1 ${active ? "text-primary" : ""}`} />
-        <span className="text-[10px] leading-tight text-center">
+        <Icon className="w-4 h-4" />
+        <span className="font-body text-[11px] font-medium leading-tight text-center">
           {item.label}
         </span>
-        {item.badge !== undefined && (
-          <Badge
-            variant="default"
-            className="absolute -top-0.5 -right-0.5 text-[9px] flex items-center justify-center rounded-full w-4 h-4 p-0"
-          >
+        {item.badge !== undefined && item.badge !== null && (
+          <span className="absolute -top-0.5 -right-0.5 inline-flex items-center justify-center min-w-[16px] h-[16px] px-1 rounded-full bg-primary text-white font-body text-[11px] font-semibold leading-none border-2 border-primary-dark">
             {item.badge}
-          </Badge>
+          </span>
         )}
       </button>
     );
   };
+
   return (
     <>
       {isOpen && onClose && (
@@ -145,44 +100,31 @@ export default function OrganizationSidebar({
         />
       )}
       <aside
-        className={`
-        w-24 bg-background/95 border-r border-border flex flex-col h-screen
-        fixed md:static left-0 top-0 z-50
-        transition-transform duration-300 ease-in-out
-        ${isOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"}
-      `}
+        className={cn(
+          "w-24 bg-primary-dark flex flex-col h-screen",
+          "fixed md:static left-0 top-0 z-50",
+          "shadow-[2px_0_12px_rgba(26,35,126,0.10)]",
+          "transition-transform duration-300 ease-in-out",
+          isOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0",
+        )}
       >
-        <div className="p-4 flex items-center justify-center">
-          <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-primary to-accent flex items-center justify-center shadow-lg shadow-primary/20">
-            <Sparkles className="w-6 h-6 text-white" />
+        <div className="p-3 flex items-center justify-center">
+          <div className="w-10 h-10 rounded-[10px] bg-primary flex items-center justify-center shadow-[0_4px_16px_rgba(58,90,254,0.25)]">
+            <Sparkles className="w-5 h-5 text-white" />
           </div>
         </div>
-        <Separator />
-        <nav className="flex-1 py-4 px-2 space-y-1 overflow-y-auto">
+        <nav className="flex-1 px-2 space-y-0.5">
           {primaryNavItems.map((item) => (
             <NavButton key={item.id} item={item} />
           ))}
-          <Separator className="my-2" />
           {secondaryNavItems.map((item) => (
             <NavButton key={item.id} item={item} />
           ))}
         </nav>
-        <Separator />
-        <div className="px-2 py-4 space-y-1">
+        <div className="px-2 py-2 space-y-0.5">
           {utilityNavItems.map((item) => (
             <NavButton key={item.id} item={item} />
           ))}
-          {onLogout && (
-            <button
-              className="w-full flex flex-col items-center justify-center py-3 px-2 rounded-lg transition-all duration-200 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
-              onClick={onLogout}
-            >
-              <LogOut className="w-5 h-5 mb-1" />
-              <span className="text-[10px] leading-tight text-center">
-                Logout
-              </span>
-            </button>
-          )}
         </div>
         {onClose && (
           <Button
