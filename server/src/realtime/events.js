@@ -29,4 +29,7 @@ export const SOCKET_EVENTS = Object.freeze({
   DELIVERABLE_UPDATED: "deliverable:updated",
   DELIVERABLE_DELETED: "deliverable:deleted",
   DELIVERABLE_ARCHIVED: "deliverable:archived",
+  ANNOUNCEMENT_UPDATED: "announcement:updated",
+  ANNOUNCEMENT_DELETED: "announcement:deleted",
+  ANNOUNCEMENT_READ: "announcement:read",
 });

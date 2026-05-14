@@ -34,6 +34,11 @@ function mapResource(r) {
   return { ...o, id: String(o._id) };
 }
 
+function mapAnnouncement(a) {
+  const o = a.toObject ? a.toObject() : a;
+  return { ...o, id: String(o._id) };
+}
+
 function normalizeTags(value) {
   if (Array.isArray(value)) {
     return value.map((tag) => String(tag).trim()).filter(Boolean);
@@ -130,6 +135,27 @@ function coerceEventPayload(body, { isUpdate = false } = {}) {
   }
   if (!isUpdate || has("capacity")) {
     out.capacity = toFiniteNumberOrNull(body.capacity);
+  }
+  return out;
+}
+
+function coerceAnnouncementPayload(body, { isUpdate = false } = {}) {
+  const out = {};
+  const has = (k) =>
+    Object.prototype.hasOwnProperty.call(body, k) && body[k] !== undefined;
+
+  if (!isUpdate || has("title")) out.title = body.title || "Announcement";
+  if (!isUpdate || has("body") || has("message")) {
+    out.body = body.body || body.message || "";
+  }
+  if (!isUpdate || has("priority")) {
+    out.priority = coerceEnum(body.priority, ANNOUNCEMENT_PRIORITIES, "normal");
+  }
+  if (!isUpdate || has("category")) {
+    out.category = coerceEnum(body.category, ANNOUNCEMENT_CATEGORIES, "general");
+  }
+  if (!isUpdate || has("emoji")) {
+    out.emoji = typeof body.emoji === "string" ? body.emoji : "";
   }
   return out;
 }
@@ -241,26 +267,18 @@ export const deleteCohortEvent = async (req, res) => {
 
 export const listCohortAnnouncements = async (req, res) => {
   const rows = await Announcement.find({ cohortId: req.params.cohortId }).sort({ createdAt: -1 });
-  return apiSuccess(res, {
-    announcements: rows.map((a) => {
-      const o = a.toObject();
-      return { ...o, id: String(o._id) };
-    }),
-  });
+  return apiSuccess(res, { announcements: rows.map(mapAnnouncement) });
 };
 
 export const createCohortAnnouncement = async (req, res) => {
   const body = req.body || {};
   const cohortId = req.params.cohortId || body.cohortId;
+  const coerced = coerceAnnouncementPayload(body, { isUpdate: false });
   const announcement = await Announcement.create({
     cohortId,
     founderId: body.founderId || null,
     organizationId: body.organizationId || null,
-    title: body.title || "Announcement",
-    body: body.body || body.message || "",
-    priority: coerceEnum(body.priority, ANNOUNCEMENT_PRIORITIES, "normal"),
-    category: coerceEnum(body.category, ANNOUNCEMENT_CATEGORIES, "general"),
-    emoji: typeof body.emoji === "string" ? body.emoji : "",
+    ...coerced,
     createdBy:
       typeof body.createdBy === "string" && body.createdBy.trim()
         ? body.createdBy.trim()
@@ -291,8 +309,103 @@ export const createCohortAnnouncement = async (req, res) => {
     console.error("[createCohortAnnouncement] notify failed:", err.message);
   }
 
-  const o = announcement.toObject();
-  return apiSuccess(res, { announcement: { ...o, id: String(o._id) } }, 201);
+  return apiSuccess(res, { announcement: mapAnnouncement(announcement) }, 201);
+};
+
+async function resolveCohortOrgId(announcement, cohortId) {
+  if (announcement.organizationId) return String(announcement.organizationId);
+  const cohort = await Cohort.findOne({ _id: cohortId, deletedAt: null })
+    .select("organizationId")
+    .lean();
+  return cohort?.organizationId ? String(cohort.organizationId) : null;
+}
+
+/** PUT /cohorts/:cohortId/announcements/:announcementId */
+export const updateCohortAnnouncement = async (req, res) => {
+  const { cohortId, announcementId } = req.params;
+  const announcement = await Announcement.findById(announcementId);
+  if (!announcement) {
+    return apiError(res, "Announcement not found.", 404);
+  }
+  if (String(announcement.cohortId) !== String(cohortId)) {
+    return apiError(res, "Announcement does not belong to this cohort.", 403);
+  }
+
+  const patch = coerceAnnouncementPayload(req.body || {}, { isUpdate: true });
+  Object.assign(announcement, patch);
+  await announcement.save();
+
+  const dto = mapAnnouncement(announcement);
+  const orgId = await resolveCohortOrgId(announcement, cohortId);
+  if (orgId) {
+    emitRealtime(SOCKET_EVENTS.ANNOUNCEMENT_UPDATED, dto, [organizationRoom(orgId)]);
+  }
+  return apiSuccess(res, { announcement: dto });
+};
+
+/** DELETE /cohorts/:cohortId/announcements/:announcementId */
+export const deleteCohortAnnouncement = async (req, res) => {
+  const { cohortId, announcementId } = req.params;
+  const announcement = await Announcement.findById(announcementId);
+  if (!announcement) {
+    return apiError(res, "Announcement not found.", 404);
+  }
+  if (String(announcement.cohortId) !== String(cohortId)) {
+    return apiError(res, "Announcement does not belong to this cohort.", 403);
+  }
+
+  const id = String(announcement._id);
+  const orgId = await resolveCohortOrgId(announcement, cohortId);
+  await Announcement.findByIdAndDelete(announcementId);
+
+  if (orgId) {
+    emitRealtime(
+      SOCKET_EVENTS.ANNOUNCEMENT_DELETED,
+      { id, cohortId: String(cohortId), organizationId: orgId },
+      [organizationRoom(orgId)],
+    );
+  }
+  return apiSuccess(res, { deleted: true, id });
+};
+
+/** POST /cohorts/:cohortId/announcements/:announcementId/read */
+export const markAnnouncementRead = async (req, res) => {
+  const { cohortId, announcementId } = req.params;
+  const userId = String(req.user?.id || "");
+  if (!userId) {
+    return apiError(res, "Authentication required.", 401);
+  }
+
+  const result = await Announcement.updateOne(
+    { _id: announcementId, cohortId },
+    { $addToSet: { readBy: userId } },
+  );
+  if (!result.matchedCount) {
+    return apiError(res, "Announcement not found.", 404);
+  }
+
+  const fresh = await Announcement.findById(announcementId)
+    .select("organizationId readBy")
+    .lean();
+  const readCount = Array.isArray(fresh?.readBy) ? fresh.readBy.length : 0;
+  const orgId = fresh?.organizationId
+    ? String(fresh.organizationId)
+    : await resolveCohortOrgId({ organizationId: null }, cohortId);
+
+  if (orgId) {
+    emitRealtime(
+      SOCKET_EVENTS.ANNOUNCEMENT_READ,
+      {
+        id: String(announcementId),
+        cohortId: String(cohortId),
+        organizationId: orgId,
+        userId,
+        readCount,
+      },
+      [organizationRoom(orgId)],
+    );
+  }
+  return apiSuccess(res, { marked: true, id: String(announcementId), readCount });
 };
 
 export const listCohortResources = async (req, res) => {

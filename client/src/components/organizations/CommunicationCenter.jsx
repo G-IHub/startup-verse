@@ -27,10 +27,17 @@ import {
   Mail,
   MailOpen,
   Reply,
+  Pencil,
+  Trash2,
 } from "lucide-react";
 import { unwrapData } from "../../utils/apiEnvelope";
 import { toastError } from "../../utils/toastError";
 import { toast } from "sonner";
+import {
+  updateCohortAnnouncement as updateCohortAnnouncementApi,
+  deleteCohortAnnouncement as deleteCohortAnnouncementApi,
+  markCohortAnnouncementRead as markCohortAnnouncementReadApi,
+} from "../../utils/api/organizationApi";
 import {
   GradientHero,
   SectionCard,
@@ -79,6 +86,7 @@ export default function CommunicationCenter({
     content: "",
     priority: "normal",
   });
+  const [editingAnnouncementId, setEditingAnnouncementId] = useState(null);
   const [messageData, setMessageData] = useState({
     subject: "",
     message: "",
@@ -131,6 +139,49 @@ export default function CommunicationCenter({
     };
   }, [activeTab, messages, userId]);
 
+  useEffect(() => {
+    if (activeTab !== "announcements") return;
+    if (isAdmin) return;
+    if (!userId) return;
+    const meIdStr = String(userId);
+    const unreadIds = announcements
+      .filter((a) => {
+        const readBy = Array.isArray(a.readBy) ? a.readBy : [];
+        return !readBy.map((v) => String(v)).includes(meIdStr);
+      })
+      .map((a) => a.id || a._id)
+      .filter(Boolean);
+    if (unreadIds.length === 0) return;
+
+    let cancelled = false;
+    (async () => {
+      const marked = [];
+      for (const id of unreadIds) {
+        try {
+          await markCohortAnnouncementReadApi(cohortId, id);
+          marked.push(String(id));
+        } catch (error) {
+          console.error("Error marking announcement as read:", error);
+        }
+      }
+      if (cancelled || marked.length === 0) return;
+      const markedSet = new Set(marked);
+      setAnnouncements((prev) =>
+        prev.map((a) => {
+          const aid = String(a.id || a._id);
+          if (!markedSet.has(aid)) return a;
+          const readBy = Array.isArray(a.readBy) ? a.readBy : [];
+          if (readBy.map((v) => String(v)).includes(meIdStr)) return a;
+          return { ...a, readBy: [...readBy, meIdStr] };
+        }),
+      );
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [activeTab, announcements, isAdmin, userId, cohortId]);
+
   const loadAnnouncements = async () => {
     try {
       setLoading(true);
@@ -163,9 +214,76 @@ export default function CommunicationCenter({
     }
   };
 
+  const resetAnnouncementForm = () => {
+    setAnnouncementData({ title: "", content: "", priority: "normal" });
+    setEditingAnnouncementId(null);
+    setShowAnnouncementForm(false);
+  };
+
+  const handleStartEditAnnouncement = (announcement) => {
+    setEditingAnnouncementId(announcement.id || announcement._id);
+    setAnnouncementData({
+      title: announcement.title || "",
+      content: announcement.body || announcement.content || "",
+      priority: announcement.priority || "normal",
+    });
+    setShowAnnouncementForm(true);
+    window?.scrollTo?.({ top: 0, behavior: "smooth" });
+  };
+
+  const handleDeleteAnnouncement = async (announcement) => {
+    const id = announcement.id || announcement._id;
+    if (!id) return;
+    const ok =
+      typeof window !== "undefined" && typeof window.confirm === "function"
+        ? window.confirm(
+            `Delete announcement "${announcement.title || ""}"? This cannot be undone.`,
+          )
+        : true;
+    if (!ok) return;
+    try {
+      await deleteCohortAnnouncementApi(cohortId, id);
+      setAnnouncements((prev) =>
+        prev.filter((a) => String(a.id || a._id) !== String(id)),
+      );
+      if (String(editingAnnouncementId) === String(id)) {
+        resetAnnouncementForm();
+      }
+      toast.success("Announcement deleted");
+    } catch (error) {
+      console.error("Error deleting announcement:", error);
+      toastError(error, "Failed to delete announcement");
+    }
+  };
+
   const handleCreateAnnouncement = async (e) => {
     e.preventDefault();
     try {
+      if (editingAnnouncementId) {
+        const payload = {
+          title: announcementData.title,
+          body: announcementData.content,
+          priority: announcementData.priority,
+        };
+        const result = await updateCohortAnnouncementApi(
+          cohortId,
+          editingAnnouncementId,
+          payload,
+        );
+        const updated = result?.announcement || null;
+        setAnnouncements((prev) =>
+          prev.map((a) =>
+            String(a.id || a._id) === String(editingAnnouncementId)
+              ? { ...a, ...(updated || payload) }
+              : a,
+          ),
+        );
+        toast.success("Announcement updated");
+        resetAnnouncementForm();
+        loadAnnouncements();
+        return;
+      }
+
       const response = await fetch(
         `${API_BASE}/cohorts/${cohortId}/announcements`,
         {
@@ -186,12 +304,16 @@ export default function CommunicationCenter({
         err.status = response.status;
         throw err;
       }
-      setAnnouncementData({ title: "", content: "", priority: "normal" });
-      setShowAnnouncementForm(false);
+      resetAnnouncementForm();
       loadAnnouncements();
     } catch (error) {
-      console.error("Error creating announcement:", error);
-      toastError(error, "Failed to create announcement");
+      console.error("Error saving announcement:", error);
+      toastError(
+        error,
+        editingAnnouncementId
+          ? "Failed to update announcement"
+          : "Failed to create announcement",
+      );
     }
   };
 
@@ -326,11 +448,24 @@ export default function CommunicationCenter({
         <TabsContent value="announcements" className="mt-3 space-y-3">
           {isAdmin && (
             <CollapsibleFormCard
-              title="Create Announcement"
-              description="Post an update visible to all cohort members"
-              triggerLabel="New"
+              title={
+                editingAnnouncementId
+                  ? "Edit Announcement"
+                  : "Create Announcement"
+              }
+              description={
+                editingAnnouncementId
+                  ? "Update this announcement for all cohort members"
+                  : "Post an update visible to all cohort members"
+              }
+              triggerLabel={editingAnnouncementId ? "Editing" : "New"}
               isOpen={showAnnouncementForm}
-              onToggle={setShowAnnouncementForm}
+              onToggle={(next) => {
+                setShowAnnouncementForm(next);
+                if (!next && editingAnnouncementId) {
+                  resetAnnouncementForm();
+                }
+              }}
             >
               <form
                 onSubmit={handleCreateAnnouncement}
@@ -399,10 +534,24 @@ export default function CommunicationCenter({
                     </SelectContent>
                   </Select>
                 </div>
-                <Button type="submit" size="sm" className={PRIMARY_BUTTON}>
-                  <Bell className="mr-2 h-4 w-4" />
-                  Post Announcement
-                </Button>
+                <div className="flex gap-2">
+                  <Button type="submit" size="sm" className={PRIMARY_BUTTON}>
+                    <Bell className="mr-2 h-4 w-4" />
+                    {editingAnnouncementId
+                      ? "Save Changes"
+                      : "Post Announcement"}
+                  </Button>
+                  {editingAnnouncementId && (
+                    <Button
+                      type="button"
+                      size="sm"
+                      onClick={resetAnnouncementForm}
+                      className="h-9 rounded-input border border-surface-border bg-white font-body text-[13px] font-medium text-text-body hover:bg-surface-page"
+                    >
+                      Cancel
+                    </Button>
+                  )}
+                </div>
               </form>
             </CollapsibleFormCard>
           )}
@@ -467,6 +616,32 @@ export default function CommunicationCenter({
                           {announcement.body || announcement.content}
                         </p>
                       </div>
+                      {isAdmin && (
+                        <div className="flex shrink-0 items-center gap-1">
+                          <Button
+                            type="button"
+                            size="sm"
+                            onClick={() =>
+                              handleStartEditAnnouncement(announcement)
+                            }
+                            aria-label="Edit announcement"
+                            className="h-8 w-8 rounded-input p-0 text-text-muted hover:bg-primary-tint hover:text-primary"
+                          >
+                            <Pencil className="h-3.5 w-3.5" />
+                          </Button>
+                          <Button
+                            type="button"
+                            size="sm"
+                            onClick={() =>
+                              handleDeleteAnnouncement(announcement)
+                            }
+                            aria-label="Delete announcement"
+                            className="h-8 w-8 rounded-input p-0 text-text-muted hover:bg-red-50 hover:text-red-600"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
+                        </div>
+                      )}
                     </div>
                     <div className="flex items-center justify-between font-body text-[12px] text-text-muted">
                       <span>
