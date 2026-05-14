@@ -3,17 +3,16 @@
  */
 import React, { useState, useEffect } from "react";
 import { API_BASE_URL } from "../../config/apiBase.js";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "../ui/card";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { Textarea } from "../ui/textarea";
-import { Badge } from "../ui/badge";
+import {
+  Select,
+  SelectTrigger,
+  SelectValue,
+  SelectContent,
+  SelectItem,
+} from "../ui/select";
 import {
   Plus,
   FileText,
@@ -27,14 +26,61 @@ import {
   FolderOpen,
 } from "lucide-react";
 import { unwrapData } from "../../utils/apiEnvelope";
+import {
+  SectionCard,
+  SectionHeader,
+  StatusBadge,
+  EmptyStateBlock,
+  CollapsibleFormCard,
+} from "./_primitives";
 
 const API_BASE = API_BASE_URL;
-
-// Default fetch options for cookie-based auth
 
 const defaultOptions = {
   credentials: "include",
   headers: { "Content-Type": "application/json" },
+};
+
+const PRIMARY_BUTTON =
+  "h-9 rounded-input bg-primary font-body text-[13px] font-semibold text-white shadow-[0_4px_16px_rgba(58,90,254,0.25)] hover:bg-primary-hover";
+
+const CATEGORY_OPTIONS = [
+  { value: "general", label: "General" },
+  { value: "template", label: "Template" },
+  { value: "guide", label: "Guide" },
+  { value: "video", label: "Video" },
+  { value: "tool", label: "Tool" },
+  { value: "article", label: "Article" },
+];
+
+const TYPE_OPTIONS = [
+  { value: "link", label: "Link" },
+  { value: "document", label: "Document" },
+  { value: "video", label: "Video" },
+  { value: "template", label: "Template" },
+];
+
+const TYPE_TONE = {
+  document: "info",
+  video: "info",
+  template: "success",
+  link: "warning",
+};
+
+const TYPE_ICON = {
+  document: FileText,
+  video: Video,
+  template: FolderOpen,
+  link: LinkIcon,
+};
+
+const CATEGORY_ICON = {
+  template: FolderOpen,
+  guide: BookOpen,
+  video: Video,
+  tool: Wrench,
+  article: Newspaper,
+  general: FileText,
 };
 
 export default function ResourceLibrary({
@@ -57,15 +103,18 @@ export default function ResourceLibrary({
     url: "",
     tags: "",
   });
+
   useEffect(() => {
     loadResources();
   }, [cohortId]);
+
   const loadResources = async () => {
     try {
       setLoading(true);
-      const response = await fetch(`${API_BASE}/cohorts/${cohortId}/resources`, {
-        ...defaultOptions,
-      });
+      const response = await fetch(
+        `${API_BASE}/cohorts/${cohortId}/resources`,
+        { ...defaultOptions },
+      );
       if (!response.ok) throw new Error("Failed to fetch resources");
       const inner = unwrapData(await response.json());
       setResources(inner.resources || []);
@@ -75,27 +124,25 @@ export default function ResourceLibrary({
       setLoading(false);
     }
   };
+
   const handleCreateResource = async (e) => {
     e.preventDefault();
     try {
-      const tags = formData.tags
-        .split(",")
-        .filter((t) => t.trim())
-        .map((t) => t.trim());
-      const response = await fetch(`${API_BASE}/cohorts/${cohortId}/resources`, {
-        ...defaultOptions,
-        method: "POST",
-        body: JSON.stringify({
-          organizationId,
-          title: formData.title,
-          description: formData.description,
-          url: formData.url,
-          founderId: userId,
-        }),
-      });
+      const response = await fetch(
+        `${API_BASE}/cohorts/${cohortId}/resources`,
+        {
+          ...defaultOptions,
+          method: "POST",
+          body: JSON.stringify({
+            organizationId,
+            title: formData.title,
+            description: formData.description,
+            url: formData.url,
+            founderId: userId,
+          }),
+        },
+      );
       if (!response.ok) throw new Error("Failed to create resource");
-
-      // Reset form and reload
       setFormData({
         title: "",
         description: "",
@@ -111,52 +158,7 @@ export default function ResourceLibrary({
       alert("Failed to create resource");
     }
   };
-  const getTypeIcon = (type) => {
-    switch (type) {
-      case "document":
-        return <FileText className="w-4 h-4" />;
-      case "video":
-        return <Video className="w-4 h-4" />;
-      case "template":
-        return <FolderOpen className="w-4 h-4" />;
-      case "link":
-        return <LinkIcon className="w-4 h-4" />;
-      default:
-        return <FileText className="w-4 h-4" />;
-    }
-  };
-  const getCategoryIcon = (category) => {
-    switch (category) {
-      case "template":
-        return <FolderOpen className="w-3 h-3" />;
-      case "guide":
-        return <BookOpen className="w-3 h-3" />;
-      case "video":
-        return <Video className="w-3 h-3" />;
-      case "tool":
-        return <Wrench className="w-3 h-3" />;
-      case "article":
-        return <Newspaper className="w-3 h-3" />;
-      default:
-        return <FileText className="w-3 h-3" />;
-    }
-  };
-  const getTypeColor = (type) => {
-    switch (type) {
-      case "document":
-        return "bg-blue-500/10 text-blue-700 dark:text-blue-400 border-blue-500/20";
-      case "video":
-        return "bg-purple-500/10 text-purple-700 dark:text-purple-400 border-purple-500/20";
-      case "template":
-        return "bg-green-500/10 text-green-700 dark:text-green-400 border-green-500/20";
-      case "link":
-        return "bg-orange-500/10 text-orange-700 dark:text-orange-400 border-orange-500/20";
-      default:
-        return "bg-gray-500/10 text-gray-700 dark:text-gray-400 border-gray-500/20";
-    }
-  };
 
-  // Filter resources
   const filteredResources = resources.filter((resource) => {
     const matchesSearch =
       resource.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -170,293 +172,315 @@ export default function ResourceLibrary({
     return matchesSearch && matchesCategory && matchesType;
   });
 
-  // Group by category
   const categories = Array.from(new Set(resources.map((r) => r.category)));
   const types = Array.from(new Set(resources.map((r) => r.type)));
+
   return (
-    <div className="space-y-4">
-      <Card>
-        <CardHeader className="pb-3">
-          <div className="flex items-start justify-between">
+    <div className="space-y-4 font-body">
+      <SectionHeader
+        icon={BookOpen}
+        title="Resource Library"
+        description="Templates, guides, and tools for your cohort"
+      />
+
+      {isAdmin && (
+        <CollapsibleFormCard
+          title="Add Resource"
+          description="Share a link, document, or template with your cohort"
+          triggerLabel="Add Resource"
+          isOpen={showCreateForm}
+          onToggle={setShowCreateForm}
+        >
+          <form onSubmit={handleCreateResource} className="space-y-3">
             <div>
-              <CardTitle className="text-[11px]">Resource Library</CardTitle>
-              <CardDescription className="text-[9px]">
-                Templates, guides, and tools for your cohort
-              </CardDescription>
+              <label className="mb-2 block font-body text-[13px] font-medium text-text-heading">
+                Title
+              </label>
+              <Input
+                value={formData.title}
+                onChange={(e) =>
+                  setFormData({ ...formData, title: e.target.value })
+                }
+                placeholder="e.g., Pitch Deck Template"
+                required={true}
+                className="font-body text-[13px]"
+              />
             </div>
-            {isAdmin && (
-              <Button
-                size="sm"
-                onClick={() => setShowCreateForm(!showCreateForm)}
-                className="h-6 text-[9px]"
-              >
-                <Plus className="w-3 h-3 mr-1" />
-                {showCreateForm ? "Cancel" : "Add Resource"}
-              </Button>
-            )}
-          </div>
-        </CardHeader>
-        {showCreateForm && (
-          <CardContent className="border-t">
-            <form onSubmit={handleCreateResource} className="space-y-3 pt-3">
+            <div>
+              <label className="mb-2 block font-body text-[13px] font-medium text-text-heading">
+                Description
+              </label>
+              <Textarea
+                value={formData.description}
+                onChange={(e) =>
+                  setFormData({ ...formData, description: e.target.value })
+                }
+                placeholder="Brief description of this resource"
+                className="min-h-[60px] font-body text-[13px]"
+              />
+            </div>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <div>
-                <label className="text-[9px] text-muted-foreground">
-                  Title
+                <label className="mb-2 block font-body text-[13px] font-medium text-text-heading">
+                  Category
                 </label>
-                <Input
-                  value={formData.title}
-                  onChange={(e) =>
-                    setFormData({
-                      ...formData,
-                      title: e.target.value,
-                    })
+                <Select
+                  value={formData.category}
+                  onValueChange={(value) =>
+                    setFormData({ ...formData, category: value })
                   }
-                  placeholder="e.g., Pitch Deck Template"
-                  required={true}
-                  className="h-7 text-[10px]"
-                />
+                >
+                  <SelectTrigger className="font-body text-[13px]">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {CATEGORY_OPTIONS.map((opt) => (
+                      <SelectItem
+                        key={opt.value}
+                        value={opt.value}
+                        className="font-body text-[13px]"
+                      >
+                        {opt.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
               <div>
-                <label className="text-[9px] text-muted-foreground">
-                  Description
+                <label className="mb-2 block font-body text-[13px] font-medium text-text-heading">
+                  Type
                 </label>
-                <Textarea
-                  value={formData.description}
-                  onChange={(e) =>
-                    setFormData({
-                      ...formData,
-                      description: e.target.value,
-                    })
+                <Select
+                  value={formData.type}
+                  onValueChange={(value) =>
+                    setFormData({ ...formData, type: value })
                   }
-                  placeholder="Brief description of this resource"
-                  className="text-[10px] min-h-[60px]"
-                />
+                >
+                  <SelectTrigger className="font-body text-[13px]">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {TYPE_OPTIONS.map((opt) => (
+                      <SelectItem
+                        key={opt.value}
+                        value={opt.value}
+                        className="font-body text-[13px]"
+                      >
+                        {opt.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="text-[9px] text-muted-foreground">
-                    Category
-                  </label>
-                  <select
-                    value={formData.category}
-                    onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        category: e.target.value,
-                      })
-                    }
-                    className="w-full h-7 text-[10px] rounded-md border border-input bg-background px-2"
-                  >
-                    <option value="general">General</option>
-                    <option value="template">Template</option>
-                    <option value="guide">Guide</option>
-                    <option value="video">Video</option>
-                    <option value="tool">Tool</option>
-                    <option value="article">Article</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="text-[9px] text-muted-foreground">
-                    Type
-                  </label>
-                  <select
-                    value={formData.type}
-                    onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        type: e.target.value,
-                      })
-                    }
-                    className="w-full h-7 text-[10px] rounded-md border border-input bg-background px-2"
-                  >
-                    <option value="link">Link</option>
-                    <option value="document">Document</option>
-                    <option value="video">Video</option>
-                    <option value="template">Template</option>
-                  </select>
-                </div>
-              </div>
-              <div>
-                <label className="text-[9px] text-muted-foreground">URL</label>
-                <Input
-                  value={formData.url}
-                  onChange={(e) =>
-                    setFormData({
-                      ...formData,
-                      url: e.target.value,
-                    })
-                  }
-                  placeholder="https://..."
-                  required={true}
-                  type="url"
-                  className="h-7 text-[10px]"
-                />
-              </div>
-              <div>
-                <label className="text-[9px] text-muted-foreground">
-                  Tags (comma separated)
-                </label>
-                <Input
-                  value={formData.tags}
-                  onChange={(e) =>
-                    setFormData({
-                      ...formData,
-                      tags: e.target.value,
-                    })
-                  }
-                  placeholder="fundraising, pitch, template"
-                  className="h-7 text-[10px]"
-                />
-              </div>
-              <Button type="submit" size="sm" className="h-6 text-[9px]">
-                Add Resource
-              </Button>
-            </form>
-          </CardContent>
-        )}
-      </Card>
-      <Card>
-        <CardContent className="p-3">
-          <div className="flex flex-col md:flex-row gap-2">
-            <div className="flex-1 relative">
-              <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 w-3 h-3 text-muted-foreground" />
+            </div>
+            <div>
+              <label className="mb-2 block font-body text-[13px] font-medium text-text-heading">
+                URL
+              </label>
+              <Input
+                value={formData.url}
+                onChange={(e) =>
+                  setFormData({ ...formData, url: e.target.value })
+                }
+                placeholder="https://..."
+                required={true}
+                type="url"
+                className="font-body text-[13px]"
+              />
+            </div>
+            <div>
+              <label className="mb-2 block font-body text-[13px] font-medium text-text-heading">
+                Tags (comma separated)
+              </label>
+              <Input
+                value={formData.tags}
+                onChange={(e) =>
+                  setFormData({ ...formData, tags: e.target.value })
+                }
+                placeholder="fundraising, pitch, template"
+                className="font-body text-[13px]"
+              />
+            </div>
+            <Button type="submit" size="sm" className={PRIMARY_BUTTON}>
+              <Plus className="mr-2 h-4 w-4" />
+              Add Resource
+            </Button>
+          </form>
+        </CollapsibleFormCard>
+      )}
+
+      <SectionCard>
+        <SectionCard.Body className="p-3">
+          <div className="flex flex-col gap-2 md:flex-row">
+            <div className="relative flex-1">
+              <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-text-muted" />
               <Input
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Search resources..."
-                className="h-7 text-[10px] pl-7"
+                className="pl-8 font-body text-[13px]"
               />
             </div>
             <div className="flex gap-2">
-              <select
+              <Select
                 value={filterCategory}
-                onChange={(e) => setFilterCategory(e.target.value)}
-                className="h-7 text-[9px] rounded-md border border-input bg-background px-2"
+                onValueChange={(value) => setFilterCategory(value)}
               >
-                <option value="all">All Categories</option>
-                {categories.map((cat) => (
-                  <option key={cat} value={cat}>
-                    {cat}
-                  </option>
-                ))}
-              </select>
-              <select
+                <SelectTrigger className="min-w-[140px] font-body text-[13px]">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all" className="font-body text-[13px]">
+                    All Categories
+                  </SelectItem>
+                  {categories.map((cat) => (
+                    <SelectItem
+                      key={cat}
+                      value={cat}
+                      className="font-body text-[13px] capitalize"
+                    >
+                      {cat}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Select
                 value={filterType}
-                onChange={(e) => setFilterType(e.target.value)}
-                className="h-7 text-[9px] rounded-md border border-input bg-background px-2"
+                onValueChange={(value) => setFilterType(value)}
               >
-                <option value="all">All Types</option>
-                {types.map((type) => (
-                  <option key={type} value={type}>
-                    {type}
-                  </option>
-                ))}
-              </select>
+                <SelectTrigger className="min-w-[120px] font-body text-[13px]">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all" className="font-body text-[13px]">
+                    All Types
+                  </SelectItem>
+                  {types.map((type) => (
+                    <SelectItem
+                      key={type}
+                      value={type}
+                      className="font-body text-[13px] capitalize"
+                    >
+                      {type}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           </div>
-        </CardContent>
-      </Card>
+        </SectionCard.Body>
+      </SectionCard>
+
       {loading ? (
-        <Card>
-          <CardContent className="p-6 text-center">
-            <div className="animate-pulse text-[10px]">
+        <SectionCard>
+          <SectionCard.Body className="p-8 text-center">
+            <div className="animate-pulse font-body text-[13px] text-text-muted">
               Loading resources...
             </div>
-          </CardContent>
-        </Card>
+          </SectionCard.Body>
+        </SectionCard>
       ) : filteredResources.length === 0 ? (
-        <Card>
-          <CardContent className="p-8 text-center">
-            <BookOpen className="w-12 h-12 text-muted-foreground mx-auto mb-2" />
-            <p className="text-[10px] text-muted-foreground">
-              {searchQuery || filterCategory !== "all" || filterType !== "all"
-                ? "No resources match your filters"
-                : "No resources yet"}
-            </p>
-            {isAdmin && !searchQuery && filterCategory === "all" && (
-              <p className="text-[9px] text-muted-foreground mt-1">
-                Add resources to help your startups succeed
-              </p>
-            )}
-          </CardContent>
-        </Card>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-          {filteredResources.map((resource) => (
-            <Card
-              key={resource.id}
-              className="hover:shadow-md transition-shadow"
-            >
-              <CardContent className="p-3">
-                <div className="flex items-start justify-between gap-2 mb-2">
-                  <div className="p-2 bg-muted/30 rounded">
-                    {getTypeIcon(resource.type)}
-                  </div>
-                  <Badge
-                    variant="outline"
-                    className={`text-[7px] ${getTypeColor(resource.type)}`}
+        <SectionCard>
+          <SectionCard.Body className="p-0">
+            <EmptyStateBlock
+              variant="centered"
+              icon={BookOpen}
+              tone="info"
+              title={
+                searchQuery || filterCategory !== "all" || filterType !== "all"
+                  ? "No resources match your filters"
+                  : "No resources yet"
+              }
+              description={
+                isAdmin && !searchQuery && filterCategory === "all"
+                  ? "Add resources to help your startups succeed"
+                  : "Try adjusting your filters or search query"
+              }
+              action={
+                isAdmin && !searchQuery && filterCategory === "all" ? (
+                  <Button
+                    size="sm"
+                    onClick={() => setShowCreateForm(true)}
+                    className={PRIMARY_BUTTON}
                   >
-                    {resource.type}
-                  </Badge>
-                </div>
-                <h3 className="text-[10px] font-medium mb-1 truncate">
-                  {resource.title}
-                </h3>
-                {resource.description && (
-                  <p className="text-[9px] text-muted-foreground mb-2 line-clamp-2">
-                    {resource.description}
-                  </p>
-                )}
-                <div className="flex items-center gap-1.5 mb-2">
-                  <Badge variant="outline" className="text-[7px]">
-                    {getCategoryIcon(resource.category)}
-                    <span className="ml-1">{resource.category}</span>
-                  </Badge>
-                </div>
-                {resource.tags.length > 0 && (
-                  <div className="flex flex-wrap gap-1 mb-2">
-                    {resource.tags.slice(0, 3).map((tag, idx) => (
-                      <Badge
-                        key={idx}
-                        variant="outline"
-                        className="text-[7px] bg-primary/5"
-                      >
-                        {tag}
-                      </Badge>
-                    ))}
-                    {resource.tags.length > 3 && (
-                      <Badge variant="outline" className="text-[7px]">
-                        +{resource.tags.length - 3}
-                      </Badge>
-                    )}
+                    <Plus className="mr-2 h-4 w-4" />
+                    Add Resource
+                  </Button>
+                ) : null
+              }
+            />
+          </SectionCard.Body>
+        </SectionCard>
+      ) : (
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3">
+          {filteredResources.map((resource) => {
+            const TypeIcon = TYPE_ICON[resource.type] || FileText;
+            const CategoryIcon =
+              CATEGORY_ICON[resource.category] || FileText;
+            const typeTone = TYPE_TONE[resource.type] || "info";
+            return (
+              <SectionCard key={resource.id} interactive={true}>
+                <SectionCard.Body>
+                  <div className="mb-2 flex items-start justify-between gap-2">
+                    <div className="flex h-9 w-9 items-center justify-center rounded-input bg-primary-tint text-primary">
+                      <TypeIcon className="h-4 w-4" />
+                    </div>
+                    <StatusBadge tone={typeTone} label={resource.type} />
                   </div>
-                )}
-                <a
-                  href={resource.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center justify-center gap-1.5 text-[9px] text-primary hover:underline font-medium"
-                >
-                  <ExternalLink className="w-3 h-3" />
-                  Open Resource
-                </a>
-                <div className="mt-2 pt-2 border-t text-[8px] text-muted-foreground">
-                  {"Added "}
-                  {new Date(resource.createdAt).toLocaleDateString()}
-                </div>
-              </CardContent>
-            </Card>
-          ))}
+                  <h3 className="mb-1 truncate font-heading text-[14px] font-bold text-text-heading">
+                    {resource.title}
+                  </h3>
+                  {resource.description && (
+                    <p className="mb-2 line-clamp-2 font-body text-[13px] text-text-body">
+                      {resource.description}
+                    </p>
+                  )}
+                  <div className="mb-2 flex items-center gap-1.5">
+                    <span className="inline-flex items-center gap-1 rounded-full border-0 bg-surface-page px-[10px] py-[2px] font-body text-[11px] font-semibold capitalize text-text-muted">
+                      <CategoryIcon className="h-3 w-3" />
+                      {resource.category}
+                    </span>
+                  </div>
+                  {resource.tags?.length > 0 && (
+                    <div className="mb-2 flex flex-wrap gap-1">
+                      {resource.tags.slice(0, 3).map((tag, idx) => (
+                        <span
+                          key={idx}
+                          className="inline-flex items-center rounded-full border-0 bg-primary-tint px-[10px] py-[2px] font-body text-[11px] font-semibold text-primary"
+                        >
+                          {tag}
+                        </span>
+                      ))}
+                      {resource.tags.length > 3 && (
+                        <span className="inline-flex items-center rounded-full border-0 bg-surface-page px-[10px] py-[2px] font-body text-[11px] font-semibold text-text-muted">
+                          +{resource.tags.length - 3}
+                        </span>
+                      )}
+                    </div>
+                  )}
+                  <a
+                    href={resource.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center justify-center gap-1.5 font-body text-[13px] font-medium text-primary hover:underline"
+                  >
+                    <ExternalLink className="h-3.5 w-3.5" />
+                    Open Resource
+                  </a>
+                  <div className="mt-2 border-t border-surface-border pt-2 font-body text-[12px] text-text-muted">
+                    Added {new Date(resource.createdAt).toLocaleDateString()}
+                  </div>
+                </SectionCard.Body>
+              </SectionCard>
+            );
+          })}
         </div>
       )}
+
       {!loading && filteredResources.length > 0 && (
         <div className="text-center">
-          <p className="text-[9px] text-muted-foreground">
-            {"Showing "}
-            {filteredResources.length}
-            {" of "}
-            {resources.length}
-            {" resources"}
+          <p className="font-body text-[12px] text-text-muted">
+            Showing {filteredResources.length} of {resources.length} resources
           </p>
         </div>
       )}

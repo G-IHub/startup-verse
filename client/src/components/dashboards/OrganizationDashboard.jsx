@@ -1,11 +1,4 @@
 import React, { useState, useEffect } from "react";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "../ui/card";
 import { Button } from "../ui/button";
 import { Badge } from "../ui/badge";
 import {
@@ -15,7 +8,6 @@ import {
   ArrowRight,
   Settings,
   LayoutGrid,
-  FileText,
   Trash2,
   MoreVertical,
 } from "lucide-react";
@@ -44,10 +36,12 @@ import {
 import CreateOrganizationModal from "../organizations/CreateOrganizationModal";
 import CreateCohortModal from "../organizations/CreateCohortModal";
 import CohortDashboardWithSidebar from "../organizations/CohortDashboardWithSidebar";
-import PortfolioOverview from "../organizations/PortfolioOverview";
-import ProgramMilestones from "../organizations/ProgramMilestones";
-import CohortAnalyticsDashboard from "../organizations/CohortAnalyticsDashboard";
-import OrganizationAgenda from "../organizations/OrganizationAgenda";
+import {
+  GradientHero,
+  SectionCard,
+  EmptyStateBlock,
+  ListRow,
+} from "../organizations/_primitives";
 
 export default function OrganizationDashboard({
   user,
@@ -66,15 +60,7 @@ export default function OrganizationDashboard({
   const [isAdmin, setIsAdmin] = useState(false);
   const [cohortToDelete, setCohortToDelete] = useState(null);
   const [isDeleting, setIsDeleting] = useState(false);
-  const [isTransitioning, setIsTransitioning] = useState(false);
-  const [currentView, setCurrentView] = useState("home");
-  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
 
-  // Handler to change view and close mobile sidebar
-  const handleViewChange = (view) => {
-    setCurrentView(view);
-    setIsMobileSidebarOpen(false);
-  };
   useEffect(() => {
     loadOrganizations();
   }, [dashboardUserId]);
@@ -224,25 +210,27 @@ export default function OrganizationDashboard({
   // No organizations yet
   if (organizations.length === 0) {
     return (
-      <div className="max-w-4xl mx-auto p-6">
-        <Card>
-          <CardContent className="p-8 text-center">
-            <Building2 className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-            <h2 className="text-[12px] font-semibold mb-2">
+      <div className="min-h-screen bg-surface-page flex items-center justify-center p-6">
+        <SectionCard className="max-w-md w-full">
+          <SectionCard.Body className="p-8 text-center">
+            <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-primary-tint text-primary">
+              <Building2 className="h-7 w-7" />
+            </div>
+            <h2 className="font-heading text-base font-bold text-text-heading">
               No Organization Yet
             </h2>
-            <p className="text-[10px] text-muted-foreground mb-4">
+            <p className="mt-2 font-body text-[13px] text-text-body">
               Create your organization to start managing cohorts of startups
             </p>
             <Button
               onClick={() => setShowCreateOrgModal(true)}
-              className="h-7 text-[10px]"
+              className="mt-5 h-10 rounded-input bg-primary font-body text-[13px] font-semibold text-white shadow-[0_4px_16px_rgba(58,90,254,0.25)] hover:bg-primary-hover"
             >
-              <Plus className="w-3 h-3 mr-1.5" />
+              <Plus className="mr-2 h-4 w-4" />
               Create Organization
             </Button>
-          </CardContent>
-        </Card>
+          </SectionCard.Body>
+        </SectionCard>
         <CreateOrganizationModal
           isOpen={showCreateOrgModal}
           onClose={() => setShowCreateOrgModal(false)}
@@ -254,282 +242,175 @@ export default function OrganizationDashboard({
       </div>
     );
   }
+  const orgTypeLabel = (selectedOrg?.type || "accelerator").replace("-", " ");
+  const cohortCountLabel = `${cohorts.length} cohort${cohorts.length === 1 ? "" : "s"}`;
+  const orgSubtitle = selectedOrg?.description
+    ? selectedOrg.description
+    : `${cohortCountLabel} · Manage startups, milestones, and outcomes in one place`;
+
   return (
-    <div className="flex h-screen overflow-hidden bg-background">
+    <div className="flex h-screen overflow-hidden bg-surface-page">
       <div className="flex-1 flex flex-col overflow-hidden">
         <div className="flex-1 overflow-y-auto">
           {selectedOrg && (
             <>
               {!selectedCohort ? (
-                <div className="p-4 md:p-6 max-w-6xl mx-auto space-y-6">
-                  {currentView === "home" && (
-                    <>
-                      <Card>
-                        <CardHeader className="pb-3 pt-4 px-4 md:px-6">
-                          <div className="flex items-start justify-between gap-3">
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-center gap-3 flex-wrap">
-                                <CardTitle className="text-base md:text-lg">
-                                  {selectedOrg.name}
-                                </CardTitle>
-                                <Badge variant="outline" className="text-xs">
-                                  {(selectedOrg.type || "accelerator").replace(
-                                    "-",
-                                    " ",
-                                  )}
-                                </Badge>
-                                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                                  <LayoutGrid className="w-4 h-4" />
-                                  <span>
-                                    {cohorts.length}
-                                    {" cohort"}
-                                    {cohorts.length !== 1 ? "s" : ""}
-                                  </span>
-                                </div>
-                              </div>
-                              {selectedOrg.description && (
-                                <CardDescription className="text-sm mt-1.5">
-                                  {selectedOrg.description}
-                                </CardDescription>
+                <div className="p-4 md:p-6 max-w-6xl mx-auto space-y-4">
+                  <GradientHero
+                    eyebrow={orgTypeLabel.toUpperCase()}
+                    title={selectedOrg.name}
+                    subtitle={orgSubtitle}
+                    icon={Building2}
+                    actions={
+                      isAdmin
+                        ? [
+                            {
+                              label: "Settings",
+                              icon: Settings,
+                              variant: "glass",
+                              onClick: () => {},
+                            },
+                          ]
+                        : []
+                    }
+                    trailing={
+                      <span className="inline-flex items-center gap-1.5 rounded-full bg-white/15 px-3 py-1 font-body text-[12px] font-semibold text-white backdrop-blur-[4px]">
+                        <LayoutGrid className="h-3.5 w-3.5" />
+                        {cohortCountLabel}
+                      </span>
+                    }
+                  />
+                  {selectedOrg.website && (
+                    <a
+                      href={selectedOrg.website}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 font-body text-[13px] font-medium text-primary hover:underline"
+                    >
+                      <ArrowRight className="h-3.5 w-3.5" />
+                      Visit website
+                    </a>
+                  )}
+                  {cohorts.length === 0 ? (
+                    <SectionCard>
+                      <SectionCard.Body className="p-6 md:p-8">
+                        <EmptyStateBlock
+                          variant="centered"
+                          icon={Users}
+                          tone="info"
+                          title="Launch your first cohort"
+                          description="Cohorts let you invite startups, track execution, and manage outcomes in one workspace."
+                          action={
+                            <div className="flex flex-col items-center justify-center gap-3 sm:flex-row">
+                              <Button
+                                onClick={() => setShowCreateCohortModal(true)}
+                                disabled={!isAdmin}
+                                className="h-10 min-w-[190px] rounded-input bg-primary font-body text-[13px] font-semibold text-white shadow-[0_4px_16px_rgba(58,90,254,0.25)] hover:bg-primary-hover"
+                              >
+                                <Plus className="mr-2 h-4 w-4" />
+                                Create First Cohort
+                                <ArrowRight className="ml-2 h-4 w-4" />
+                              </Button>
+                              {!isAdmin && (
+                                <p className="font-body text-[12px] text-text-muted">
+                                  You are currently in observer mode. Ask an
+                                  organization admin to grant cohort management
+                                  access.
+                                </p>
                               )}
                             </div>
-                            <div className="flex items-center gap-2 flex-shrink-0">
-                              <Badge className="text-xs">
-                                {isAdmin ? "Admin" : "Observer"}
-                              </Badge>
-                              {isAdmin && (
+                          }
+                        />
+                      </SectionCard.Body>
+                    </SectionCard>
+                  ) : (
+                    <SectionCard>
+                      <SectionCard.Header
+                        title="Cohorts"
+                        description={`${cohortCountLabel} in ${selectedOrg.name}`}
+                        action={
+                          isAdmin && (
+                            <Button
+                              size="sm"
+                              onClick={() => setShowCreateCohortModal(true)}
+                              className="h-9 rounded-input bg-primary font-body text-[13px] font-semibold text-white shadow-[0_4px_16px_rgba(58,90,254,0.25)] hover:bg-primary-hover"
+                            >
+                              <Plus className="w-4 h-4 mr-2" />
+                              New Cohort
+                            </Button>
+                          )
+                        }
+                      />
+                      <SectionCard.Body>
+                        {cohorts.map((cohort) => (
+                          <ListRow
+                            key={cohort.id}
+                            onClick={() => setSelectedCohort(cohort)}
+                            title={cohort.name}
+                            description={cohort.description || undefined}
+                            meta={
+                              cohort.startDate ? (
+                                <span className="inline-flex items-center gap-1 font-body text-[12px] text-text-muted">
+                                  {"Started "}
+                                  {new Date(cohort.startDate).toLocaleDateString()}
+                                </span>
+                              ) : null
+                            }
+                            trailing={
+                              <>
+                                {cohort.stats && (
+                                  <Badge
+                                    variant="secondary"
+                                    className="rounded-full border-0 bg-primary-tint px-2.5 py-0.5 font-body text-[11px] font-semibold text-primary"
+                                  >
+                                    {cohort.stats.totalStartups || 0}
+                                    {" startups"}
+                                  </Badge>
+                                )}
                                 <Button
                                   variant="ghost"
                                   size="sm"
-                                  className="h-8 w-8 p-0"
+                                  className="h-9 rounded-input font-body text-[13px] font-medium text-primary hover:bg-primary-tint"
                                 >
-                                  <Settings className="w-4 h-4" />
+                                  View
                                 </Button>
-                              )}
-                            </div>
-                          </div>
-                        </CardHeader>
-                        {selectedOrg.website && (
-                          <CardContent className="pb-4 pt-0 px-4 md:px-6">
-                            <a
-                              href={selectedOrg.website}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="text-sm text-primary hover:underline"
-                            >
-                              Visit website
-                            </a>
-                          </CardContent>
-                        )}
-                      </Card>
-                      {cohorts.length === 0 ? (
-                        <Card className="border-border/70 shadow-sm">
-                          <CardContent className="p-6 md:p-8">
-                            <div className="rounded-2xl border border-border/60 bg-gradient-to-br from-card to-muted/30 p-6 md:p-8">
-                              <div className="mx-auto max-w-2xl text-center">
-                                <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-primary/10 text-primary">
-                                  <Users className="h-7 w-7" />
-                                </div>
-                                <h3 className="text-lg font-semibold text-foreground">
-                                  Launch your first cohort
-                                </h3>
-                                <p className="mt-2 text-sm text-muted-foreground">
-                                  Cohorts let you invite startups, track execution, and manage
-                                  outcomes in one workspace.
-                                </p>
-
-                                <div className="mt-6 flex flex-col items-center justify-center gap-3 sm:flex-row">
-                                  <Button
-                                    onClick={() => setShowCreateCohortModal(true)}
-                                    className="h-10 min-w-[190px] text-sm"
-                                    disabled={!isAdmin}
-                                  >
-                                    <Plus className="mr-2 h-4 w-4" />
-                                    Create First Cohort
-                                    <ArrowRight className="ml-2 h-4 w-4" />
-                                  </Button>
-                                  <Button
-                                    variant="outline"
-                                    className="h-10 min-w-[170px] text-sm"
-                                    onClick={() => setCurrentView("settings")}
-                                  >
-                                    Open Settings
-                                  </Button>
-                                </div>
-
-                                {!isAdmin ? (
-                                  <p className="mt-3 text-xs text-muted-foreground">
-                                    You are currently in observer mode. Ask an organization admin
-                                    to grant cohort management access.
-                                  </p>
-                                ) : null}
-                              </div>
-                            </div>
-                          </CardContent>
-                        </Card>
-                      ) : (
-                        <Card>
-                          <CardHeader className="pb-4 pt-4 px-4 md:px-6">
-                            <div className="flex items-center justify-between">
-                              <CardTitle className="text-base">
-                                Cohorts
-                              </CardTitle>
-                              {isAdmin && (
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() => setShowCreateCohortModal(true)}
-                                  className="h-9 text-sm"
-                                >
-                                  <Plus className="w-4 h-4 mr-2" />
-                                  New Cohort
-                                </Button>
-                              )}
-                            </div>
-                          </CardHeader>
-                          <CardContent className="pb-4 px-4 md:px-6">
-                            <div className="space-y-3">
-                              {cohorts.map((cohort) => (
-                                <div
-                                  key={cohort.id}
-                                  className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50 transition-colors cursor-pointer"
-                                  onClick={() => setSelectedCohort(cohort)}
-                                >
-                                  <div className="flex-1 min-w-0">
-                                    <h4 className="text-sm font-semibold">
-                                      {cohort.name}
-                                    </h4>
-                                    {cohort.description && (
-                                      <p className="text-sm text-muted-foreground mt-1 truncate">
-                                        {cohort.description}
-                                      </p>
-                                    )}
-                                    {cohort.startDate && (
-                                      <p className="text-xs text-muted-foreground mt-1">
-                                        {"Started "}
-                                        {new Date(
-                                          cohort.startDate,
-                                        ).toLocaleDateString()}
-                                      </p>
-                                    )}
-                                  </div>
-                                  <div className="flex items-center gap-3 flex-shrink-0 ml-4">
-                                    {cohort.stats && (
-                                      <Badge
-                                        variant="secondary"
-                                        className="text-xs"
-                                      >
-                                        {cohort.stats.totalStartups || 0}
-                                        {" startups"}
-                                      </Badge>
-                                    )}
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
-                                      className="h-9 text-sm"
+                                {isAdmin && (
+                                  <DropdownMenu>
+                                    <DropdownMenuTrigger
+                                      asChild={true}
+                                      onClick={(e) => e.stopPropagation()}
                                     >
-                                      View
-                                    </Button>
-                                    {isAdmin && (
-                                      <DropdownMenu>
-                                        <DropdownMenuTrigger
-                                          asChild={true}
-                                          onClick={(e) => e.stopPropagation()}
-                                        >
-                                          <Button
-                                            variant="ghost"
-                                            size="sm"
-                                            className="h-8 w-8 p-0"
-                                          >
-                                            <MoreVertical className="w-4 h-4" />
-                                          </Button>
-                                        </DropdownMenuTrigger>
-                                        <DropdownMenuContent
-                                          align="end"
-                                          className="w-40"
-                                        >
-                                          <DropdownMenuItem
-                                            onClick={(e) => {
-                                              e.stopPropagation();
-                                              setCohortToDelete(cohort);
-                                            }}
-                                            className="text-sm text-destructive focus:text-destructive"
-                                          >
-                                            <Trash2 className="w-4 h-4 mr-2" />
-                                            Delete Cohort
-                                          </DropdownMenuItem>
-                                        </DropdownMenuContent>
-                                      </DropdownMenu>
-                                    )}
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
-                          </CardContent>
-                        </Card>
-                      )}
-                    </>
-                  )}
-                  {currentView === "portfolio" && selectedOrg && (
-                    <PortfolioOverview organizationId={selectedOrg.id} />
-                  )}
-                  {currentView === "analytics" &&
-                    selectedOrg &&
-                    cohorts.length > 0 && (
-                      <CohortAnalyticsDashboard
-                        cohortId={cohorts[0].id}
-                        organizationId={selectedOrg.id}
-                      />
-                    )}
-                  {currentView === "milestones" && selectedOrg && (
-                    <ProgramMilestones
-                      organizationId={selectedOrg.id}
-                      cohorts={cohorts}
-                    />
-                  )}
-                  {currentView === "deliverables" && (
-                    <Card>
-                      <CardHeader>
-                        <CardTitle className="text-base">
-                          Deliverables
-                        </CardTitle>
-                        <CardDescription className="text-sm">
-                          Track and manage startup deliverables across all
-                          cohorts
-                        </CardDescription>
-                      </CardHeader>
-                      <CardContent>
-                        <div className="text-center py-12">
-                          <FileText className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-                          <p className="text-sm text-muted-foreground">
-                            Deliverables tracking coming soon
-                          </p>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  )}
-                  {currentView === "calendar" && selectedOrg && (
-                    <OrganizationAgenda organizationId={selectedOrg.id} />
-                  )}
-                  {currentView === "settings" && (
-                    <Card>
-                      <CardHeader>
-                        <CardTitle className="text-base">
-                          Organization Settings
-                        </CardTitle>
-                        <CardDescription className="text-sm">
-                          Manage your organization preferences and settings
-                        </CardDescription>
-                      </CardHeader>
-                      <CardContent>
-                        <div className="text-center py-12">
-                          <Settings className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-                          <p className="text-sm text-muted-foreground">
-                            Settings interface coming soon
-                          </p>
-                        </div>
-                      </CardContent>
-                    </Card>
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        className="h-8 w-8 p-0"
+                                      >
+                                        <MoreVertical className="w-4 h-4" />
+                                      </Button>
+                                    </DropdownMenuTrigger>
+                                    <DropdownMenuContent
+                                      align="end"
+                                      className="w-40"
+                                    >
+                                      <DropdownMenuItem
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          setCohortToDelete(cohort);
+                                        }}
+                                        className="font-body text-[13px] text-destructive focus:text-destructive"
+                                      >
+                                        <Trash2 className="w-4 h-4 mr-2" />
+                                        Delete Cohort
+                                      </DropdownMenuItem>
+                                    </DropdownMenuContent>
+                                  </DropdownMenu>
+                                )}
+                              </>
+                            }
+                          />
+                        ))}
+                      </SectionCard.Body>
+                    </SectionCard>
                   )}
                 </div>
               ) : (
@@ -581,10 +462,10 @@ export default function OrganizationDashboard({
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle className="text-base">
+            <AlertDialogTitle className="font-heading text-base font-bold text-text-heading">
               Delete Cohort
             </AlertDialogTitle>
-            <AlertDialogDescription className="text-sm">
+            <AlertDialogDescription className="font-body text-[13px] text-text-body">
               {"Are you sure you want to delete "}
               <strong>{cohortToDelete?.name}</strong>? This will remove all
               associated invitations and member data. This action cannot be
@@ -592,13 +473,16 @@ export default function OrganizationDashboard({
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel className="h-9 text-sm" disabled={isDeleting}>
+            <AlertDialogCancel
+              className="h-9 rounded-input font-body text-[13px] font-medium"
+              disabled={isDeleting}
+            >
               Cancel
             </AlertDialogCancel>
             <AlertDialogAction
               onClick={handleDeleteCohort}
               disabled={isDeleting}
-              className="h-9 text-sm bg-destructive hover:bg-destructive/90"
+              className="h-9 rounded-input bg-destructive font-body text-[13px] font-semibold text-white hover:bg-destructive/90"
             >
               {isDeleting ? "Deleting..." : "Delete Cohort"}
             </AlertDialogAction>

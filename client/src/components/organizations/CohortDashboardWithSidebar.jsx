@@ -6,8 +6,15 @@
 import React, { useState, useEffect } from "react";
 import { Card, CardContent } from "../ui/card";
 import { Button } from "../ui/button";
-import { Menu, Plus, Download } from "lucide-react";
+import { Menu, Plus, Download, Rocket, ChevronRight } from "lucide-react";
 import OrganizationSidebar from "./OrganizationSidebar";
+import {
+  SectionCard,
+  SectionHeader,
+  ListRow,
+  StatusBadge,
+  EmptyStateBlock,
+} from "./_primitives";
 import CohortHomePage from "./CohortHomePage";
 import InviteStartupModal from "./InviteStartupModal";
 import StartupSnapshotModal from "./StartupSnapshotModal";
@@ -153,6 +160,7 @@ export default function CohortDashboardWithSidebar({
             isAdmin={isAdmin}
             organizationName={organizationName}
             organizationType={organizationType}
+            userName={userName}
             onBack={onBack}
           />
         );
@@ -230,81 +238,71 @@ export default function CohortDashboardWithSidebar({
         );
       case "members":
         return (
-          <Card>
-            <CardContent className="p-6">
-              <div className="space-y-4">
-                <div className="flex items-center justify-between mb-4">
-                  <div>
-                    <h3 className="text-base font-semibold">Cohort Members</h3>
-                    <p className="text-sm text-muted-foreground">
-                      {startups.length}
-                      {" startup"}
-                      {startups.length !== 1 ? "s" : ""}
-                      {" in this cohort"}
-                    </p>
-                  </div>
-                  {isAdmin && (
-                    <Button
-                      size="sm"
-                      onClick={() => setShowInviteModal(true)}
-                      className="h-9 text-sm"
-                    >
-                      <Plus className="w-4 h-4 mr-2" />
-                      Invite Startup
-                    </Button>
-                  )}
-                </div>
-                {startups.length === 0 ? (
-                  <div className="text-center py-12">
-                    <p className="text-sm text-muted-foreground mb-2">
-                      No startups yet
-                    </p>
-                    <p className="text-sm text-muted-foreground">
-                      Click "Invite Startup" to add startups to this cohort
-                    </p>
-                  </div>
-                ) : (
-                  <div className="space-y-3">
-                    {startups.map((startup) => (
-                      <div
-                        key={startup.startupId}
-                        className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/30 transition-colors cursor-pointer"
-                        onClick={() => handleViewStartup(startup)}
+          <SectionCard>
+            <SectionCard.Header
+              title="Cohort Members"
+              description={`${startups.length} startup${startups.length !== 1 ? "s" : ""} in this cohort`}
+              action={
+                isAdmin ? (
+                  <Button
+                    size="sm"
+                    onClick={() => setShowInviteModal(true)}
+                    className="h-9 rounded-input bg-primary font-body text-[13px] font-semibold text-white shadow-[0_4px_16px_rgba(58,90,254,0.20)] hover:bg-primary-hover"
+                  >
+                    <Plus className="mr-2 h-4 w-4" />
+                    Invite Startup
+                  </Button>
+                ) : null
+              }
+            />
+            <SectionCard.Body>
+              {startups.length === 0 ? (
+                <EmptyStateBlock
+                  variant="centered"
+                  icon={Rocket}
+                  tone="info"
+                  title="No startups yet"
+                  description='Click "Invite Startup" to add startups to this cohort'
+                  action={
+                    isAdmin ? (
+                      <Button
+                        size="sm"
+                        onClick={() => setShowInviteModal(true)}
+                        className="h-9 rounded-input bg-primary font-body text-[13px] font-semibold text-white shadow-[0_4px_16px_rgba(58,90,254,0.20)] hover:bg-primary-hover"
                       >
-                        <div className="flex-1">
-                          <div className="text-sm font-semibold">
-                            {startup.startupName}
-                          </div>
-                          <div className="text-sm text-muted-foreground">
-                            {startup.founderName}
-                          </div>
+                        <Plus className="mr-2 h-4 w-4" />
+                        Invite Startup
+                      </Button>
+                    ) : null
+                  }
+                />
+              ) : (
+                <div className="space-y-2">
+                  {startups.map((startup) => (
+                    <ListRow
+                      key={startup.startupId}
+                      onClick={() => handleViewStartup(startup)}
+                      leading={
+                        <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary-tint font-heading text-[13px] font-bold text-primary">
+                          {(startup.startupName || "?")
+                            .charAt(0)
+                            .toUpperCase()}
                         </div>
-                        <div className="flex items-center gap-3">
-                          <div
-                            className={`
-                            px-3 py-1 rounded-full text-xs font-medium
-                            ${startup.status === "active" ? "bg-green-100 text-green-700 dark:bg-green-950 dark:text-green-400" : ""}
-                            ${startup.status === "slowing" ? "bg-yellow-100 text-yellow-700 dark:bg-yellow-950 dark:text-yellow-400" : ""}
-                            ${startup.status === "stalled" ? "bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-400" : ""}
-                          `}
-                          >
-                            {startup.status}
-                          </div>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-9 text-sm"
-                          >
-                            View
-                          </Button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </CardContent>
-          </Card>
+                      }
+                      title={startup.startupName}
+                      description={startup.founderName}
+                      trailing={
+                        <>
+                          <StatusBadge status={startup.status} />
+                          <ChevronRight className="h-4 w-4 text-text-muted" />
+                        </>
+                      }
+                    />
+                  ))}
+                </div>
+              )}
+            </SectionCard.Body>
+          </SectionCard>
         );
       case "settings":
         return (
@@ -338,7 +336,7 @@ export default function CohortDashboardWithSidebar({
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="animate-pulse text-[10px] text-muted-foreground">
+        <div className="animate-pulse font-body text-[13px] text-text-muted">
           Loading cohort...
         </div>
       </div>
@@ -346,9 +344,9 @@ export default function CohortDashboardWithSidebar({
   }
   if (error || !cohort) {
     return (
-      <Card>
+      <Card className="rounded-card border border-surface-border bg-white shadow-soft">
         <CardContent className="p-8 text-center">
-          <p className="text-[10px] text-red-600">
+          <p className="font-body text-[13px] text-[#ff4f6b]">
             {error || "Cohort not found"}
           </p>
         </CardContent>
@@ -356,7 +354,7 @@ export default function CohortDashboardWithSidebar({
     );
   }
   return (
-    <div className="flex h-full">
+    <div className="flex h-full bg-surface-page">
       <OrganizationSidebar
         currentPage={currentPage}
         onPageChange={setCurrentPage}
@@ -369,8 +367,8 @@ export default function CohortDashboardWithSidebar({
         onClose={() => setIsMobileSidebarOpen(false)}
       />
       <div className="flex-1 flex flex-col overflow-hidden">
-        <div className="border-b p-4 md:p-6 flex items-center justify-between gap-4 flex-shrink-0 bg-background">
-          <div className="flex items-center gap-4 flex-1 min-w-0">
+        <div className="border-b border-surface-border bg-surface-card shadow-[0_1px_8px_rgba(0,0,0,0.05)] px-4 md:px-6 py-3 flex items-center justify-between gap-4 flex-shrink-0">
+          <div className="flex items-center gap-3 flex-1 min-w-0">
             <Button
               variant="ghost"
               size="sm"
@@ -380,10 +378,10 @@ export default function CohortDashboardWithSidebar({
               <Menu className="w-5 h-5" />
             </Button>
             <div className="min-w-0 flex-1">
-              <h2 className="text-sm md:text-base font-bold truncate">
+              <h2 className="font-heading text-base md:text-lg font-bold text-text-heading truncate">
                 {cohort.name}
               </h2>
-              <p className="text-xs md:text-sm text-muted-foreground truncate">
+              <p className="font-body text-[12px] md:text-sm text-text-body truncate">
                 {cohort.description ||
                   `${cohort.stats?.totalStartups || 0} startups`}
               </p>
@@ -392,10 +390,10 @@ export default function CohortDashboardWithSidebar({
           <div className="flex items-center gap-2 flex-shrink-0">
             {onBack && (
               <Button
-                variant="ghost"
+                variant="outline"
                 size="sm"
                 onClick={onBack}
-                className="h-9 text-sm flex-shrink-0"
+                className="h-9 rounded-input border border-surface-border bg-white font-body text-[13px] font-medium text-text-body hover:border-primary hover:text-primary"
               >
                 ← Back to program
               </Button>
@@ -406,7 +404,7 @@ export default function CohortDashboardWithSidebar({
                   <Button
                     size="sm"
                     onClick={() => setShowInviteModal(true)}
-                    className="h-9 text-sm"
+                    className="h-9 rounded-input bg-primary font-body text-[13px] font-semibold text-white shadow-[0_4px_16px_rgba(58,90,254,0.20)] hover:bg-primary-hover"
                   >
                     <Plus className="w-4 h-4 mr-2" />
                     Invite Startup
@@ -419,7 +417,7 @@ export default function CohortDashboardWithSidebar({
                         variant="outline"
                         size="sm"
                         onClick={() => setShowInviteModal(true)}
-                        className="h-9 text-sm hidden sm:flex"
+                        className="h-9 rounded-input border border-surface-border bg-white font-body text-[13px] font-medium text-text-body hover:border-primary hover:text-primary hidden sm:flex"
                       >
                         <Plus className="w-4 h-4 mr-2" />
                         Invite
@@ -429,7 +427,7 @@ export default function CohortDashboardWithSidebar({
                       variant="outline"
                       size="sm"
                       onClick={handleExport}
-                      className="h-9 text-sm"
+                      className="h-9 rounded-input border border-surface-border bg-white font-body text-[13px] font-medium text-text-body hover:border-primary hover:text-primary"
                     >
                       <Download className="w-4 h-4 sm:mr-2" />
                       <span className="hidden sm:inline">Export</span>
@@ -440,7 +438,7 @@ export default function CohortDashboardWithSidebar({
             )}
           </div>
         </div>
-        <div className="flex-1 overflow-y-auto p-4 md:p-6">
+        <div className="flex-1 overflow-y-auto p-4 md:p-6 bg-surface-page">
           {renderPageContent()}
         </div>
       </div>

@@ -6,8 +6,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "../ui/dialog";
-import { Badge } from "../ui/badge";
-import { Progress } from "../ui/progress";
 import {
   Building2,
   Users,
@@ -16,149 +14,120 @@ import {
   Calendar,
   CheckCircle2,
 } from "lucide-react";
+import {
+  StatusBadge,
+  BrandProgress,
+  ListRow,
+} from "./_primitives";
 
-// Using a relaxed type since the actual data structure from CohortDashboard
-// doesn't fully match the types/organizations.ts definition
+const PANEL =
+  "rounded-input border border-surface-border bg-surface-page p-3";
+const MICRO_LABEL =
+  "font-body text-[12px] font-semibold uppercase tracking-wide text-text-muted";
 
 export default function StartupSnapshotModal({ isOpen, onClose, startup }) {
-  // Guard against undefined data
-  if (!startup) {
-    return null;
-  }
+  if (!startup) return null;
 
-  // Calculate activity status based on the status field
-  const getActivityStatus = () => {
-    const status = startup.status || "unknown";
-    switch (status.toLowerCase()) {
-      case "active":
-        return {
-          label: "Active",
-          color:
-            "text-green-600 bg-green-100 dark:bg-green-950 border-green-300",
-        };
-      case "slowing":
-        return {
-          label: "Slowing",
-          color:
-            "text-yellow-600 bg-yellow-100 dark:bg-yellow-950 border-yellow-300",
-        };
-      case "stalled":
-        return {
-          label: "Stalled",
-          color: "text-red-600 bg-red-100 dark:bg-red-950 border-red-300",
-        };
-      default:
-        return {
-          label: "Unknown",
-          color: "text-gray-600 bg-gray-100 dark:bg-gray-950 border-gray-300",
-        };
-    }
-  };
-  const activityStatus = getActivityStatus();
+  const status = (startup.status || "unknown").toLowerCase();
   const executionSummary = startup.executionSummary || {};
   const activitySummary = startup.activitySummary || {};
   const contributionBalance = startup.contributionBalance || {};
+
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+      <DialogContent className="max-h-[85vh] max-w-2xl overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="text-sm flex items-center gap-2">
-            <Building2 className="w-4 h-4 text-primary" />
+          <DialogTitle className="flex items-center gap-2 font-heading text-[18px] font-bold text-text-heading">
+            <Building2 className="h-5 w-5 text-primary" />
             {startup.startupName || "Startup"}
           </DialogTitle>
-          <DialogDescription className="text-xs">
+          <DialogDescription className="font-body text-[13px] text-text-body">
             {startup.founderName && `${startup.founderName} • `}
             {startup.founderEmail || ""}
           </DialogDescription>
         </DialogHeader>
-        <div className="space-y-3 mt-2">
+
+        <div className="mt-2 space-y-3 font-body">
           <div className="grid grid-cols-2 gap-2">
-            <div className="p-2.5 bg-muted/30 rounded-lg border">
-              <p className="text-[9px] text-muted-foreground uppercase mb-1">
-                Activity Status
-              </p>
-              <Badge className={`text-[9px] ${activityStatus.color}`}>
-                {activityStatus.label}
-              </Badge>
+            <div className={PANEL}>
+              <p className={`${MICRO_LABEL} mb-1`}>Activity Status</p>
+              <StatusBadge status={status} />
             </div>
-            <div className="p-2.5 bg-muted/30 rounded-lg border">
-              <p className="text-[9px] text-muted-foreground uppercase mb-1">
-                Team Size
-              </p>
+            <div className={PANEL}>
+              <p className={`${MICRO_LABEL} mb-1`}>Team Size</p>
               <div className="flex items-center gap-1">
-                <Users className="w-3 h-3 text-primary" />
-                <span className="text-sm font-bold">
+                <Users className="h-3.5 w-3.5 text-primary" />
+                <span className="font-heading text-[18px] font-bold text-text-heading">
                   {startup.teamSize || 1}
                 </span>
               </div>
             </div>
           </div>
+
           {startup.stageName && (
-            <div className="p-2.5 bg-muted/30 rounded-lg border">
-              <p className="text-[9px] text-muted-foreground uppercase mb-1">
-                Current Stage
-              </p>
-              <Badge variant="outline" className="text-[9px]">
-                {startup.currentStage && `Stage ${startup.currentStage}: `}
-                {startup.stageName}
-              </Badge>
+            <div className={PANEL}>
+              <p className={`${MICRO_LABEL} mb-1`}>Current Stage</p>
+              <StatusBadge
+                tone="info"
+                label={
+                  startup.currentStage
+                    ? `Stage ${startup.currentStage}: ${startup.stageName}`
+                    : startup.stageName
+                }
+              />
             </div>
           )}
+
           {executionSummary && (
-            <div className="p-2.5 bg-muted/30 rounded-lg border">
-              <div className="flex items-center gap-2 mb-2">
-                <Target className="w-3.5 h-3.5 text-primary" />
-                <h3 className="text-xs font-semibold">Execution Metrics</h3>
+            <div className={PANEL}>
+              <div className="mb-2 flex items-center gap-2">
+                <Target className="h-4 w-4 text-primary" />
+                <h3 className="font-heading text-[14px] font-semibold text-text-heading">
+                  Execution Metrics
+                </h3>
               </div>
-              <div className="grid grid-cols-3 gap-2 mb-3">
-                <div className="p-1.5 bg-background rounded border text-center">
-                  <p className="text-[9px] text-muted-foreground uppercase">
-                    Weekly Streak
-                  </p>
-                  <p className="text-sm font-bold text-primary">
+              <div className="mb-3 grid grid-cols-3 gap-2">
+                <div className="rounded-input border border-surface-border bg-white p-2 text-center">
+                  <p className={MICRO_LABEL}>Weekly Streak</p>
+                  <p className="font-heading text-[18px] font-bold text-primary">
                     {executionSummary.weeklyStreak || 0}
                   </p>
                 </div>
                 {executionSummary.milestonesCompleted !== undefined && (
-                  <div className="p-1.5 bg-background rounded border text-center">
-                    <p className="text-[9px] text-muted-foreground uppercase">
-                      Milestones
-                    </p>
-                    <p className="text-sm font-bold">
+                  <div className="rounded-input border border-surface-border bg-white p-2 text-center">
+                    <p className={MICRO_LABEL}>Milestones</p>
+                    <p className="font-heading text-[18px] font-bold text-text-heading">
                       {executionSummary.milestonesCompleted || 0}
                     </p>
                   </div>
                 )}
                 {executionSummary.tasksCompletedThisWeek !== undefined && (
-                  <div className="p-1.5 bg-background rounded border text-center">
-                    <p className="text-[9px] text-muted-foreground uppercase">
-                      This Week
-                    </p>
-                    <p className="text-sm font-bold text-green-600">
+                  <div className="rounded-input border border-surface-border bg-white p-2 text-center">
+                    <p className={MICRO_LABEL}>This Week</p>
+                    <p className="font-heading text-[18px] font-bold text-[#00c896]">
                       {executionSummary.tasksCompletedThisWeek || 0}
                     </p>
                   </div>
                 )}
               </div>
+
               {executionSummary.currentOutcome && (
-                <div className="p-2 bg-primary/5 rounded-lg border border-primary/20">
-                  <p className="text-[9px] text-muted-foreground uppercase mb-1">
-                    Current Outcome
-                  </p>
-                  <p className="text-xs font-medium mb-2">
+                <div className="rounded-input border border-primary/20 bg-primary-tint p-3">
+                  <p className={`${MICRO_LABEL} mb-1`}>Current Outcome</p>
+                  <p className="mb-2 font-body text-[13px] font-medium text-text-heading">
                     {executionSummary.currentOutcome.title}
                   </p>
                   {executionSummary.currentOutcome.progress !== undefined && (
                     <div className="space-y-1.5">
-                      <div className="flex items-center justify-between text-[9px]">
-                        <span className="text-muted-foreground">Progress</span>
-                        <span className="font-medium">
+                      <div className="flex items-center justify-between font-body text-[12px]">
+                        <span className="text-text-muted">Progress</span>
+                        <span className="font-medium text-text-heading">
                           {executionSummary.currentOutcome.progress}%
                         </span>
                       </div>
-                      <Progress
+                      <BrandProgress
                         value={executionSummary.currentOutcome.progress}
-                        className="h-1.5"
+                        size="sm"
                       />
                     </div>
                   )}
@@ -166,14 +135,12 @@ export default function StartupSnapshotModal({ isOpen, onClose, startup }) {
                     undefined &&
                     executionSummary.currentOutcome.milestonesTotal !==
                       undefined && (
-                      <div className="flex items-center justify-between text-[9px] mt-1.5">
-                        <span className="text-muted-foreground">
-                          Milestones
-                        </span>
-                        <span className="font-medium">
+                      <div className="mt-1.5 flex items-center justify-between font-body text-[12px]">
+                        <span className="text-text-muted">Milestones</span>
+                        <span className="font-medium text-text-heading">
                           {executionSummary.currentOutcome.milestonesComplete}/
-                          {executionSummary.currentOutcome.milestonesTotal}
-                          {" complete"}
+                          {executionSummary.currentOutcome.milestonesTotal}{" "}
+                          complete
                         </span>
                       </div>
                     )}
@@ -181,126 +148,118 @@ export default function StartupSnapshotModal({ isOpen, onClose, startup }) {
               )}
             </div>
           )}
+
           {activitySummary && Object.keys(activitySummary).length > 0 && (
-            <div className="p-2.5 bg-muted/30 rounded-lg border">
-              <div className="flex items-center gap-2 mb-2">
-                <Calendar className="w-3.5 h-3.5 text-primary" />
-                <h3 className="text-xs font-semibold">
+            <div className={PANEL}>
+              <div className="mb-2 flex items-center gap-2">
+                <Calendar className="h-4 w-4 text-primary" />
+                <h3 className="font-heading text-[14px] font-semibold text-text-heading">
                   Recent Activity (30 days)
                 </h3>
               </div>
               <div className="grid grid-cols-2 gap-2">
                 {activitySummary.totalTasks !== undefined && (
-                  <div className="p-1.5 bg-background rounded border">
-                    <p className="text-[9px] text-muted-foreground uppercase">
-                      Total Tasks
-                    </p>
-                    <p className="text-sm font-bold">
+                  <div className="rounded-input border border-surface-border bg-white p-2">
+                    <p className={MICRO_LABEL}>Total Tasks</p>
+                    <p className="font-heading text-[18px] font-bold text-text-heading">
                       {activitySummary.totalTasks}
                     </p>
                   </div>
                 )}
                 {activitySummary.completedTasks !== undefined && (
-                  <div className="p-1.5 bg-background rounded border">
-                    <p className="text-[9px] text-muted-foreground uppercase">
-                      Completed
-                    </p>
-                    <p className="text-sm font-bold text-green-600">
+                  <div className="rounded-input border border-surface-border bg-white p-2">
+                    <p className={MICRO_LABEL}>Completed</p>
+                    <p className="font-heading text-[18px] font-bold text-[#00c896]">
                       {activitySummary.completedTasks}
                     </p>
                   </div>
                 )}
               </div>
               {activitySummary.lastActivityAt && (
-                <p className="text-[9px] text-muted-foreground mt-2">
-                  {"Last activity: "}
+                <p className="mt-2 font-body text-[12px] text-text-muted">
+                  Last activity:{" "}
                   {new Date(activitySummary.lastActivityAt).toLocaleString()}
                 </p>
               )}
             </div>
           )}
+
           {startup.lastActivity && !activitySummary?.lastActivityAt && (
-            <div className="p-2.5 bg-muted/30 rounded-lg border">
-              <p className="text-[9px] text-muted-foreground uppercase mb-1">
-                Last Activity
-              </p>
-              <p className="text-xs">
+            <div className={PANEL}>
+              <p className={`${MICRO_LABEL} mb-1`}>Last Activity</p>
+              <p className="font-body text-[13px] text-text-heading">
                 {new Date(startup.lastActivity).toLocaleString()}
               </p>
             </div>
           )}
+
           {startup.joinedCohortAt && (
-            <div className="p-2.5 bg-muted/30 rounded-lg border">
-              <p className="text-[9px] text-muted-foreground uppercase mb-1">
-                Joined Cohort
-              </p>
-              <p className="text-xs">
+            <div className={PANEL}>
+              <p className={`${MICRO_LABEL} mb-1`}>Joined Cohort</p>
+              <p className="font-body text-[13px] text-text-heading">
                 {new Date(startup.joinedCohortAt).toLocaleDateString()}
               </p>
             </div>
           )}
+
           {startup.teamMembers && startup.teamMembers.length > 0 && (
-            <div className="p-2.5 bg-muted/30 rounded-lg border">
-              <div className="flex items-center gap-2 mb-2">
-                <Users className="w-3.5 h-3.5 text-primary" />
-                <h3 className="text-xs font-semibold">
+            <div className={PANEL}>
+              <div className="mb-2 flex items-center gap-2">
+                <Users className="h-4 w-4 text-primary" />
+                <h3 className="font-heading text-[14px] font-semibold text-text-heading">
                   Team ({startup.teamMembers.length})
                 </h3>
               </div>
-              <div className="space-y-1">
+              <div className="space-y-2">
                 {startup.teamMembers.map((member, index) => (
-                  <div
+                  <ListRow
                     key={member.id || index}
-                    className="flex items-center justify-between p-1.5 bg-background rounded border"
-                  >
-                    <div>
-                      <p className="text-[10px] font-medium">{member.name}</p>
-                      {member.role && (
-                        <p className="text-[9px] text-muted-foreground">
-                          {member.role}
-                        </p>
-                      )}
-                    </div>
-                    {member.joinedAt && (
-                      <p className="text-[9px] text-muted-foreground">
-                        {"Joined "}
-                        {new Date(member.joinedAt).toLocaleDateString()}
-                      </p>
-                    )}
-                  </div>
+                    title={member.name}
+                    description={member.role || undefined}
+                    trailing={
+                      member.joinedAt ? (
+                        <span className="font-body text-[12px] text-text-muted">
+                          Joined{" "}
+                          {new Date(member.joinedAt).toLocaleDateString()}
+                        </span>
+                      ) : null
+                    }
+                  />
                 ))}
               </div>
             </div>
           )}
+
           {contributionBalance.topContributor && (
-            <div className="p-2.5 bg-muted/30 rounded-lg border">
-              <div className="flex items-center gap-2 mb-2">
-                <TrendingUp className="w-3.5 h-3.5 text-primary" />
-                <h3 className="text-xs font-semibold">Contribution Balance</h3>
+            <div className={PANEL}>
+              <div className="mb-2 flex items-center gap-2">
+                <TrendingUp className="h-4 w-4 text-primary" />
+                <h3 className="font-heading text-[14px] font-semibold text-text-heading">
+                  Contribution Balance
+                </h3>
               </div>
               <div className="space-y-1.5">
                 <div className="flex items-center justify-between">
-                  <p className="text-[10px] text-muted-foreground">
+                  <p className="font-body text-[13px] text-text-muted">
                     Top Contributor
                   </p>
-                  <p className="text-[10px] font-medium">
-                    {contributionBalance.topContributor.name}
-                    {" ("}
+                  <p className="font-body text-[13px] font-medium text-text-heading">
+                    {contributionBalance.topContributor.name} (
                     {contributionBalance.topContributor.percentage}%)
                   </p>
                 </div>
                 <div className="flex items-center gap-2">
                   {contributionBalance.isBalanced ? (
                     <>
-                      <CheckCircle2 className="w-3 h-3 text-green-600" />
-                      <p className="text-[10px] text-green-600">
+                      <CheckCircle2 className="h-3.5 w-3.5 text-[#00c896]" />
+                      <p className="font-body text-[13px] text-[#00c896]">
                         Well-balanced team contributions
                       </p>
                     </>
                   ) : (
                     <>
-                      <TrendingUp className="w-3 h-3 text-yellow-600" />
-                      <p className="text-[10px] text-yellow-600">
+                      <TrendingUp className="h-3.5 w-3.5 text-[#ffb300]" />
+                      <p className="font-body text-[13px] text-[#ffb300]">
                         Single contributor dominating
                       </p>
                     </>
@@ -309,12 +268,12 @@ export default function StartupSnapshotModal({ isOpen, onClose, startup }) {
               </div>
             </div>
           )}
-          <div className="p-2 bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-900 rounded-lg">
-            <p className="text-[10px] text-blue-900 dark:text-blue-100">
-              <strong>Privacy Note:</strong>
-              {
-                " This is a read-only aggregate view based on execution signals. Individual task details and sensitive data are protected."
-              }
+
+          <div className="rounded-input border border-primary/20 bg-primary-tint p-3">
+            <p className="font-body text-[13px] text-primary">
+              <strong>Privacy Note:</strong> This is a read-only aggregate view
+              based on execution signals. Individual task details and sensitive
+              data are protected.
             </p>
           </div>
         </div>

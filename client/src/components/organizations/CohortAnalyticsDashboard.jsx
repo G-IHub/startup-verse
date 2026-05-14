@@ -4,13 +4,6 @@
 import React, { useState, useEffect } from "react";
 import { API_BASE_URL } from "../../config/apiBase.js";
 import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "../ui/card";
-import {
   BarChart3,
   TrendingUp,
   Users,
@@ -18,32 +11,68 @@ import {
   CheckCircle2,
   Activity,
   FileText,
+  ListChecks,
+  Send,
+  Inbox,
+  Award,
 } from "lucide-react";
 import { unwrapData } from "../../utils/apiEnvelope";
+import {
+  StatTile,
+  SectionCard,
+  SectionHeader,
+  BrandProgress,
+  EmptyStateBlock,
+} from "./_primitives";
 
 const API_BASE = API_BASE_URL;
-
-// Default fetch options for cookie-based auth
 
 const defaultOptions = {
   credentials: "include",
   headers: { "Content-Type": "application/json" },
 };
 
+function ProgressRow({ label, value, max, tone = "info" }) {
+  const numericValue = typeof value === "number" ? value : Number(value) || 0;
+  const numericMax = typeof max === "number" ? max : Number(max) || 0;
+  const pct =
+    numericMax > 0 ? Math.min(100, Math.round((numericValue / numericMax) * 100)) : 0;
+  const toneClass =
+    tone === "success"
+      ? "text-[#00c896]"
+      : tone === "warning"
+        ? "text-[#ffb300]"
+        : tone === "danger"
+          ? "text-[#ff4f6b]"
+          : "text-primary";
+  return (
+    <div className="space-y-1.5">
+      <div className="flex items-center justify-between">
+        <span className="font-body text-[12px] text-text-muted">{label}</span>
+        <span className="font-heading text-[14px] font-semibold text-text-heading">
+          <span className={toneClass}>{numericValue}</span>
+          <span className="text-text-muted font-normal"> / {numericMax}</span>
+        </span>
+      </div>
+      <BrandProgress value={pct} className="h-1.5" />
+    </div>
+  );
+}
+
 export default function CohortAnalyticsDashboard({ cohortId }) {
   const [analytics, setAnalytics] = useState(null);
   const [loading, setLoading] = useState(true);
+
   useEffect(() => {
     loadAnalytics();
   }, [cohortId]);
+
   const loadAnalytics = async () => {
     try {
       setLoading(true);
       const response = await fetch(
         `${API_BASE}/cohorts/${cohortId}/analytics/overview`,
-        {
-          ...defaultOptions,
-        },
+        { ...defaultOptions },
       );
       if (!response.ok) throw new Error("Failed to fetch analytics");
       const inner = unwrapData(await response.json());
@@ -54,249 +83,239 @@ export default function CohortAnalyticsDashboard({ cohortId }) {
       setLoading(false);
     }
   };
+
   if (loading) {
     return (
-      <Card>
-        <CardContent className="p-6 text-center">
-          <div className="animate-pulse text-[10px]">Loading analytics...</div>
-        </CardContent>
-      </Card>
+      <SectionCard>
+        <SectionCard.Body className="p-8 text-center">
+          <div className="font-body text-[13px] text-text-muted animate-pulse">
+            Loading analytics...
+          </div>
+        </SectionCard.Body>
+      </SectionCard>
     );
   }
+
   if (!analytics) {
     return (
-      <Card>
-        <CardContent className="p-8 text-center">
-          <BarChart3 className="w-12 h-12 text-muted-foreground mx-auto mb-2" />
-          <p className="text-[10px] text-muted-foreground">
-            Failed to load analytics
-          </p>
-        </CardContent>
-      </Card>
+      <SectionCard>
+        <SectionCard.Body className="p-0">
+          <EmptyStateBlock
+            variant="centered"
+            icon={BarChart3}
+            tone="danger"
+            title="Failed to load analytics"
+            description="We could not fetch cohort analytics. Try refreshing the page."
+          />
+        </SectionCard.Body>
+      </SectionCard>
     );
   }
+
+  const aggregate = analytics.aggregateMetrics || {};
+  const program = analytics.programMetrics || {};
+
   return (
-    <div className="space-y-4">
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-[11px]">Cohort Overview</CardTitle>
-          <CardDescription className="text-[9px]">
-            {"Key metrics across all "}
-            {analytics.cohortSize}
-            {" active startups"}
-            {typeof analytics.recentJoinsLast30Days === "number" ? (
-              <>
-                {" · "}
-                {analytics.recentJoinsLast30Days}
-                {" joined in the last 30 days"}
-              </>
-            ) : null}
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <div className="text-center p-3 bg-accent/50 rounded-lg">
-              <Users className="w-5 h-5 text-primary mx-auto mb-1" />
-              <div className="text-[18px] font-bold">
-                {analytics.cohortSize}
-              </div>
-              <div className="text-[8px] text-muted-foreground">Startups</div>
-            </div>
-            <div className="text-center p-3 bg-accent/50 rounded-lg">
-              <Users className="w-5 h-5 text-blue-600 mx-auto mb-1" />
-              <div className="text-[18px] font-bold">
-                {analytics.aggregateMetrics.totalTeamMembers}
-              </div>
-              <div className="text-[8px] text-muted-foreground">
-                Total Team Members
-              </div>
-            </div>
-            <div className="text-center p-3 bg-accent/50 rounded-lg">
-              <Users className="w-5 h-5 text-green-600 mx-auto mb-1" />
-              <div className="text-[18px] font-bold">
-                {analytics.aggregateMetrics.avgTeamSize}
-              </div>
-              <div className="text-[8px] text-muted-foreground">
-                Avg Team Size
-              </div>
-            </div>
-            <div className="text-center p-3 bg-accent/50 rounded-lg">
-              <TrendingUp className="w-5 h-5 text-purple-600 mx-auto mb-1" />
-              <div className="text-[18px] font-bold">
-                {analytics.aggregateMetrics.totalWeeklyOutcomes}
-              </div>
-              <div className="text-[8px] text-muted-foreground">
-                Weekly Outcomes
-              </div>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-[10px] flex items-center gap-1.5">
-              <CheckCircle2 className="w-4 h-4" />
-              Task Completion
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-2">
-            <div className="flex items-center justify-between">
-              <span className="text-[9px] text-muted-foreground">
-                Total Tasks
-              </span>
-              <span className="text-[11px] font-bold">
-                {analytics.aggregateMetrics.totalTasks}
-              </span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-[9px] text-muted-foreground">
-                Completed
-              </span>
-              <span className="text-[11px] font-bold text-green-600">
-                {analytics.aggregateMetrics.completedTasks}
-              </span>
-            </div>
-            <div className="mt-2">
-              <div className="flex items-center justify-between mb-1">
-                <span className="text-[8px] text-muted-foreground">
-                  Completion Rate
-                </span>
-                <span className="text-[10px] font-bold">
-                  {analytics.aggregateMetrics.taskCompletionRate}%
-                </span>
-              </div>
-              <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
-                <div
-                  className="bg-green-500 h-2 rounded-full"
-                  style={{
-                    width: `${analytics.aggregateMetrics.taskCompletionRate}%`,
-                  }}
-                />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-[10px] flex items-center gap-1.5">
-              <Target className="w-4 h-4" />
-              Milestone Progress
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-2">
-            <div className="flex items-center justify-between">
-              <span className="text-[9px] text-muted-foreground">
-                Total Milestones
-              </span>
-              <span className="text-[11px] font-bold">
-                {analytics.aggregateMetrics.totalMilestones}
-              </span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-[9px] text-muted-foreground">
-                Completed
-              </span>
-              <span className="text-[11px] font-bold text-blue-600">
-                {analytics.aggregateMetrics.completedMilestones}
-              </span>
-            </div>
-            <div className="mt-2">
-              <div className="flex items-center justify-between mb-1">
-                <span className="text-[8px] text-muted-foreground">
-                  Completion Rate
-                </span>
-                <span className="text-[10px] font-bold">
-                  {analytics.aggregateMetrics.milestoneCompletionRate}%
-                </span>
-              </div>
-              <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
-                <div
-                  className="bg-blue-500 h-2 rounded-full"
-                  style={{
-                    width: `${analytics.aggregateMetrics.milestoneCompletionRate}%`,
-                  }}
-                />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+    <div className="space-y-4 font-body">
+      <SectionHeader
+        icon={BarChart3}
+        title="Analytics &amp; Insights"
+        description={
+          typeof analytics.recentJoinsLast30Days === "number"
+            ? `Key metrics across all ${analytics.cohortSize} active startups · ${analytics.recentJoinsLast30Days} joined in the last 30 days`
+            : `Key metrics across all ${analytics.cohortSize} active startups`
+        }
+      />
+
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <StatTile
+          tone="info"
+          icon={Users}
+          label="Startups"
+          value={analytics.cohortSize}
+          note="In this cohort"
+        />
+        <StatTile
+          tone="info"
+          icon={Users}
+          label="Team Members"
+          value={aggregate.totalTeamMembers}
+          note="Across all startups"
+        />
+        <StatTile
+          tone="success"
+          icon={Award}
+          label="Avg Team Size"
+          value={aggregate.avgTeamSize}
+          note="Per startup"
+        />
+        <StatTile
+          tone="info"
+          icon={TrendingUp}
+          label="Weekly Outcomes"
+          value={aggregate.totalWeeklyOutcomes}
+          note="Logged this cycle"
+        />
       </div>
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-[10px] flex items-center gap-1.5">
-            <FileText className="w-4 h-4" />
-            Program Metrics
-          </CardTitle>
-          <CardDescription className="text-[8px]">
-            Deliverables and program milestones tracking
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <SectionCard>
+          <SectionCard.Header
+            title={
+              <span className="inline-flex items-center gap-2">
+                <CheckCircle2 className="h-4 w-4 text-[#00c896]" />
+                Task Completion
+              </span>
+            }
+            description="Total vs completed tasks across the cohort"
+          />
+          <SectionCard.Body>
+            <div className="space-y-3">
+              <div className="grid grid-cols-2 gap-3">
+                <div className="rounded-input bg-surface-page p-3">
+                  <div className="font-body text-[12px] text-text-muted">
+                    Total Tasks
+                  </div>
+                  <div className="font-heading text-[20px] font-bold text-text-heading">
+                    {aggregate.totalTasks}
+                  </div>
+                </div>
+                <div className="rounded-input bg-surface-page p-3">
+                  <div className="font-body text-[12px] text-text-muted">
+                    Completed
+                  </div>
+                  <div className="font-heading text-[20px] font-bold text-[#00c896]">
+                    {aggregate.completedTasks}
+                  </div>
+                </div>
+              </div>
+              <ProgressRow
+                label="Completion Rate"
+                value={aggregate.completedTasks}
+                max={aggregate.totalTasks}
+                tone="success"
+              />
+            </div>
+          </SectionCard.Body>
+        </SectionCard>
+
+        <SectionCard>
+          <SectionCard.Header
+            title={
+              <span className="inline-flex items-center gap-2">
+                <Target className="h-4 w-4 text-primary" />
+                Milestone Progress
+              </span>
+            }
+            description="Total vs completed milestones across the cohort"
+          />
+          <SectionCard.Body>
+            <div className="space-y-3">
+              <div className="grid grid-cols-2 gap-3">
+                <div className="rounded-input bg-surface-page p-3">
+                  <div className="font-body text-[12px] text-text-muted">
+                    Total Milestones
+                  </div>
+                  <div className="font-heading text-[20px] font-bold text-text-heading">
+                    {aggregate.totalMilestones}
+                  </div>
+                </div>
+                <div className="rounded-input bg-surface-page p-3">
+                  <div className="font-body text-[12px] text-text-muted">
+                    Completed
+                  </div>
+                  <div className="font-heading text-[20px] font-bold text-primary">
+                    {aggregate.completedMilestones}
+                  </div>
+                </div>
+              </div>
+              <ProgressRow
+                label="Completion Rate"
+                value={aggregate.completedMilestones}
+                max={aggregate.totalMilestones}
+                tone="info"
+              />
+            </div>
+          </SectionCard.Body>
+        </SectionCard>
+      </div>
+
+      <SectionCard>
+        <SectionCard.Header
+          title={
+            <span className="inline-flex items-center gap-2">
+              <FileText className="h-4 w-4 text-primary" />
+              Program Metrics
+            </span>
+          }
+          description="Deliverables and program milestones tracking"
+        />
+        <SectionCard.Body>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            <div className="text-center">
-              <div className="text-[16px] font-bold text-purple-600">
-                {analytics.programMetrics.totalProgramMilestones}
-              </div>
-              <div className="text-[8px] text-muted-foreground">
-                Program Milestones
-              </div>
-            </div>
-            <div className="text-center">
-              <div className="text-[16px] font-bold text-blue-600">
-                {analytics.programMetrics.totalDeliverables}
-              </div>
-              <div className="text-[8px] text-muted-foreground">
-                Deliverables
-              </div>
-            </div>
-            <div className="text-center">
-              <div className="text-[16px] font-bold text-green-600">
-                {analytics.programMetrics.totalSubmissions}
-              </div>
-              <div className="text-[8px] text-muted-foreground">
-                Submissions
-              </div>
-            </div>
-            <div className="text-center">
-              <div className="text-[16px] font-bold text-orange-600">
-                {analytics.programMetrics.submissionRate}%
-              </div>
-              <div className="text-[8px] text-muted-foreground">
-                Submission Rate
-              </div>
-            </div>
+            <StatTile
+              tone="info"
+              icon={Target}
+              label="Program Milestones"
+              value={program.totalProgramMilestones}
+              note="Configured"
+            />
+            <StatTile
+              tone="info"
+              icon={ListChecks}
+              label="Deliverables"
+              value={program.totalDeliverables}
+              note="Configured"
+            />
+            <StatTile
+              tone="success"
+              icon={Inbox}
+              label="Submissions"
+              value={program.totalSubmissions}
+              note="Received"
+            />
+            <StatTile
+              tone="warning"
+              icon={Send}
+              label="Submission Rate"
+              value={`${program.submissionRate ?? 0}%`}
+              note="Of expected"
+              progress={Number(program.submissionRate) || 0}
+            />
           </div>
-        </CardContent>
-      </Card>
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-[10px] flex items-center gap-1.5">
-            <Activity className="w-4 h-4" />
-            Weekly Execution
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <div className="text-[9px] text-muted-foreground mb-1">
+        </SectionCard.Body>
+      </SectionCard>
+
+      <SectionCard>
+        <SectionCard.Header
+          title={
+            <span className="inline-flex items-center gap-2">
+              <Activity className="h-4 w-4 text-primary" />
+              Weekly Execution
+            </span>
+          }
+          description="Outcome logging across the cohort"
+        />
+        <SectionCard.Body>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div className="rounded-input bg-surface-page p-4">
+              <div className="font-body text-[12px] text-text-muted">
                 Total Weekly Outcomes
               </div>
-              <div className="text-[20px] font-bold text-primary">
-                {analytics.aggregateMetrics.totalWeeklyOutcomes}
+              <div className="font-heading text-[20px] font-bold text-primary">
+                {aggregate.totalWeeklyOutcomes}
               </div>
             </div>
-            <div>
-              <div className="text-[9px] text-muted-foreground mb-1">
+            <div className="rounded-input bg-surface-page p-4">
+              <div className="font-body text-[12px] text-text-muted">
                 Avg Per Startup
               </div>
-              <div className="text-[20px] font-bold text-green-600">
-                {analytics.aggregateMetrics.avgWeeklyOutcomesPerStartup}
+              <div className="font-heading text-[20px] font-bold text-[#00c896]">
+                {aggregate.avgWeeklyOutcomesPerStartup}
               </div>
             </div>
           </div>
-        </CardContent>
-      </Card>
+        </SectionCard.Body>
+      </SectionCard>
     </div>
   );
 }

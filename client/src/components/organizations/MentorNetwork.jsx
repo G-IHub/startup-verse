@@ -37,8 +37,8 @@ export default function MentorNetwork({
   };
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-pulse text-[10px] text-muted-foreground">
+      <div className="flex h-64 items-center justify-center">
+        <div className="animate-pulse font-body text-[13px] text-text-muted">
           Loading mentors...
         </div>
       </div>

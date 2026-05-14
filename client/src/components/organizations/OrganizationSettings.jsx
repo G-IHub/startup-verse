@@ -4,18 +4,10 @@
  */
 import React, { useState, useEffect } from "react";
 import { API_BASE_URL } from "../../config/apiBase.js";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "../ui/card";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { Label } from "../ui/label";
 import { Textarea } from "../ui/textarea";
-import { Badge } from "../ui/badge";
 import {
   Building2,
   Mail,
@@ -29,16 +21,19 @@ import {
   AlertCircle,
 } from "lucide-react";
 import { unwrapData } from "../../utils/apiEnvelope";
+import { SectionCard, ListRow, StatusBadge } from "./_primitives";
 
 const API_BASE = API_BASE_URL;
 
-// Default fetch options for cookie-based auth
 const defaultOptions = {
   credentials: "include",
-  headers: {
-    "Content-Type": "application/json",
-  },
+  headers: { "Content-Type": "application/json" },
 };
+
+const PRIMARY_BUTTON =
+  "h-9 rounded-input bg-primary font-body text-[13px] font-semibold text-white shadow-[0_4px_16px_rgba(58,90,254,0.25)] hover:bg-primary-hover";
+const OUTLINE_BUTTON =
+  "h-9 rounded-input border border-surface-border bg-white font-body text-[13px] font-medium text-text-body hover:bg-primary-tint hover:text-primary";
 
 export default function OrganizationSettings({
   organizationId,
@@ -52,48 +47,44 @@ export default function OrganizationSettings({
   const [saving, setSaving] = useState(false);
   const [uploadingLogo, setUploadingLogo] = useState(false);
 
-  // Form state
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [website, setWebsite] = useState("");
   const [logo, setLogo] = useState("");
 
-  // Add admin state
   const [showAddAdmin, setShowAddAdmin] = useState(false);
   const [newAdminEmail, setNewAdminEmail] = useState("");
   const [addingAdmin, setAddingAdmin] = useState(false);
 
-  // Messages
   const [successMessage, setSuccessMessage] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
 
-  // Track if component is mounted to prevent state updates after unmount
   const isMountedRef = React.useRef(true);
   const abortControllerRef = React.useRef(null);
+
   useEffect(() => {
     isMountedRef.current = true;
     loadData();
     return () => {
       isMountedRef.current = false;
-      // Abort any pending requests
       if (abortControllerRef.current) {
         abortControllerRef.current.abort();
       }
     };
   }, [organizationId]);
+
   const loadData = async () => {
     if (!isMountedRef.current) return;
     try {
       setLoading(true);
-
-      // Create new abort controller for this request
       abortControllerRef.current = new AbortController();
-
-      // Load organization data
-      const orgResponse = await fetch(`${API_BASE}/organizations/${organizationId}`, {
-        ...defaultOptions,
-        signal: abortControllerRef.current.signal,
-      });
+      const orgResponse = await fetch(
+        `${API_BASE}/organizations/${organizationId}`,
+        {
+          ...defaultOptions,
+          signal: abortControllerRef.current.signal,
+        },
+      );
       if (!isMountedRef.current) return;
       if (orgResponse.ok) {
         const org = unwrapData(await orgResponse.json());
@@ -107,7 +98,6 @@ export default function OrganizationSettings({
         }
       }
 
-      // Load admins
       const adminsResponse = await fetch(
         `${API_BASE}/organizations/${organizationId}/admins`,
         {
@@ -122,10 +112,7 @@ export default function OrganizationSettings({
         setAdmins(Array.isArray(raw) ? raw : raw.admins || []);
       }
     } catch (error) {
-      if (error.name === "AbortError") {
-        console.log("Request aborted");
-        return;
-      }
+      if (error.name === "AbortError") return;
       console.error("Failed to load settings:", error);
       if (isMountedRef.current) {
         setErrorMessage("Failed to load organization settings");
@@ -136,6 +123,7 @@ export default function OrganizationSettings({
       }
     }
   };
+
   const handleSave = async () => {
     if (!isMountedRef.current) return;
     try {
@@ -147,19 +135,11 @@ export default function OrganizationSettings({
         {
           ...defaultOptions,
           method: "PUT",
-          body: JSON.stringify({
-            name,
-            description,
-            website,
-            logo,
-            userId,
-          }),
+          body: JSON.stringify({ name, description, website, logo, userId }),
         },
       );
       if (!isMountedRef.current) return;
-      if (!response.ok) {
-        throw new Error("Failed to update organization");
-      }
+      if (!response.ok) throw new Error("Failed to update organization");
       if (isMountedRef.current) {
         setSuccessMessage("Organization updated successfully!");
         setTimeout(() => {
@@ -178,17 +158,14 @@ export default function OrganizationSettings({
       }
     }
   };
+
   const handleLogoUpload = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
-
-    // Validate file type
     if (!file.type.startsWith("image/")) {
       setErrorMessage("Please upload an image file");
       return;
     }
-
-    // Validate file size (max 5MB)
     if (file.size > 5 * 1024 * 1024) {
       setErrorMessage("Image must be less than 5MB");
       return;
@@ -210,9 +187,7 @@ export default function OrganizationSettings({
           body: JSON.stringify({ logo: dataUrl }),
         },
       );
-      if (!response.ok) {
-        throw new Error("Failed to upload logo");
-      }
+      if (!response.ok) throw new Error("Failed to upload logo");
       const inner = unwrapData(await response.json());
       const nextLogo = inner?.logo || inner?.url;
       if (nextLogo) {
@@ -227,6 +202,7 @@ export default function OrganizationSettings({
       setUploadingLogo(false);
     }
   };
+
   const handleAddAdmin = async () => {
     if (!newAdminEmail.trim()) {
       setErrorMessage("Please enter an email address");
@@ -255,7 +231,7 @@ export default function OrganizationSettings({
       setTimeout(() => setSuccessMessage(""), 3000);
       setNewAdminEmail("");
       setShowAddAdmin(false);
-      loadData(); // Reload admins
+      loadData();
     } catch (error) {
       console.error("Failed to add admin:", error);
       setErrorMessage(
@@ -265,10 +241,9 @@ export default function OrganizationSettings({
       setAddingAdmin(false);
     }
   };
+
   const handleRemoveAdmin = async (adminUserId) => {
-    if (!confirm("Are you sure you want to remove this admin?")) {
-      return;
-    }
+    if (!confirm("Are you sure you want to remove this admin?")) return;
     try {
       setErrorMessage("");
       setSuccessMessage("");
@@ -277,18 +252,18 @@ export default function OrganizationSettings({
         {
           ...defaultOptions,
           method: "DELETE",
-          body: JSON.stringify({
-            removedBy: userId,
-          }),
+          body: JSON.stringify({ removedBy: userId }),
         },
       );
       if (!response.ok) {
         const data = await response.json();
-        throw new Error(data.message || data.error || "Failed to remove admin");
+        throw new Error(
+          data.message || data.error || "Failed to remove admin",
+        );
       }
       setSuccessMessage("Admin removed successfully!");
       setTimeout(() => setSuccessMessage(""), 3000);
-      loadData(); // Reload admins
+      loadData();
     } catch (error) {
       console.error("Failed to remove admin:", error);
       setErrorMessage(
@@ -296,52 +271,53 @@ export default function OrganizationSettings({
       );
     }
   };
+
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-pulse text-[10px] text-muted-foreground">
+      <div className="flex h-64 items-center justify-center">
+        <div className="animate-pulse font-body text-[13px] text-text-muted">
           Loading settings...
         </div>
       </div>
     );
   }
+
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 font-body">
       {successMessage && (
-        <Card className="border-green-200 bg-green-50 dark:bg-green-950/20">
-          <CardContent className="p-3 flex items-center gap-2 text-[10px] text-green-700 dark:text-green-400">
-            <Check className="w-4 h-4" />
-            {successMessage}
-          </CardContent>
-        </Card>
+        <div className="flex items-center gap-2 rounded-input bg-[#d1fae5] px-3 py-2.5 font-body text-[13px] text-[#00c896]">
+          <Check className="h-4 w-4 shrink-0" />
+          {successMessage}
+        </div>
       )}
       {errorMessage && (
-        <Card className="border-red-200 bg-red-50 dark:bg-red-950/20">
-          <CardContent className="p-3 flex items-center gap-2 text-[10px] text-red-700 dark:text-red-400">
-            <AlertCircle className="w-4 h-4" />
-            {errorMessage}
-          </CardContent>
-        </Card>
+        <div className="flex items-center gap-2 rounded-input bg-[#fff1f2] px-3 py-2.5 font-body text-[13px] text-[#ff4f6b]">
+          <AlertCircle className="h-4 w-4 shrink-0" />
+          {errorMessage}
+        </div>
       )}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-[11px] flex items-center gap-2">
-            <Building2 className="w-4 h-4" />
-            Organization Profile
-          </CardTitle>
-          <CardDescription className="text-[9px]">
-            Basic information about your organization
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
+
+      <SectionCard>
+        <SectionCard.Header
+          title={
+            <span className="inline-flex items-center gap-2">
+              <Building2 className="h-5 w-5 text-primary" />
+              Organization Profile
+            </span>
+          }
+          description="Basic information about your organization"
+        />
+        <SectionCard.Body className="space-y-4">
           <div className="space-y-2">
-            <Label className="text-[9px]">Organization Logo</Label>
+            <Label className="font-body text-[13px] font-medium text-text-heading">
+              Organization Logo
+            </Label>
             <div className="flex items-center gap-3">
               {logo && (
                 <img
                   src={logo}
                   alt="Organization logo"
-                  className="w-16 h-16 rounded-lg object-cover border"
+                  className="h-16 w-16 rounded-input border border-surface-border object-cover"
                 />
               )}
               <div className="flex-1">
@@ -350,16 +326,20 @@ export default function OrganizationSettings({
                   accept="image/*"
                   onChange={handleLogoUpload}
                   disabled={uploadingLogo}
-                  className="text-[9px] h-8"
+                  className="font-body text-[13px]"
                 />
-                <p className="text-[8px] text-muted-foreground mt-1">
+                <p className="mt-1 font-body text-[12px] text-text-muted">
                   PNG, JPG or WEBP. Max 5MB.
                 </p>
               </div>
             </div>
           </div>
+
           <div className="space-y-2">
-            <Label htmlFor="name" className="text-[9px]">
+            <Label
+              htmlFor="name"
+              className="font-body text-[13px] font-medium text-text-heading"
+            >
               Organization Name *
             </Label>
             <Input
@@ -367,11 +347,15 @@ export default function OrganizationSettings({
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="e.g., Y Combinator"
-              className="text-[10px] h-8"
+              className="font-body text-[13px]"
             />
           </div>
+
           <div className="space-y-2">
-            <Label htmlFor="description" className="text-[9px]">
+            <Label
+              htmlFor="description"
+              className="font-body text-[13px] font-medium text-text-heading"
+            >
               Description
             </Label>
             <Textarea
@@ -379,15 +363,16 @@ export default function OrganizationSettings({
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               placeholder="Brief description of your organization..."
-              className="text-[10px] min-h-[80px]"
+              className="min-h-[80px] font-body text-[13px]"
             />
           </div>
+
           <div className="space-y-2">
             <Label
               htmlFor="website"
-              className="text-[9px] flex items-center gap-1"
+              className="flex items-center gap-1 font-body text-[13px] font-medium text-text-heading"
             >
-              <Globe className="w-3 h-3" />
+              <Globe className="h-3.5 w-3.5" />
               Website
             </Label>
             <Input
@@ -396,98 +381,96 @@ export default function OrganizationSettings({
               value={website}
               onChange={(e) => setWebsite(e.target.value)}
               placeholder="https://yourorganization.com"
-              className="text-[10px] h-8"
+              className="font-body text-[13px]"
             />
           </div>
+
           <Button
             onClick={handleSave}
             disabled={saving || !name.trim()}
-            className="h-8 text-[9px]"
+            className={PRIMARY_BUTTON}
           >
-            <Save className="w-3 h-3 mr-1" />
+            <Save className="mr-2 h-4 w-4" />
             {saving ? "Saving..." : "Save Changes"}
           </Button>
-        </CardContent>
-      </Card>
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-[11px] flex items-center gap-2">
-            <Shield className="w-4 h-4" />
-            Admin Team
-          </CardTitle>
-          <CardDescription className="text-[9px]">
-            Manage who can administer this organization
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-3">
+        </SectionCard.Body>
+      </SectionCard>
+
+      <SectionCard>
+        <SectionCard.Header
+          title={
+            <span className="inline-flex items-center gap-2">
+              <Shield className="h-5 w-5 text-primary" />
+              Admin Team
+            </span>
+          }
+          description="Manage who can administer this organization"
+        />
+        <SectionCard.Body className="space-y-3">
           <div className="space-y-2">
             {admins.map((admin) => (
-              <div
+              <ListRow
                 key={admin.userId}
-                className="flex items-center justify-between p-2.5 border rounded-lg"
-              >
-                <div className="flex-1">
-                  <div className="text-[10px] font-medium flex items-center gap-2">
+                title={
+                  <span className="inline-flex items-center gap-2">
                     {admin.name}
                     {admin.isCreator && (
-                      <Badge
-                        variant="outline"
-                        className="text-[7px] px-1.5 py-0"
-                      >
-                        Creator
-                      </Badge>
+                      <StatusBadge tone="info" label="Creator" />
                     )}
-                  </div>
-                  <div className="text-[8px] text-muted-foreground flex items-center gap-1">
-                    <Mail className="w-3 h-3" />
+                  </span>
+                }
+                description={
+                  <span className="flex items-center gap-1">
+                    <Mail className="h-3 w-3" />
                     {admin.email}
-                  </div>
-                  <div className="text-[8px] text-muted-foreground">
-                    {"Added "}
-                    {new Date(admin.addedAt).toLocaleDateString()}
-                  </div>
-                </div>
-                {isCreator && !admin.isCreator && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => handleRemoveAdmin(admin.userId)}
-                    className="h-7 text-[9px] text-red-600 hover:text-red-700"
-                  >
-                    <Trash2 className="w-3 h-3" />
-                  </Button>
-                )}
-              </div>
+                  </span>
+                }
+                meta={
+                  <span className="font-body text-[12px] text-text-muted">
+                    Added {new Date(admin.addedAt).toLocaleDateString()}
+                  </span>
+                }
+                trailing={
+                  isCreator && !admin.isCreator ? (
+                    <Button
+                      size="sm"
+                      onClick={() => handleRemoveAdmin(admin.userId)}
+                      className="h-9 w-9 rounded-input p-0 text-[#ff4f6b] hover:bg-[#fff1f2]"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  ) : null
+                }
+              />
             ))}
           </div>
+
           {isCreator && (
             <div className="space-y-2">
               {!showAddAdmin ? (
                 <Button
-                  variant="outline"
                   size="sm"
                   onClick={() => setShowAddAdmin(true)}
-                  className="h-7 text-[9px] w-full"
+                  className={`w-full ${OUTLINE_BUTTON}`}
                 >
-                  <UserPlus className="w-3 h-3 mr-1" />
+                  <UserPlus className="mr-2 h-4 w-4" />
                   Add Admin
                 </Button>
               ) : (
-                <div className="border rounded-lg p-3 space-y-2 bg-muted/20">
-                  <div className="flex items-center justify-between mb-2">
-                    <Label className="text-[9px] font-semibold">
+                <div className="space-y-2 rounded-input bg-surface-page p-3">
+                  <div className="mb-2 flex items-center justify-between">
+                    <Label className="font-heading text-[14px] font-semibold text-text-heading">
                       Add New Admin
                     </Label>
                     <Button
-                      variant="ghost"
                       size="sm"
                       onClick={() => {
                         setShowAddAdmin(false);
                         setNewAdminEmail("");
                       }}
-                      className="h-6 w-6 p-0"
+                      className="h-7 w-7 rounded-input p-0 text-text-muted hover:bg-surface-border/40"
                     >
-                      <X className="w-3 h-3" />
+                      <X className="h-4 w-4" />
                     </Button>
                   </div>
                   <Input
@@ -495,29 +478,28 @@ export default function OrganizationSettings({
                     value={newAdminEmail}
                     onChange={(e) => setNewAdminEmail(e.target.value)}
                     placeholder="admin@example.com"
-                    className="text-[10px] h-8"
+                    className="font-body text-[13px]"
                     onKeyDown={(e) => {
                       if (e.key === "Enter") handleAddAdmin();
                     }}
                   />
-                  <p className="text-[8px] text-muted-foreground">
+                  <p className="font-body text-[12px] text-text-muted">
                     The user must have a StartupVerse account with this email
                   </p>
                   <div className="flex gap-2">
                     <Button
                       onClick={handleAddAdmin}
                       disabled={addingAdmin || !newAdminEmail.trim()}
-                      className="h-7 text-[9px] flex-1"
+                      className={`flex-1 ${PRIMARY_BUTTON}`}
                     >
                       {addingAdmin ? "Adding..." : "Add Admin"}
                     </Button>
                     <Button
-                      variant="outline"
                       onClick={() => {
                         setShowAddAdmin(false);
                         setNewAdminEmail("");
                       }}
-                      className="h-7 text-[9px]"
+                      className={OUTLINE_BUTTON}
                     >
                       Cancel
                     </Button>
@@ -526,34 +508,34 @@ export default function OrganizationSettings({
               )}
             </div>
           )}
+
           {!isCreator && (
-            <p className="text-[8px] text-muted-foreground italic">
+            <p className="font-body text-[12px] italic text-text-muted">
               Only the organization creator can manage admins
             </p>
           )}
-        </CardContent>
-      </Card>
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-[11px]">Organization Details</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-2">
-          <div className="flex items-center justify-between text-[9px]">
-            <span className="text-muted-foreground">Organization ID</span>
-            <span className="font-mono">{organizationId}</span>
+        </SectionCard.Body>
+      </SectionCard>
+
+      <SectionCard>
+        <SectionCard.Header title="Organization Details" />
+        <SectionCard.Body className="space-y-2">
+          <div className="flex items-center justify-between font-body text-[13px]">
+            <span className="text-text-muted">Organization ID</span>
+            <span className="font-mono text-text-body">{organizationId}</span>
           </div>
-          <div className="flex items-center justify-between text-[9px]">
-            <span className="text-muted-foreground">Type</span>
-            <Badge variant="outline" className="text-[8px]">
-              {organization?.type || "N/A"}
-            </Badge>
+          <div className="flex items-center justify-between font-body text-[13px]">
+            <span className="text-text-muted">Type</span>
+            <StatusBadge tone="info" label={organization?.type || "N/A"} />
           </div>
-          <div className="flex items-center justify-between text-[9px]">
-            <span className="text-muted-foreground">Total Admins</span>
-            <span className="font-semibold">{admins.length}</span>
+          <div className="flex items-center justify-between font-body text-[13px]">
+            <span className="text-text-muted">Total Admins</span>
+            <span className="font-semibold text-text-heading">
+              {admins.length}
+            </span>
           </div>
-        </CardContent>
-      </Card>
+        </SectionCard.Body>
+      </SectionCard>
     </div>
   );
 }
