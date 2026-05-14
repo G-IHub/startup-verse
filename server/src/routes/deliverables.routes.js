@@ -21,6 +21,24 @@ deliverablesRouter.post(
   requireOrgAdmin,
   asyncHandler(deliverablesController.createCohortDeliverable),
 );
+deliverablesRouter.put(
+  "/cohorts/:cohortId/deliverables/:deliverableId",
+  requireAuth,
+  requireOrgAdmin,
+  asyncHandler(deliverablesController.updateCohortDeliverable),
+);
+deliverablesRouter.patch(
+  "/cohorts/:cohortId/deliverables/:deliverableId/archive",
+  requireAuth,
+  requireOrgAdmin,
+  asyncHandler(deliverablesController.archiveCohortDeliverable),
+);
+deliverablesRouter.delete(
+  "/cohorts/:cohortId/deliverables/:deliverableId",
+  requireAuth,
+  requireOrgAdmin,
+  asyncHandler(deliverablesController.deleteCohortDeliverable),
+);
 
 deliverablesRouter.get("/deliverables/founder/:founderId", requireAuth, asyncHandler(deliverablesController.getFounderDeliverables));
 deliverablesRouter.get(

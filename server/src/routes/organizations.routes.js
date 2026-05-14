@@ -63,6 +63,18 @@ organizationsRouter.post(
   requireOrgAdmin,
   asyncHandler(organizationsController.createProgramMilestone),
 );
+organizationsRouter.put(
+  "/cohorts/:cohortId/program-milestones/:milestoneId",
+  requireAuth,
+  requireOrgAdmin,
+  asyncHandler(organizationsController.updateProgramMilestone),
+);
+organizationsRouter.delete(
+  "/cohorts/:cohortId/program-milestones/:milestoneId",
+  requireAuth,
+  requireOrgAdmin,
+  asyncHandler(organizationsController.deleteProgramMilestone),
+);
 organizationsRouter.get(
   "/cohorts/:cohortId/events",
   requireAuth,
@@ -74,6 +86,18 @@ organizationsRouter.post(
   requireAuth,
   requireOrgAdmin,
   asyncHandler(cohortWorkspaceController.createCohortEvent),
+);
+organizationsRouter.put(
+  "/cohorts/:cohortId/events/:eventId",
+  requireAuth,
+  requireOrgAdmin,
+  asyncHandler(cohortWorkspaceController.updateCohortEvent),
+);
+organizationsRouter.delete(
+  "/cohorts/:cohortId/events/:eventId",
+  requireAuth,
+  requireOrgAdmin,
+  asyncHandler(cohortWorkspaceController.deleteCohortEvent),
 );
 organizationsRouter.get(
   "/cohorts/:cohortId/announcements",
@@ -99,6 +123,18 @@ organizationsRouter.post(
   requireOrgAdmin,
   asyncHandler(cohortWorkspaceController.createCohortResource),
 );
+organizationsRouter.put(
+  "/cohorts/:cohortId/resources/:resourceId",
+  requireAuth,
+  requireOrgAdmin,
+  asyncHandler(cohortWorkspaceController.updateCohortResource),
+);
+organizationsRouter.delete(
+  "/cohorts/:cohortId/resources/:resourceId",
+  requireAuth,
+  requireOrgAdmin,
+  asyncHandler(cohortWorkspaceController.deleteCohortResource),
+);
 organizationsRouter.get(
   "/cohorts/:cohortId/analytics/overview",
   requireAuth,
@@ -117,7 +153,18 @@ organizationsRouter.get(
   requireCohortReadAccess,
   asyncHandler(organizationsController.getCohortById),
 );
-organizationsRouter.delete("/cohorts/:cohortId", requireAuth, requireOrgAdmin, asyncHandler(organizationsController.deleteCohort));
+organizationsRouter.put(
+  "/cohorts/:cohortId",
+  requireAuth,
+  requireOrgAdmin,
+  asyncHandler(organizationsController.updateCohort),
+);
+organizationsRouter.delete(
+  "/cohorts/:cohortId",
+  requireAuth,
+  requireOrgAdmin,
+  asyncHandler(organizationsController.deleteCohort),
+);
 
 organizationsRouter.get(
   "/cohorts/:cohortId/members",

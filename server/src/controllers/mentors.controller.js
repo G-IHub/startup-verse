@@ -2,6 +2,7 @@ import crypto from "crypto";
 import MentorProfile from "../models/MentorProfile.js";
 import User from "../models/User.js";
 import Organization from "../models/Organization.js";
+import CohortMembership from "../models/CohortMembership.js";
 import { assertFounderInMentorOrganization } from "../utils/mentorFounderAssignment.js";
 import { error as apiError, success as apiSuccess } from "../utils/apiResponse.js";
 import { createNotification } from "../services/notificationService.js";
@@ -10,23 +11,60 @@ const isProduction = process.env.NODE_ENV === "production";
 
 const MENTOR_COOKIE = "mentor_token";
 
+// Canonical mentor DTO used across list, invite, get, assign, unassign, and
+// session payloads. Pre-Step-1.11 rows physically lack `status`/`invitedAt`/
+// `lastLoginAt`; lean reads don't materialize schema defaults, so the mapper
+// fills them here. `cohortIds` is always derived from CohortMembership joins
+// at the call site.
+function mapMentor(mentor, user, cohortIds = []) {
+  const doc = mentor?.toObject ? mentor.toObject() : mentor || {};
+  return {
+    id: String(doc._id || ""),
+    userId: doc.userId ? String(doc.userId) : null,
+    organizationId: doc.organizationId ? String(doc.organizationId) : null,
+    name: user?.name || "",
+    email: user?.email || "",
+    avatarUrl: user?.avatarUrl || "",
+    expertise: Array.isArray(doc.expertise) ? doc.expertise : [],
+    status: doc.status || "active",
+    assignedFounderIds: Array.isArray(doc.assignedFounders)
+      ? doc.assignedFounders.map(String)
+      : [],
+    cohortIds: Array.from(new Set((cohortIds || []).map(String))),
+    invitedAt: doc.invitedAt || doc.createdAt || null,
+    lastLoginAt: doc.lastLoginAt || null,
+    createdAt: doc.createdAt || null,
+    updatedAt: doc.updatedAt || null,
+  };
+}
+
+// Compute the unique set of cohortIds a mentor reaches through their
+// assignedFounders → CohortMembership join.
+async function cohortIdsForFounders(founderIds) {
+  const ids = Array.from(new Set((founderIds || []).map(String).filter(Boolean)));
+  if (ids.length === 0) return [];
+  const memberships = await CohortMembership.find(
+    { founderId: { $in: ids } },
+    { cohortId: 1 },
+  ).lean();
+  return Array.from(new Set(memberships.map((m) => String(m.cohortId))));
+}
+
 async function mentorPayloadFromToken(token) {
   const trimmed = String(token || "").trim();
   if (!trimmed) return null;
   const mentor = await MentorProfile.findOne({ token: trimmed });
   if (!mentor) return null;
-  const user = await User.findById(mentor.userId).select("name email avatarUrl").lean();
+  const user = mentor.userId
+    ? await User.findById(mentor.userId).select("name email avatarUrl").lean()
+    : null;
   const organization = mentor.organizationId
     ? await Organization.findById(mentor.organizationId).select("name").lean()
     : null;
+  const cohortIds = await cohortIdsForFounders(mentor.assignedFounders || []);
   return {
-    id: String(mentor._id),
-    name: user?.name || "",
-    email: user?.email || "",
-    avatarUrl: user?.avatarUrl || "",
-    organizationId: mentor.organizationId ? String(mentor.organizationId) : null,
+    ...mapMentor(mentor, user, cohortIds),
     organizationName: organization?.name || "",
-    expertise: mentor.expertise || [],
   };
 }
 
@@ -56,6 +94,14 @@ export const createMentorSession = async (req, res) => {
     return apiError(res, "Invalid or expired mentor token.", 401);
   }
   setMentorSessionCookie(res, token);
+  // Bump lastLoginAt on the underlying MentorProfile so admins can see when
+  // a mentor last actually used their session. Awaited so the response and
+  // any immediate re-read reflect the new timestamp.
+  await MentorProfile.updateOne(
+    { token },
+    { $set: { lastLoginAt: new Date() } },
+  );
+  mentor.lastLoginAt = new Date();
   return apiSuccess(res, { mentor });
 };
 
@@ -141,11 +187,54 @@ export const requestMentorLink = async (req, res) => {
 };
 
 export const listOrganizationMentors = async (req, res) => {
-  const mentors = await MentorProfile.find({ organizationId: req.params.orgId }).sort({ createdAt: -1 });
+  const mentorDocs = await MentorProfile.find({ organizationId: req.params.orgId })
+    .sort({ createdAt: -1 })
+    .lean();
+
+  const userIds = [
+    ...new Set(mentorDocs.map((m) => (m.userId ? String(m.userId) : "")).filter(Boolean)),
+  ];
+  const users = userIds.length
+    ? await User.find(
+        { _id: { $in: userIds } },
+        { name: 1, email: 1, avatarUrl: 1 },
+      ).lean()
+    : [];
+  const usersById = new Map(users.map((u) => [String(u._id), u]));
+
+  const allFounderIds = [
+    ...new Set(
+      mentorDocs.flatMap((m) =>
+        Array.isArray(m.assignedFounders) ? m.assignedFounders.map(String) : [],
+      ),
+    ),
+  ];
+  const memberships = allFounderIds.length
+    ? await CohortMembership.find(
+        { founderId: { $in: allFounderIds } },
+        { founderId: 1, cohortId: 1 },
+      ).lean()
+    : [];
+  const cohortIdsByFounder = new Map();
+  for (const m of memberships) {
+    const f = String(m.founderId);
+    const set = cohortIdsByFounder.get(f) || new Set();
+    set.add(String(m.cohortId));
+    cohortIdsByFounder.set(f, set);
+  }
+
   return apiSuccess(res, {
-    mentors: mentors.map((m) => {
-      const o = m.toObject();
-      return { ...o, id: String(o._id) };
+    mentors: mentorDocs.map((mentor) => {
+      const cohortIds = new Set();
+      for (const f of mentor.assignedFounders || []) {
+        const s = cohortIdsByFounder.get(String(f));
+        if (s) for (const c of s) cohortIds.add(c);
+      }
+      return mapMentor(
+        mentor,
+        usersById.get(String(mentor.userId)),
+        [...cohortIds],
+      );
     }),
   });
 };
@@ -153,14 +242,23 @@ export const listOrganizationMentors = async (req, res) => {
 export const inviteOrganizationMentor = async (req, res) => {
   const orgId = req.params.orgId;
   const body = req.body || {};
-  let userId = body.userId;
-  if (!userId && body.email) {
-    const u = await User.findOne({ email: String(body.email).trim().toLowerCase() });
-    userId = u?._id;
+  let user = null;
+  if (body.userId) {
+    user = await User.findById(body.userId).select("name email avatarUrl").lean();
   }
-  if (!userId) {
+  if (!user && body.email) {
+    user = await User.findOne({ email: String(body.email).trim().toLowerCase() })
+      .select("name email avatarUrl")
+      .lean();
+  }
+  // Interim: `MentorProfile.userId` is required + globally unique today, so
+  // we can't persist a "pending" invite for an unregistered email. Step
+  // 2.10/2.11 will lift this via a magic-link delivery and a separate
+  // pending-invite row.
+  if (!user) {
     return apiError(res, "userId or a registered user email is required.", 400);
   }
+  const userId = user._id;
 
   const expertise = Array.isArray(body.expertise)
     ? body.expertise
@@ -170,8 +268,16 @@ export const inviteOrganizationMentor = async (req, res) => {
 
   const mentor = await MentorProfile.findOneAndUpdate(
     { userId },
-    { userId, organizationId: orgId, expertise },
-    { upsert: true, new: true, runValidators: true },
+    {
+      $set: {
+        userId,
+        organizationId: orgId,
+        expertise,
+        status: "active",
+      },
+      $setOnInsert: { invitedAt: new Date() },
+    },
+    { upsert: true, new: true, runValidators: true, setDefaultsOnInsert: true },
   );
 
   await createNotification({
@@ -183,8 +289,8 @@ export const inviteOrganizationMentor = async (req, res) => {
     metadata: { mentorId: String(mentor._id), organizationId: String(orgId) },
   }).catch(() => null);
 
-  const o = mentor.toObject();
-  return apiSuccess(res, { mentor: { ...o, id: String(o._id) } }, 201);
+  // New invites have no founder assignments yet, so cohortIds is [].
+  return apiSuccess(res, { mentor: mapMentor(mentor, user, []) }, 201);
 };
 
 export const getMentorById = async (req, res) => {
@@ -192,8 +298,11 @@ export const getMentorById = async (req, res) => {
   if (!mentor) {
     return apiError(res, "Mentor not found.", 404);
   }
-  const o = mentor.toObject();
-  return apiSuccess(res, { mentor: { ...o, id: String(o._id) } });
+  const user = mentor.userId
+    ? await User.findById(mentor.userId).select("name email avatarUrl").lean()
+    : null;
+  const cohortIds = await cohortIdsForFounders(mentor.assignedFounders || []);
+  return apiSuccess(res, { mentor: mapMentor(mentor, user, cohortIds) });
 };
 
 export const deleteMentorById = async (req, res) => {
@@ -285,8 +394,11 @@ export const assignFounderToMentor = async (req, res) => {
     ]);
   }
 
-  const o = mentor.toObject();
-  return apiSuccess(res, { mentor: { ...o, id: String(o._id) } });
+  const user = mentor.userId
+    ? await User.findById(mentor.userId).select("name email avatarUrl").lean()
+    : null;
+  const cohortIds = await cohortIdsForFounders(mentor.assignedFounders || []);
+  return apiSuccess(res, { mentor: mapMentor(mentor, user, cohortIds) });
 };
 
 export const unassignFounderFromMentor = async (req, res) => {
@@ -300,6 +412,9 @@ export const unassignFounderFromMentor = async (req, res) => {
   );
   await mentor.save();
 
-  const o = mentor.toObject();
-  return apiSuccess(res, { mentor: { ...o, id: String(o._id) } });
+  const user = mentor.userId
+    ? await User.findById(mentor.userId).select("name email avatarUrl").lean()
+    : null;
+  const cohortIds = await cohortIdsForFounders(mentor.assignedFounders || []);
+  return apiSuccess(res, { mentor: mapMentor(mentor, user, cohortIds) });
 };

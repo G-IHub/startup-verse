@@ -14,10 +14,10 @@ const organizationSchema = new mongoose.Schema(
       default: "",
       maxlength: [5000, "Description cannot exceed 5000 characters"]
     },
-    logo: { 
-      type: String, 
+    logo: {
+      type: String,
       default: "",
-      maxlength: [1000, "Logo URL cannot exceed 1000 characters"]
+      maxlength: [1000, "Logo URL cannot exceed 1000 characters"],
     },
     website: { 
       type: String, 

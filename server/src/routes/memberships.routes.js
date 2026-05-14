@@ -27,7 +27,7 @@ membershipsRouter.get(
       .lean();
     const cohortIds = memberships.map((m) => m.cohortId);
     const cohorts = cohortIds.length
-      ? await Cohort.find({ _id: { $in: cohortIds } }).lean()
+      ? await Cohort.find({ _id: { $in: cohortIds }, deletedAt: null }).lean()
       : [];
     const cohortById = new Map(cohorts.map((c) => [String(c._id), c]));
     const items = memberships.map((m) => ({

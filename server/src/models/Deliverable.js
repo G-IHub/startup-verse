@@ -28,6 +28,10 @@ const deliverableSchema = new mongoose.Schema(
     requirements: { type: [String], default: [] },
     dueDate: { type: Date },
     createdBy: { type: mongoose.Schema.Types.ObjectId, ref: "User", index: true },
+    // Step 2.7 soft-archive marker. Archived deliverables are hidden from the
+    // default list views but stay queryable via `?includeArchived=1`. Hard
+    // delete is blocked when any DeliverableSubmission exists.
+    archived: { type: Boolean, default: false, index: true },
   },
   { timestamps: true },
 );

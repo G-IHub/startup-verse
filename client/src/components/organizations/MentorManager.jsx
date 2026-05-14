@@ -39,7 +39,6 @@ export default function MentorManager({ organizationId, cohorts, isAdmin }) {
   const [loading, setLoading] = useState(true);
   const [showInviteForm, setShowInviteForm] = useState(false);
   const [formData, setFormData] = useState({
-    name: "",
     email: "",
     cohortIds: [],
     expertise: "",
@@ -93,7 +92,6 @@ export default function MentorManager({ organizationId, cohorts, isAdmin }) {
         "Mentor linked to your organization. They must use a registered StartupVerse email.",
       );
       setFormData({
-        name: "",
         email: "",
         cohortIds: [],
         expertise: "",
@@ -160,35 +158,24 @@ export default function MentorManager({ organizationId, cohorts, isAdmin }) {
         onToggle={setShowInviteForm}
       >
         <form onSubmit={handleInviteMentor} className="space-y-3">
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <div>
-              <label className="mb-2 block font-body text-[13px] font-medium text-text-heading">
-                Display name (optional)
-              </label>
-              <Input
-                value={formData.name}
-                onChange={(e) =>
-                  setFormData({ ...formData, name: e.target.value })
-                }
-                placeholder="For your notes only"
-                className="font-body text-[13px]"
-              />
-            </div>
-            <div>
-              <label className="mb-2 block font-body text-[13px] font-medium text-text-heading">
-                Email
-              </label>
-              <Input
-                type="email"
-                value={formData.email}
-                onChange={(e) =>
-                  setFormData({ ...formData, email: e.target.value })
-                }
-                placeholder="mentor@example.com"
-                required={true}
-                className="font-body text-[13px]"
-              />
-            </div>
+          <div>
+            <label className="mb-2 block font-body text-[13px] font-medium text-text-heading">
+              Email
+            </label>
+            <Input
+              type="email"
+              value={formData.email}
+              onChange={(e) =>
+                setFormData({ ...formData, email: e.target.value })
+              }
+              placeholder="mentor@example.com"
+              required={true}
+              className="font-body text-[13px]"
+            />
+            <p className="mt-1 font-body text-[12px] text-text-muted">
+              The mentor's display name will be pulled from their registered
+              StartupVerse account.
+            </p>
           </div>
 
           <div>
@@ -281,19 +268,45 @@ export default function MentorManager({ organizationId, cohorts, isAdmin }) {
       ) : (
         <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
           {mentors.map((mentor) => {
-            const isActive = mentor.status === "active";
+            const status = mentor.status || "active";
+            const isActive = status === "active";
+            const displayName = mentor.name || mentor.email || "Mentor";
+            const initials = displayName
+              .split(/\s+/)
+              .filter(Boolean)
+              .slice(0, 2)
+              .map((s) => s[0]?.toUpperCase() || "")
+              .join("") || "M";
+            const expertise = Array.isArray(mentor.expertise)
+              ? mentor.expertise.join(", ")
+              : mentor.expertise || "";
+            const cohortCount = mentor.cohortIds?.length ?? 0;
+            const invitedAt = mentor.invitedAt || mentor.createdAt || null;
             return (
               <SectionCard key={mentor.id}>
                 <SectionCard.Body>
                   <div className="mb-3 flex items-start justify-between gap-2">
-                    <div className="min-w-0 flex-1">
-                      <h3 className="font-heading text-[14px] font-bold text-text-heading">
-                        {mentor.name}
-                      </h3>
-                      <p className="mt-0.5 flex items-center gap-1 truncate font-body text-[12px] text-text-muted">
-                        <Mail className="h-3 w-3" />
-                        {mentor.email}
-                      </p>
+                    <div className="flex min-w-0 flex-1 items-center gap-3">
+                      {mentor.avatarUrl ? (
+                        <img
+                          src={mentor.avatarUrl}
+                          alt={displayName}
+                          className="h-10 w-10 shrink-0 rounded-full object-cover"
+                        />
+                      ) : (
+                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary-tint font-body text-[13px] font-semibold text-primary">
+                          {initials}
+                        </div>
+                      )}
+                      <div className="min-w-0 flex-1">
+                        <h3 className="truncate font-heading text-[14px] font-bold text-text-heading">
+                          {displayName}
+                        </h3>
+                        <p className="mt-0.5 flex items-center gap-1 truncate font-body text-[12px] text-text-muted">
+                          <Mail className="h-3 w-3" />
+                          {mentor.email || "No email on file"}
+                        </p>
+                      </div>
                     </div>
                     <Button
                       size="sm"
@@ -304,9 +317,9 @@ export default function MentorManager({ organizationId, cohorts, isAdmin }) {
                     </Button>
                   </div>
 
-                  {mentor.expertise && (
+                  {expertise && (
                     <p className="mb-2 font-body text-[13px] text-text-body">
-                      {mentor.expertise}
+                      {expertise}
                     </p>
                   )}
 
@@ -317,7 +330,7 @@ export default function MentorManager({ organizationId, cohorts, isAdmin }) {
                     />
                     <StatusBadge
                       tone="info"
-                      label={`${mentor.cohortIds?.length || 0} Cohorts`}
+                      label={`${cohortCount} Cohorts`}
                     />
                   </div>
 
@@ -327,10 +340,11 @@ export default function MentorManager({ organizationId, cohorts, isAdmin }) {
                       {new Date(mentor.lastLoginAt).toLocaleDateString()}
                     </p>
                   )}
-                  <p className="mt-1 font-body text-[12px] text-text-muted">
-                    Invited:{" "}
-                    {new Date(mentor.invitedAt).toLocaleDateString()}
-                  </p>
+                  {invitedAt && (
+                    <p className="mt-1 font-body text-[12px] text-text-muted">
+                      Invited: {new Date(invitedAt).toLocaleDateString()}
+                    </p>
+                  )}
                 </SectionCard.Body>
               </SectionCard>
             );

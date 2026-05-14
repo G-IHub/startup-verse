@@ -87,49 +87,30 @@ export default function CohortDashboardWithSidebar({
       // Get all startups in this cohort with real backend data
       const members = await getCohortMembers(cohortId);
 
-      // Map members to startup snapshots format
-      const snapshotData = members.map((member) => ({
-        startupId: member.founderId,
-        startupName: member.startupName,
-        founderName: member.founderName,
-        founderEmail: member.founderEmail,
-        stageName: member.founder?.stage || "Unknown",
-        teamSize: 1,
-        status: member.progress.activityStatus,
+      const snapshotData = members.map((m) => ({
+        startupId: m.founderId,
+        startupName: m.startupName || "Unnamed Startup",
+        founderName: m.founderName || "",
+        founderEmail: m.founderEmail || "",
+        stageName: m.currentStage || m.startup?.stage || "—",
+        teamSize: m.progress?.teamSize ?? 1,
+        status: m.progress?.activityStatus || "stalled",
         executionSummary: {
-          weeklyStreak: member.progress.weeklyOutcomeStreak,
-          currentOutcome: member.progress.currentMilestone
+          weeklyStreak: m.progress?.weeklyOutcomeStreak ?? 0,
+          currentOutcome: m.progress?.currentMilestone
             ? {
-                title: member.progress.currentMilestone,
+                title: m.progress.currentMilestone,
                 progress: 50,
                 daysLeft: 7,
               }
             : null,
-          milestonesCompleted: member.progress.completedMilestones,
-          tasksCompletedThisWeek: member.progress.tasksCompletedThisWeek,
+          milestonesCompleted: m.progress?.completedMilestones ?? 0,
+          tasksCompletedThisWeek: m.progress?.tasksCompletedThisWeek ?? 0,
         },
-        lastActivity: member.progress.lastActive || member.joinedAt,
-        joinedCohortAt: member.joinedAt,
+        lastActivity: m.progress?.lastActive || m.joinedAt,
+        joinedCohortAt: m.joinedAt,
       }));
       setStartups(snapshotData);
-
-      // Update cohort stats
-      const stats = {
-        totalStartups: members.length,
-        activeStartups: members.filter(
-          (m) => m.progress.activityStatus === "active",
-        ).length,
-        slowingStartups: members.filter(
-          (m) => m.progress.activityStatus === "slowing",
-        ).length,
-        stalledStartups: members.filter(
-          (m) => m.progress.activityStatus === "stalled",
-        ).length,
-      };
-      setCohort({
-        ...cohortData,
-        stats,
-      });
     } catch (error) {
       console.error("Failed to load cohort data:", error);
       setError("Failed to load cohort data");

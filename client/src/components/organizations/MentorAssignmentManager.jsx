@@ -56,7 +56,6 @@ export default function MentorAssignmentManager({
   const [assigning, setAssigning] = useState(false);
   const [showInviteForm, setShowInviteForm] = useState(false);
   const [inviteEmail, setInviteEmail] = useState("");
-  const [inviteName, setInviteName] = useState("");
   const [inviting, setInviting] = useState(false);
   const [showJoinMeetingDialog, setShowJoinMeetingDialog] = useState(false);
   const [meetingToJoin, setMeetingToJoin] = useState(null);
@@ -185,12 +184,14 @@ export default function MentorAssignmentManager({
   const isAssigned = (mentorId, founderId) =>
     assignments[mentorId]?.includes(founderId) || false;
 
-  const filteredFounders = founders.filter(
-    (f) =>
-      f.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      f.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      f.startupName?.toLowerCase().includes(searchQuery.toLowerCase()),
-  );
+  const filteredFounders = founders.filter((f) => {
+    const q = searchQuery.toLowerCase();
+    return (
+      (f.name || "").toLowerCase().includes(q) ||
+      (f.email || "").toLowerCase().includes(q) ||
+      (f.startupName || "").toLowerCase().includes(q)
+    );
+  });
 
   const sortedMentors = [...mentors].sort((a, b) => {
     if (a.status === "active" && b.status !== "active") return -1;
@@ -208,7 +209,7 @@ export default function MentorAssignmentManager({
         {
           ...defaultOptions,
           method: "POST",
-          body: JSON.stringify({ email: inviteEmail, name: inviteName }),
+          body: JSON.stringify({ email: inviteEmail }),
         },
       );
       const payload = await response.json();
@@ -218,26 +219,22 @@ export default function MentorAssignmentManager({
         );
       }
       const inner = unwrapData(payload);
-      const m = inner.mentor || inner;
-      setMentors((prev) => [
-        ...prev,
-        {
-          id: m.id || m._id,
-          name: inviteName,
-          email: inviteEmail,
-          expertise: "",
-          status: "pending",
-        },
-      ]);
+      const serverMentor = inner.mentor || inner;
+      if (serverMentor && (serverMentor.id || serverMentor._id)) {
+        setMentors((prev) => {
+          const id = String(serverMentor.id || serverMentor._id);
+          const without = prev.filter((m) => String(m.id) !== id);
+          return [...without, { ...serverMentor, id }];
+        });
+      }
       toast.success("Mentor invited successfully!");
+      setShowInviteForm(false);
+      setInviteEmail("");
     } catch (error) {
       console.error("Error inviting mentor:", error);
       toast.error(`Failed to invite mentor: ${error.message}`);
     } finally {
       setInviting(false);
-      setShowInviteForm(false);
-      setInviteName("");
-      setInviteEmail("");
     }
   };
 
@@ -314,22 +311,21 @@ export default function MentorAssignmentManager({
                   Invite New Mentor
                 </p>
                 <Input
-                  value={inviteName}
-                  onChange={(e) => setInviteName(e.target.value)}
-                  placeholder="Mentor Name"
-                  className="font-body text-[13px]"
-                />
-                <Input
+                  type="email"
                   value={inviteEmail}
                   onChange={(e) => setInviteEmail(e.target.value)}
                   placeholder="Mentor Email"
                   className="font-body text-[13px]"
                 />
+                <p className="font-body text-[12px] text-text-muted">
+                  The mentor's display name will be pulled from their registered
+                  StartupVerse account.
+                </p>
                 <div className="flex gap-2">
                   <Button
                     size="sm"
                     onClick={handleInviteMentor}
-                    disabled={inviting || !inviteName || !inviteEmail}
+                    disabled={inviting || !inviteEmail.trim()}
                     className={`flex-1 ${PRIMARY_BUTTON}`}
                   >
                     {inviting ? "Inviting..." : "Send Invite"}
@@ -338,7 +334,6 @@ export default function MentorAssignmentManager({
                     size="sm"
                     onClick={() => {
                       setShowInviteForm(false);
-                      setInviteName("");
                       setInviteEmail("");
                     }}
                     className={OUTLINE_BUTTON}
@@ -359,6 +354,11 @@ export default function MentorAssignmentManager({
                 </div>
                 {activeMentors.map((mentor) => {
                   const selected = selectedMentor === mentor.id;
+                  const displayName =
+                    mentor.name || mentor.email || "Mentor";
+                  const expertise = Array.isArray(mentor.expertise)
+                    ? mentor.expertise.join(", ")
+                    : mentor.expertise || "";
                   return (
                     <button
                       type="button"
@@ -372,14 +372,14 @@ export default function MentorAssignmentManager({
                       )}
                     >
                       <h3 className="truncate font-heading text-[14px] font-semibold text-text-heading">
-                        {mentor.name}
+                        {displayName}
                       </h3>
                       <p className="truncate font-body text-[12px] text-text-muted">
-                        {mentor.email}
+                        {mentor.email || ""}
                       </p>
-                      {mentor.expertise && (
+                      {expertise && (
                         <p className="mt-1 font-body text-[12px] text-text-muted">
-                          {mentor.expertise}
+                          {expertise}
                         </p>
                       )}
                       <div className="mt-1.5 flex items-center gap-1">
@@ -404,6 +404,11 @@ export default function MentorAssignmentManager({
                 </div>
                 {invitedMentors.map((mentor) => {
                   const selected = selectedMentor === mentor.id;
+                  const displayName =
+                    mentor.name || mentor.email || "Mentor";
+                  const expertise = Array.isArray(mentor.expertise)
+                    ? mentor.expertise.join(", ")
+                    : mentor.expertise || "";
                   return (
                     <button
                       type="button"
@@ -420,16 +425,16 @@ export default function MentorAssignmentManager({
                         <div className="min-w-0 flex-1">
                           <div className="flex items-center gap-2">
                             <h3 className="truncate font-heading text-[14px] font-semibold text-text-heading">
-                              {mentor.name}
+                              {displayName}
                             </h3>
                             <StatusBadge status="invited" />
                           </div>
                           <p className="truncate font-body text-[12px] text-text-muted">
-                            {mentor.email}
+                            {mentor.email || ""}
                           </p>
-                          {mentor.expertise && (
+                          {expertise && (
                             <p className="mt-1 font-body text-[12px] text-text-muted">
-                              {mentor.expertise}
+                              {expertise}
                             </p>
                           )}
                         </div>
@@ -452,7 +457,10 @@ export default function MentorAssignmentManager({
               title={
                 <span className="inline-flex items-center gap-2">
                   <UsersRound className="h-4 w-4 text-primary" />
-                  {mentors.find((m) => m.id === selectedMentor)?.name}'s Group
+                  {(() => {
+                    const m = mentors.find((x) => x.id === selectedMentor);
+                    return `${m?.name || m?.email || "Mentor"}'s Group`;
+                  })()}
                 </span>
               }
               description="Manage group membership by adding or removing founders"
@@ -535,9 +543,12 @@ export default function MentorAssignmentManager({
                             e.stopPropagation();
                             setMeetingToJoin({
                               mentorId: selectedMentor,
-                              mentorName:
-                                mentors.find((m) => m.id === selectedMentor)
-                                  ?.name || "Mentor",
+                              mentorName: (() => {
+                                const m = mentors.find(
+                                  (x) => x.id === selectedMentor,
+                                );
+                                return m?.name || m?.email || "Mentor";
+                              })(),
                             });
                             setShowJoinMeetingDialog(true);
                           }}
@@ -574,12 +585,14 @@ export default function MentorAssignmentManager({
                       <div className="flex items-start justify-between gap-2">
                         <div className="flex min-w-0 flex-1 items-start gap-2">
                           <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[linear-gradient(135deg,#3a5afe_0%,#7c4dff_100%)] font-heading text-[13px] font-bold text-white">
-                            {founder.name.charAt(0).toUpperCase()}
+                            {(founder.name || founder.email || "?")
+                              .charAt(0)
+                              .toUpperCase()}
                           </div>
                           <div className="min-w-0 flex-1">
                             <div className="flex items-center gap-1.5">
                               <h4 className="truncate font-heading text-[14px] font-semibold text-text-heading">
-                                {founder.name}
+                                {founder.name || founder.email || "Founder"}
                               </h4>
                               {assigned && (
                                 <StatusBadge

@@ -16,7 +16,9 @@ function getOrganizationId(req) {
 
 async function orgIdFromCohortId(cohortId) {
   if (!cohortId || !mongoose.Types.ObjectId.isValid(String(cohortId))) return null;
-  const cohort = await Cohort.findById(cohortId).select("organizationId").lean();
+  const cohort = await Cohort.findOne({ _id: cohortId, deletedAt: null })
+    .select("organizationId")
+    .lean();
   return cohort?.organizationId ? String(cohort.organizationId) : null;
 }
 

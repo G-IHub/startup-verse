@@ -15,11 +15,29 @@ import {
   createInvitation,
   searchUserByEmail,
 } from "../../utils/organizationHelpersBackend";
+import { toast } from "sonner";
+import { toastError } from "../../utils/toastError";
 
 const PRIMARY_BUTTON =
   "h-9 rounded-input bg-primary font-body text-[13px] font-semibold text-white shadow-[0_4px_16px_rgba(58,90,254,0.25)] hover:bg-primary-hover";
 const OUTLINE_BUTTON =
   "h-9 rounded-input border border-surface-border bg-white font-body text-[13px] font-medium text-text-body hover:bg-primary-tint hover:text-primary";
+
+function parseApiError(error) {
+  const match = /^API Error \((\d+)\):\s*(.*)$/s.exec(error?.message || "");
+  if (!match) return { status: 0, message: error?.message || "" };
+  const status = Number(match[1]);
+  let message = match[2];
+  try {
+    const parsed = JSON.parse(match[2]);
+    if (parsed && typeof parsed.message === "string") {
+      message = parsed.message;
+    }
+  } catch (_) {
+    // Keep the raw server text if it is not JSON.
+  }
+  return { status, message };
+}
 
 export default function InviteStartupModal({
   isOpen,
@@ -36,10 +54,17 @@ export default function InviteStartupModal({
   const [message, setMessage] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSearching, setIsSearching] = useState(false);
+  const [inviteError, setInviteError] = useState("");
+
+  const handleClose = () => {
+    setInviteError("");
+    onClose();
+  };
 
   const handleSearch = async () => {
     setIsSearching(true);
     setSelectedFounder(null);
+    setInviteError("");
     try {
       const user = await searchUserByEmail(searchEmail);
       if (user && user.role === "founder") {
@@ -49,12 +74,12 @@ export default function InviteStartupModal({
         );
         return;
       }
-      alert(
-        `No founder found with email "${searchEmail}".\n\nThe founder must have a StartupVerse account first.\n\nAsk them to sign up at StartupVerse\nThey should select "Founder" as their role\nAfter they complete signup, you can search for them here`,
+      toast.error(
+        `No founder found with email "${searchEmail}". Ask them to sign up at StartupVerse first and select "Founder" as their role.`,
       );
     } catch (error) {
       console.error("Error searching for founder:", error);
-      alert("Error searching for founder. Please try again.");
+      toastError(error, "Error searching for founder. Please try again.");
     } finally {
       setIsSearching(false);
     }
@@ -80,19 +105,38 @@ export default function InviteStartupModal({
       setSearchEmail("");
       setSelectedFounder(null);
       setMessage("");
-      onClose();
+      setInviteError("");
+      handleClose();
     } catch (error) {
       console.error("Failed to send invitation:", error);
-      alert(
-        "Failed to send invitation. Please ensure the backend is deployed.",
-      );
+      const parsed = parseApiError(error);
+      if (parsed.status === 409) {
+        setInviteError(
+          parsed.message ||
+            "A pending invitation already exists for this founder.",
+        );
+        toastError(
+          { status: parsed.status, message: parsed.message },
+          "A pending invitation already exists for this founder.",
+        );
+      } else {
+        toastError(
+          { status: parsed.status, message: parsed.message },
+          "Failed to send invitation. Please ensure the backend is deployed.",
+        );
+      }
     } finally {
       setIsSubmitting(false);
     }
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
+    <Dialog
+      open={isOpen}
+      onOpenChange={(open) => {
+        if (!open) handleClose();
+      }}
+    >
       <DialogContent className="max-w-md">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 font-heading text-[18px] font-bold text-text-heading">
@@ -160,6 +204,7 @@ export default function InviteStartupModal({
                     onClick={() => {
                       setSelectedFounder(null);
                       setSearchEmail("");
+                      setInviteError("");
                     }}
                     className="h-7 rounded-input bg-white px-3 font-body text-[12px] font-medium text-primary hover:bg-white/70"
                   >
@@ -194,10 +239,16 @@ export default function InviteStartupModal({
             </>
           )}
 
+          {inviteError && (
+            <div className="rounded-input border border-error/20 bg-error/5 px-3 py-2 font-body text-[12px] text-error">
+              {inviteError}
+            </div>
+          )}
+
           <div className="flex gap-2 border-t border-surface-border pt-3">
             <Button
               type="button"
-              onClick={onClose}
+              onClick={handleClose}
               className={`flex-1 ${OUTLINE_BUTTON}`}
               disabled={isSubmitting}
             >

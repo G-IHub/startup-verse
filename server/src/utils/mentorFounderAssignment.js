@@ -14,7 +14,9 @@ export async function assertFounderInMentorOrganization(founderId, mentorOrgId, 
   }
 
   if (cohortId && mongoose.Types.ObjectId.isValid(String(cohortId))) {
-    const cohort = await Cohort.findById(cohortId).select("organizationId").lean();
+    const cohort = await Cohort.findOne({ _id: cohortId, deletedAt: null })
+      .select("organizationId")
+      .lean();
     if (!cohort) {
       return { ok: false, message: "Cohort not found." };
     }
@@ -31,7 +33,12 @@ export async function assertFounderInMentorOrganization(founderId, mentorOrgId, 
     return { ok: true };
   }
 
-  const cohorts = await Cohort.find({ organizationId: mentorOrgId }).select("_id").lean();
+  const cohorts = await Cohort.find({
+    organizationId: mentorOrgId,
+    deletedAt: null,
+  })
+    .select("_id")
+    .lean();
   const cohortIds = cohorts.map((c) => c._id);
   if (!cohortIds.length) {
     return { ok: false, message: "Organization has no cohorts." };

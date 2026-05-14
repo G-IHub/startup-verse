@@ -22,6 +22,8 @@ import {
 } from "lucide-react";
 import { unwrapData } from "../../utils/apiEnvelope";
 import { SectionCard, ListRow, StatusBadge } from "./_primitives";
+import { uploadFile } from "../../utils/api/uploadApi";
+import { toastError } from "../../utils/toastError";
 
 const API_BASE = API_BASE_URL;
 
@@ -135,7 +137,7 @@ export default function OrganizationSettings({
         {
           ...defaultOptions,
           method: "PUT",
-          body: JSON.stringify({ name, description, website, logo, userId }),
+          body: JSON.stringify({ name, description, website, userId }),
         },
       );
       if (!isMountedRef.current) return;
@@ -173,31 +175,34 @@ export default function OrganizationSettings({
     try {
       setUploadingLogo(true);
       setErrorMessage("");
-      const dataUrl = await new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(reader.result);
-        reader.onerror = () => reject(new Error("Failed to read file"));
-        reader.readAsDataURL(file);
-      });
+      const uploaded = await uploadFile(file, "org-logo");
+      const logoUrl = uploaded?.url;
+      if (!logoUrl) {
+        throw new Error("Upload did not return a URL");
+      }
       const response = await fetch(
         `${API_BASE}/organizations/${organizationId}/logo`,
         {
           ...defaultOptions,
           method: "PUT",
-          body: JSON.stringify({ logo: dataUrl }),
+          body: JSON.stringify({ logo: logoUrl }),
         },
       );
-      if (!response.ok) throw new Error("Failed to upload logo");
-      const inner = unwrapData(await response.json());
-      const nextLogo = inner?.logo || inner?.url;
-      if (nextLogo) {
-        setLogo(nextLogo);
-        setSuccessMessage("Logo uploaded successfully!");
-        setTimeout(() => setSuccessMessage(""), 3000);
+      const responseJson = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        const err = new Error(responseJson?.message || "Failed to upload logo");
+        err.status = response.status;
+        throw err;
       }
+      const inner = unwrapData(responseJson);
+      const nextLogo = inner?.logo || inner?.url || logoUrl;
+      setLogo(nextLogo);
+      setSuccessMessage("Logo uploaded successfully!");
+      setTimeout(() => setSuccessMessage(""), 3000);
     } catch (error) {
       console.error("Failed to upload logo:", error);
       setErrorMessage("Failed to upload logo. Please try again.");
+      toastError(error, "Failed to upload logo. Please try again.");
     } finally {
       setUploadingLogo(false);
     }
@@ -219,7 +224,6 @@ export default function OrganizationSettings({
           method: "POST",
           body: JSON.stringify({
             email: newAdminEmail.trim(),
-            addedBy: userId,
           }),
         },
       );

@@ -8,6 +8,7 @@ import {
   ArrowRight,
   Settings,
   LayoutGrid,
+  Pencil,
   Trash2,
   MoreVertical,
 } from "lucide-react";
@@ -33,6 +34,7 @@ import {
   isOrganizationAdmin,
   deleteCohort,
 } from "../../utils/organizationHelpersBackend";
+import { toastError } from "../../utils/toastError";
 import CreateOrganizationModal from "../organizations/CreateOrganizationModal";
 import CreateCohortModal from "../organizations/CreateCohortModal";
 import CohortDashboardWithSidebar from "../organizations/CohortDashboardWithSidebar";
@@ -57,6 +59,9 @@ export default function OrganizationDashboard({
   const dashboardUserId = String(user._id ?? user.id ?? "");
 
   const [showCreateCohortModal, setShowCreateCohortModal] = useState(false);
+  // `cohortToEdit` non-null means the CreateCohortModal opens in edit mode.
+  // It is mutually exclusive with `showCreateCohortModal`.
+  const [cohortToEdit, setCohortToEdit] = useState(null);
   const [isAdmin, setIsAdmin] = useState(false);
   const [cohortToDelete, setCohortToDelete] = useState(null);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -196,7 +201,7 @@ export default function OrganizationDashboard({
       console.log("✅✅✅ FRONTEND: Cohort deletion complete");
     } catch (error) {
       console.error("❌❌❌ FRONTEND: Failed to delete cohort:", error);
-      alert("Failed to delete cohort. Please try again.");
+      toastError(error, "Failed to delete cohort. Please try again.");
 
       // Reload cohorts to ensure UI is in sync
       if (selectedOrg?.id) {
@@ -395,6 +400,16 @@ export default function OrganizationDashboard({
                                       <DropdownMenuItem
                                         onClick={(e) => {
                                           e.stopPropagation();
+                                          setCohortToEdit(cohort);
+                                        }}
+                                        className="font-body text-[13px]"
+                                      >
+                                        <Pencil className="w-4 h-4 mr-2" />
+                                        Edit Cohort
+                                      </DropdownMenuItem>
+                                      <DropdownMenuItem
+                                        onClick={(e) => {
+                                          e.stopPropagation();
                                           setCohortToDelete(cohort);
                                         }}
                                         className="font-body text-[13px] text-destructive focus:text-destructive"
@@ -443,16 +458,24 @@ export default function OrganizationDashboard({
       />
       {selectedOrg && (
         <CreateCohortModal
-          isOpen={showCreateCohortModal}
-          onClose={() => setShowCreateCohortModal(false)}
+          isOpen={showCreateCohortModal || !!cohortToEdit}
+          onClose={() => {
+            setShowCreateCohortModal(false);
+            setCohortToEdit(null);
+          }}
           organizationId={selectedOrg.id}
           organizationName={selectedOrg.name}
           userId={dashboardUserId}
           creatorEmail={user?.email}
           creatorName={user?.name}
+          cohort={cohortToEdit}
           onSuccess={() => {
             loadCohorts(selectedOrg.id);
             setShowCreateCohortModal(false);
+          }}
+          onUpdated={() => {
+            loadCohorts(selectedOrg.id);
+            setCohortToEdit(null);
           }}
         />
       )}

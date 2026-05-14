@@ -14,6 +14,7 @@ import {
   getOrganization,
   getCohort,
 } from "../../utils/organizationHelpersBackend";
+import { toastError } from "../../utils/toastError";
 export default function CohortInvitationCard({ invitation, onRespond }) {
   const [isResponding, setIsResponding] = useState(false);
   const [showDetails, setShowDetails] = useState(false);
@@ -51,7 +52,7 @@ export default function CohortInvitationCard({ invitation, onRespond }) {
       }
     } catch (error) {
       console.error("Failed to respond to invitation:", error);
-      alert("Failed to respond to invitation. Please try again.");
+      toastError(error, "Failed to respond to invitation. Please try again.");
     } finally {
       setIsResponding(false);
     }

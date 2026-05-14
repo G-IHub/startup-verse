@@ -3,7 +3,7 @@
  * Enhanced milestone/deliverable creation for organizations
  * Generates the same quality structure that founders get
  */
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   Dialog,
   DialogContent,
@@ -34,6 +34,7 @@ import {
   X,
 } from "lucide-react";
 import { SectionCard } from "./_primitives";
+import { toast } from "sonner";
 
 const CATEGORY_OPTIONS = [
   { value: "general", label: "General" },
@@ -56,8 +57,11 @@ export default function StructuredMilestoneCreator({
   onClose,
   onSubmit,
   type,
+  milestone,
 }) {
-  const [step, setStep] = useState("input");
+  const isEditMode = Boolean(milestone);
+  // In edit mode we skip the "input" gate; otherwise we start at the first step.
+  const [step, setStep] = useState(isEditMode ? "structure" : "input");
   const [formData, setFormData] = useState({
     title: "",
     description: "",
@@ -71,6 +75,43 @@ export default function StructuredMilestoneCreator({
     { title: "", tasks: ["", "", ""] },
   ]);
   const [isGenerating, setIsGenerating] = useState(false);
+
+  // Hydrate form/milestones whenever the dialog opens or the edit target changes.
+  useEffect(() => {
+    if (!isOpen) return;
+    if (isEditMode) {
+      const dueDate = milestone.dueDate
+        ? new Date(milestone.dueDate).toISOString().slice(0, 10)
+        : "";
+      setFormData({
+        title: milestone.title || "",
+        description: milestone.description || "",
+        dueDate,
+        week: milestone.week != null ? String(milestone.week) : "",
+        category:
+          milestone.category ||
+          (type === "deliverable" ? "deliverable" : "general"),
+      });
+      const sm = Array.isArray(milestone.structuredMilestones)
+        ? milestone.structuredMilestones
+        : [];
+      setMilestones(
+        sm.length > 0
+          ? sm.map((m) => ({
+              title: m.title || "",
+              tasks:
+                Array.isArray(m.tasks) && m.tasks.length > 0
+                  ? m.tasks.slice()
+                  : [""],
+            }))
+          : [{ title: "", tasks: [""] }],
+      );
+      setStep("structure");
+    } else {
+      // Reset for a fresh "create" pass when reopening without a target.
+      setStep("input");
+    }
+  }, [isOpen, isEditMode, milestone, type]);
 
   const resetState = () => {
     setStep("input");
@@ -134,7 +175,7 @@ export default function StructuredMilestoneCreator({
 
   const handleSubmit = async () => {
     if (!formData.title || !formData.dueDate) {
-      alert("Please fill in title and due date");
+      toast.error("Please fill in title and due date");
       return;
     }
     const validMilestones = milestones
@@ -145,7 +186,7 @@ export default function StructuredMilestoneCreator({
       }))
       .filter((m) => m.tasks.length > 0);
     if (validMilestones.length === 0) {
-      alert("Please add at least one milestone with tasks");
+      toast.error("Please add at least one milestone with tasks");
       return;
     }
     await onSubmit({
@@ -162,6 +203,7 @@ export default function StructuredMilestoneCreator({
   );
 
   const titleLabel = type === "deliverable" ? "Deliverable" : "Program Milestone";
+  const verb = isEditMode ? "Edit" : "Create";
 
   return (
     <Dialog open={isOpen} onOpenChange={handleOpenChange}>
@@ -170,7 +212,7 @@ export default function StructuredMilestoneCreator({
           <DialogHeader className="border-b border-surface-border pb-4 text-left">
             <DialogTitle className="flex items-center gap-2 font-heading text-[18px] font-bold text-text-heading">
               <Sparkles className="h-5 w-5 text-primary" />
-              Create {titleLabel}
+              {verb} {titleLabel}
             </DialogTitle>
             <DialogDescription className="font-body text-[13px] text-text-body">
               {step === "input" &&
@@ -524,7 +566,9 @@ export default function StructuredMilestoneCreator({
               <DialogFooter className="border-t border-surface-border pt-4 sm:justify-start">
                 <Button onClick={handleSubmit} className={PRIMARY_BUTTON}>
                   <CheckCircle2 className="mr-2 h-4 w-4" />
-                  Create &amp; Deploy to Cohort
+                  {isEditMode
+                    ? "Save Changes"
+                    : "Create & Deploy to Cohort"}
                 </Button>
                 <Button
                   onClick={() => setStep("structure")}

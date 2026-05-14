@@ -24,8 +24,31 @@ import {
   Wrench,
   Newspaper,
   FolderOpen,
+  Upload,
+  Pencil,
+  Trash2,
+  MoreVertical,
 } from "lucide-react";
 import { unwrapData } from "../../utils/apiEnvelope";
+import { toastError } from "../../utils/toastError";
+import { toast } from "sonner";
+import { uploadFile } from "../../utils/api/uploadApi";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "../ui/dropdown-menu";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "../ui/alert-dialog";
 import {
   SectionCard,
   SectionHeader,
@@ -33,6 +56,18 @@ import {
   EmptyStateBlock,
   CollapsibleFormCard,
 } from "./_primitives";
+
+const OUTLINE_BUTTON =
+  "h-9 rounded-input border border-surface-border bg-white font-body text-[13px] font-medium text-text-body hover:bg-primary-tint hover:text-primary";
+
+/** Map a MIME type to the closest Resource.type enum value the form supports. */
+function inferResourceTypeFromMime(mimeType) {
+  const mt = String(mimeType || "").toLowerCase();
+  if (mt.startsWith("video/")) return "video";
+  // Everything else uploaded as a file is treated as a "document" - the safest
+  // bucket that still maps to an option in TYPE_OPTIONS.
+  return "document";
+}
 
 const API_BASE = API_BASE_URL;
 
@@ -95,14 +130,20 @@ export default function ResourceLibrary({
   const [searchQuery, setSearchQuery] = useState("");
   const [filterCategory, setFilterCategory] = useState("all");
   const [filterType, setFilterType] = useState("all");
-  const [formData, setFormData] = useState({
+  // Non-null editingResourceId puts the form into edit mode (PUT instead of POST)
+  const [editingResourceId, setEditingResourceId] = useState(null);
+  const [resourceToDelete, setResourceToDelete] = useState(null);
+  const [isDeletingResource, setIsDeletingResource] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
+  const emptyForm = {
     title: "",
     description: "",
     category: "general",
     type: "link",
     url: "",
     tags: "",
-  });
+  };
+  const [formData, setFormData] = useState(emptyForm);
 
   useEffect(() => {
     loadResources();
@@ -125,37 +166,121 @@ export default function ResourceLibrary({
     }
   };
 
-  const handleCreateResource = async (e) => {
+  const handleSubmitResource = async (e) => {
     e.preventDefault();
+    const isEdit = Boolean(editingResourceId);
     try {
-      const response = await fetch(
-        `${API_BASE}/cohorts/${cohortId}/resources`,
-        {
-          ...defaultOptions,
-          method: "POST",
-          body: JSON.stringify({
-            organizationId,
-            title: formData.title,
-            description: formData.description,
-            url: formData.url,
-            founderId: userId,
-          }),
-        },
-      );
-      if (!response.ok) throw new Error("Failed to create resource");
-      setFormData({
-        title: "",
-        description: "",
-        category: "general",
-        type: "link",
-        url: "",
-        tags: "",
+      const payload = {
+        organizationId,
+        title: formData.title,
+        description: formData.description,
+        category: formData.category,
+        type: formData.type,
+        url: formData.url,
+        tags: formData.tags
+          .split(",")
+          .map((tag) => tag.trim())
+          .filter(Boolean),
+        founderId: userId,
+        createdBy: userId,
+      };
+      const url = isEdit
+        ? `${API_BASE}/cohorts/${cohortId}/resources/${editingResourceId}`
+        : `${API_BASE}/cohorts/${cohortId}/resources`;
+      const response = await fetch(url, {
+        ...defaultOptions,
+        method: isEdit ? "PUT" : "POST",
+        body: JSON.stringify(payload),
       });
+      if (!response.ok) {
+        const body = await response.json().catch(() => ({}));
+        const err = new Error(
+          body?.message ||
+            (isEdit ? "Failed to update resource" : "Failed to create resource"),
+        );
+        err.status = response.status;
+        throw err;
+      }
+      setFormData(emptyForm);
+      setEditingResourceId(null);
       setShowCreateForm(false);
       loadResources();
+      toast.success(isEdit ? "Resource updated" : "Resource added");
     } catch (error) {
-      console.error("Error creating resource:", error);
-      alert("Failed to create resource");
+      console.error(
+        isEdit ? "Error updating resource:" : "Error creating resource:",
+        error,
+      );
+      toastError(
+        error,
+        isEdit ? "Failed to update resource" : "Failed to create resource",
+      );
+    }
+  };
+
+  const handleUploadFile = async (file) => {
+    if (!file) return;
+    setIsUploading(true);
+    try {
+      const result = await uploadFile(file, "resources");
+      const inferredType = inferResourceTypeFromMime(result?.mimeType);
+      setFormData((prev) => ({
+        ...prev,
+        url: result?.url || prev.url,
+        type: inferredType,
+        title: prev.title || file.name.replace(/\.[^.]+$/, ""),
+      }));
+      toast.success("File uploaded - URL filled in");
+    } catch (error) {
+      console.error("Error uploading file:", error);
+      toastError(error, "Failed to upload file");
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  const startEditResource = (resource) => {
+    setEditingResourceId(resource.id || resource._id);
+    setFormData({
+      title: resource.title || "",
+      description: resource.description || "",
+      category: resource.category || "general",
+      type: resource.type || "link",
+      url: resource.url || "",
+      tags: Array.isArray(resource.tags) ? resource.tags.join(", ") : "",
+    });
+    setShowCreateForm(true);
+  };
+
+  const cancelEdit = () => {
+    setEditingResourceId(null);
+    setFormData(emptyForm);
+    setShowCreateForm(false);
+  };
+
+  const confirmDeleteResource = async () => {
+    if (!resourceToDelete) return;
+    setIsDeletingResource(true);
+    try {
+      const id = resourceToDelete.id || resourceToDelete._id;
+      const response = await fetch(
+        `${API_BASE}/cohorts/${cohortId}/resources/${id}`,
+        { ...defaultOptions, method: "DELETE" },
+      );
+      if (!response.ok) {
+        const body = await response.json().catch(() => ({}));
+        const err = new Error(body?.message || "Failed to delete resource");
+        err.status = response.status;
+        throw err;
+      }
+      setResourceToDelete(null);
+      loadResources();
+      toast.success("Resource deleted");
+    } catch (error) {
+      console.error("Error deleting resource:", error);
+      toastError(error, "Failed to delete resource");
+    } finally {
+      setIsDeletingResource(false);
     }
   };
 
@@ -185,13 +310,20 @@ export default function ResourceLibrary({
 
       {isAdmin && (
         <CollapsibleFormCard
-          title="Add Resource"
-          description="Share a link, document, or template with your cohort"
-          triggerLabel="Add Resource"
+          title={editingResourceId ? "Edit Resource" : "Add Resource"}
+          description={
+            editingResourceId
+              ? "Update resource details"
+              : "Share a link, document, or template with your cohort"
+          }
+          triggerLabel={editingResourceId ? "Edit Resource" : "Add Resource"}
           isOpen={showCreateForm}
-          onToggle={setShowCreateForm}
+          onToggle={(open) => {
+            if (!open && editingResourceId) cancelEdit();
+            else setShowCreateForm(open);
+          }}
         >
-          <form onSubmit={handleCreateResource} className="space-y-3">
+          <form onSubmit={handleSubmitResource} className="space-y-3">
             <div>
               <label className="mb-2 block font-body text-[13px] font-medium text-text-heading">
                 Title
@@ -277,16 +409,37 @@ export default function ResourceLibrary({
               <label className="mb-2 block font-body text-[13px] font-medium text-text-heading">
                 URL
               </label>
-              <Input
-                value={formData.url}
-                onChange={(e) =>
-                  setFormData({ ...formData, url: e.target.value })
-                }
-                placeholder="https://..."
-                required={true}
-                type="url"
-                className="font-body text-[13px]"
-              />
+              <div className="flex items-stretch gap-2">
+                <Input
+                  value={formData.url}
+                  onChange={(e) =>
+                    setFormData({ ...formData, url: e.target.value })
+                  }
+                  placeholder="https://..."
+                  required={true}
+                  type="url"
+                  className="flex-1 font-body text-[13px]"
+                />
+                <label
+                  className={`${OUTLINE_BUTTON} flex cursor-pointer items-center px-3`}
+                >
+                  <Upload className="mr-2 h-4 w-4" />
+                  {isUploading ? "Uploading..." : "Upload file"}
+                  <input
+                    type="file"
+                    className="hidden"
+                    disabled={isUploading}
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      e.target.value = "";
+                      if (file) handleUploadFile(file);
+                    }}
+                  />
+                </label>
+              </div>
+              <p className="mt-1 font-body text-[12px] text-text-muted">
+                Optional: upload a file to auto-fill the URL.
+              </p>
             </div>
             <div>
               <label className="mb-2 block font-body text-[13px] font-medium text-text-heading">
@@ -301,10 +454,22 @@ export default function ResourceLibrary({
                 className="font-body text-[13px]"
               />
             </div>
-            <Button type="submit" size="sm" className={PRIMARY_BUTTON}>
-              <Plus className="mr-2 h-4 w-4" />
-              Add Resource
-            </Button>
+            <div className="flex gap-2">
+              <Button type="submit" size="sm" className={PRIMARY_BUTTON}>
+                <Plus className="mr-2 h-4 w-4" />
+                {editingResourceId ? "Save Changes" : "Add Resource"}
+              </Button>
+              {editingResourceId && (
+                <Button
+                  type="button"
+                  size="sm"
+                  onClick={cancelEdit}
+                  className={OUTLINE_BUTTON}
+                >
+                  Cancel
+                </Button>
+              )}
+            </div>
           </form>
         </CollapsibleFormCard>
       )}
@@ -425,7 +590,41 @@ export default function ResourceLibrary({
                     <div className="flex h-9 w-9 items-center justify-center rounded-input bg-primary-tint text-primary">
                       <TypeIcon className="h-4 w-4" />
                     </div>
-                    <StatusBadge tone={typeTone} label={resource.type} />
+                    <div className="flex items-center gap-1">
+                      <StatusBadge tone={typeTone} label={resource.type} />
+                      {isAdmin && (
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild={true}>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-8 w-8 p-0"
+                            >
+                              <MoreVertical className="w-4 h-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent
+                            align="end"
+                            className="w-36"
+                          >
+                            <DropdownMenuItem
+                              onClick={() => startEditResource(resource)}
+                              className="font-body text-[13px]"
+                            >
+                              <Pencil className="w-4 h-4 mr-2" />
+                              Edit
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={() => setResourceToDelete(resource)}
+                              className="font-body text-[13px] text-destructive focus:text-destructive"
+                            >
+                              <Trash2 className="w-4 h-4 mr-2" />
+                              Delete
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      )}
+                    </div>
                   </div>
                   <h3 className="mb-1 truncate font-heading text-[14px] font-bold text-text-heading">
                     {resource.title}
@@ -484,6 +683,39 @@ export default function ResourceLibrary({
           </p>
         </div>
       )}
+
+      <AlertDialog
+        open={!!resourceToDelete}
+        onOpenChange={(open) => !open && setResourceToDelete(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="font-heading text-base font-bold text-text-heading">
+              Delete Resource
+            </AlertDialogTitle>
+            <AlertDialogDescription className="font-body text-[13px] text-text-body">
+              {"Delete "}
+              <strong>{resourceToDelete?.title}</strong>? This action cannot be
+              undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel
+              className="h-9 rounded-input font-body text-[13px] font-medium"
+              disabled={isDeletingResource}
+            >
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmDeleteResource}
+              disabled={isDeletingResource}
+              className="h-9 rounded-input bg-destructive font-body text-[13px] font-semibold text-white hover:bg-destructive/90"
+            >
+              {isDeletingResource ? "Deleting..." : "Delete Resource"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
