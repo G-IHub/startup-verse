@@ -111,6 +111,24 @@ organizationsRouter.post(
   requireOrgAdmin,
   asyncHandler(cohortWorkspaceController.createCohortAnnouncement),
 );
+organizationsRouter.put(
+  "/cohorts/:cohortId/announcements/:announcementId",
+  requireAuth,
+  requireOrgAdmin,
+  asyncHandler(cohortWorkspaceController.updateCohortAnnouncement),
+);
+organizationsRouter.delete(
+  "/cohorts/:cohortId/announcements/:announcementId",
+  requireAuth,
+  requireOrgAdmin,
+  asyncHandler(cohortWorkspaceController.deleteCohortAnnouncement),
+);
+organizationsRouter.post(
+  "/cohorts/:cohortId/announcements/:announcementId/read",
+  requireAuth,
+  requireCohortReadAccess,
+  asyncHandler(cohortWorkspaceController.markAnnouncementRead),
+);
 organizationsRouter.get(
   "/cohorts/:cohortId/resources",
   requireAuth,

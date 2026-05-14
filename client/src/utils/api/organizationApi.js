@@ -175,6 +175,37 @@ export async function updateCohort(cohortId, patch) {
 }
 
 // ==========================================
+// COHORT ANNOUNCEMENTS (Step 2.8)
+// ==========================================
+
+export async function updateCohortAnnouncement(cohortId, announcementId, patch) {
+  const result = await apiCall(
+    `/cohorts/${cohortId}/announcements/${announcementId}`,
+    {
+      method: "PUT",
+      body: JSON.stringify(patch),
+    },
+  );
+  return unwrapData(result);
+}
+
+export async function deleteCohortAnnouncement(cohortId, announcementId) {
+  const result = await apiCall(
+    `/cohorts/${cohortId}/announcements/${announcementId}`,
+    { method: "DELETE" },
+  );
+  return unwrapData(result);
+}
+
+export async function markCohortAnnouncementRead(cohortId, announcementId) {
+  const result = await apiCall(
+    `/cohorts/${cohortId}/announcements/${announcementId}/read`,
+    { method: "POST" },
+  );
+  return unwrapData(result);
+}
+
+// ==========================================
 // INVITATION MANAGEMENT
 // ==========================================
 
