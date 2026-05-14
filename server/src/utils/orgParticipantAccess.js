@@ -13,7 +13,9 @@ export async function userHasOrganizationScope(userId, organizationId) {
     return false;
   }
 
-  const cohorts = await Cohort.find({ organizationId }).select("_id").lean();
+  const cohorts = await Cohort.find({ organizationId, deletedAt: null })
+    .select("_id")
+    .lean();
   const cohortIds = cohorts.map((c) => c._id);
   if (!cohortIds.length) {
     return false;

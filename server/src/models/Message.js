@@ -25,6 +25,18 @@ const messageSchema = new mongoose.Schema(
       index: true,
     },
     body: { type: String, required: true },
+    subject: { type: String, default: "", maxlength: 250 },
+    messageType: {
+      type: String,
+      enum: ["dm", "announcement", "bulk", "individual"],
+      default: "dm",
+      index: true,
+    },
+    cohortId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Cohort",
+      index: true,
+    },
     attachments: { type: [mongoose.Schema.Types.Mixed], default: [] },
     readAt: { type: Date, default: null },
     metadata: { type: mongoose.Schema.Types.Mixed, default: {} },
@@ -38,6 +50,8 @@ messageSchema.index({
   toUserId: 1,
   createdAt: -1,
 });
+
+messageSchema.index({ organizationId: 1, createdAt: -1 });
 
 const Message =
   mongoose.models.Message || mongoose.model("Message", messageSchema);

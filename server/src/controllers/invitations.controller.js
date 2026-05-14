@@ -197,7 +197,7 @@ export const createInvitation = async (req, res) => {
   if (!cohortId) {
     return apiError(res, "cohortId is required.", 400);
   }
-  const cohort = await Cohort.findById(cohortId).lean();
+  const cohort = await Cohort.findOne({ _id: cohortId, deletedAt: null }).lean();
   if (!cohort) {
     return apiError(res, "Cohort not found.", 404);
   }
@@ -214,16 +214,59 @@ export const createInvitation = async (req, res) => {
     }
   }
 
+  const rawEmail = req.body?.email ?? req.body?.founderEmail ?? "";
+  const normalizedEmail = String(rawEmail).toLowerCase().trim();
+  if (!normalizedEmail) {
+    return apiError(res, "email is required.", 400);
+  }
+
+  const existingByEmail = await CohortInvitation.findOne({
+    cohortId,
+    email: normalizedEmail,
+    status: "pending",
+  }).lean();
+  if (existingByEmail) {
+    return apiError(
+      res,
+      "A pending invitation already exists for this email in this cohort.",
+      409,
+    );
+  }
+
+  const founderId = req.body?.founderId || null;
+  if (founderId && mongoose.Types.ObjectId.isValid(String(founderId))) {
+    const existingByFounder = await CohortInvitation.findOne({
+      cohortId,
+      founderId,
+      status: "pending",
+    }).lean();
+    if (existingByFounder) {
+      return apiError(
+        res,
+        "A pending invitation already exists for this founder in this cohort.",
+        409,
+      );
+    }
+  }
+
+  const metadata = { ...(req.body?.metadata || {}) };
+  if (typeof req.body?.founderName === "string" && req.body.founderName.trim()) {
+    metadata.founderName = req.body.founderName.trim();
+  }
+  if (typeof req.body?.startupName === "string" && req.body.startupName.trim()) {
+    metadata.startupName = req.body.startupName.trim();
+  }
+
   const invitation = await CohortInvitation.create({
     cohortId,
     organizationId: cohort.organizationId,
-    founderId: req.body?.founderId || null,
-    email: req.body?.email || "",
+    founderId,
+    email: normalizedEmail,
     message: req.body?.message || "",
     token: crypto.randomUUID(),
     status: "pending",
     invitedBy: req.user.id,
-    metadata: req.body?.metadata || {},
+    metadata,
   });
 
   // If the invitee is an existing user, drop a notification immediately.
@@ -272,7 +315,10 @@ export const getInvitationByToken = async (req, res) => {
   const cohortInvite = await CohortInvitation.findOne({ token: req.params.token });
   if (cohortInvite) {
     const cohort = cohortInvite.cohortId
-      ? await Cohort.findById(cohortInvite.cohortId).lean()
+      ? await Cohort.findOne({
+          _id: cohortInvite.cohortId,
+          deletedAt: null,
+        }).lean()
       : null;
     const organization = cohortInvite.organizationId
       ? await Organization.findById(cohortInvite.organizationId, {

@@ -3,18 +3,14 @@ import Cohort from "../models/Cohort.js";
 import CohortMembership from "../models/CohortMembership.js";
 import Message from "../models/Message.js";
 import OrganizationAdmin from "../models/OrganizationAdmin.js";
+import Startup from "../models/Startup.js";
+import User from "../models/User.js";
 import { error as apiError, success as apiSuccess } from "../utils/apiResponse.js";
 import { userHasOrganizationScope } from "../utils/orgParticipantAccess.js";
 import { emitRealtime } from "../services/realtime.service.js";
 import { SOCKET_EVENTS } from "../realtime/events.js";
 import { organizationRoom, userRoom } from "../realtime/rooms.js";
-
-function buildMessageBody(subject, message) {
-  const s = String(subject || "").trim();
-  const m = String(message || "").trim();
-  if (s && m) return `${s}\n\n${m}`;
-  return s || m || "(no content)";
-}
+import { mapMessageDto } from "../utils/messageDto.js";
 
 async function assertCohortBelongsToOrg(cohortId, organizationId) {
   if (!cohortId || !mongoose.Types.ObjectId.isValid(String(cohortId))) {
@@ -23,7 +19,9 @@ async function assertCohortBelongsToOrg(cohortId, organizationId) {
   if (!organizationId || !mongoose.Types.ObjectId.isValid(String(organizationId))) {
     return { ok: false, status: 400, message: "Invalid organizationId." };
   }
-  const cohort = await Cohort.findById(cohortId).select("organizationId").lean();
+  const cohort = await Cohort.findOne({ _id: cohortId, deletedAt: null })
+    .select("organizationId")
+    .lean();
   if (!cohort) {
     return { ok: false, status: 404, message: "Cohort not found." };
   }
@@ -60,7 +58,70 @@ async function emitOrgMessage(message) {
     rooms.push(organizationRoom(message.organizationId));
   }
   rooms.push(userRoom(message.toUserId));
-  emitRealtime(SOCKET_EVENTS.MESSAGE_CREATED, message, rooms);
+  rooms.push(userRoom(message.fromUserId));
+  const uniqueRooms = [...new Set(rooms.filter(Boolean))];
+  emitRealtime(SOCKET_EVENTS.MESSAGE_CREATED, mapMessageDto(message), uniqueRooms);
+}
+
+/**
+ * Build a per-user enrichment map: { userId -> { id, name, email, avatarUrl, startupName? } }.
+ * Single batched User lookup + single batched Startup lookup (keyed by founderId) so
+ * an inbox page is O(1) round-trips regardless of conversation count.
+ */
+async function buildUserEnrichmentMap(userIdStrings) {
+  const result = new Map();
+  const ids = (userIdStrings || [])
+    .map((id) => String(id || "").trim())
+    .filter((id) => id && mongoose.Types.ObjectId.isValid(id));
+  if (ids.length === 0) return result;
+
+  const [users, startups] = await Promise.all([
+    User.find({ _id: { $in: ids } }, { name: 1, email: 1, avatarUrl: 1 }).lean(),
+    Startup.find({ founderId: { $in: ids } }, { founderId: 1, name: 1 }).lean(),
+  ]);
+
+  const startupByFounder = new Map(
+    startups.map((s) => [String(s.founderId), s.name || ""]),
+  );
+
+  for (const user of users) {
+    const idStr = String(user._id);
+    const startupName = startupByFounder.get(idStr) || "";
+    result.set(idStr, {
+      id: idStr,
+      name: user.name || "",
+      email: user.email || "",
+      avatarUrl: user.avatarUrl || "",
+      ...(startupName ? { startupName } : {}),
+    });
+  }
+
+  return result;
+}
+
+function enrichedMessageDto(row, userMap) {
+  const fromId = row.fromUserId ? String(row.fromUserId) : "";
+  const toId = row.toUserId ? String(row.toUserId) : "";
+  return {
+    id: String(row._id),
+    subject: typeof row.subject === "string" ? row.subject : "",
+    body: row.body || "",
+    fromUserId: fromId,
+    toUserId: toId,
+    organizationId: row.organizationId ? String(row.organizationId) : "",
+    cohortId: row.cohortId ? String(row.cohortId) : "",
+    startupId: row.startupId ? String(row.startupId) : "",
+    messageType:
+      typeof row.messageType === "string" && row.messageType
+        ? row.messageType
+        : "dm",
+    attachments: Array.isArray(row.attachments) ? row.attachments : [],
+    readAt: row.readAt || null,
+    createdAt: row.createdAt || null,
+    updatedAt: row.updatedAt || null,
+    from: userMap.get(fromId) || (fromId ? { id: fromId, name: "", email: "" } : null),
+    to: userMap.get(toId) || (toId ? { id: toId, name: "", email: "" } : null),
+  };
 }
 
 /**
@@ -76,37 +137,52 @@ export const listOrganizationMessages = async (req, res) => {
   const userRole = String(req.user.role || "").toLowerCase();
   const isPlatformAdmin = req.user.isAdmin === true || userRole === "admin";
 
-  const baseQuery = () => Message.find({ organizationId }).sort({ createdAt: -1 }).limit(500);
+  const fetchAll = () =>
+    Message.find({ organizationId })
+      .sort({ createdAt: -1 })
+      .limit(500)
+      .lean();
 
+  let rows;
   if (isPlatformAdmin) {
-    return apiSuccess(res, await baseQuery());
+    rows = await fetchAll();
+  } else {
+    const isOrgAdmin = await OrganizationAdmin.exists({
+      organizationId,
+      userId: req.user.id,
+    });
+    if (isOrgAdmin) {
+      rows = await fetchAll();
+    } else {
+      const inScope = await userHasOrganizationScope(
+        req.user.id,
+        organizationId,
+      );
+      if (!inScope) {
+        return apiError(
+          res,
+          "Forbidden. You do not have access to this organization's message history.",
+          403,
+        );
+      }
+      rows = await Message.find({
+        organizationId,
+        $or: [{ toUserId: req.user.id }, { fromUserId: req.user.id }],
+      })
+        .sort({ createdAt: -1 })
+        .limit(500)
+        .lean();
+    }
   }
 
-  const isOrgAdmin = await OrganizationAdmin.exists({
-    organizationId,
-    userId: req.user.id,
-  });
-  if (isOrgAdmin) {
-    return apiSuccess(res, await baseQuery());
+  const userIds = new Set();
+  for (const row of rows) {
+    if (row.fromUserId) userIds.add(String(row.fromUserId));
+    if (row.toUserId) userIds.add(String(row.toUserId));
   }
+  const userMap = await buildUserEnrichmentMap([...userIds]);
 
-  const inScope = await userHasOrganizationScope(req.user.id, organizationId);
-  if (!inScope) {
-    return apiError(
-      res,
-      "Forbidden. You do not have access to this organization's message history.",
-      403,
-    );
-  }
-
-  const messages = await Message.find({
-    organizationId,
-    $or: [{ toUserId: req.user.id }, { fromUserId: req.user.id }],
-  })
-    .sort({ createdAt: -1 })
-    .limit(500);
-
-  return apiSuccess(res, messages);
+  return apiSuccess(res, rows.map((row) => enrichedMessageDto(row, userMap)));
 };
 
 export const bulkSendOrgMessages = async (req, res) => {
@@ -125,15 +201,22 @@ export const bulkSendOrgMessages = async (req, res) => {
     return apiError(res, recipients.message, recipients.status);
   }
 
-  const text = buildMessageBody(body.subject, body.message);
-  const created = [];
+  const subject = String(body.subject || "").trim();
+  const messageBody = String(body.message || "").trim();
+  if (!messageBody && !subject) {
+    return apiError(res, "Message subject or body is required.", 400);
+  }
 
+  const created = [];
   for (const toUserId of recipients.recipientIds) {
     const message = await Message.create({
       organizationId,
+      cohortId,
       fromUserId: req.user.id,
       toUserId,
-      body: text,
+      subject,
+      body: messageBody || subject,
+      messageType: "bulk",
       attachments: [],
     });
     created.push(message);
@@ -167,12 +250,20 @@ export const sendIndividualOrgMessage = async (req, res) => {
     return apiError(res, recipients.message, recipients.status);
   }
 
-  const text = buildMessageBody(body.subject, body.message);
+  const subject = String(body.subject || "").trim();
+  const messageBody = String(body.message || "").trim();
+  if (!messageBody && !subject) {
+    return apiError(res, "Message subject or body is required.", 400);
+  }
+
   const message = await Message.create({
     organizationId,
+    cohortId,
     fromUserId: req.user.id,
     toUserId: recipientId,
-    body: text,
+    subject,
+    body: messageBody || subject,
+    messageType: "individual",
     attachments: [],
   });
   await emitOrgMessage(message);

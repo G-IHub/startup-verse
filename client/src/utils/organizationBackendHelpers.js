@@ -168,6 +168,19 @@ export async function deleteCohort(cohortId, userId) {
   }
 }
 
+export async function updateCohort(cohortId, patch) {
+  console.log("📤 Updating cohort via API...", { cohortId });
+
+  try {
+    const cohort = await orgApi.updateCohort(cohortId, patch);
+    console.log("✅ Cohort updated:", cohortId);
+    return cohort;
+  } catch (error) {
+    console.error("❌ Failed to update cohort:", error);
+    throw error;
+  }
+}
+
 export async function getCohort(cohortId) {
   console.log("📤 Fetching cohort from API:", cohortId);
 
@@ -218,11 +231,12 @@ export async function createInvitation(
   });
 
   try {
+    const email = String(founderEmail || "").toLowerCase().trim();
     const invitation = await orgApi.createInvitation({
       cohortId,
       organizationId,
       founderId,
-      founderEmail,
+      email,
       founderName,
       startupName,
       invitedBy,
@@ -465,14 +479,14 @@ export async function generateCohortExport(cohortId) {
         endDate: cohort.endDate,
         exportedAt: new Date().toISOString(),
       },
-      startups: members.map((member) => ({
-        name: member.startupName,
-        founder: member.founderName,
-        stage: "N/A",
-        teamSize: member.progress?.teamSize || 1,
-        status: member.progress?.activityStatus || "unknown",
-        lastActivity: member.progress?.lastActive || "Never",
-        weeklyStreak: member.progress?.weeklyOutcomeStreak || 0,
+      startups: members.map((m) => ({
+        name: m.startupName || "Unnamed Startup",
+        founder: m.founderName || "",
+        stage: m.currentStage || m.startup?.stage || "",
+        teamSize: m.progress?.teamSize ?? 1,
+        status: m.progress?.activityStatus || "unknown",
+        lastActivity: m.progress?.lastActive || "Never",
+        weeklyStreak: m.progress?.weeklyOutcomeStreak ?? 0,
       })),
     };
   } catch (error) {

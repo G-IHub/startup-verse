@@ -12,8 +12,27 @@ import {
   AlertCircle,
   Sparkles,
   CheckCircle2,
+  Pencil,
+  Trash2,
+  MoreVertical,
 } from "lucide-react";
 import StructuredMilestoneCreator from "./StructuredMilestoneCreator";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "../ui/dropdown-menu";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "../ui/alert-dialog";
 import {
   SectionHeader,
   SectionCard,
@@ -21,6 +40,8 @@ import {
   StatusBadge,
   EmptyStateBlock,
 } from "./_primitives";
+import { toastError } from "../../utils/toastError";
+import { toast } from "sonner";
 
 const API_BASE = API_BASE_URL;
 
@@ -43,6 +64,10 @@ export default function ProgramMilestones({
   const [milestones, setMilestones] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showCreateForm, setShowCreateForm] = useState(false);
+  // Non-null editingMilestone means the creator dialog opens in edit mode.
+  const [editingMilestone, setEditingMilestone] = useState(null);
+  const [milestoneToDelete, setMilestoneToDelete] = useState(null);
+  const [isDeletingMilestone, setIsDeletingMilestone] = useState(false);
 
   useEffect(() => {
     loadMilestones();
@@ -66,31 +91,74 @@ export default function ProgramMilestones({
     }
   };
 
-  const handleCreateStructuredMilestone = async (data) => {
+  const handleSubmitStructuredMilestone = async (data) => {
+    const isEdit = Boolean(editingMilestone);
+    try {
+      const payload = {
+        organizationId,
+        title: data.title,
+        description: data.description,
+        dueDate: data.dueDate,
+        week: data.week,
+        category: data.category,
+        createdBy: userId,
+        structuredMilestones: data.milestones,
+      };
+      const url = isEdit
+        ? `${API_BASE}/cohorts/${cohortId}/program-milestones/${editingMilestone.id}`
+        : `${API_BASE}/cohorts/${cohortId}/program-milestones`;
+      const response = await fetch(url, {
+        ...defaultOptions,
+        method: isEdit ? "PUT" : "POST",
+        body: JSON.stringify(payload),
+      });
+      if (!response.ok) {
+        const body = await response.json().catch(() => ({}));
+        const err = new Error(
+          body?.message ||
+            (isEdit ? "Failed to update milestone" : "Failed to create milestone"),
+        );
+        err.status = response.status;
+        throw err;
+      }
+      setShowCreateForm(false);
+      setEditingMilestone(null);
+      loadMilestones();
+      toast.success(isEdit ? "Milestone updated" : "Milestone created");
+    } catch (error) {
+      console.error(
+        isEdit ? "Error updating milestone:" : "Error creating milestone:",
+        error,
+      );
+      toastError(
+        error,
+        isEdit ? "Failed to update milestone" : "Failed to create milestone",
+      );
+    }
+  };
+
+  const confirmDeleteMilestone = async () => {
+    if (!milestoneToDelete) return;
+    setIsDeletingMilestone(true);
     try {
       const response = await fetch(
-        `${API_BASE}/cohorts/${cohortId}/program-milestones`,
-        {
-          ...defaultOptions,
-          method: "POST",
-          body: JSON.stringify({
-            organizationId,
-            title: data.title,
-            description: data.description,
-            dueDate: data.dueDate,
-            week: data.week,
-            category: data.category,
-            createdBy: userId,
-            structuredMilestones: data.milestones,
-          }),
-        },
+        `${API_BASE}/cohorts/${cohortId}/program-milestones/${milestoneToDelete.id}`,
+        { ...defaultOptions, method: "DELETE" },
       );
-      if (!response.ok) throw new Error("Failed to create milestone");
-      setShowCreateForm(false);
+      if (!response.ok) {
+        const body = await response.json().catch(() => ({}));
+        const err = new Error(body?.message || "Failed to delete milestone");
+        err.status = response.status;
+        throw err;
+      }
+      setMilestoneToDelete(null);
       loadMilestones();
+      toast.success("Milestone deleted");
     } catch (error) {
-      console.error("Error creating milestone:", error);
-      alert("Failed to create milestone");
+      console.error("Error deleting milestone:", error);
+      toastError(error, "Failed to delete milestone");
+    } finally {
+      setIsDeletingMilestone(false);
     }
   };
 
@@ -116,10 +184,14 @@ export default function ProgramMilestones({
   return (
     <div className="space-y-4 font-body">
       <StructuredMilestoneCreator
-        isOpen={showCreateForm}
-        onClose={() => setShowCreateForm(false)}
-        onSubmit={handleCreateStructuredMilestone}
+        isOpen={showCreateForm || Boolean(editingMilestone)}
+        onClose={() => {
+          setShowCreateForm(false);
+          setEditingMilestone(null);
+        }}
+        onSubmit={handleSubmitStructuredMilestone}
         type="milestone"
+        milestone={editingMilestone}
       />
 
       <SectionHeader
@@ -243,11 +315,47 @@ export default function ProgramMilestones({
                       </>
                     }
                     trailing={
-                      <StatusBadge
-                        status={status}
-                        icon={statusIcon}
-                        label={statusLabel}
-                      />
+                      <div className="flex items-center gap-2">
+                        <StatusBadge
+                          status={status}
+                          icon={statusIcon}
+                          label={statusLabel}
+                        />
+                        {isAdmin && (
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild={true}>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-8 w-8 p-0"
+                              >
+                                <MoreVertical className="w-4 h-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent
+                              align="end"
+                              className="w-36"
+                            >
+                              <DropdownMenuItem
+                                onClick={() => setEditingMilestone(milestone)}
+                                className="font-body text-[13px]"
+                              >
+                                <Pencil className="w-4 h-4 mr-2" />
+                                Edit
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                onClick={() =>
+                                  setMilestoneToDelete(milestone)
+                                }
+                                className="font-body text-[13px] text-destructive focus:text-destructive"
+                              >
+                                <Trash2 className="w-4 h-4 mr-2" />
+                                Delete
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        )}
+                      </div>
                     }
                   />
                 );
@@ -256,6 +364,39 @@ export default function ProgramMilestones({
           </SectionCard.Body>
         </SectionCard>
       )}
+
+      <AlertDialog
+        open={!!milestoneToDelete}
+        onOpenChange={(open) => !open && setMilestoneToDelete(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="font-heading text-base font-bold text-text-heading">
+              Delete Milestone
+            </AlertDialogTitle>
+            <AlertDialogDescription className="font-body text-[13px] text-text-body">
+              {"Delete "}
+              <strong>{milestoneToDelete?.title}</strong>? Founders will lose
+              the structured tasks tied to it. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel
+              className="h-9 rounded-input font-body text-[13px] font-medium"
+              disabled={isDeletingMilestone}
+            >
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmDeleteMilestone}
+              disabled={isDeletingMilestone}
+              className="h-9 rounded-input bg-destructive font-body text-[13px] font-semibold text-white hover:bg-destructive/90"
+            >
+              {isDeletingMilestone ? "Deleting..." : "Delete Milestone"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

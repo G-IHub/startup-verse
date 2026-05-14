@@ -6,15 +6,25 @@ import errorHandler from "./middleware/errorHandler.js";
 import notFound from "./middleware/notFound.js";
 import requestId from "./middleware/requestId.js";
 import apiRouter from "./routes/index.js";
+import { getUploadRoot } from "./services/storage.js";
 import { success as apiSuccess } from "./utils/apiResponse.js";
 
 const app = express();
 
 app.use(cors(corsOptions));
 app.use(cookieParser());
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+app.use(express.json({ limit: "1mb" }));
+app.use(express.urlencoded({ extended: true, limit: "1mb" }));
 app.use(requestId);
+
+// Step 2.1 disk-driver static mount. Serves files persisted by
+// `saveBufferToDisk` under the `/uploads/*` URL prefix that the disk driver
+// hands back. Safe under the Cloudinary driver too (directory may not exist
+// yet; `fallthrough: true` lets the request fall through to `notFound`).
+app.use(
+  "/uploads",
+  express.static(getUploadRoot(), { fallthrough: true, maxAge: "1d" }),
+);
 
 app.get("/", (req, res) => {
   return apiSuccess(res, {

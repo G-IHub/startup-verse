@@ -146,13 +146,13 @@ export default function MentorPortal({ mentor, onLogout }) {
               <div className="flex-1">
                 <CardTitle className="text-base flex items-center gap-2">
                   {"👋 Welcome, "}
-                  {mentor.name}
+                  {mentor.name || mentor.email || "Mentor"}
                 </CardTitle>
                 <CardDescription className="text-xs mt-1">
                   {"Mentor Portal • "}
-                  {mentor.cohortIds.length}
+                  {(mentor.cohortIds || []).length}
                   {" Cohort"}
-                  {mentor.cohortIds.length !== 1 ? "s" : ""}
+                  {(mentor.cohortIds || []).length !== 1 ? "s" : ""}
                 </CardDescription>
               </div>
               <Button
@@ -166,13 +166,18 @@ export default function MentorPortal({ mentor, onLogout }) {
               </Button>
             </div>
           </CardHeader>
-          {mentor.expertise && (
-            <CardContent className="border-t pt-3">
-              <p className="text-[10px] text-muted-foreground">
-                <strong>Expertise:</strong> {mentor.expertise}
-              </p>
-            </CardContent>
-          )}
+          {(() => {
+            const expertiseLabel = Array.isArray(mentor.expertise)
+              ? mentor.expertise.join(", ")
+              : mentor.expertise || "";
+            return expertiseLabel ? (
+              <CardContent className="border-t pt-3">
+                <p className="text-[10px] text-muted-foreground">
+                  <strong>Expertise:</strong> {expertiseLabel}
+                </p>
+              </CardContent>
+            ) : null;
+          })()}
         </Card>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
           <Card>
@@ -200,7 +205,9 @@ export default function MentorPortal({ mentor, onLogout }) {
                   <p className="text-[10px] text-muted-foreground">
                     Active Cohorts
                   </p>
-                  <p className="text-lg font-bold">{mentor.cohortIds.length}</p>
+                  <p className="text-lg font-bold">
+                    {(mentor.cohortIds || []).length}
+                  </p>
                 </div>
               </div>
             </CardContent>

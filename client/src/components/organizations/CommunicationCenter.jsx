@@ -29,6 +29,8 @@ import {
   Reply,
 } from "lucide-react";
 import { unwrapData } from "../../utils/apiEnvelope";
+import { toastError } from "../../utils/toastError";
+import { toast } from "sonner";
 import {
   GradientHero,
   SectionCard,
@@ -71,6 +73,7 @@ export default function CommunicationCenter({
   const [messageMode, setMessageMode] = useState("individual");
   const [selectedRecipients, setSelectedRecipients] = useState([]);
   const [selectedRecipient, setSelectedRecipient] = useState("");
+  const [activeTab, setActiveTab] = useState("announcements");
   const [announcementData, setAnnouncementData] = useState({
     title: "",
     content: "",
@@ -85,6 +88,48 @@ export default function CommunicationCenter({
     loadAnnouncements();
     loadMessages();
   }, [cohortId, organizationId]);
+
+  useEffect(() => {
+    if (activeTab !== "messages") return;
+    if (!userId) return;
+    const meIdStr = String(userId);
+    const unreadInboundIds = messages
+      .filter(
+        (m) =>
+          !m.readAt && String(m.toUserId || "") === meIdStr,
+      )
+      .map((m) => m.id || m._id)
+      .filter(Boolean);
+    if (unreadInboundIds.length === 0) return;
+
+    let cancelled = false;
+    (async () => {
+      try {
+        const response = await fetch(`${API_BASE}/messages/mark-read`, {
+          ...defaultOptions,
+          method: "POST",
+          body: JSON.stringify({ messageIds: unreadInboundIds }),
+        });
+        if (!response.ok) return;
+        if (cancelled) return;
+        const nowIso = new Date().toISOString();
+        const idSet = new Set(unreadInboundIds.map(String));
+        setMessages((prev) =>
+          prev.map((m) =>
+            idSet.has(String(m.id || m._id))
+              ? { ...m, readAt: m.readAt || nowIso }
+              : m,
+          ),
+        );
+      } catch (error) {
+        console.error("Error marking messages as read:", error);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [activeTab, messages, userId]);
 
   const loadAnnouncements = async () => {
     try {
@@ -135,24 +180,29 @@ export default function CommunicationCenter({
           }),
         },
       );
-      if (!response.ok) throw new Error("Failed to create announcement");
+      if (!response.ok) {
+        const body = await response.json().catch(() => ({}));
+        const err = new Error(body?.message || "Failed to create announcement");
+        err.status = response.status;
+        throw err;
+      }
       setAnnouncementData({ title: "", content: "", priority: "normal" });
       setShowAnnouncementForm(false);
       loadAnnouncements();
     } catch (error) {
       console.error("Error creating announcement:", error);
-      alert("Failed to create announcement");
+      toastError(error, "Failed to create announcement");
     }
   };
 
   const handleSendMessage = async (e) => {
     e.preventDefault();
     if (messageMode === "bulk" && selectedRecipients.length === 0) {
-      alert("Please select at least one recipient");
+      toast.error("Please select at least one recipient");
       return;
     }
     if (messageMode === "individual" && !selectedRecipient) {
-      alert("Please select a recipient");
+      toast.error("Please select a recipient");
       return;
     }
     try {
@@ -185,13 +235,18 @@ export default function CommunicationCenter({
         method: "POST",
         body: JSON.stringify(body),
       });
-      if (!response.ok) throw new Error("Failed to send message");
-      const inner = unwrapData(await response.json());
+      const responseJson = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        const err = new Error(responseJson?.message || "Failed to send message");
+        err.status = response.status;
+        throw err;
+      }
+      const inner = unwrapData(responseJson);
       const recipientCount =
         messageMode === "bulk"
           ? (inner.recipientCount ?? inner.recipients?.length ?? 1)
           : 1;
-      alert(
+      toast.success(
         `Message sent to ${recipientCount} startup${recipientCount > 1 ? "s" : ""}!`,
       );
       setMessageData({ subject: "", message: "" });
@@ -201,7 +256,7 @@ export default function CommunicationCenter({
       loadMessages();
     } catch (error) {
       console.error("Error sending message:", error);
-      alert("Failed to send message");
+      toastError(error, "Failed to send message");
     }
   };
 
@@ -246,7 +301,11 @@ export default function CommunicationCenter({
         actions={heroActions}
       />
 
-      <Tabs defaultValue="announcements" className="w-full">
+      <Tabs
+        value={activeTab}
+        onValueChange={setActiveTab}
+        className="w-full"
+      >
         <TabsList className="grid h-10 w-full grid-cols-2 rounded-card bg-surface-page p-1">
           <TabsTrigger
             value="announcements"
@@ -627,11 +686,31 @@ export default function CommunicationCenter({
               ) : (
                 <div className="space-y-2">
                   {messages.map((message) => {
+                    const meIdStr = String(userId || "");
                     const isReceived =
-                      message.type === "received" || message.fromFounder;
+                      String(message.toUserId || "") === meIdStr;
+                    const senderLabel =
+                      message.from?.startupName ||
+                      message.from?.name ||
+                      message.from?.email ||
+                      "Sender";
+                    const recipientLabel =
+                      message.to?.startupName ||
+                      message.to?.name ||
+                      cohortMembers.find(
+                        (m) => String(m.founderId) === String(message.toUserId),
+                      )?.startupName ||
+                      cohortMembers.find(
+                        (m) => String(m.founderId) === String(message.toUserId),
+                      )?.founderName ||
+                      message.to?.email ||
+                      "Startup";
+                    const messageBody = message.body ?? message.message ?? "";
+                    const sentAt = message.createdAt || message.sentAt;
+                    const messageKey = message.id || message._id;
                     return (
                       <div
-                        key={message.id}
+                        key={messageKey}
                         className={cn(
                           "rounded-input border p-3",
                           isReceived
@@ -645,24 +724,14 @@ export default function CommunicationCenter({
                               <>
                                 <Mail className="h-3.5 w-3.5 text-primary" />
                                 <span className="font-body text-[12px] font-semibold text-text-heading">
-                                  From:{" "}
-                                  {message.startupName || message.founderName}
+                                  From: {senderLabel}
                                 </span>
                               </>
                             ) : (
                               <>
                                 <MailOpen className="h-3.5 w-3.5 text-text-muted" />
                                 <span className="font-body text-[12px] font-semibold text-text-heading">
-                                  To:{" "}
-                                  {cohortMembers.find(
-                                    (m) =>
-                                      m.founderId === message.recipientId,
-                                  )?.startupName ||
-                                    cohortMembers.find(
-                                      (m) =>
-                                        m.founderId === message.recipientId,
-                                    )?.founderName ||
-                                    "Startup"}
+                                  To: {recipientLabel}
                                 </span>
                               </>
                             )}
@@ -673,23 +742,27 @@ export default function CommunicationCenter({
                           />
                         </div>
                         <h4 className="mb-1 font-heading text-[14px] font-bold text-text-heading">
-                          {message.subject}
+                          {message.subject || "(no subject)"}
                         </h4>
                         <p className="mb-2 whitespace-pre-wrap font-body text-[13px] text-text-body">
-                          {message.message}
+                          {messageBody}
                         </p>
                         <div className="flex items-center justify-between">
                           <span className="font-body text-[12px] text-text-muted">
-                            {new Date(message.sentAt).toLocaleString()}
+                            {sentAt
+                              ? new Date(sentAt).toLocaleString()
+                              : ""}
                           </span>
                           {isReceived && (
                             <Button
                               size="sm"
                               onClick={() => {
                                 setMessageMode("individual");
-                                setSelectedRecipient(message.founderId || "");
+                                setSelectedRecipient(
+                                  message.fromUserId || message.from?.id || "",
+                                );
                                 setMessageData({
-                                  subject: `Re: ${message.subject}`,
+                                  subject: `Re: ${message.subject || ""}`,
                                   message: "",
                                 });
                                 setShowMessageForm(true);

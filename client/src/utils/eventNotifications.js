@@ -225,7 +225,14 @@ export async function notifyOrganizationRSVP(
       );
     }
 
-    const { admins } = await response.json();
+    const body = await response.json();
+    const admins = Array.isArray(body)
+      ? body
+      : Array.isArray(body?.data)
+        ? body.data
+        : Array.isArray(body?.admins)
+          ? body.admins
+          : [];
 
     const statusEmoji = {
       attending: "✅",

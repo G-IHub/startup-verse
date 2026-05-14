@@ -10,27 +10,10 @@ import Startup from "../models/Startup.js";
 import { emitRealtime } from "../services/realtime.service.js";
 import { SOCKET_EVENTS } from "../realtime/events.js";
 import { startupRoom, userRoom, organizationRoom } from "../realtime/rooms.js";
+import { mapMessageDto } from "../utils/messageDto.js";
 
 const messagesRouter = Router();
 const isSelfOrAdmin = (req, userId) => req.user?.isAdmin === true || String(req.user?.id) === String(userId);
-
-function mapMessageDto(messageDoc) {
-  if (!messageDoc) return null;
-  const row = messageDoc.toObject ? messageDoc.toObject() : messageDoc;
-  return {
-    id: String(row._id || row.id || ""),
-    startupId: row.startupId ? String(row.startupId) : "",
-    organizationId: row.organizationId ? String(row.organizationId) : "",
-    fromUserId: row.fromUserId ? String(row.fromUserId) : "",
-    toUserId: row.toUserId ? String(row.toUserId) : "",
-    body: String(row.body || ""),
-    attachments: Array.isArray(row.attachments) ? row.attachments : [],
-    readAt: row.readAt || null,
-    createdAt: row.createdAt || null,
-    updatedAt: row.updatedAt || null,
-    metadata: row.metadata && typeof row.metadata === "object" ? row.metadata : {},
-  };
-}
 
 async function canAccessStartupMessages(req, startupId) {
   if (req.user?.isAdmin) return true;
@@ -263,19 +246,6 @@ messagesRouter.get(
     });
 
     return apiSuccess(res, { unreadCount: count, count });
-  }),
-);
-
-messagesRouter.post(
-  "/messages/upload-file",
-  requireAuth,
-  asyncHandler(async (req, res) => {
-    const fileName = req.body?.fileName || "attachment.bin";
-    return apiSuccess(res, {
-      uploaded: true,
-      fileName,
-      fileUrl: `/uploads/${Date.now()}-${fileName}`,
-    });
   }),
 );
 

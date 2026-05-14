@@ -166,6 +166,14 @@ export async function deleteCohort(cohortId, userId) {
   });
 }
 
+export async function updateCohort(cohortId, patch) {
+  const result = await apiCall(`/cohorts/${cohortId}`, {
+    method: "PUT",
+    body: JSON.stringify(patch),
+  });
+  return mapEntity(unwrapData(result));
+}
+
 // ==========================================
 // INVITATION MANAGEMENT
 // ==========================================

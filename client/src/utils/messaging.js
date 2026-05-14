@@ -2,6 +2,7 @@
 
 import { API_BASE_URL } from "../config/apiBase.js";
 import { request } from "./backendClient";
+import { uploadFile } from "./api/uploadApi.js";
 
 // Default fetch options for cookie-based auth
 const defaultOptions = {
@@ -318,32 +319,19 @@ export function formatMessageTimestamp(timestamp) {
   return `${date.toLocaleDateString()} at ${timeStr}`;
 }
 
-// Upload file to the messaging API (multipart)
-export async function uploadMessageFile(file, startupId, senderId, options = {}) {
+// Upload a message attachment through the canonical `POST /uploads`
+// endpoint. The previous `/messages/upload-file` stub was retired in Step 2.1;
+// this function preserves the existing call sites' return shape but the bytes
+// now land in the configured storage driver (Cloudinary or disk).
+export async function uploadMessageFile(file, _startupId, _senderId, options = {}) {
   try {
-    const formData = new FormData();
-    formData.append("file", file);
-    formData.append("startupId", startupId);
-    formData.append("senderId", senderId);
-
-    const response = await fetch(`${API_BASE}/messages/upload-file`, {
-      method: "POST",
-      credentials: "include",
-      body: formData,
-    });
-
-    if (!response.ok) {
-      const error = await response.json();
-      console.error("Error uploading file:", error);
-      return null;
-    }
-
-    const data = await response.json();
+    const result = await uploadFile(file, "messages");
     return {
-      url: data?.data?.fileUrl || data?.fileUrl || data?.url,
+      url: result?.url || "",
+      key: result?.key || "",
       fileName: file.name,
-      fileSize: file.size,
-      fileType: file.type,
+      fileSize: typeof result?.size === "number" ? result.size : file.size,
+      fileType: result?.mimeType || file.type,
     };
   } catch (error) {
     if (options?.strict) throw error;

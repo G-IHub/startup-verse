@@ -10,6 +10,16 @@ import {
   DialogTitle,
   DialogFooter,
 } from "../ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "../ui/alert-dialog";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { Textarea } from "../ui/textarea";
@@ -29,9 +39,12 @@ import {
   Video,
   FileText,
   Target,
+  Pencil,
+  Trash2,
 } from "lucide-react";
 import { notifyEventCreated } from "../../utils/eventNotifications";
 import { toast } from "sonner";
+import { toastError } from "../../utils/toastError";
 import MiniCalendar from "../calendar/MiniCalendar";
 import { getOrganizationCalendarEvents } from "../../utils/calendarIntegration";
 import { unwrapData } from "../../utils/apiEnvelope";
@@ -115,7 +128,12 @@ export default function EventManager({
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [agendaFilter, setAgendaFilter] = useState("all");
   const [selectedAgenda, setSelectedAgenda] = useState(null);
-  const [formData, setFormData] = useState({
+  // Non-null editingEventId puts the create form into "edit mode" and a PUT is
+  // submitted instead of a POST.
+  const [editingEventId, setEditingEventId] = useState(null);
+  const [eventToDelete, setEventToDelete] = useState(null);
+  const [isDeletingEvent, setIsDeletingEvent] = useState(false);
+  const emptyForm = {
     title: "",
     description: "",
     eventType: "workshop",
@@ -125,7 +143,8 @@ export default function EventManager({
     isVirtual: false,
     meetingUrl: "",
     capacity: "",
-  });
+  };
+  const [formData, setFormData] = useState(emptyForm);
 
   useEffect(() => {
     loadEvents();
@@ -158,62 +177,141 @@ export default function EventManager({
     }
   };
 
-  const handleCreateEvent = async (e) => {
+  const handleSubmitEvent = async (e) => {
     e.preventDefault();
+    const isEdit = Boolean(editingEventId);
     try {
-      let meetingUrl = formData.meetingUrl;
-      const eventId = `event-${cohortId.slice(0, 8)}-${Date.now()}`;
-      if (formData.isVirtual && !meetingUrl) {
-        meetingUrl = `${window.location.origin}/join/Event-${eventId}`;
-      }
-      const response = await fetch(`${API_BASE}/cohorts/${cohortId}/events`, {
-        ...defaultOptions,
-        method: "POST",
-        body: JSON.stringify({
-          organizationId,
-          title: formData.title,
-          description: formData.description,
-          eventType: formData.eventType,
-          startTime: formData.startTime,
-          endTime: formData.endTime || null,
-          location: formData.location,
-          isVirtual: formData.isVirtual,
-          meetingUrl: meetingUrl,
-          capacity: formData.capacity ? parseInt(formData.capacity) : null,
-          createdBy: userId,
-        }),
-      });
-      if (!response.ok) throw new Error("Failed to create event");
-      const created = unwrapData(await response.json());
-      const event = created.event;
-
-      await notifyEventCreated(cohortId, organizationId, {
-        id: event?.id || event?._id,
+      // Server fills in a default `/join/Event-...` URL when isVirtual and the
+      // field is blank; the client no longer fabricates URLs.
+      const payload = {
+        organizationId,
         title: formData.title,
-        startTime: formData.startTime,
+        description: formData.description,
         eventType: formData.eventType,
+        startTime: formData.startTime,
+        endTime: formData.endTime || null,
         location: formData.location,
         isVirtual: formData.isVirtual,
+        meetingUrl: formData.meetingUrl || "",
+        capacity: formData.capacity ? parseInt(formData.capacity, 10) : null,
         createdBy: userId,
-      });
+      };
 
-      setFormData({
-        title: "",
-        description: "",
-        eventType: "workshop",
-        startTime: "",
-        endTime: "",
-        location: "",
-        isVirtual: false,
-        meetingUrl: "",
-        capacity: "",
+      const url = isEdit
+        ? `${API_BASE}/cohorts/${cohortId}/events/${editingEventId}`
+        : `${API_BASE}/cohorts/${cohortId}/events`;
+      const response = await fetch(url, {
+        ...defaultOptions,
+        method: isEdit ? "PUT" : "POST",
+        body: JSON.stringify(payload),
       });
+      const responseJson = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        const err = new Error(
+          responseJson?.message ||
+            (isEdit ? "Failed to update event" : "Failed to create event"),
+        );
+        err.status = response.status;
+        throw err;
+      }
+      const result = unwrapData(responseJson);
+      const event = result.event;
+
+      if (!isEdit) {
+        await notifyEventCreated(cohortId, organizationId, {
+          id: event?.id || event?._id,
+          title: formData.title,
+          startTime: formData.startTime,
+          eventType: formData.eventType,
+          location: formData.location,
+          isVirtual: formData.isVirtual,
+          createdBy: userId,
+        });
+      }
+
+      setFormData(emptyForm);
+      setEditingEventId(null);
       setShowCreateForm(false);
       loadEvents();
-      toast.success("Event created successfully!");
+      loadAllCalendarItems();
+      toast.success(
+        isEdit ? "Event updated successfully!" : "Event created successfully!",
+      );
     } catch (error) {
-      console.error("Error creating event:", error);
-      alert("Failed to create event");
+      console.error(
+        isEdit ? "Error updating event:" : "Error creating event:",
+        error,
+      );
+      toastError(
+        error,
+        isEdit ? "Failed to update event" : "Failed to create event",
+      );
+    }
+  };
+
+  // Convert an ISO date/time to the value expected by `<input type="datetime-local">`.
+  function toDatetimeLocal(value) {
+    if (!value) return "";
+    const d = new Date(value);
+    if (Number.isNaN(d.getTime())) return "";
+    const pad = (n) => String(n).padStart(2, "0");
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  }
+
+  const startEditEvent = (agenda) => {
+    // Hydrate from the agenda dialog row + the source event for any fields the
+    // calendar mapper drops.
+    const source =
+      events.find((e) => String(e.id || e._id) === String(agenda.id)) || {};
+    setEditingEventId(agenda.id);
+    setFormData({
+      title: agenda.title || source.title || "",
+      description: agenda.description || source.description || "",
+      eventType: source.eventType || agenda.metadata?.eventType || "workshop",
+      startTime: toDatetimeLocal(agenda.startDate || source.startsAt),
+      endTime: toDatetimeLocal(agenda.endDate || source.endsAt),
+      location: agenda.location || source.location || "",
+      isVirtual: Boolean(agenda.isVirtual ?? source.isVirtual),
+      meetingUrl: agenda.meetingUrl || source.meetingUrl || "",
+      capacity:
+        source.capacity != null && source.capacity !== ""
+          ? String(source.capacity)
+          : "",
+    });
+    setShowCreateForm(true);
+    setSelectedAgenda(null);
+  };
+
+  const cancelEdit = () => {
+    setEditingEventId(null);
+    setFormData(emptyForm);
+    setShowCreateForm(false);
+  };
+
+  const confirmDeleteEvent = async () => {
+    if (!eventToDelete) return;
+    setIsDeletingEvent(true);
+    try {
+      const response = await fetch(
+        `${API_BASE}/cohorts/${cohortId}/events/${eventToDelete.id}`,
+        { ...defaultOptions, method: "DELETE" },
+      );
+      const responseJson = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        const err = new Error(responseJson?.message || "Failed to delete event");
+        err.status = response.status;
+        throw err;
+      }
+      setEventToDelete(null);
+      setSelectedAgenda(null);
+      loadEvents();
+      loadAllCalendarItems();
+      toast.success("Event deleted");
+    } catch (error) {
+      console.error("Error deleting event:", error);
+      toastError(error, "Failed to delete event");
+    } finally {
+      setIsDeletingEvent(false);
     }
   };
 
@@ -255,13 +353,20 @@ export default function EventManager({
 
       {isAdmin && (
         <CollapsibleFormCard
-          title="Schedule Meeting"
-          description="Create a new event for the cohort"
-          triggerLabel="Schedule Meeting"
+          title={editingEventId ? "Edit Event" : "Schedule Meeting"}
+          description={
+            editingEventId
+              ? "Update event details"
+              : "Create a new event for the cohort"
+          }
+          triggerLabel={editingEventId ? "Edit Event" : "Schedule Meeting"}
           isOpen={showCreateForm}
-          onToggle={setShowCreateForm}
+          onToggle={(open) => {
+            if (!open && editingEventId) cancelEdit();
+            else setShowCreateForm(open);
+          }}
         >
-          <form onSubmit={handleCreateEvent} className="space-y-3">
+          <form onSubmit={handleSubmitEvent} className="space-y-3">
             <div>
               <label className="mb-2 block font-body text-[13px] font-medium text-text-heading">
                 Event Title
@@ -385,13 +490,12 @@ export default function EventManager({
                   onChange={(e) =>
                     setFormData({ ...formData, meetingUrl: e.target.value })
                   }
-                  placeholder="Leave blank to auto-generate Jitsi link"
+                  placeholder="Leave blank to auto-generate a meeting link"
                   type="url"
                   className="font-body text-[13px]"
                 />
                 <p className="mt-1 font-body text-[12px] text-text-muted">
-                  Tip: A Jitsi video conference link will be auto-generated if
-                  left blank
+                  Tip: We'll generate a meeting room link for you if left blank
                 </p>
               </div>
             ) : (
@@ -409,10 +513,22 @@ export default function EventManager({
                 />
               </div>
             )}
-            <Button type="submit" size="sm" className={PRIMARY_BUTTON}>
-              <Plus className="mr-2 h-4 w-4" />
-              Create Event
-            </Button>
+            <div className="flex gap-2">
+              <Button type="submit" size="sm" className={PRIMARY_BUTTON}>
+                <Plus className="mr-2 h-4 w-4" />
+                {editingEventId ? "Save Changes" : "Create Event"}
+              </Button>
+              {editingEventId && (
+                <Button
+                  type="button"
+                  size="sm"
+                  onClick={cancelEdit}
+                  className={OUTLINE_BUTTON}
+                >
+                  Cancel
+                </Button>
+              )}
+            </div>
           </form>
         </CollapsibleFormCard>
       )}
@@ -664,7 +780,7 @@ export default function EventManager({
                 </div>
               )}
 
-              <DialogFooter className="sm:justify-start">
+              <DialogFooter className="sm:justify-start flex-wrap gap-2">
                 {selectedAgenda.meetingUrl &&
                   selectedAgenda.type === "event" && (
                     <Button
@@ -679,6 +795,26 @@ export default function EventManager({
                       Join Meeting
                     </Button>
                   )}
+                {isAdmin && selectedAgenda.type === "event" && (
+                  <>
+                    <Button
+                      size="sm"
+                      onClick={() => startEditEvent(selectedAgenda)}
+                      className={OUTLINE_BUTTON}
+                    >
+                      <Pencil className="mr-2 h-4 w-4" />
+                      Edit
+                    </Button>
+                    <Button
+                      size="sm"
+                      onClick={() => setEventToDelete(selectedAgenda)}
+                      className="h-9 rounded-input border border-destructive/40 bg-white font-body text-[13px] font-medium text-destructive hover:bg-destructive/10"
+                    >
+                      <Trash2 className="mr-2 h-4 w-4" />
+                      Delete
+                    </Button>
+                  </>
+                )}
                 {selectedAgenda.type === "deliverable" && (
                   <Button
                     size="sm"
@@ -717,6 +853,47 @@ export default function EventManager({
           )}
         </DialogContent>
       </Dialog>
+
+      <AlertDialog
+        open={!!eventToDelete}
+        onOpenChange={(open) => !open && setEventToDelete(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="font-heading text-base font-bold text-text-heading">
+              Delete Event
+            </AlertDialogTitle>
+            <AlertDialogDescription className="font-body text-[13px] text-text-body">
+              {"Delete "}
+              <strong>{eventToDelete?.title}</strong>?
+              {eventToDelete?.startDate &&
+                new Date(eventToDelete.startDate).getTime() - Date.now() <
+                  24 * 3600 * 1000 &&
+                new Date(eventToDelete.startDate).getTime() > Date.now() && (
+                  <span className="mt-2 block font-body text-[12px] text-warning">
+                    This event starts in less than 24 hours. Founders will be
+                    notified that it has been cancelled.
+                  </span>
+                )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel
+              className="h-9 rounded-input font-body text-[13px] font-medium"
+              disabled={isDeletingEvent}
+            >
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmDeleteEvent}
+              disabled={isDeletingEvent}
+              className="h-9 rounded-input bg-destructive font-body text-[13px] font-semibold text-white hover:bg-destructive/90"
+            >
+              {isDeletingEvent ? "Deleting..." : "Delete Event"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

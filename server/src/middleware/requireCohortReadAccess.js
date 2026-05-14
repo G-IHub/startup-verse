@@ -39,7 +39,9 @@ export default async function requireCohortReadAccess(req, res, next) {
     return apiError(res, "Invalid cohort or deliverable identifier.", 400);
   }
 
-  const cohort = await Cohort.findById(cohortId).select("organizationId").lean();
+  const cohort = await Cohort.findOne({ _id: cohortId, deletedAt: null })
+    .select("organizationId")
+    .lean();
   if (!cohort) {
     return apiError(res, "Cohort not found.", 404);
   }

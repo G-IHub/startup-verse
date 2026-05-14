@@ -22,6 +22,11 @@ const cohortSchema = new mongoose.Schema(
       default: "active",
       maxlength: [50, "Status cannot exceed 50 characters"]
     },
+    // Soft-delete marker. Cleared on restore; populated by Step 2.3's
+    // soft-delete handler. All "active" cohort read sites filter
+    // `{ deletedAt: null }`; display-only sites (e.g. submission lists)
+    // intentionally do not, so historical references keep rendering names.
+    deletedAt: { type: Date, default: null, index: true },
   },
   { timestamps: true },
 );

@@ -20,6 +20,7 @@ import {
 import { Building2, CheckCircle2 } from "lucide-react";
 import { createOrganization } from "../../utils/organizationHelpersBackend";
 import { loadCurrentUser } from "../../app/session";
+import { toastError } from "../../utils/toastError";
 
 const PRIMARY_BUTTON =
   "h-9 rounded-input bg-primary font-body text-[13px] font-semibold text-white shadow-[0_4px_16px_rgba(58,90,254,0.25)] hover:bg-primary-hover";
@@ -70,11 +71,10 @@ export default function CreateOrganizationModal({
       onClose();
     } catch (error) {
       console.error("Failed to create organization:", error);
-      const msg =
-        error instanceof Error && error.message?.trim()
-          ? error.message.trim()
-          : "Failed to create organization. Check that the API is running and you are signed in.";
-      alert(msg);
+      toastError(
+        error,
+        "Failed to create organization. Check that the API is running and you are signed in.",
+      );
     } finally {
       setIsSubmitting(false);
     }

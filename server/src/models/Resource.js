@@ -6,10 +6,16 @@ const resourceSchema = new mongoose.Schema(
     founderId: { type: mongoose.Schema.Types.ObjectId, ref: "User", index: true },
     title: { type: String, required: true },
     description: { type: String, default: "" },
+    category: {
+      type: String,
+      enum: ["general", "template", "guide", "video", "tool", "article"],
+      default: "general",
+      index: true,
+    },
     url: { type: String, default: "" },
     type: {
       type: String,
-      enum: ["video", "article", "tool", "template", "other"],
+      enum: ["link", "document", "video", "article", "tool", "template", "other"],
       default: "other",
       index: true,
     },
@@ -19,12 +25,14 @@ const resourceSchema = new mongoose.Schema(
     duration: { type: String, default: "" },
     recommended: { type: Boolean, default: false },
     tags: { type: [String], default: [] },
+    createdBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
   },
   { timestamps: true },
 );
 
 resourceSchema.index({ cohortId: 1, createdAt: -1 });
 resourceSchema.index({ type: 1, stageId: 1 });
+resourceSchema.index({ cohortId: 1, category: 1, type: 1 });
 
 const Resource = mongoose.models.Resource || mongoose.model("Resource", resourceSchema);
 

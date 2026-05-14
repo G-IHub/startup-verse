@@ -24,8 +24,31 @@ import {
   Users,
   CheckCircle2,
   Inbox,
+  Archive,
+  Pencil,
+  Trash2,
+  MoreVertical,
 } from "lucide-react";
 import { unwrapData } from "../../utils/apiEnvelope";
+import { toastError } from "../../utils/toastError";
+import { toast } from "sonner";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "../ui/dropdown-menu";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "../ui/alert-dialog";
+import { Checkbox } from "../ui/checkbox";
 import {
   SectionCard,
   SectionHeader,
@@ -80,12 +103,20 @@ export default function DeliverablesManager({
   const [loading, setLoading] = useState(true);
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [reviewingSubmission, setReviewingSubmission] = useState(null);
-  const [formData, setFormData] = useState({
+  const [includeArchived, setIncludeArchived] = useState(false);
+  // Non-null editingDeliverableId switches the create form into edit mode (PUT).
+  const [editingDeliverableId, setEditingDeliverableId] = useState(null);
+  const [deliverableToArchive, setDeliverableToArchive] = useState(null);
+  const [isArchiving, setIsArchiving] = useState(false);
+  const [deliverableToDelete, setDeliverableToDelete] = useState(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const emptyForm = {
     title: "",
     description: "",
     dueDate: "",
     requirements: "",
-  });
+  };
+  const [formData, setFormData] = useState(emptyForm);
   const [reviewData, setReviewData] = useState({
     status: "approved",
     feedback: "",
@@ -93,7 +124,7 @@ export default function DeliverablesManager({
 
   useEffect(() => {
     loadDeliverables();
-  }, [cohortId]);
+  }, [cohortId, includeArchived]);
 
   useEffect(() => {
     if (selectedDeliverable) {
@@ -105,8 +136,9 @@ export default function DeliverablesManager({
   const loadDeliverables = async () => {
     try {
       setLoading(true);
+      const qs = includeArchived ? "?includeArchived=1" : "";
       const response = await fetch(
-        `${API_BASE}/cohorts/${cohortId}/deliverables`,
+        `${API_BASE}/cohorts/${cohortId}/deliverables${qs}`,
         { ...defaultOptions },
       );
       if (!response.ok) throw new Error("Failed to fetch deliverables");
@@ -116,8 +148,16 @@ export default function DeliverablesManager({
         id: d.id || d._id,
       }));
       setDeliverables(normalized);
-      if (normalized.length > 0 && !selectedDeliverable) {
-        setSelectedDeliverable(normalized[0]);
+      // Keep selection in sync when filter changes hide the previously selected
+      // deliverable.
+      const selectedId = String(
+        selectedDeliverable?.id || selectedDeliverable?._id || "",
+      );
+      const stillVisible = normalized.find((d) => String(d.id) === selectedId);
+      if (!stillVisible) {
+        setSelectedDeliverable(normalized[0] || null);
+      } else {
+        setSelectedDeliverable(stillVisible);
       }
     } catch (error) {
       console.error("Error loading deliverables:", error);
@@ -147,40 +187,127 @@ export default function DeliverablesManager({
     }
   };
 
-  const handleCreateDeliverable = async (e) => {
+  const handleSubmitDeliverable = async (e) => {
     e.preventDefault();
+    const isEdit = Boolean(editingDeliverableId);
     try {
       const requirements = formData.requirements
         .split("\n")
         .filter((r) => r.trim())
         .map((r) => r.trim());
-      const response = await fetch(
-        `${API_BASE}/cohorts/${cohortId}/deliverables`,
-        {
-          ...defaultOptions,
-          method: "POST",
-          body: JSON.stringify({
-            organizationId,
-            title: formData.title,
-            description: formData.description,
-            dueDate: formData.dueDate,
-            requirements,
-            createdBy: userId,
-          }),
-        },
-      );
-      if (!response.ok) throw new Error("Failed to create deliverable");
-      setFormData({
-        title: "",
-        description: "",
-        dueDate: "",
-        requirements: "",
+      const payload = {
+        organizationId,
+        title: formData.title,
+        description: formData.description,
+        dueDate: formData.dueDate,
+        requirements,
+        createdBy: userId,
+      };
+      const url = isEdit
+        ? `${API_BASE}/cohorts/${cohortId}/deliverables/${editingDeliverableId}`
+        : `${API_BASE}/cohorts/${cohortId}/deliverables`;
+      const response = await fetch(url, {
+        ...defaultOptions,
+        method: isEdit ? "PUT" : "POST",
+        body: JSON.stringify(payload),
       });
+      if (!response.ok) {
+        const body = await response.json().catch(() => ({}));
+        const err = new Error(
+          body?.message ||
+            (isEdit ? "Failed to update deliverable" : "Failed to create deliverable"),
+        );
+        err.status = response.status;
+        throw err;
+      }
+      setFormData(emptyForm);
+      setEditingDeliverableId(null);
       setShowCreateForm(false);
       loadDeliverables();
+      toast.success(isEdit ? "Deliverable updated" : "Deliverable created");
     } catch (error) {
-      console.error("Error creating deliverable:", error);
-      alert("Failed to create deliverable");
+      console.error(
+        isEdit ? "Error updating deliverable:" : "Error creating deliverable:",
+        error,
+      );
+      toastError(
+        error,
+        isEdit ? "Failed to update deliverable" : "Failed to create deliverable",
+      );
+    }
+  };
+
+  const startEditDeliverable = (deliverable) => {
+    setEditingDeliverableId(deliverable.id || deliverable._id);
+    setFormData({
+      title: deliverable.title || "",
+      description: deliverable.description || "",
+      dueDate: deliverable.dueDate
+        ? new Date(deliverable.dueDate).toISOString().slice(0, 10)
+        : "",
+      requirements: Array.isArray(deliverable.requirements)
+        ? deliverable.requirements.join("\n")
+        : "",
+    });
+    setShowCreateForm(true);
+  };
+
+  const cancelEdit = () => {
+    setEditingDeliverableId(null);
+    setFormData(emptyForm);
+    setShowCreateForm(false);
+  };
+
+  const confirmArchiveDeliverable = async () => {
+    if (!deliverableToArchive) return;
+    setIsArchiving(true);
+    try {
+      const id = deliverableToArchive.id || deliverableToArchive._id;
+      const response = await fetch(
+        `${API_BASE}/cohorts/${cohortId}/deliverables/${id}/archive`,
+        { ...defaultOptions, method: "PATCH" },
+      );
+      if (!response.ok) {
+        const body = await response.json().catch(() => ({}));
+        const err = new Error(body?.message || "Failed to archive deliverable");
+        err.status = response.status;
+        throw err;
+      }
+      setDeliverableToArchive(null);
+      loadDeliverables();
+      toast.success("Deliverable archived");
+    } catch (error) {
+      console.error("Error archiving deliverable:", error);
+      toastError(error, "Failed to archive deliverable");
+    } finally {
+      setIsArchiving(false);
+    }
+  };
+
+  const confirmDeleteDeliverable = async () => {
+    if (!deliverableToDelete) return;
+    setIsDeleting(true);
+    try {
+      const id = deliverableToDelete.id || deliverableToDelete._id;
+      const response = await fetch(
+        `${API_BASE}/cohorts/${cohortId}/deliverables/${id}`,
+        { ...defaultOptions, method: "DELETE" },
+      );
+      if (!response.ok) {
+        const body = await response.json().catch(() => ({}));
+        // 409 from server says "archive instead" - surface it as a toast.
+        const err = new Error(body?.message || "Failed to delete deliverable");
+        err.status = response.status;
+        throw err;
+      }
+      setDeliverableToDelete(null);
+      loadDeliverables();
+      toast.success("Deliverable deleted");
+    } catch (error) {
+      console.error("Error deleting deliverable:", error);
+      toastError(error, "Failed to delete deliverable");
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -198,7 +325,12 @@ export default function DeliverablesManager({
           }),
         },
       );
-      if (!response.ok) throw new Error("Failed to review submission");
+      if (!response.ok) {
+        const body = await response.json().catch(() => ({}));
+        const err = new Error(body?.message || "Failed to review submission");
+        err.status = response.status;
+        throw err;
+      }
       setReviewingSubmission(null);
       setReviewData({ status: "approved", feedback: "" });
       if (selectedDeliverable) {
@@ -207,7 +339,7 @@ export default function DeliverablesManager({
       }
     } catch (error) {
       console.error("Error reviewing submission:", error);
-      alert("Failed to review submission");
+      toastError(error, "Failed to review submission");
     }
   };
 
@@ -228,13 +360,20 @@ export default function DeliverablesManager({
 
       {isAdmin && (
         <CollapsibleFormCard
-          title="Create Deliverable"
-          description="Add a new deliverable for the cohort"
-          triggerLabel="New Deliverable"
+          title={editingDeliverableId ? "Edit Deliverable" : "Create Deliverable"}
+          description={
+            editingDeliverableId
+              ? "Update deliverable details"
+              : "Add a new deliverable for the cohort"
+          }
+          triggerLabel={editingDeliverableId ? "Edit Deliverable" : "New Deliverable"}
           isOpen={showCreateForm}
-          onToggle={setShowCreateForm}
+          onToggle={(open) => {
+            if (!open && editingDeliverableId) cancelEdit();
+            else setShowCreateForm(open);
+          }}
         >
-          <form onSubmit={handleCreateDeliverable} className="space-y-3">
+          <form onSubmit={handleSubmitDeliverable} className="space-y-3">
             <div>
               <label className="mb-2 block font-body text-[13px] font-medium text-text-heading">
                 Title
@@ -289,12 +428,40 @@ export default function DeliverablesManager({
                 className="min-h-[80px] font-body text-[13px]"
               />
             </div>
-            <Button type="submit" size="sm" className={PRIMARY_BUTTON}>
-              <Plus className="mr-2 h-4 w-4" />
-              Create Deliverable
-            </Button>
+            <div className="flex gap-2">
+              <Button type="submit" size="sm" className={PRIMARY_BUTTON}>
+                <Plus className="mr-2 h-4 w-4" />
+                {editingDeliverableId ? "Save Changes" : "Create Deliverable"}
+              </Button>
+              {editingDeliverableId && (
+                <Button
+                  type="button"
+                  size="sm"
+                  onClick={cancelEdit}
+                  className={OUTLINE_BUTTON}
+                >
+                  Cancel
+                </Button>
+              )}
+            </div>
           </form>
         </CollapsibleFormCard>
+      )}
+
+      {isAdmin && (
+        <div className="flex items-center gap-2">
+          <Checkbox
+            id="includeArchived"
+            checked={includeArchived}
+            onCheckedChange={(checked) => setIncludeArchived(Boolean(checked))}
+          />
+          <label
+            htmlFor="includeArchived"
+            className="font-body text-[13px] text-text-body"
+          >
+            Show archived
+          </label>
+        </div>
       )}
 
       {loading ? (
@@ -344,25 +511,89 @@ export default function DeliverablesManager({
                   selectedDeliverable?.id || selectedDeliverable?._id,
                 ) === String(deliverable.id || deliverable._id);
               return (
-                <button
-                  type="button"
+                <div
                   key={deliverable.id || deliverable._id}
+                  role="button"
+                  tabIndex={0}
                   onClick={() => setSelectedDeliverable(deliverable)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      setSelectedDeliverable(deliverable);
+                    }
+                  }}
                   className={cn(
-                    "w-full rounded-card border bg-white p-3 text-left transition-all",
+                    "relative w-full cursor-pointer rounded-card border bg-white p-3 text-left transition-all",
                     isSelected
                       ? "border-primary shadow-[0_0_0_3px_rgba(58,90,254,0.10)]"
                       : "border-surface-border hover:border-primary/40 hover:shadow-soft",
+                    deliverable.archived && "opacity-60",
                   )}
                 >
-                  <h3 className="mb-1 truncate font-heading text-[14px] font-semibold text-text-heading">
-                    {deliverable.title}
-                  </h3>
+                  <div className="flex items-start justify-between gap-2">
+                    <h3 className="mb-1 truncate font-heading text-[14px] font-semibold text-text-heading">
+                      {deliverable.title}
+                    </h3>
+                    {isAdmin && (
+                      <DropdownMenu>
+                        <DropdownMenuTrigger
+                          asChild={true}
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-7 w-7 shrink-0 p-0"
+                          >
+                            <MoreVertical className="w-4 h-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent
+                          align="end"
+                          className="w-44"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <DropdownMenuItem
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              startEditDeliverable(deliverable);
+                            }}
+                            className="font-body text-[13px]"
+                          >
+                            <Pencil className="w-4 h-4 mr-2" />
+                            Edit
+                          </DropdownMenuItem>
+                          {!deliverable.archived && (
+                            <DropdownMenuItem
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setDeliverableToArchive(deliverable);
+                              }}
+                              className="font-body text-[13px]"
+                            >
+                              <Archive className="w-4 h-4 mr-2" />
+                              Archive
+                            </DropdownMenuItem>
+                          )}
+                          <DropdownMenuItem
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setDeliverableToDelete(deliverable);
+                            }}
+                            className="font-body text-[13px] text-destructive focus:text-destructive"
+                          >
+                            <Trash2 className="w-4 h-4 mr-2" />
+                            Delete
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    )}
+                  </div>
                   <div className="flex items-center gap-1.5 font-body text-[12px] text-text-muted">
                     <Calendar className="h-3.5 w-3.5" />
                     {new Date(deliverable.dueDate).toLocaleDateString()}
                   </div>
-                  <div className="mt-2">
+                  <div className="mt-2 flex items-center gap-2">
                     {pastDue ? (
                       <StatusBadge
                         tone="danger"
@@ -382,15 +613,22 @@ export default function DeliverablesManager({
                         icon={Clock}
                       />
                     )}
+                    {deliverable.archived && (
+                      <StatusBadge
+                        tone="info"
+                        label="Archived"
+                        icon={Archive}
+                      />
+                    )}
                   </div>
-                </button>
+                </div>
               );
             })}
           </div>
 
           <div className="md:col-span-2">
             {selectedDeliverable && (
-              <SectionCard>
+              <SectionCard key={selectedDeliverable.id}>
                 <SectionCard.Header
                   title={selectedDeliverable.title}
                   description={selectedDeliverable.description}
@@ -600,6 +838,74 @@ export default function DeliverablesManager({
           </div>
         </div>
       )}
+
+      <AlertDialog
+        open={!!deliverableToArchive}
+        onOpenChange={(open) => !open && setDeliverableToArchive(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="font-heading text-base font-bold text-text-heading">
+              Archive Deliverable
+            </AlertDialogTitle>
+            <AlertDialogDescription className="font-body text-[13px] text-text-body">
+              {"Archive "}
+              <strong>{deliverableToArchive?.title}</strong>? Founders will no
+              longer see it in their default list but submissions stay
+              accessible to admins.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel
+              className="h-9 rounded-input font-body text-[13px] font-medium"
+              disabled={isArchiving}
+            >
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmArchiveDeliverable}
+              disabled={isArchiving}
+              className="h-9 rounded-input bg-primary font-body text-[13px] font-semibold text-white hover:bg-primary-hover"
+            >
+              {isArchiving ? "Archiving..." : "Archive"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog
+        open={!!deliverableToDelete}
+        onOpenChange={(open) => !open && setDeliverableToDelete(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="font-heading text-base font-bold text-text-heading">
+              Delete Deliverable
+            </AlertDialogTitle>
+            <AlertDialogDescription className="font-body text-[13px] text-text-body">
+              {"Delete "}
+              <strong>{deliverableToDelete?.title}</strong>? If founders have
+              already submitted, the server will block the delete and ask you
+              to archive instead.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel
+              className="h-9 rounded-input font-body text-[13px] font-medium"
+              disabled={isDeleting}
+            >
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmDeleteDeliverable}
+              disabled={isDeleting}
+              className="h-9 rounded-input bg-destructive font-body text-[13px] font-semibold text-white hover:bg-destructive/90"
+            >
+              {isDeleting ? "Deleting..." : "Delete"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
