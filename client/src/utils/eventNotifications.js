@@ -15,8 +15,56 @@ const defaultOptions = {
 
 const upcomingEventReminderSent = new Set();
 
-// Step 2.12: notifyEventCreated removed. Server-side createCohortEvent now
-// broadcasts cohort-event-created notifications to all active cohort members.
+/**
+ * Send notification when a new event is created.
+ */
+export async function notifyEventCreated(cohortId, organizationId, eventData) {
+  try {
+    const response = await fetch(`${API_BASE_URL}/cohorts/${cohortId}/members`, {
+      ...defaultOptions,
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to fetch cohort members: ${response.statusText}`);
+    }
+
+    const { members } = await response.json();
+
+    const notifications = members.map((member) => ({
+      userId: member.founderId,
+      type: "event-created",
+      title: `New Event: ${eventData.title}`,
+      message: `A new ${eventData.eventType} has been scheduled for ${new Date(eventData.startTime).toLocaleString()}`,
+      actionUrl: `/dashboard?view=calendar&event=${eventData.id}`,
+      metadata: {
+        eventId: eventData.id,
+        eventTitle: eventData.title,
+        eventTime: eventData.startTime,
+        eventType: eventData.eventType,
+        location: eventData.location,
+        isVirtual: eventData.isVirtual,
+      },
+      createdAt: new Date().toISOString(),
+    }));
+
+    const notificationResponse = await fetch(`${API_BASE_URL}/notifications/batch`, {
+      method: "POST",
+      ...defaultOptions,
+      body: JSON.stringify({ notifications }),
+    });
+
+    if (!notificationResponse.ok) {
+      throw new Error(
+        `Failed to create notifications: ${notificationResponse.statusText}`,
+      );
+    }
+
+    return { success: true, count: notifications.length };
+  } catch (error) {
+    console.error("Failed to send event creation notifications:", error);
+    return { success: false, error };
+  }
+}
 
 /**
  * Send notification when an event is updated.

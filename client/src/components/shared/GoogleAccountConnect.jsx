@@ -34,27 +34,6 @@ export default function GoogleAccountConnect({ userId, userType }) {
   useEffect(() => {
     checkConnectionStatus();
   }, [userId]);
-
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const googleParam = params.get("google");
-    if (!googleParam) return;
-
-    if (googleParam === "connected") {
-      toast.success("Google account connected successfully");
-      checkConnectionStatus();
-    } else if (googleParam === "error") {
-      toast.error("Google connection failed", {
-        description: params.get("message") || "Please try again.",
-      });
-    }
-
-    params.delete("google");
-    params.delete("message");
-    const qs = params.toString();
-    const next = `${window.location.pathname}${qs ? `?${qs}` : ""}`;
-    window.history.replaceState({}, "", next);
-  }, []);
   const checkConnectionStatus = async () => {
     try {
       setLoading(true);
@@ -66,16 +45,9 @@ export default function GoogleAccountConnect({ userId, userType }) {
       const payload = await response.json();
       const data = unwrapData(payload) || {};
       const enabled = data.enabled === true;
-      const placeholder = data.placeholder === true;
-      const unavailable = !enabled || placeholder;
-      setIntegrationOff(unavailable);
-      setStatusMessage(
-        data.message ||
-          (placeholder
-            ? "Google OAuth is not available on this server yet."
-            : ""),
-      );
-      setConnected(Boolean(data.connected) && enabled && !placeholder);
+      setIntegrationOff(!enabled);
+      setStatusMessage(data.message || "");
+      setConnected(Boolean(data.connected) && enabled);
       setEmail(data.email || "");
     } catch (error) {
       console.error("Error checking Google connection status:", error);
@@ -83,15 +55,80 @@ export default function GoogleAccountConnect({ userId, userType }) {
       setLoading(false);
     }
   };
-  const connectGoogle = () => {
-    if (integrationOff) {
-      toast.error(
-        statusMessage || "Google OAuth is not available on this server yet.",
+  const connectGoogle = async () => {
+    try {
+      setConnecting(true);
+
+      // Get authorization URL
+      const response = await fetch(
+        `${API_BASE_URL}/google/oauth/authorize?userId=${userId}&userType=${userType}`,
+        defaultOptions,
       );
-      return;
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error("OAuth authorize failed:", response.status, errorText);
+        throw new Error(
+          `Failed to initiate OAuth: ${response.status} - ${errorText}`,
+        );
+      }
+      const payload = await response.json();
+      const data = unwrapData(payload) || {};
+      const authUrl =
+        data.authUrl || data.authorizationUrl || data.url || null;
+      if (!authUrl) {
+        console.error("No auth URL in response:", payload);
+        throw new Error(
+          payload?.message ||
+            data?.message ||
+            "Google OAuth is not available on this server",
+        );
+      }
+
+      // Open OAuth popup
+      const width = 600;
+      const height = 700;
+      const left = window.screen.width / 2 - width / 2;
+      const top = window.screen.height / 2 - height / 2;
+      const popup = window.open(
+        authUrl,
+        "Google OAuth",
+        `width=${width},height=${height},left=${left},top=${top}`,
+      );
+      if (!popup) {
+        throw new Error(
+          "Failed to open popup window. Please allow popups for this site.",
+        );
+      }
+
+      // Poll for popup close
+      const pollTimer = setInterval(() => {
+        if (popup?.closed) {
+          clearInterval(pollTimer);
+          // Check status after popup closes
+          setTimeout(() => {
+            checkConnectionStatus();
+            setConnecting(false);
+          }, 1000);
+        }
+      }, 500);
+
+      // Timeout after 5 minutes
+      setTimeout(() => {
+        clearInterval(pollTimer);
+        if (popup && !popup.closed) {
+          popup.close();
+        }
+        setConnecting(false);
+      }, 300000);
+    } catch (error) {
+      console.error("Error connecting Google account:", error);
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "Failed to connect Google account",
+      );
+      setConnecting(false);
     }
-    setConnecting(true);
-    window.location.href = `${API_BASE_URL}/google/connect`;
   };
   const disconnectGoogle = async () => {
     try {

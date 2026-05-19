@@ -43,12 +43,5 @@ mentorsRouter.delete(
   requireMentorProfileOrgAdmin,
   asyncHandler(mentorsController.deleteMentorById),
 );
-// Step 2.10 — org admins edit a mentor's expertise / status.
-mentorsRouter.put(
-  "/mentors/:mentorId",
-  requireAuth,
-  requireMentorProfileOrgAdmin,
-  asyncHandler(mentorsController.updateMentorById),
-);
 
 export default mentorsRouter;

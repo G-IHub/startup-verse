@@ -1,17 +1,10 @@
-import "./config/sentry.js";
 import http from "http";
 import cron from "node-cron";
 import app from "./app.js";
-import { captureSentryException } from "./config/sentry.js";
 import { corsOptions } from "./config/cors.js";
 import { connectDatabase } from "./config/db.js";
 import { env } from "./config/env.js";
 import { logger } from "./config/logger.js";
-import {
-  getGoogleOAuthConfig,
-  getGoogleOAuthMisconfigMessage,
-  isGoogleIntegrationEnabled,
-} from "./config/googleIntegration.js";
 import { initSocketServer } from "./realtime/socketServer.js";
 import { processReminderJobsOnce } from "./services/reminderDeliveryQueue.js";
 import {
@@ -86,14 +79,6 @@ async function startServer() {
 
   try {
     await connectDatabase();
-    if (isGoogleIntegrationEnabled()) {
-      const googleCfg = getGoogleOAuthConfig();
-      if (!googleCfg.configured) {
-        logger.warn(getGoogleOAuthMisconfigMessage());
-      } else {
-        logger.info("Google Calendar/Meet integration enabled and configured.");
-      }
-    }
     startBackgroundWorkers();
   } catch (error) {
     logger.error("Failed to initialize server dependencies.", {
@@ -104,16 +89,12 @@ async function startServer() {
 }
 
 process.on("unhandledRejection", (reason) => {
-  const error =
-    reason instanceof Error ? reason : new Error(String(reason ?? "unknown"));
-  captureSentryException(error);
   logger.error("Unhandled promise rejection.", {
-    error: error.message,
+    error: reason instanceof Error ? reason.message : String(reason),
   });
 });
 
 process.on("uncaughtException", (err) => {
-  captureSentryException(err);
   logger.error("Uncaught exception.", {
     error: err instanceof Error ? err.message : String(err),
   });

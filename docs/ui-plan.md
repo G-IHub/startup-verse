@@ -103,10 +103,9 @@ Use this map to avoid introducing UI states that cannot be backed by current ser
 - Keep token names stable for component-level reuse.
 
 ### 3.2 Typography
-- Headings: **Sora** (see [`client/src/styles/globals.css`](../client/src/styles/globals.css))
-- Body/UI text: **IBM Plex Sans**
-- Apply via global CSS variables, Tailwind `font-heading` / `font-body`, and utility classes.
-- Rollout flags and env: [`UI_REDESIGN_ROLLOUT.md`](UI_REDESIGN_ROLLOUT.md)
+- Headings: **Syne**
+- Body/UI text: **DM Sans**
+- Apply via global CSS variables and utility classes.
 - Set minimum readable size standards for app content:
   - Body: no less than 14px on desktop/mobile content regions
   - Micro labels/badges: avoid sub-12px for critical information

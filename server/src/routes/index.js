@@ -37,10 +37,8 @@ apiRouter.use(publicRouter);
 apiRouter.use(activityRouter);
 apiRouter.use(authRouter);
 apiRouter.use(usersRouter);
-// Mount before foundersRouter so GET /startups/:id/snapshot uses org controller
-// (multi-role auth) instead of the legacy founder-only snapshot handler.
-apiRouter.use(organizationsRouter);
 apiRouter.use(foundersRouter);
+apiRouter.use(organizationsRouter);
 apiRouter.use(invitationsRouter);
 apiRouter.use(deliverablesRouter);
 apiRouter.use(messagesRouter);

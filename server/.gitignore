@@ -26,6 +26,3 @@ Thumbs.db
 
 # Local backup of prior nested repo metadata
 .client-git-backup/
-
-# Legacy local upload artifacts (disk driver removed)
-uploads/

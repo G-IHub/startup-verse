@@ -37,7 +37,6 @@ const deliverableSchema = new mongoose.Schema(
 );
 
 deliverableSchema.index({ cohortId: 1, dueDate: 1 });
-deliverableSchema.index({ title: "text", description: "text" });
 
 const Deliverable = mongoose.models.Deliverable || mongoose.model("Deliverable", deliverableSchema);
 

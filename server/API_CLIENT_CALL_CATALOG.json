@@ -1,26 +1,31 @@
 {
-  "generatedAt": "2026-05-19T09:00:24.632Z",
+  "generatedAt": "2026-04-11T13:13:05.718Z",
   "calls": [
     {
       "path": "/admin",
       "method": "GET",
       "files": [
         "components/AdminDatabaseClear.jsx",
-        "utils/adminAnalytics.js"
+        "components/AdminMegaNuclear.jsx",
+        "components/AdminNuclearReset.jsx",
+        "components/AdminSuperNuclear.jsx",
+        "utils/nuclearWipe.js"
       ]
     },
     {
       "path": "/agenda",
       "method": "GET",
       "files": [
-        "components/calendar/AgendaNotificationTrigger.jsx"
+        "components/calendar/AgendaNotificationTrigger.jsx",
+        "utils/api/agendaApi.jsx"
       ]
     },
     {
       "path": "/agenda/:param",
       "method": "GET",
       "files": [
-        "components/calendar/AgendaNotificationTrigger.jsx"
+        "components/calendar/AgendaNotificationTrigger.jsx",
+        "utils/api/agendaApi.jsx"
       ]
     },
     {
@@ -35,9 +40,7 @@
       "method": "GET",
       "files": [
         "api/authApi.jsx",
-        "config/apiBase.js",
-        "utils/api/authApi.js",
-        "utils/backendHealthCheck.js"
+        "utils/api/authApi.js"
       ]
     },
     {
@@ -55,30 +58,18 @@
         "components/organizations/CommunicationCenter.jsx",
         "components/organizations/DeliverablesManager.jsx",
         "components/organizations/EventManager.jsx",
+        "components/organizations/MentorAssignmentManager.jsx",
         "components/organizations/OrganizationAgenda.jsx",
         "components/organizations/PortfolioOverview.jsx",
         "components/organizations/ProgramMilestones.jsx",
         "components/organizations/ResourceLibrary.jsx",
         "utils/api/organizationApi.js",
-        "utils/calendarIntegration.js"
+        "utils/calendarIntegration.js",
+        "utils/eventNotifications.js"
       ]
     },
     {
-      "path": "/cohorts/:param/announcements/:param",
-      "method": "GET",
-      "files": [
-        "utils/api/organizationApi.js"
-      ]
-    },
-    {
-      "path": "/cohorts/:param/announcements/:param/read",
-      "method": "GET",
-      "files": [
-        "utils/api/organizationApi.js"
-      ]
-    },
-    {
-      "path": "/cohorts/:param/badge-counts",
+      "path": "/cohorts/:param/members",
       "method": "GET",
       "files": [
         "utils/api/organizationApi.js"
@@ -120,9 +111,24 @@
       ]
     },
     {
+      "path": "/cron",
+      "method": "GET",
+      "files": [
+        "components/NotificationCronTrigger.jsx"
+      ]
+    },
+    {
+      "path": "/debug",
+      "method": "GET",
+      "files": [
+        "components/office/VirtualStartupOfficeWorkspace.jsx"
+      ]
+    },
+    {
       "path": "/deliverables",
       "method": "GET",
       "files": [
+        "components/dashboards/FounderDashboard.jsx",
         "components/founders/FounderDeliverablesView.jsx",
         "components/organizations/DeliverablesManager.jsx",
         "utils/calendarIntegration.js"
@@ -132,7 +138,23 @@
       "path": "/deliverables/:param",
       "method": "GET",
       "files": [
-        "components/founders/FounderDeliverablesView.jsx"
+        "components/dashboards/FounderDashboard.jsx",
+        "components/founders/FounderDeliverablesView.jsx",
+        "components/organizations/DeliverablesManager.jsx"
+      ]
+    },
+    {
+      "path": "/emails",
+      "method": "GET",
+      "files": [
+        "utils/emailHelpers.js"
+      ]
+    },
+    {
+      "path": "/emails/test",
+      "method": "GET",
+      "files": [
+        "components/EmailSetupPrompt.jsx"
       ]
     },
     {
@@ -146,13 +168,15 @@
       "path": "/execution-score/:param",
       "method": "GET",
       "files": [
-        "components/ExecutionScore.jsx"
+        "components/ExecutionScore.jsx",
+        "components/dashboards/FounderDashboard.jsx"
       ]
     },
     {
       "path": "/founder/:param",
       "method": "GET",
       "files": [
+        "components/office/VirtualStartupOfficeWorkspace.jsx",
         "components/organizations/OrganizationAnnouncementsWidget.jsx",
         "components/organizations/OrganizationEventsWidget.jsx",
         "utils/calendarIntegration.js",
@@ -172,7 +196,7 @@
       "files": [
         "components/analytics/AnalyticsDashboard.jsx",
         "components/founders/FounderResourcesView.jsx",
-        "utils/calendarIntegration.js"
+        "utils/api/taskApi.js"
       ]
     },
     {
@@ -180,13 +204,6 @@
       "method": "GET",
       "files": [
         "utils/api/coreEngineApi.js"
-      ]
-    },
-    {
-      "path": "/founders/:param/intent-parse",
-      "method": "GET",
-      "files": [
-        "utils/api/founderApi.js"
       ]
     },
     {
@@ -201,8 +218,7 @@
       "method": "GET",
       "files": [
         "utils/api/coreEngineApi.js",
-        "utils/api/founderApi.js",
-        "utils/api/taskApi.js"
+        "utils/api/founderApi.js"
       ]
     },
     {
@@ -238,8 +254,7 @@
       "method": "GET",
       "files": [
         "utils/api/coreEngineApi.js",
-        "utils/api/founderApi.js",
-        "utils/api/taskApi.js"
+        "utils/api/founderApi.js"
       ]
     },
     {
@@ -247,31 +262,21 @@
       "method": "GET",
       "files": [
         "utils/api/coreEngineApi.js",
-        "utils/api/founderApi.js",
-        "utils/api/taskApi.js"
+        "utils/api/founderApi.js"
       ]
     },
     {
       "path": "/founders/:param/tasks/:param/assign",
       "method": "GET",
       "files": [
-        "utils/api/coreEngineApi.js",
-        "utils/api/taskApi.js"
+        "utils/api/coreEngineApi.js"
       ]
     },
     {
       "path": "/founders/:param/tasks/:param/status",
       "method": "GET",
       "files": [
-        "utils/api/coreEngineApi.js",
-        "utils/api/taskApi.js"
-      ]
-    },
-    {
-      "path": "/founders/:param/team-members",
-      "method": "GET",
-      "files": [
-        "utils/api/teamMemberApi.js"
+        "utils/api/coreEngineApi.js"
       ]
     },
     {
@@ -279,8 +284,7 @@
       "method": "GET",
       "files": [
         "utils/api/coreEngineApi.js",
-        "utils/api/founderApi.js",
-        "utils/api/taskApi.js"
+        "utils/api/founderApi.js"
       ]
     },
     {
@@ -330,7 +334,9 @@
       "path": "/health",
       "method": "GET",
       "files": [
+        "components/NotificationCronTrigger.jsx",
         "contexts/NotificationContext.jsx",
+        "utils/apiClient.js",
         "utils/backendHealthCheck.js",
         "utils/backendHealthCheck.jsx",
         "utils/testBackendConnection.js"
@@ -341,13 +347,6 @@
       "method": "GET",
       "files": [
         "components/layout/AppLayoutHybrid.jsx"
-      ]
-    },
-    {
-      "path": "/interests/:param",
-      "method": "GET",
-      "files": [
-        "utils/api/compensationApi.js"
       ]
     },
     {
@@ -382,7 +381,6 @@
       "path": "/interests/send",
       "method": "GET",
       "files": [
-        "domains/talent/hooks/useTalentHomeData.js",
         "utils/api/inboxApi.js"
       ]
     },
@@ -390,7 +388,6 @@
       "path": "/interests/sent/:param",
       "method": "GET",
       "files": [
-        "domains/talent/hooks/useTalentHomeData.js",
         "utils/api/inboxApi.js"
       ]
     },
@@ -398,19 +395,10 @@
       "path": "/invitations",
       "method": "GET",
       "files": [
-        "App.jsx",
         "components/InvitationAcceptance.jsx",
         "components/TeamMemberOnboarding.jsx",
         "components/layout/AppLayoutHybrid.jsx",
         "utils/api/inboxApi.js"
-      ]
-    },
-    {
-      "path": "/invitations/:param",
-      "method": "GET",
-      "files": [
-        "components/InvitationAcceptance.jsx",
-        "utils/api/compensationApi.js"
       ]
     },
     {
@@ -455,7 +443,6 @@
       "path": "/invitations/received/:param",
       "method": "GET",
       "files": [
-        "domains/talent/hooks/useTalentHomeData.js",
         "utils/api/inboxApi.js"
       ]
     },
@@ -514,8 +501,7 @@
       "files": [
         "components/mentor/MentorPortal.jsx",
         "components/organizations/MentorAssignmentManager.jsx",
-        "components/organizations/MentorManager.jsx",
-        "utils/api/organizationApi.js"
+        "components/organizations/MentorManager.jsx"
       ]
     },
     {
@@ -524,7 +510,8 @@
       "files": [
         "components/Inbox.jsx",
         "components/founders/OrganizationMessaging.jsx",
-        "components/organizations/CommunicationCenter.jsx"
+        "components/organizations/CommunicationCenter.jsx",
+        "utils/messaging.js"
       ]
     },
     {
@@ -532,50 +519,14 @@
       "method": "GET",
       "files": [
         "components/Inbox.jsx",
-        "components/founders/OrganizationMessaging.jsx",
-        "utils/messaging.js"
+        "components/founders/OrganizationMessaging.jsx"
       ]
     },
     {
-      "path": "/messages/conversation/:param/:param/:param",
+      "path": "/migrate",
       "method": "GET",
       "files": [
-        "utils/messaging.js"
-      ]
-    },
-    {
-      "path": "/messages/conversations/:param/:param",
-      "method": "GET",
-      "files": [
-        "utils/messaging.js"
-      ]
-    },
-    {
-      "path": "/messages/direct/:param/:param",
-      "method": "GET",
-      "files": [
-        "utils/messaging.js"
-      ]
-    },
-    {
-      "path": "/messages/mark-read",
-      "method": "GET",
-      "files": [
-        "utils/messaging.js"
-      ]
-    },
-    {
-      "path": "/messages/send",
-      "method": "GET",
-      "files": [
-        "utils/messaging.js"
-      ]
-    },
-    {
-      "path": "/messages/unread-count/:param/:param",
-      "method": "GET",
-      "files": [
-        "utils/messaging.js"
+        "utils/backendHealthCheck.js"
       ]
     },
     {
@@ -591,6 +542,7 @@
       "files": [
         "components/NotificationDebugPanel.jsx",
         "contexts/NotificationContext.jsx",
+        "utils/emailNotifications.js",
         "utils/eventNotifications.js",
         "utils/eventReminders.js",
         "utils/notificationTriggers.js"
@@ -601,6 +553,13 @@
       "method": "GET",
       "files": [
         "contexts/NotificationContext.jsx"
+      ]
+    },
+    {
+      "path": "/onboard-team-member",
+      "method": "GET",
+      "files": [
+        "utils/api/compensationApi.js"
       ]
     },
     {
@@ -636,9 +595,17 @@
       ]
     },
     {
+      "path": "/performance",
+      "method": "GET",
+      "files": [
+        "utils/api/performanceApi.js"
+      ]
+    },
+    {
       "path": "/presence",
       "method": "GET",
       "files": [
+        "utils/activityApi.js",
         "utils/presenceApi.js",
         "utils/testBackendConnection.js"
       ]
@@ -647,7 +614,7 @@
       "path": "/presence/:param",
       "method": "GET",
       "files": [
-        "utils/api/teamMemberApi.js",
+        "utils/activityApi.js",
         "utils/presenceApi.js"
       ]
     },
@@ -659,38 +626,17 @@
       ]
     },
     {
-      "path": "/startups/:param/announcements",
-      "method": "GET",
-      "files": [
-        "utils/announcementApi.js"
-      ]
-    },
-    {
-      "path": "/startups/:param/polls",
-      "method": "GET",
-      "files": [
-        "utils/pollApi.js"
-      ]
-    },
-    {
-      "path": "/startups/:param/polls/:param/close",
-      "method": "GET",
-      "files": [
-        "utils/pollApi.js"
-      ]
-    },
-    {
-      "path": "/startups/:param/polls/:param/vote",
-      "method": "GET",
-      "files": [
-        "utils/pollApi.js"
-      ]
-    },
-    {
       "path": "/startups/:param/snapshot",
       "method": "GET",
       "files": [
         "utils/api/organizationApi.js"
+      ]
+    },
+    {
+      "path": "/startups/:param/team-members",
+      "method": "GET",
+      "files": [
+        "utils/api/teamMemberApi.js"
       ]
     },
     {
@@ -704,7 +650,6 @@
       "path": "/talent/:param/applications",
       "method": "GET",
       "files": [
-        "domains/talent/hooks/useTalentHomeData.js",
         "utils/api/talentApi.js"
       ]
     },
@@ -719,7 +664,6 @@
       "path": "/talent/:param/saved",
       "method": "GET",
       "files": [
-        "domains/talent/hooks/useTalentHomeData.js",
         "utils/api/talentApi.js"
       ]
     },
@@ -728,13 +672,6 @@
       "method": "GET",
       "files": [
         "utils/api/talentApi.js"
-      ]
-    },
-    {
-      "path": "/talent/:param/saved/startup/:param",
-      "method": "GET",
-      "files": [
-        "domains/talent/hooks/useTalentHomeData.js"
       ]
     },
     {
@@ -769,7 +706,6 @@
       "path": "/talent/startup-posts",
       "method": "GET",
       "files": [
-        "domains/talent/hooks/useTalentHomeData.js",
         "utils/api/founderApi.js"
       ]
     },
@@ -778,7 +714,9 @@
       "method": "GET",
       "files": [
         "components/AdminDebugDatabase.jsx",
-        "utils/api/offlineTaskApi.js"
+        "utils/api/offlineTaskApi.js",
+        "utils/api/performanceApi.js",
+        "utils/api/taskApi.js"
       ]
     },
     {
@@ -786,20 +724,6 @@
       "method": "GET",
       "files": [
         "utils/api/teamMemberApi.js"
-      ]
-    },
-    {
-      "path": "/team-members/:param/leave",
-      "method": "GET",
-      "files": [
-        "utils/api/teamMemberApi.js"
-      ]
-    },
-    {
-      "path": "/team-members/:param/performance",
-      "method": "GET",
-      "files": [
-        "utils/api/performanceApi.js"
       ]
     },
     {
@@ -813,7 +737,6 @@
       "path": "/team-members/:param/tasks",
       "method": "GET",
       "files": [
-        "utils/api/taskApi.js",
         "utils/api/teamMemberApi.js"
       ]
     },
@@ -839,10 +762,17 @@
       ]
     },
     {
-      "path": "/uploads",
+      "path": "/upload-avatar",
       "method": "GET",
       "files": [
-        "utils/api/uploadApi.js"
+        "components/ProfileCompletionForm.jsx"
+      ]
+    },
+    {
+      "path": "/users",
+      "method": "GET",
+      "files": [
+        "components/ProfileCompletionModal.jsx"
       ]
     },
     {
@@ -852,13 +782,6 @@
         "components/NotificationDebugPanel.jsx",
         "contexts/NotificationContext.jsx",
         "utils/api/userApi.js"
-      ]
-    },
-    {
-      "path": "/users/:param/client-preferences",
-      "method": "GET",
-      "files": [
-        "utils/api/clientPreferencesApi.js"
       ]
     },
     {

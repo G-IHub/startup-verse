@@ -49,7 +49,6 @@ import { wipeLegacyStartupVerseStorage } from "../utils/clearLegacyClientStorage
 import { leaveStartup } from "../utils/api/teamMemberApi";
 import { AdminDatabaseClear } from "./AdminDatabaseClear";
 import ProfilePage from "./ProfilePage";
-import GoogleAccountConnect from "./shared/GoogleAccountConnect";
 export default function SettingsPage({
   user,
   onUpdateUser,
@@ -365,12 +364,6 @@ export default function SettingsPage({
         </Dialog>
         {hasVirtualOffice && (
           <TabsContent value="virtual-office" className="space-y-4">
-            {exportUserId ? (
-              <GoogleAccountConnect
-                userId={exportUserId}
-                userType={user?.role || "founder"}
-              />
-            ) : null}
             <Card className="border-0 bg-surface-card shadow-soft rounded-card">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 font-heading text-base font-semibold text-text-heading">
@@ -694,7 +687,7 @@ export default function SettingsPage({
                   </div>
                 </div>
               </div>
-              {user?.role === "admin" && <AdminDatabaseClear />}
+              <AdminDatabaseClear />
               <div className="border-t border-surface-border pt-4">
                 <div className="flex items-center justify-between font-body text-sm text-text-muted">
                   <div className="flex items-center gap-2">

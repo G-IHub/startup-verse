@@ -8,15 +8,10 @@ import Milestone from "../models/Milestone.js";
 import Task from "../models/Task.js";
 import TeamMemberProfile from "../models/TeamMemberProfile.js";
 import { classifyActivity } from "./cohortActivityClassifier.js";
-import { escapeRegex } from "./listQuery.js";
-import {
-  startOfWeekMondayUTC,
-  daysAgoDate,
-  computeWeeklyStreak,
-} from "./cohortWeekUtils.js";
 
 const DAY_MS = 86_400_000;
 const STREAK_LOOKBACK_WEEKS = 8;
+const STREAK_QUALIFYING_STATUSES = new Set(["completed", "partial"]);
 
 function toIdString(value) {
   if (!value) return "";
@@ -25,80 +20,71 @@ function toIdString(value) {
   return String(value);
 }
 
-/**
- * Paginated membership query with optional text search on founder / startup.
- */
-async function queryMembershipPage(cohortId, listOptions) {
-  const cohortOid = new mongoose.Types.ObjectId(String(cohortId));
-  const match = { cohortId: cohortOid };
-  if (listOptions.status) {
-    match.status = listOptions.status;
-  }
-
-  const { limit, skip, sort, q } = listOptions;
-
-  if (q) {
-    const regex = new RegExp(escapeRegex(q), "i");
-    const userCol = User.collection.name;
-    const startupCol = Startup.collection.name;
-    const [facet] = await CohortMembership.aggregate([
-      { $match: match },
-      {
-        $lookup: {
-          from: userCol,
-          localField: "founderId",
-          foreignField: "_id",
-          as: "founderUser",
-        },
-      },
-      {
-        $lookup: {
-          from: startupCol,
-          localField: "startupId",
-          foreignField: "_id",
-          as: "startupDoc",
-        },
-      },
-      { $unwind: { path: "$founderUser", preserveNullAndEmptyArrays: true } },
-      { $unwind: { path: "$startupDoc", preserveNullAndEmptyArrays: true } },
-      {
-        $match: {
-          $or: [
-            { "founderUser.name": regex },
-            { "founderUser.email": regex },
-            { "startupDoc.name": regex },
-          ],
-        },
-      },
-      {
-        $facet: {
-          meta: [{ $count: "total" }],
-          rows: [
-            { $sort: sort },
-            { $skip: skip },
-            { $limit: limit },
-            { $project: { founderUser: 0, startupDoc: 0 } },
-          ],
-        },
-      },
-    ]);
-    const total = facet?.meta?.[0]?.total ?? 0;
-    const memberships = facet?.rows ?? [];
-    return { memberships, total };
-  }
-
-  const [total, memberships] = await Promise.all([
-    CohortMembership.countDocuments(match),
-    CohortMembership.find(match).sort(sort).skip(skip).limit(limit).lean(),
-  ]);
-  return { memberships, total };
+/** Monday 00:00:00 UTC of the week that contains `now`. */
+function startOfWeekMondayUTC(now = new Date()) {
+  const d = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+  const dow = d.getUTCDay(); // 0 (Sun) .. 6 (Sat)
+  const daysSinceMonday = (dow + 6) % 7; // Sun -> 6, Mon -> 0, ...
+  d.setUTCDate(d.getUTCDate() - daysSinceMonday);
+  return d;
 }
 
 /**
- * Enrich a page of CohortMembership rows with User + Startup + progress.
+ * Count consecutive trailing weeks (ending with the current week) that have at
+ * least one WeeklyOutcome with a qualifying status. Stop at the first gap.
+ *
+ * `weeklyOutcomes` is the founder's WeeklyOutcome rows from the last
+ * STREAK_LOOKBACK_WEEKS weeks, in any order. We bucket by weekOf normalised to
+ * a Monday-UTC boundary and walk backwards.
  */
-async function enrichMembershipRows(memberships) {
-  if (!memberships.length) return [];
+function computeStreak(weeklyOutcomes) {
+  if (!Array.isArray(weeklyOutcomes) || weeklyOutcomes.length === 0) return 0;
+
+  const qualifyingWeekKeys = new Set();
+  for (const wo of weeklyOutcomes) {
+    if (!wo?.weekOf || !STREAK_QUALIFYING_STATUSES.has(String(wo.status))) continue;
+    const weekStart = startOfWeekMondayUTC(new Date(wo.weekOf));
+    qualifyingWeekKeys.add(weekStart.toISOString());
+  }
+  if (qualifyingWeekKeys.size === 0) return 0;
+
+  let streak = 0;
+  const cursor = startOfWeekMondayUTC();
+  for (let i = 0; i < STREAK_LOOKBACK_WEEKS; i += 1) {
+    const key = cursor.toISOString();
+    if (qualifyingWeekKeys.has(key)) {
+      streak += 1;
+      cursor.setUTCDate(cursor.getUTCDate() - 7);
+    } else {
+      break;
+    }
+  }
+  return streak;
+}
+
+/**
+ * Load all CohortMembership rows for a cohort, joined with each founder's User
+ * + Startup + computed `progress` block. Single helper call → ~9 parallel DB
+ * round-trips regardless of cohort size.
+ *
+ * Response shape per row (back-compat top-level mirrors + nested objects):
+ *   id, cohortId, joinedAt, status,
+ *   founderId, founderName, founderEmail, currentStage,
+ *   founder { id, name, email, avatarUrl, role },
+ *   startupId, startupName,
+ *   startup { id, name, description, industry, stage, logoUrl } | null,
+ *   progress {
+ *     activityStatus, weeklyOutcomeStreak, completedMilestones, totalMilestones,
+ *     tasksCompletedThisWeek, lastActive, currentMilestone, teamSize
+ *   }
+ */
+export async function loadCohortMembersEnriched(cohortId) {
+  if (!cohortId || !mongoose.Types.ObjectId.isValid(String(cohortId))) {
+    return [];
+  }
+
+  const memberships = await CohortMembership.find({ cohortId }).lean();
+  if (memberships.length === 0) return [];
 
   const founderIds = [
     ...new Set(memberships.map((m) => toIdString(m.founderId)).filter(Boolean)),
@@ -107,7 +93,7 @@ async function enrichMembershipRows(memberships) {
     ...new Set(memberships.map((m) => toIdString(m.startupId)).filter(Boolean)),
   ];
 
-  const eightWeeksAgo = daysAgoDate(STREAK_LOOKBACK_WEEKS * 7);
+  const eightWeeksAgo = new Date(Date.now() - STREAK_LOOKBACK_WEEKS * 7 * DAY_MS);
   const weekStart = startOfWeekMondayUTC();
 
   const [
@@ -288,10 +274,7 @@ async function enrichMembershipRows(memberships) {
 
       progress: {
         activityStatus: classifyActivity(lastActive),
-        weeklyOutcomeStreak: computeWeeklyStreak(
-          weeklyOutcomesByFounder.get(founderId) || [],
-          STREAK_LOOKBACK_WEEKS,
-        ),
+        weeklyOutcomeStreak: computeStreak(weeklyOutcomesByFounder.get(founderId) || []),
         completedMilestones: milestoneCounts.completed,
         totalMilestones: milestoneCounts.total,
         tasksCompletedThisWeek: tasksThisWeekByFounder.get(founderId) || 0,
@@ -301,53 +284,4 @@ async function enrichMembershipRows(memberships) {
       },
     };
   });
-}
-
-/**
- * Step 3.1 — paginated, searchable cohort member list with enrichment.
- */
-export async function loadCohortMembersEnriched(cohortId, listOptions) {
-  const empty = {
-    items: [],
-    total: 0,
-    limit: listOptions?.limit ?? 25,
-    skip: listOptions?.skip ?? 0,
-  };
-
-  if (!cohortId || !mongoose.Types.ObjectId.isValid(String(cohortId))) {
-    return empty;
-  }
-
-  const { memberships, total } = await queryMembershipPage(cohortId, listOptions);
-  if (!memberships.length) {
-    return { ...empty, total };
-  }
-
-  const items = await enrichMembershipRows(memberships);
-  return {
-    items,
-    total,
-    limit: listOptions.limit,
-    skip: listOptions.skip,
-  };
-}
-
-/** Max rows for GET /cohorts/:cohortId/export (Step 4.1). */
-export const EXPORT_MAX_MEMBERS = 500;
-
-/**
- * Load enriched cohort members for export (no search filter; capped at EXPORT_MAX_MEMBERS).
- */
-export async function loadCohortMembersForExport(cohortId) {
-  const listOptions = {
-    q: "",
-    limit: EXPORT_MAX_MEMBERS,
-    skip: 0,
-    sort: { joinedAt: -1 },
-    sortBy: "joinedAt",
-    sortOrder: "desc",
-    status: "",
-    extraFilters: {},
-  };
-  return loadCohortMembersEnriched(cohortId, listOptions);
 }

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React from "react";
 import {
   Dialog,
   DialogContent,
@@ -13,90 +13,20 @@ import {
   Target,
   Calendar,
   CheckCircle2,
-  Loader2,
 } from "lucide-react";
 import {
   StatusBadge,
   BrandProgress,
   ListRow,
 } from "./_primitives";
-import { getStartupSnapshot } from "../../utils/api/organizationApi";
 
 const PANEL =
   "rounded-input border border-surface-border bg-surface-page p-3";
 const MICRO_LABEL =
   "font-body text-[12px] font-semibold uppercase tracking-wide text-text-muted";
 
-export default function StartupSnapshotModal({
-  isOpen,
-  onClose,
-  startup: inlineStartup,
-  startupId,
-  founderId,
-}) {
-  // Step 2.9: when ids are supplied, fetch the canonical snapshot from the
-  // server on open. The legacy `startup` prop still works (Cohort dashboard
-  // pre-builds it from enriched members) but new call sites should pass ids.
-  const fetchKey = startupId || founderId || null;
-  const [fetched, setFetched] = useState(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
-
-  useEffect(() => {
-    if (!isOpen || !fetchKey || inlineStartup) {
-      return undefined;
-    }
-    let cancelled = false;
-    setLoading(true);
-    setError(null);
-    setFetched(null);
-    getStartupSnapshot(fetchKey)
-      .then((data) => {
-        if (cancelled) return;
-        setFetched(data || null);
-      })
-      .catch((err) => {
-        if (cancelled) return;
-        setError(err?.message || "Failed to load startup snapshot.");
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [isOpen, fetchKey, inlineStartup]);
-
-  const startup = inlineStartup || fetched;
-
-  if (!isOpen) return null;
-
-  if (!startup) {
-    return (
-      <Dialog open={isOpen} onOpenChange={onClose}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 font-heading text-[18px] font-bold text-text-heading">
-              <Building2 className="h-5 w-5 text-primary" />
-              Startup Snapshot
-            </DialogTitle>
-          </DialogHeader>
-          <div className="flex min-h-[160px] items-center justify-center font-body text-[13px] text-text-muted">
-            {loading ? (
-              <div className="flex items-center gap-2">
-                <Loader2 className="h-4 w-4 animate-spin" />
-                Loading snapshot…
-              </div>
-            ) : error ? (
-              <p className="text-center text-text-body">{error}</p>
-            ) : (
-              <p>No snapshot available.</p>
-            )}
-          </div>
-        </DialogContent>
-      </Dialog>
-    );
-  }
+export default function StartupSnapshotModal({ isOpen, onClose, startup }) {
+  if (!startup) return null;
 
   const status = (startup.status || "unknown").toLowerCase();
   const executionSummary = startup.executionSummary || {};

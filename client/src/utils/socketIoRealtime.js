@@ -8,7 +8,6 @@ import { getConversation } from "./messaging.js";
 import { getStartupActivities, getStartupWins } from "./activityApi.js";
 import { getFounderTasks, getTeamMemberTasks } from "./api/taskApi.js";
 import { getStartupAnnouncements } from "./announcementApi.js";
-import { ORG_SOCKET_EVENTS } from "../realtime/orgEvents.js";
 
 /** Mirrors server/src/realtime/rooms.js */
 export function startupSocketRoom(startupId) {
@@ -22,11 +21,6 @@ export function userSocketRoom(userId) {
 /** Matches server/src/realtime/rooms.js announcementRoom */
 export function announcementSocketRoom(startupId) {
   return `announcements:${String(startupId)}`;
-}
-
-/** Matches server/src/realtime/rooms.js organizationRoom */
-export function organizationSocketRoom(organizationId) {
-  return `organization:${String(organizationId)}`;
 }
 
 class SocketEngine {
@@ -716,82 +710,6 @@ export function subscribeToInterests(userId, onUpdate) {
 // ========================================
 // INVITATIONS — invitation:created / invitation:updated
 // ========================================
-
-// ========================================
-// ORGANIZATION — org dashboard realtime (Phase 3)
-// ========================================
-
-export function matchesOrgCohort(payload, cohortId) {
-  if (!cohortId) return true;
-  return (
-    payload?.cohortId != null && String(payload.cohortId) === String(cohortId)
-  );
-}
-
-/**
- * Subscribe to organization-room events. Payloads are filtered by cohortId when provided.
- * @returns {() => void} unsubscribe
- */
-export function subscribeToOrganizationEvents(
-  organizationId,
-  handlers = {},
-  options = {},
-) {
-  const { cohortId } = options;
-  if (!organizationId) return () => {};
-
-  const socket = SocketEngine.getSocket();
-  const roomId = organizationSocketRoom(organizationId);
-
-  const wrap =
-    (handler) =>
-    (payload) => {
-      if (!handler) return;
-      if (!matchesOrgCohort(payload, cohortId)) return;
-      handler(payload);
-    };
-
-  const eventHandlers = [
-    [ORG_SOCKET_EVENTS.MESSAGE_CREATED, handlers.onMessage],
-    [ORG_SOCKET_EVENTS.DELIVERABLE_CREATED, handlers.onDeliverable],
-    [ORG_SOCKET_EVENTS.DELIVERABLE_UPDATED, handlers.onDeliverable],
-    [ORG_SOCKET_EVENTS.DELIVERABLE_DELETED, handlers.onDeliverable],
-    [ORG_SOCKET_EVENTS.DELIVERABLE_ARCHIVED, handlers.onDeliverable],
-    [ORG_SOCKET_EVENTS.EVENT_CREATED, handlers.onEvent],
-    [ORG_SOCKET_EVENTS.EVENT_UPDATED, handlers.onEvent],
-    [ORG_SOCKET_EVENTS.EVENT_DELETED, handlers.onEvent],
-    [ORG_SOCKET_EVENTS.EVENT_CANCELLED, handlers.onEvent],
-    [ORG_SOCKET_EVENTS.ANNOUNCEMENT_CREATED, handlers.onAnnouncement],
-    [ORG_SOCKET_EVENTS.ANNOUNCEMENT_UPDATED, handlers.onAnnouncement],
-    [ORG_SOCKET_EVENTS.ANNOUNCEMENT_DELETED, handlers.onAnnouncement],
-    [ORG_SOCKET_EVENTS.ANNOUNCEMENT_READ, handlers.onAnnouncement],
-    [ORG_SOCKET_EVENTS.COHORT_INVITATION_CHANGED, handlers.onInvitation],
-    [ORG_SOCKET_EVENTS.COHORT_UPDATED, handlers.onCohort],
-    [ORG_SOCKET_EVENTS.COHORT_DELETED, handlers.onCohort],
-    [ORG_SOCKET_EVENTS.RESOURCE_CREATED, handlers.onResource],
-    [ORG_SOCKET_EVENTS.RESOURCE_UPDATED, handlers.onResource],
-    [ORG_SOCKET_EVENTS.RESOURCE_DELETED, handlers.onResource],
-    [ORG_SOCKET_EVENTS.MILESTONE_UPDATED, handlers.onMilestone],
-    [ORG_SOCKET_EVENTS.MILESTONE_DELETED, handlers.onMilestone],
-  ];
-
-  joinRoom(roomId);
-
-  const registered = [];
-  for (const [eventName, handler] of eventHandlers) {
-    if (!handler) continue;
-    const listener = wrap(handler);
-    socket.on(eventName, listener);
-    registered.push([eventName, listener]);
-  }
-
-  return () => {
-    for (const [eventName, listener] of registered) {
-      socket.off(eventName, listener);
-    }
-    leaveRoom(roomId);
-  };
-}
 
 export function subscribeToInvitations(userId, onUpdate) {
   const socket = SocketEngine.getSocket();

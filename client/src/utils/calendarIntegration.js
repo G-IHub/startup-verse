@@ -20,11 +20,10 @@ function unwrapData(json) {
   return json.data !== undefined ? json.data : json;
 }
 
-/** Handles paginated `{ items }`, legacy named keys, and bare arrays. */
+/** Handles `{ data: T[] }`, `{ data: { events: T[] } }`, and compat `{ data: { 0: row, 1: row, _compat } }`. */
 function listFromApi(json, ...namedKeys) {
   const data = unwrapData(json);
   if (Array.isArray(data)) return data;
-  if (Array.isArray(data?.items)) return data.items;
   for (const key of namedKeys) {
     if (Array.isArray(data?.[key])) return data[key];
   }
@@ -293,10 +292,9 @@ export async function getOrganizationCalendarEvents(organizationId) {
       const cohortId = cohort.id || cohort._id;
       const cohortName = cohort.name;
 
-      const eventsResponse = await fetch(
-        `${API_BASE}/cohorts/${cohortId}/events?limit=100`,
-        { ...defaultOptions },
-      );
+      const eventsResponse = await fetch(`${API_BASE}/cohorts/${cohortId}/events`, {
+        ...defaultOptions,
+      });
 
       if (eventsResponse.ok) {
         const payload = await eventsResponse.json();
@@ -311,7 +309,7 @@ export async function getOrganizationCalendarEvents(organizationId) {
       }
 
       const deliverablesResponse = await fetch(
-        `${API_BASE}/cohorts/${cohortId}/deliverables?limit=100`,
+        `${API_BASE}/cohorts/${cohortId}/deliverables`,
         { ...defaultOptions },
       );
 
@@ -336,7 +334,7 @@ export async function getOrganizationCalendarEvents(organizationId) {
       }
 
       const milestonesResponse = await fetch(
-        `${API_BASE}/cohorts/${cohortId}/program-milestones?limit=100`,
+        `${API_BASE}/cohorts/${cohortId}/program-milestones`,
         { ...defaultOptions },
       );
 
