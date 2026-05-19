@@ -1,10 +1,9 @@
 /**
  * PROGRAM MILESTONES - Set weekly goals for entire cohort
  */
-import React, { useState, useCallback } from "react";
+import React, { useState, useEffect } from "react";
 import { API_BASE_URL } from "../../config/apiBase.js";
 import { Button } from "../ui/button";
-import { Input } from "../ui/input";
 import { Badge } from "../ui/badge";
 import {
   Calendar,
@@ -16,7 +15,6 @@ import {
   Pencil,
   Trash2,
   MoreVertical,
-  Search,
 } from "lucide-react";
 import StructuredMilestoneCreator from "./StructuredMilestoneCreator";
 import {
@@ -44,9 +42,6 @@ import {
 } from "./_primitives";
 import { toastError } from "../../utils/toastError";
 import { toast } from "sonner";
-import { useOrgListQuery } from "../../hooks/useOrgListQuery";
-import { getProgramMilestonesPage } from "../../utils/api/organizationApi";
-import PaginationControls from "../shared/PaginationControls";
 
 const API_BASE = API_BASE_URL;
 
@@ -66,39 +61,35 @@ export default function ProgramMilestones({
   userId,
   isAdmin,
 }) {
+  const [milestones, setMilestones] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [showCreateForm, setShowCreateForm] = useState(false);
   // Non-null editingMilestone means the creator dialog opens in edit mode.
   const [editingMilestone, setEditingMilestone] = useState(null);
   const [milestoneToDelete, setMilestoneToDelete] = useState(null);
   const [isDeletingMilestone, setIsDeletingMilestone] = useState(false);
 
-  const {
-    items: milestoneRows,
-    total,
-    limit,
-    loading,
-    q,
-    setSearch,
-    currentPage,
-    totalPages,
-    hasNext,
-    hasPrev,
-    goToPage,
-    nextPage,
-    prevPage,
-    refresh,
-  } = useOrgListQuery({
-    fetchFn: useCallback(
-      (params) => getProgramMilestonesPage(cohortId, params),
-      [cohortId],
-    ),
-    initialLimit: 25,
-  });
+  useEffect(() => {
+    loadMilestones();
+  }, [cohortId]);
 
-  const milestones = milestoneRows.map((m) => ({
-    ...m,
-    id: m.id || m._id,
-  }));
+  const loadMilestones = async () => {
+    try {
+      setLoading(true);
+      const response = await fetch(
+        `${API_BASE}/cohorts/${cohortId}/program-milestones`,
+        { ...defaultOptions },
+      );
+      if (!response.ok) throw new Error("Failed to fetch milestones");
+      const payload = await response.json();
+      const inner = payload?.data ?? payload;
+      setMilestones(inner.milestones || []);
+    } catch (error) {
+      console.error("Error loading milestones:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleSubmitStructuredMilestone = async (data) => {
     const isEdit = Boolean(editingMilestone);
@@ -132,7 +123,7 @@ export default function ProgramMilestones({
       }
       setShowCreateForm(false);
       setEditingMilestone(null);
-      await refresh();
+      loadMilestones();
       toast.success(isEdit ? "Milestone updated" : "Milestone created");
     } catch (error) {
       console.error(
@@ -161,7 +152,7 @@ export default function ProgramMilestones({
         throw err;
       }
       setMilestoneToDelete(null);
-      await refresh();
+      loadMilestones();
       toast.success("Milestone deleted");
     } catch (error) {
       console.error("Error deleting milestone:", error);
@@ -225,20 +216,6 @@ export default function ProgramMilestones({
         }
       />
 
-      <SectionCard>
-        <SectionCard.Body className="p-3">
-          <div className="relative">
-            <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-text-muted" />
-            <Input
-              value={q}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search milestones…"
-              className="pl-8 font-body text-[13px]"
-            />
-          </div>
-        </SectionCard.Body>
-      </SectionCard>
-
       {loading ? (
         <SectionCard>
           <SectionCard.Body className="p-8 text-center">
@@ -247,14 +224,14 @@ export default function ProgramMilestones({
             </div>
           </SectionCard.Body>
         </SectionCard>
-      ) : total === 0 ? (
+      ) : sortedMilestones.length === 0 ? (
         <SectionCard>
           <SectionCard.Body className="p-0">
             <EmptyStateBlock
               variant="centered"
               icon={Target}
               tone="info"
-              title={q ? "No matching milestones" : "No milestones yet"}
+              title="No milestones yet"
               description={
                 isAdmin
                   ? "Create your first program milestone to track cohort progress"
@@ -386,20 +363,6 @@ export default function ProgramMilestones({
             </div>
           </SectionCard.Body>
         </SectionCard>
-      )}
-
-      {!loading && total > limit && (
-        <PaginationControls
-          currentPage={currentPage}
-          totalPages={totalPages}
-          hasNext={hasNext}
-          hasPrev={hasPrev}
-          onNext={nextPage}
-          onPrev={prevPage}
-          onGoToPage={goToPage}
-          totalItems={total}
-          pageSize={limit}
-        />
       )}
 
       <AlertDialog

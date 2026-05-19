@@ -31,7 +31,6 @@ const eventSchema = new mongoose.Schema(
 );
 
 eventSchema.index({ cohortId: 1, startsAt: 1 });
-eventSchema.index({ title: "text", description: "text" });
 
 const Event = mongoose.models.Event || mongoose.model("Event", eventSchema);
 

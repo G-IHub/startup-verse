@@ -2,7 +2,7 @@
  * COMMUNICATION CENTER - Unified messaging system for organizations
  * Two-way communication between organizations and founders
  */
-import React, { useState, useEffect, useMemo, useCallback } from "react";
+import React, { useState, useEffect } from "react";
 import { API_BASE_URL } from "../../config/apiBase.js";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
@@ -29,16 +29,8 @@ import {
   Reply,
   Pencil,
   Trash2,
-  Search,
 } from "lucide-react";
 import { unwrapData } from "../../utils/apiEnvelope";
-import { useOrgListQuery } from "../../hooks/useOrgListQuery";
-import { useOrgRealtime } from "../../hooks/useOrgRealtime";
-import {
-  getCohortAnnouncementsPage,
-  getOrganizationMessagesPage,
-} from "../../utils/api/organizationApi";
-import PaginationControls from "../shared/PaginationControls";
 import { toastError } from "../../utils/toastError";
 import { toast } from "sonner";
 import {
@@ -80,6 +72,9 @@ export default function CommunicationCenter({
   isAdmin,
   cohortMembers = [],
 }) {
+  const [announcements, setAnnouncements] = useState([]);
+  const [messages, setMessages] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [showAnnouncementForm, setShowAnnouncementForm] = useState(false);
   const [showMessageForm, setShowMessageForm] = useState(false);
   const [messageMode, setMessageMode] = useState("individual");
@@ -96,133 +91,11 @@ export default function CommunicationCenter({
     subject: "",
     message: "",
   });
-  const [selectedThreadFounderId, setSelectedThreadFounderId] = useState(null);
 
-  const {
-    items: announcementRows,
-    total: announcementsTotal,
-    limit: announcementsLimit,
-    loading: announcementsLoading,
-    q: announcementsQ,
-    setSearch: setAnnouncementsSearch,
-    currentPage: announcementsPage,
-    totalPages: announcementsTotalPages,
-    hasNext: announcementsHasNext,
-    hasPrev: announcementsHasPrev,
-    goToPage: goToAnnouncementsPage,
-    nextPage: announcementsNextPage,
-    prevPage: announcementsPrevPage,
-    refresh: refreshAnnouncements,
-  } = useOrgListQuery({
-    fetchFn: useCallback(
-      (params) => getCohortAnnouncementsPage(cohortId, params),
-      [cohortId],
-    ),
-    initialLimit: 25,
-  });
-
-  const announcements = announcementRows;
-
-  const {
-    items: messages,
-    total: messagesTotal,
-    limit: messagesLimit,
-    loading: messagesLoading,
-    q: messagesQ,
-    setSearch: setMessagesSearch,
-    currentPage: messagesPage,
-    totalPages: messagesTotalPages,
-    hasNext: messagesHasNext,
-    hasPrev: messagesHasPrev,
-    goToPage: goToMessagesPage,
-    nextPage: messagesNextPage,
-    prevPage: messagesPrevPage,
-    refresh: refreshMessages,
-  } = useOrgListQuery({
-    fetchFn: useCallback(
-      (params) => getOrganizationMessagesPage(organizationId, params),
-      [organizationId],
-    ),
-    initialLimit: 50,
-    autoFetch: activeTab === "messages",
-  });
-
-  useOrgRealtime(organizationId, cohortId, {
-    onMessage: () => {
-      refreshMessages().catch(() => {});
-    },
-    onAnnouncement: () => {
-      refreshAnnouncements().catch(() => {});
-    },
-  });
-
-  // Step 2.14: group inbound messages by founder so admins can triage by
-  // conversation instead of scanning a flat list. Outbound (Sent) rows still
-  // render in a separate flat list below.
-  const meIdStr = String(userId || "");
-  const founderThreads = useMemo(() => {
-    const byFounder = new Map();
-    for (const m of messages) {
-      if (String(m.toUserId || "") !== meIdStr) continue;
-      const senderId = String(m.fromUserId || m.from?.id || "");
-      if (!senderId) continue;
-      const fallbackMember = cohortMembers.find(
-        (cm) => String(cm.founderId) === senderId,
-      );
-      const t = byFounder.get(senderId) || {
-        founderId: senderId,
-        founderName:
-          m.from?.name ||
-          m.metadata?.founderName ||
-          fallbackMember?.founderName ||
-          "Founder",
-        startupName:
-          m.from?.startupName ||
-          m.metadata?.startupName ||
-          fallbackMember?.startupName ||
-          "",
-        messages: [],
-        unread: 0,
-        latestAt: 0,
-      };
-      t.messages.push(m);
-      if (!m.readAt) t.unread += 1;
-      const at = new Date(m.createdAt || m.sentAt || 0).getTime();
-      if (at > t.latestAt) t.latestAt = at;
-      byFounder.set(senderId, t);
-    }
-    for (const t of byFounder.values()) {
-      t.messages.sort(
-        (a, b) =>
-          new Date(a.createdAt || a.sentAt || 0).getTime() -
-          new Date(b.createdAt || b.sentAt || 0).getTime(),
-      );
-    }
-    return [...byFounder.values()].sort((a, b) => b.latestAt - a.latestAt);
-  }, [messages, meIdStr, cohortMembers]);
-
-  const sentMessages = useMemo(
-    () => messages.filter((m) => String(m.toUserId || "") !== meIdStr),
-    [messages, meIdStr],
-  );
-
-  const selectedThread = useMemo(
-    () =>
-      founderThreads.find((t) => t.founderId === selectedThreadFounderId) ||
-      founderThreads[0] ||
-      null,
-    [founderThreads, selectedThreadFounderId],
-  );
-
-  const replyToFounder = (founderId, subject = "") => {
-    setMessageMode("individual");
-    setSelectedRecipient(founderId);
-    setMessageData({
-      subject: subject ? `Re: ${subject}` : "",
-      message: "",
-    });
-    setShowMessageForm(true);
-  };
+  useEffect(() => {
+    loadAnnouncements();
+    loadMessages();
+  }, [cohortId, organizationId]);
 
   useEffect(() => {
     if (activeTab !== "messages") return;
@@ -247,7 +120,15 @@ export default function CommunicationCenter({
         });
         if (!response.ok) return;
         if (cancelled) return;
-        await refreshMessages();
+        const nowIso = new Date().toISOString();
+        const idSet = new Set(unreadInboundIds.map(String));
+        setMessages((prev) =>
+          prev.map((m) =>
+            idSet.has(String(m.id || m._id))
+              ? { ...m, readAt: m.readAt || nowIso }
+              : m,
+          ),
+        );
       } catch (error) {
         console.error("Error marking messages as read:", error);
       }
@@ -284,13 +165,54 @@ export default function CommunicationCenter({
         }
       }
       if (cancelled || marked.length === 0) return;
-      await refreshAnnouncements();
+      const markedSet = new Set(marked);
+      setAnnouncements((prev) =>
+        prev.map((a) => {
+          const aid = String(a.id || a._id);
+          if (!markedSet.has(aid)) return a;
+          const readBy = Array.isArray(a.readBy) ? a.readBy : [];
+          if (readBy.map((v) => String(v)).includes(meIdStr)) return a;
+          return { ...a, readBy: [...readBy, meIdStr] };
+        }),
+      );
     })();
 
     return () => {
       cancelled = true;
     };
   }, [activeTab, announcements, isAdmin, userId, cohortId]);
+
+  const loadAnnouncements = async () => {
+    try {
+      setLoading(true);
+      const response = await fetch(
+        `${API_BASE}/cohorts/${cohortId}/announcements`,
+        { ...defaultOptions },
+      );
+      if (!response.ok) throw new Error("Failed to fetch announcements");
+      const inner = unwrapData(await response.json());
+      setAnnouncements(inner.announcements || []);
+    } catch (error) {
+      console.error("Error loading announcements:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const loadMessages = async () => {
+    try {
+      const response = await fetch(
+        `${API_BASE}/messages/organization/${organizationId}`,
+        defaultOptions,
+      );
+      if (!response.ok) throw new Error("Failed to fetch messages");
+      const raw = unwrapData(await response.json());
+      const list = Array.isArray(raw) ? raw : raw.messages || [];
+      setMessages(list);
+    } catch (error) {
+      console.error("Error loading messages:", error);
+    }
+  };
 
   const resetAnnouncementForm = () => {
     setAnnouncementData({ title: "", content: "", priority: "normal" });
@@ -321,7 +243,9 @@ export default function CommunicationCenter({
     if (!ok) return;
     try {
       await deleteCohortAnnouncementApi(cohortId, id);
-      await refreshAnnouncements();
+      setAnnouncements((prev) =>
+        prev.filter((a) => String(a.id || a._id) !== String(id)),
+      );
       if (String(editingAnnouncementId) === String(id)) {
         resetAnnouncementForm();
       }
@@ -341,14 +265,22 @@ export default function CommunicationCenter({
           body: announcementData.content,
           priority: announcementData.priority,
         };
-        await updateCohortAnnouncementApi(
+        const result = await updateCohortAnnouncementApi(
           cohortId,
           editingAnnouncementId,
           payload,
         );
+        const updated = result?.announcement || null;
+        setAnnouncements((prev) =>
+          prev.map((a) =>
+            String(a.id || a._id) === String(editingAnnouncementId)
+              ? { ...a, ...(updated || payload) }
+              : a,
+          ),
+        );
         toast.success("Announcement updated");
         resetAnnouncementForm();
-        await refreshAnnouncements();
+        loadAnnouncements();
         return;
       }
 
@@ -373,7 +305,7 @@ export default function CommunicationCenter({
         throw err;
       }
       resetAnnouncementForm();
-      await refreshAnnouncements();
+      loadAnnouncements();
     } catch (error) {
       console.error("Error saving announcement:", error);
       toastError(
@@ -443,7 +375,7 @@ export default function CommunicationCenter({
       setSelectedRecipients([]);
       setSelectedRecipient("");
       setShowMessageForm(false);
-      await refreshMessages();
+      loadMessages();
     } catch (error) {
       console.error("Error sending message:", error);
       toastError(error, "Failed to send message");
@@ -624,21 +556,7 @@ export default function CommunicationCenter({
             </CollapsibleFormCard>
           )}
 
-          <SectionCard>
-            <SectionCard.Body className="p-3">
-              <div className="relative">
-                <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-text-muted" />
-                <Input
-                  value={announcementsQ}
-                  onChange={(e) => setAnnouncementsSearch(e.target.value)}
-                  placeholder="Search announcements…"
-                  className="pl-8 font-body text-[13px]"
-                />
-              </div>
-            </SectionCard.Body>
-          </SectionCard>
-
-          {announcementsLoading ? (
+          {loading ? (
             <SectionCard>
               <SectionCard.Body className="p-8 text-center">
                 <div className="font-body text-[13px] text-text-muted animate-pulse">
@@ -646,7 +564,7 @@ export default function CommunicationCenter({
                 </div>
               </SectionCard.Body>
             </SectionCard>
-          ) : announcementsTotal === 0 ? (
+          ) : announcements.length === 0 ? (
             <SectionCard>
               <SectionCard.Body className="p-0">
                 <EmptyStateBlock
@@ -736,20 +654,6 @@ export default function CommunicationCenter({
                 </SectionCard>
               ))}
             </div>
-          )}
-
-          {!announcementsLoading && announcementsTotal > announcementsLimit && (
-            <PaginationControls
-              currentPage={announcementsPage}
-              totalPages={announcementsTotalPages}
-              hasNext={announcementsHasNext}
-              hasPrev={announcementsHasPrev}
-              onNext={announcementsNextPage}
-              onPrev={announcementsPrevPage}
-              onGoToPage={goToAnnouncementsPage}
-              totalItems={announcementsTotal}
-              pageSize={announcementsLimit}
-            />
           )}
         </TabsContent>
 
@@ -941,177 +845,30 @@ export default function CommunicationCenter({
           )}
 
           <SectionCard>
-            <SectionCard.Body className="p-3">
-              <div className="relative">
-                <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-text-muted" />
-                <Input
-                  value={messagesQ}
-                  onChange={(e) => setMessagesSearch(e.target.value)}
-                  placeholder="Search messages…"
-                  className="pl-8 font-body text-[13px]"
-                />
-              </div>
-            </SectionCard.Body>
-          </SectionCard>
-
-          <SectionCard>
             <SectionCard.Header
-              title="Founder threads"
-              description={
-                founderThreads.length === 0
-                  ? "No inbound messages yet"
-                  : `${founderThreads.length} founder${founderThreads.length !== 1 ? "s" : ""}`
-              }
+              title="Message Inbox"
+              description={`${messages.length} message${messages.length !== 1 ? "s" : ""}`}
             />
             <SectionCard.Body>
-              {messagesLoading ? (
-                <div className="py-8 text-center font-body text-[13px] text-text-muted animate-pulse">
-                  Loading messages…
-                </div>
-              ) : founderThreads.length === 0 ? (
+              {messages.length === 0 ? (
                 <EmptyStateBlock
                   variant="compact"
                   icon={MessageSquare}
                   tone="info"
                   title="No messages yet"
-                  description="Messages from cohort founders will appear here, grouped by founder."
+                  description="Conversations with cohort startups will appear here"
                 />
               ) : (
-                <div className="grid grid-cols-1 gap-3 md:grid-cols-[260px,1fr]">
-                  <div className="space-y-1.5 md:max-h-[520px] md:overflow-y-auto md:pr-1">
-                    {founderThreads.map((t) => {
-                      const isActive =
-                        (selectedThread?.founderId || founderThreads[0]?.founderId) ===
-                        t.founderId;
-                      const latest = t.messages[t.messages.length - 1];
-                      return (
-                        <button
-                          key={t.founderId}
-                          type="button"
-                          onClick={() => setSelectedThreadFounderId(t.founderId)}
-                          className={cn(
-                            "w-full rounded-input border p-2.5 text-left transition-colors",
-                            isActive
-                              ? "border-primary/40 bg-primary-tint"
-                              : "border-surface-border bg-white hover:bg-surface-page",
-                          )}
-                        >
-                          <div className="mb-1 flex items-center justify-between gap-2">
-                            <span className="truncate font-body text-[13px] font-semibold text-text-heading">
-                              {t.founderName}
-                              {t.startupName ? (
-                                <span className="ml-1 font-normal text-text-muted">
-                                  · {t.startupName}
-                                </span>
-                              ) : null}
-                            </span>
-                            {t.unread > 0 ? (
-                              <span className="rounded-full bg-primary px-1.5 py-0.5 font-body text-[10px] font-bold text-white">
-                                {t.unread}
-                              </span>
-                            ) : null}
-                          </div>
-                          <p className="truncate font-body text-[12px] text-text-muted">
-                            {latest?.subject || latest?.body || "(no subject)"}
-                          </p>
-                          <p className="font-body text-[11px] text-text-muted">
-                            {t.latestAt
-                              ? new Date(t.latestAt).toLocaleString()
-                              : ""}
-                          </p>
-                        </button>
-                      );
-                    })}
-                  </div>
-                  <div className="rounded-input border border-surface-border bg-white">
-                    {selectedThread ? (
-                      <>
-                        <div className="flex items-center justify-between border-b border-surface-border p-3">
-                          <div>
-                            <h4 className="font-heading text-[14px] font-bold text-text-heading">
-                              {selectedThread.founderName}
-                              {selectedThread.startupName ? (
-                                <span className="ml-1 font-body text-[12px] font-normal text-text-muted">
-                                  · {selectedThread.startupName}
-                                </span>
-                              ) : null}
-                            </h4>
-                            <p className="font-body text-[12px] text-text-muted">
-                              {selectedThread.messages.length} message
-                              {selectedThread.messages.length === 1 ? "" : "s"}
-                            </p>
-                          </div>
-                          <Button
-                            size="sm"
-                            onClick={() =>
-                              replyToFounder(
-                                selectedThread.founderId,
-                                selectedThread.messages[
-                                  selectedThread.messages.length - 1
-                                ]?.subject || "",
-                              )
-                            }
-                            className="h-8 rounded-input bg-primary font-body text-[12px] font-semibold text-white hover:bg-primary-hover"
-                          >
-                            <Reply className="mr-1 h-3.5 w-3.5" />
-                            Reply
-                          </Button>
-                        </div>
-                        <div className="space-y-2 p-3 md:max-h-[440px] md:overflow-y-auto">
-                          {selectedThread.messages.map((msg) => {
-                            const sentAt = msg.createdAt || msg.sentAt;
-                            const msgKey = msg.id || msg._id;
-                            return (
-                              <div
-                                key={msgKey}
-                                className="rounded-input border border-primary/20 bg-primary-tint p-3"
-                              >
-                                <div className="mb-1 flex items-center justify-between gap-2">
-                                  <div className="flex items-center gap-1.5">
-                                    <Mail className="h-3.5 w-3.5 text-primary" />
-                                    <span className="font-body text-[12px] font-semibold text-text-heading">
-                                      {selectedThread.founderName}
-                                    </span>
-                                  </div>
-                                  <span className="font-body text-[11px] text-text-muted">
-                                    {sentAt
-                                      ? new Date(sentAt).toLocaleString()
-                                      : ""}
-                                  </span>
-                                </div>
-                                {msg.subject ? (
-                                  <h5 className="mb-1 font-heading text-[13px] font-bold text-text-heading">
-                                    {msg.subject}
-                                  </h5>
-                                ) : null}
-                                <p className="whitespace-pre-wrap font-body text-[13px] text-text-body">
-                                  {msg.body ?? msg.message ?? ""}
-                                </p>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </>
-                    ) : (
-                      <div className="p-6 text-center font-body text-[13px] text-text-muted">
-                        Select a founder to read their messages.
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
-            </SectionCard.Body>
-          </SectionCard>
-
-          {sentMessages.length > 0 && (
-            <SectionCard>
-              <SectionCard.Header
-                title="Sent"
-                description={`${sentMessages.length} message${sentMessages.length !== 1 ? "s" : ""}`}
-              />
-              <SectionCard.Body>
                 <div className="space-y-2">
-                  {sentMessages.map((message) => {
+                  {messages.map((message) => {
+                    const meIdStr = String(userId || "");
+                    const isReceived =
+                      String(message.toUserId || "") === meIdStr;
+                    const senderLabel =
+                      message.from?.startupName ||
+                      message.from?.name ||
+                      message.from?.email ||
+                      "Sender";
                     const recipientLabel =
                       message.to?.startupName ||
                       message.to?.name ||
@@ -1129,16 +886,35 @@ export default function CommunicationCenter({
                     return (
                       <div
                         key={messageKey}
-                        className="rounded-input border border-surface-border bg-surface-page p-3"
+                        className={cn(
+                          "rounded-input border p-3",
+                          isReceived
+                            ? "border-primary/20 bg-primary-tint"
+                            : "border-surface-border bg-surface-page",
+                        )}
                       >
                         <div className="mb-1 flex items-start justify-between gap-2">
                           <div className="flex items-center gap-1.5">
-                            <MailOpen className="h-3.5 w-3.5 text-text-muted" />
-                            <span className="font-body text-[12px] font-semibold text-text-heading">
-                              To: {recipientLabel}
-                            </span>
+                            {isReceived ? (
+                              <>
+                                <Mail className="h-3.5 w-3.5 text-primary" />
+                                <span className="font-body text-[12px] font-semibold text-text-heading">
+                                  From: {senderLabel}
+                                </span>
+                              </>
+                            ) : (
+                              <>
+                                <MailOpen className="h-3.5 w-3.5 text-text-muted" />
+                                <span className="font-body text-[12px] font-semibold text-text-heading">
+                                  To: {recipientLabel}
+                                </span>
+                              </>
+                            )}
                           </div>
-                          <StatusBadge tone="success" label="Sent" />
+                          <StatusBadge
+                            tone={isReceived ? "info" : "success"}
+                            label={isReceived ? "Received" : "Sent"}
+                          />
                         </div>
                         <h4 className="mb-1 font-heading text-[14px] font-bold text-text-heading">
                           {message.subject || "(no subject)"}
@@ -1146,30 +922,40 @@ export default function CommunicationCenter({
                         <p className="mb-2 whitespace-pre-wrap font-body text-[13px] text-text-body">
                           {messageBody}
                         </p>
-                        <span className="font-body text-[12px] text-text-muted">
-                          {sentAt ? new Date(sentAt).toLocaleString() : ""}
-                        </span>
+                        <div className="flex items-center justify-between">
+                          <span className="font-body text-[12px] text-text-muted">
+                            {sentAt
+                              ? new Date(sentAt).toLocaleString()
+                              : ""}
+                          </span>
+                          {isReceived && (
+                            <Button
+                              size="sm"
+                              onClick={() => {
+                                setMessageMode("individual");
+                                setSelectedRecipient(
+                                  message.fromUserId || message.from?.id || "",
+                                );
+                                setMessageData({
+                                  subject: `Re: ${message.subject || ""}`,
+                                  message: "",
+                                });
+                                setShowMessageForm(true);
+                              }}
+                              className="h-8 rounded-input font-body text-[12px] font-medium text-primary hover:bg-primary-tint"
+                            >
+                              <Reply className="mr-1 h-3.5 w-3.5" />
+                              Reply
+                            </Button>
+                          )}
+                        </div>
                       </div>
                     );
                   })}
                 </div>
-              </SectionCard.Body>
-            </SectionCard>
-          )}
-
-          {!messagesLoading && messagesTotal > messagesLimit && (
-            <PaginationControls
-              currentPage={messagesPage}
-              totalPages={messagesTotalPages}
-              hasNext={messagesHasNext}
-              hasPrev={messagesHasPrev}
-              onNext={messagesNextPage}
-              onPrev={messagesPrevPage}
-              onGoToPage={goToMessagesPage}
-              totalItems={messagesTotal}
-              pageSize={messagesLimit}
-            />
-          )}
+              )}
+            </SectionCard.Body>
+          </SectionCard>
         </TabsContent>
       </Tabs>
     </div>

@@ -7,9 +7,10 @@ import { error as apiError, success as apiSuccess } from "../utils/apiResponse.j
 import Message from "../models/Message.js";
 import User from "../models/User.js";
 import Startup from "../models/Startup.js";
-import { createMessage } from "../services/messageDelivery.js";
+import { emitRealtime } from "../services/realtime.service.js";
+import { SOCKET_EVENTS } from "../realtime/events.js";
+import { startupRoom, userRoom, organizationRoom } from "../realtime/rooms.js";
 import { mapMessageDto } from "../utils/messageDto.js";
-import * as messagesController from "../controllers/messages.controller.js";
 
 const messagesRouter = Router();
 const isSelfOrAdmin = (req, userId) => req.user?.isAdmin === true || String(req.user?.id) === String(userId);
@@ -25,6 +26,29 @@ async function canAccessStartupMessages(req, startupId) {
   if (String(me.startupId || "") === normalizedStartupId) return true;
   const founded = await Startup.findOne({ founderId: req.user.id }, { _id: 1 });
   return String(founded?._id || "") === normalizedStartupId;
+}
+
+async function createMessage(payload) {
+  const message = await Message.create(payload);
+
+  const rooms = [];
+  const isDirectPeer =
+    Boolean(message.toUserId) &&
+    Boolean(message.fromUserId) &&
+    String(message.toUserId) !== String(message.fromUserId);
+  if (message.organizationId) {
+    rooms.push(organizationRoom(message.organizationId));
+  }
+  if (message.startupId && !isDirectPeer) {
+    rooms.push(startupRoom(message.startupId));
+  }
+  rooms.push(userRoom(message.fromUserId));
+  rooms.push(userRoom(message.toUserId));
+
+  const uniqueRooms = [...new Set(rooms.filter(Boolean))];
+  emitRealtime(SOCKET_EVENTS.MESSAGE_CREATED, mapMessageDto(message), uniqueRooms);
+
+  return message;
 }
 
 messagesRouter.post(
@@ -64,12 +88,6 @@ messagesRouter.post(
   requireAuth,
   requireOrgAdmin,
   asyncHandler(organizationMessagesController.sendIndividualOrgMessage),
-);
-
-messagesRouter.post(
-  "/messages/founder-to-org",
-  requireAuth,
-  asyncHandler(messagesController.sendFounderToOrg),
 );
 
 messagesRouter.post(

@@ -1,113 +1,55 @@
 import { Router } from "express";
 import asyncHandler from "../utils/asyncHandler.js";
 import requireAuth from "../middleware/requireAuth.js";
-import requireSelfOrAdmin from "../middleware/requireSelfOrAdmin.js";
 import { success as apiSuccess, error as apiError } from "../utils/apiResponse.js";
-import {
-  getGoogleOAuthMisconfigMessage,
-  getGoogleOAuthConfig,
-  getSettingsRedirectUrl,
-  isGoogleIntegrationEnabled,
-} from "../config/googleIntegration.js";
-import {
-  disconnectUser,
-  getAuthorizationUrl,
-  getConnectionStatus,
-  handleOAuthCallback,
-} from "../services/googleOAuthService.js";
-import {
-  createInstantMeet,
-  createMeetingWithMeet,
-} from "../services/googleMeetService.js";
-import { logger } from "../config/logger.js";
+import { isGoogleIntegrationEnabled } from "../config/googleIntegration.js";
 
 const googleRouter = Router();
 
-function integrationUnavailable(res) {
-  const message = getGoogleOAuthMisconfigMessage();
-  const status = isGoogleIntegrationEnabled() ? 503 : 503;
-  return apiError(res, message, status);
-}
-
-async function redirectToGoogle(req, res) {
-  if (!isGoogleIntegrationEnabled()) {
-    return integrationUnavailable(res);
-  }
-  const cfg = getGoogleOAuthConfig();
-  if (!cfg.configured) {
-    return integrationUnavailable(res);
-  }
-  try {
-    const url = getAuthorizationUrl(req.user.id);
-    return res.redirect(url);
-  } catch (err) {
-    logger.error("Google OAuth authorize failed.", {
-      error: err instanceof Error ? err.message : String(err),
-    });
-    return res.redirect(
-      getSettingsRedirectUrl({ google: "error", message: "authorize_failed" }),
-    );
-  }
-}
+const disabledMessage =
+  "Google Calendar and Meet integration is turned off. Set GOOGLE_INTEGRATION_ENABLED=true when OAuth credentials are configured.";
 
 googleRouter.get(
   "/google/status/:userId",
   requireAuth,
-  requireSelfOrAdmin("userId"),
   asyncHandler(async (req, res) => {
-    const status = await getConnectionStatus(req.params.userId);
-    return apiSuccess(res, status);
+    const enabled = isGoogleIntegrationEnabled();
+    return apiSuccess(res, {
+      userId: req.params.userId,
+      enabled,
+      connected: false,
+      email: "",
+      provider: "google",
+      placeholder: true,
+      message: enabled
+        ? "OAuth flow not yet implemented on this server."
+        : disabledMessage,
+    });
   }),
-);
-
-googleRouter.get(
-  "/google/connect",
-  requireAuth,
-  asyncHandler(redirectToGoogle),
 );
 
 googleRouter.get(
   "/google/oauth/authorize",
   requireAuth,
-  asyncHandler(redirectToGoogle),
+  asyncHandler(async (req, res) => {
+    if (!isGoogleIntegrationEnabled()) {
+      return apiError(res, disabledMessage, 503);
+    }
+    return apiError(
+      res,
+      "Google OAuth authorize URL is not configured. Provide client credentials and implement the redirect.",
+      501,
+    );
+  }),
 );
 
 googleRouter.get(
   "/google/oauth/callback",
   asyncHandler(async (req, res) => {
-    const { code, state, error: oauthError } = req.query;
-    if (oauthError) {
-      return res.redirect(
-        getSettingsRedirectUrl({
-          google: "error",
-          message: String(oauthError),
-        }),
-      );
-    }
-    if (!code || !state) {
-      return res.redirect(
-        getSettingsRedirectUrl({ google: "error", message: "missing_code" }),
-      );
-    }
     if (!isGoogleIntegrationEnabled()) {
-      return res.redirect(
-        getSettingsRedirectUrl({ google: "error", message: "disabled" }),
-      );
+      return apiError(res, disabledMessage, 503);
     }
-    try {
-      await handleOAuthCallback(String(code), String(state));
-      return res.redirect(getSettingsRedirectUrl({ google: "connected" }));
-    } catch (err) {
-      logger.error("Google OAuth callback failed.", {
-        error: err instanceof Error ? err.message : String(err),
-      });
-      return res.redirect(
-        getSettingsRedirectUrl({
-          google: "error",
-          message: "callback_failed",
-        }),
-      );
-    }
+    return apiError(res, "Google OAuth callback handler not implemented.", 501);
   }),
 );
 
@@ -116,63 +58,32 @@ googleRouter.post(
   requireAuth,
   asyncHandler(async (req, res) => {
     if (!isGoogleIntegrationEnabled()) {
-      return integrationUnavailable(res);
+      return apiError(res, disabledMessage, 503);
     }
-    const cfg = getGoogleOAuthConfig();
-    if (!cfg.configured) {
-      return integrationUnavailable(res);
-    }
-    try {
-      const result = await createMeetingWithMeet(req.user.id, req.body || {});
-      return apiSuccess(res, result);
-    } catch (err) {
-      const message = err instanceof Error ? err.message : "Meet creation failed.";
-      const status = message.includes("not connected") ? 403 : 502;
-      return apiError(res, message, status);
-    }
+    return apiError(res, "Google Meet creation is not implemented.", 501);
   }),
 );
 
 googleRouter.post(
   "/google/instant-meeting/:userId",
   requireAuth,
-  requireSelfOrAdmin("userId"),
   asyncHandler(async (req, res) => {
     if (!isGoogleIntegrationEnabled()) {
-      return integrationUnavailable(res);
+      return apiError(res, disabledMessage, 503);
     }
-    const cfg = getGoogleOAuthConfig();
-    if (!cfg.configured) {
-      return integrationUnavailable(res);
-    }
-    const title =
-      typeof req.body?.title === "string" && req.body.title.trim()
-        ? req.body.title.trim()
-        : typeof req.body?.roomName === "string" && req.body.roomName.trim()
-          ? req.body.roomName.trim()
-          : "StartupVerse Meeting";
-    try {
-      const result = await createInstantMeet(req.params.userId, { title });
-      return apiSuccess(res, result);
-    } catch (err) {
-      const message = err instanceof Error ? err.message : "Instant Meet failed.";
-      const status = message.includes("not connected") ? 403 : 502;
-      return apiError(res, message, status);
-    }
+    return apiError(res, "Instant Google Meet is not implemented.", 501);
   }),
 );
 
 googleRouter.post(
   "/google/disconnect/:userId",
   requireAuth,
-  requireSelfOrAdmin("userId"),
   asyncHandler(async (req, res) => {
-    const result = await disconnectUser(req.params.userId);
     return apiSuccess(res, {
       provider: "google",
       userId: req.params.userId,
-      disconnected: result.disconnected,
-      placeholder: false,
+      disconnected: true,
+      placeholder: true,
     });
   }),
 );
@@ -180,14 +91,12 @@ googleRouter.post(
 googleRouter.delete(
   "/google/disconnect/:userId",
   requireAuth,
-  requireSelfOrAdmin("userId"),
   asyncHandler(async (req, res) => {
-    const result = await disconnectUser(req.params.userId);
     return apiSuccess(res, {
       provider: "google",
       userId: req.params.userId,
-      disconnected: result.disconnected,
-      placeholder: false,
+      disconnected: true,
+      placeholder: true,
     });
   }),
 );

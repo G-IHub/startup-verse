@@ -23,8 +23,7 @@ async function main() {
   const reminderQueue = await read("services/reminderDeliveryQueue.js");
   const adminRoutes = await read("routes/admin.routes.js");
 
-  assertContains(googleRoutes, "/google/connect", "google OAuth connect route", failures);
-  assertContains(googleRoutes, "getConnectionStatus", "google status service", failures);
+  assertContains(googleRoutes, "placeholder: true", "google routes marked placeholder", failures);
   assertContains(agendaRoutes, "/calendar/:userId", "calendar route mounted", failures);
   assertContains(agendaRoutes, "programMilestones", "calendar aggregates program milestones", failures);
   assertContains(agendaRoutes, "timeline", "calendar returns unified timeline", failures);

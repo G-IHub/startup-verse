@@ -3,14 +3,6 @@
  * All organization-related API calls
  */
 import { API_BASE_URL } from "../../config/apiBase.js";
-import {
-  buildListQueryString,
-  fetchOrgList,
-  normalizeListPage,
-  unwrapListPage,
-} from "./listQuery.js";
-
-export { buildListQueryString, fetchOrgList, normalizeListPage, unwrapListPage };
 
 // Default fetch options for cookie-based auth
 const defaultOptions = {
@@ -162,72 +154,6 @@ export async function getCohort(cohortId) {
   return mapEntity(unwrapData(result));
 }
 
-export async function getCohortBadgeCounts(cohortId) {
-  const result = await apiCall(`/cohorts/${cohortId}/badge-counts`);
-  return unwrapData(result);
-}
-
-function parseContentDispositionFilename(header) {
-  if (!header) return null;
-  const star = /filename\*=UTF-8''([^;]+)/i.exec(header);
-  if (star) {
-    try {
-      return decodeURIComponent(star[1].trim());
-    } catch {
-      return star[1].trim();
-    }
-  }
-  const quoted = /filename="([^"]+)"/i.exec(header);
-  if (quoted) return quoted[1];
-  const plain = /filename=([^;]+)/i.exec(header);
-  return plain ? plain[1].trim().replace(/^"|"$/g, "") : null;
-}
-
-/**
- * Download cohort export CSV from GET /cohorts/:cohortId/export (Step 4.2 / O3).
- * Triggers a browser file save; does not use apiCall (response is not JSON).
- */
-export async function downloadCohortExport(cohortId, { format = "csv" } = {}) {
-  const fmt = format === "json" ? "json" : "csv";
-  const url = `${API_BASE_URL}/cohorts/${cohortId}/export?format=${encodeURIComponent(fmt)}`;
-  const response = await fetch(url, { credentials: "include" });
-
-  if (!response.ok) {
-    let message = `Export failed (${response.status})`;
-    try {
-      const body = await response.json();
-      message = body?.message || message;
-    } catch {
-      try {
-        const text = await response.text();
-        if (text) message = text.slice(0, 200);
-      } catch {
-        /* ignore */
-      }
-    }
-    const err = new Error(message);
-    err.status = response.status;
-    throw err;
-  }
-
-  const blob = await response.blob();
-  const filename =
-    parseContentDispositionFilename(
-      response.headers.get("Content-Disposition"),
-    ) || (fmt === "json" ? "cohort-export.json" : "cohort-export.csv");
-
-  const objectUrl = URL.createObjectURL(blob);
-  const anchor = document.createElement("a");
-  anchor.href = objectUrl;
-  anchor.download = filename;
-  anchor.click();
-  URL.revokeObjectURL(objectUrl);
-
-  return {
-    truncated: response.headers.get("X-Export-Truncated") === "true",
-  };
-}
-
 export async function getOrganizationCohorts(orgId) {
   const result = await apiCall(`/cohorts/organization/${orgId}`);
   return mapList(unwrapData(result));
@@ -318,50 +244,9 @@ export async function respondToInvitation(invitationId, founderId, status) {
 // COHORT MEMBERSHIP & DATA ACCESS
 // ==========================================
 
-export async function getCohortMembers(cohortId, params = {}) {
-  const page = await fetchOrgList(`/cohorts/${cohortId}/members`, {
-    limit: 100,
-    ...params,
-  });
-  return mapList(page.items);
-}
-
-/** Paginated cohort members (Step 3.1). */
-export async function getCohortMembersPage(cohortId, params = {}) {
-  const page = await fetchOrgList(`/cohorts/${cohortId}/members`, params);
-  return { ...page, items: mapList(page.items) };
-}
-
-export async function getOrganizationMentorsPage(orgId, params = {}) {
-  return fetchOrgList(`/organizations/${orgId}/mentors`, params);
-}
-
-export async function getCohortResourcesPage(cohortId, params = {}) {
-  return fetchOrgList(`/cohorts/${cohortId}/resources`, params);
-}
-
-export async function getCohortEventsPage(cohortId, params = {}) {
-  return fetchOrgList(`/cohorts/${cohortId}/events`, params);
-}
-
-export async function getCohortAnnouncementsPage(cohortId, params = {}) {
-  return fetchOrgList(`/cohorts/${cohortId}/announcements`, params);
-}
-
-export async function getCohortDeliverablesPage(cohortId, params = {}) {
-  return fetchOrgList(`/cohorts/${cohortId}/deliverables`, params);
-}
-
-export async function getDeliverableSubmissionsPage(deliverableId, params = {}) {
-  return fetchOrgList(`/deliverables/${deliverableId}/submissions`, params);
-}
-
-export async function getProgramMilestonesPage(cohortId, params = {}) {
-  return fetchOrgList(`/cohorts/${cohortId}/program-milestones`, params);
-}
-
-export async function getOrganizationMessagesPage(orgId, params = {}) {
-  return fetchOrgList(`/messages/organization/${orgId}`, params);
+export async function getCohortMembers(cohortId) {
+  const result = await apiCall(`/cohorts/${cohortId}/members`);
+  return mapList(unwrapData(result));
 }
 
 export async function getFounderMemberships(founderId) {
@@ -371,82 +256,9 @@ export async function getFounderMemberships(founderId) {
   return { success: true, memberships: mapList(items) };
 }
 
-/**
- * Fetch the per-startup snapshot. Accepts either a Startup `_id` (canonical)
- * or the founder's User `_id` — the server resolves both. See Step 2.9.
- */
-export async function getStartupSnapshot(idOrFounderId) {
-  const result = await apiCall(`/startups/${idOrFounderId}/snapshot`);
+export async function getStartupSnapshot(founderId) {
+  const result = await apiCall(`/startups/${founderId}/snapshot`);
   return unwrapData(result);
-}
-
-// ==========================================
-// MENTOR MUTATIONS
-// ==========================================
-
-/**
- * Step 2.10 — update a mentor's expertise (CSV string or string[]) and / or
- * status (`active` | `revoked`). Returns the updated mentor DTO.
- */
-export async function updateMentor(mentorId, patch) {
-  const result = await apiCall(`/mentors/${mentorId}`, {
-    method: "PUT",
-    body: JSON.stringify(patch || {}),
-  });
-  const data = unwrapData(result);
-  return data?.mentor ?? data;
-}
-
-// ==========================================
-// COHORT INVITATIONS — cancel / resend / list (Step 2.13)
-// ==========================================
-
-// These helpers bypass apiCall on the failure path so callers can branch on
-// the server's `code` field (e.g. INVITATION_RESEND_TOO_SOON). On error they
-// throw an Error decorated with { status, code, message, errors,
-// retryAfterSeconds }.
-async function invitationFetch(endpoint, options = {}) {
-  const url = `${API_BASE_URL}${endpoint}`;
-  const response = await fetch(url, {
-    ...defaultOptions,
-    ...options,
-    headers: { ...defaultOptions.headers, ...options.headers },
-  });
-  const payload = await response.json().catch(() => ({}));
-  if (!response.ok) {
-    const err = new Error(
-      payload?.message || `Request failed (${response.status})`,
-    );
-    err.status = response.status;
-    err.code = payload?.code || "";
-    err.errors = Array.isArray(payload?.errors) ? payload.errors : [];
-    const ra = err.errors.find?.((e) => typeof e?.retryAfterSeconds === "number");
-    if (ra) err.retryAfterSeconds = ra.retryAfterSeconds;
-    throw err;
-  }
-  return unwrapData(payload);
-}
-
-export async function cancelInvitation(invitationId) {
-  return invitationFetch(`/invitations/${invitationId}/cancel`, {
-    method: "POST",
-  });
-}
-
-export async function resendInvitation(invitationId) {
-  return invitationFetch(`/invitations/${invitationId}/resend`, {
-    method: "POST",
-  });
-}
-
-/** Paginated cohort invitations (Step 3.1). */
-export async function getCohortInvitationsPage(cohortId, params = {}) {
-  return fetchOrgList(`/cohorts/${cohortId}/invitations`, params);
-}
-
-export async function listCohortInvitations(cohortId, { status = "pending" } = {}) {
-  const page = await getCohortInvitationsPage(cohortId, { status, limit: 100 });
-  return page.items;
 }
 
 // ==========================================

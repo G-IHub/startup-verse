@@ -5,12 +5,7 @@ import Organization from "../models/Organization.js";
 import CohortMembership from "../models/CohortMembership.js";
 import { assertFounderInMentorOrganization } from "../utils/mentorFounderAssignment.js";
 import { error as apiError, success as apiSuccess } from "../utils/apiResponse.js";
-import { parseListQuery, paginatedSuccess, escapeRegex } from "../utils/listQuery.js";
-import { publicAppUrl } from "../utils/publicAppUrl.js";
 import { createNotification } from "../services/notificationService.js";
-import { sendEmail } from "../services/emailService.js";
-import { renderMentorMagicLinkEmail } from "../services/emailTemplates/mentorMagicLink.js";
-import { logger } from "../config/logger.js";
 
 const isProduction = process.env.NODE_ENV === "production";
 
@@ -183,28 +178,6 @@ export const requestMentorLink = async (req, res) => {
     skipPreferences: true,
   });
 
-  // Step 2.11: fire-and-forget the mentor magic-link email. The in-app
-  // notification above is the authoritative source; email failures must
-  // not block the response.
-  const magicLinkUrl = `${publicAppUrl()}/mentor/${token}`;
-  Promise.resolve()
-    .then(async () => {
-      const organization = organizationId
-        ? await Organization.findById(organizationId, { name: 1 }).lean()
-        : null;
-      return sendEmail({
-        to: email,
-        ...renderMentorMagicLinkEmail({
-          organizationName: organization?.name || "",
-          magicLinkUrl,
-        }),
-        tags: [{ name: "kind", value: "mentor-magic-link" }],
-      });
-    })
-    .catch((err) =>
-      logger.warn("mentor.email_failed", { error: String(err?.message || err) }),
-    );
-
   return apiSuccess(res, {
     sent: true,
     email,
@@ -214,61 +187,9 @@ export const requestMentorLink = async (req, res) => {
 };
 
 export const listOrganizationMentors = async (req, res) => {
-  const listOptions = parseListQuery(req, {
-    allowedSortFields: ["createdAt", "status", "invitedAt"],
-  });
-  const orgId = req.params.orgId;
-  const baseFilter = { organizationId: orgId };
-  const allowedStatuses = ["pending", "active", "revoked"];
-  if (listOptions.status && allowedStatuses.includes(listOptions.status)) {
-    baseFilter.status = listOptions.status;
-  }
-
-  let mentorDocs;
-  let total;
-
-  if (listOptions.q) {
-    const regex = new RegExp(escapeRegex(listOptions.q), "i");
-    const userCol = User.collection.name;
-    const [facet] = await MentorProfile.aggregate([
-      { $match: baseFilter },
-      {
-        $lookup: {
-          from: userCol,
-          localField: "userId",
-          foreignField: "_id",
-          as: "user",
-        },
-      },
-      { $unwind: { path: "$user", preserveNullAndEmptyArrays: true } },
-      {
-        $match: {
-          $or: [{ "user.name": regex }, { "user.email": regex }],
-        },
-      },
-      {
-        $facet: {
-          meta: [{ $count: "total" }],
-          rows: [
-            { $sort: listOptions.sort },
-            { $skip: listOptions.skip },
-            { $limit: listOptions.limit },
-          ],
-        },
-      },
-    ]);
-    total = facet?.meta?.[0]?.total ?? 0;
-    mentorDocs = facet?.rows ?? [];
-  } else {
-    [total, mentorDocs] = await Promise.all([
-      MentorProfile.countDocuments(baseFilter),
-      MentorProfile.find(baseFilter)
-        .sort(listOptions.sort)
-        .skip(listOptions.skip)
-        .limit(listOptions.limit)
-        .lean(),
-    ]);
-  }
+  const mentorDocs = await MentorProfile.find({ organizationId: req.params.orgId })
+    .sort({ createdAt: -1 })
+    .lean();
 
   const userIds = [
     ...new Set(mentorDocs.map((m) => (m.userId ? String(m.userId) : "")).filter(Boolean)),
@@ -281,16 +202,16 @@ export const listOrganizationMentors = async (req, res) => {
     : [];
   const usersById = new Map(users.map((u) => [String(u._id), u]));
 
-  const pageFounderIds = [
+  const allFounderIds = [
     ...new Set(
       mentorDocs.flatMap((m) =>
         Array.isArray(m.assignedFounders) ? m.assignedFounders.map(String) : [],
       ),
     ),
   ];
-  const memberships = pageFounderIds.length
+  const memberships = allFounderIds.length
     ? await CohortMembership.find(
-        { founderId: { $in: pageFounderIds } },
+        { founderId: { $in: allFounderIds } },
         { founderId: 1, cohortId: 1 },
       ).lean()
     : [];
@@ -302,29 +223,25 @@ export const listOrganizationMentors = async (req, res) => {
     cohortIdsByFounder.set(f, set);
   }
 
-  const items = mentorDocs.map((mentor) => {
-    const cohortIds = new Set();
-    for (const f of mentor.assignedFounders || []) {
-      const s = cohortIdsByFounder.get(String(f));
-      if (s) for (const c of s) cohortIds.add(c);
-    }
-    return mapMentor(mentor, usersById.get(String(mentor.userId)), [...cohortIds]);
+  return apiSuccess(res, {
+    mentors: mentorDocs.map((mentor) => {
+      const cohortIds = new Set();
+      for (const f of mentor.assignedFounders || []) {
+        const s = cohortIdsByFounder.get(String(f));
+        if (s) for (const c of s) cohortIds.add(c);
+      }
+      return mapMentor(
+        mentor,
+        usersById.get(String(mentor.userId)),
+        [...cohortIds],
+      );
+    }),
   });
-
-  return paginatedSuccess(res, items, total, listOptions);
 };
 
 export const inviteOrganizationMentor = async (req, res) => {
   const orgId = req.params.orgId;
   const body = req.body || {};
-
-  // Step 2.10: registered-users-only invite path. We surface stable `code`
-  // strings so the UI can show specific toasts ("not on StartupVerse yet"
-  // vs "already a mentor") rather than a generic failure.
-  if (!body.userId && !body.email) {
-    return apiError(res, "email is required.", 400, undefined, "EMAIL_REQUIRED");
-  }
-
   let user = null;
   if (body.userId) {
     user = await User.findById(body.userId).select("name email avatarUrl").lean();
@@ -334,33 +251,14 @@ export const inviteOrganizationMentor = async (req, res) => {
       .select("name email avatarUrl")
       .lean();
   }
+  // Interim: `MentorProfile.userId` is required + globally unique today, so
+  // we can't persist a "pending" invite for an unregistered email. Step
+  // 2.10/2.11 will lift this via a magic-link delivery and a separate
+  // pending-invite row.
   if (!user) {
-    return apiError(
-      res,
-      "No registered StartupVerse user has that email. Ask them to sign up first.",
-      404,
-      undefined,
-      "NOT_A_REGISTERED_USER",
-    );
+    return apiError(res, "userId or a registered user email is required.", 400);
   }
   const userId = user._id;
-
-  // Dedupe: one mentor row per (user, organisation). Re-inviting an existing
-  // mentor is almost certainly an admin mistake; tell them clearly instead
-  // of silently overwriting the expertise / status / magic-link token.
-  const existing = await MentorProfile.findOne({
-    userId,
-    organizationId: orgId,
-  }).lean();
-  if (existing) {
-    return apiError(
-      res,
-      "That user is already a mentor for this organisation.",
-      409,
-      undefined,
-      "MENTOR_ALREADY_LINKED",
-    );
-  }
 
   const expertise = Array.isArray(body.expertise)
     ? body.expertise
@@ -368,11 +266,6 @@ export const inviteOrganizationMentor = async (req, res) => {
       ? body.expertise.split(",").map((s) => s.trim()).filter(Boolean)
       : [];
 
-  // Mint a magic-link token alongside the upsert so the welcome email is a
-  // single round-trip away. `findOneAndUpdate` still upserts in case a
-  // different-organisation MentorProfile exists for this user (the unique
-  // index is on `userId` alone in the current schema).
-  const token = crypto.randomUUID();
   const mentor = await MentorProfile.findOneAndUpdate(
     { userId },
     {
@@ -381,8 +274,6 @@ export const inviteOrganizationMentor = async (req, res) => {
         organizationId: orgId,
         expertise,
         status: "active",
-        token,
-        tokenIssuedAt: new Date(),
       },
       $setOnInsert: { invitedAt: new Date() },
     },
@@ -397,27 +288,6 @@ export const inviteOrganizationMentor = async (req, res) => {
     actionUrl: `/?view=mentor-portal`,
     metadata: { mentorId: String(mentor._id), organizationId: String(orgId) },
   }).catch(() => null);
-
-  // Fire-and-forget magic-link email. Failure must not block the response —
-  // the in-app notification above is the authoritative signal.
-  const magicLinkUrl = `${publicAppUrl()}/mentor/${token}`;
-  Promise.resolve()
-    .then(async () => {
-      const organization = orgId
-        ? await Organization.findById(orgId, { name: 1 }).lean()
-        : null;
-      return sendEmail({
-        to: user.email,
-        ...renderMentorMagicLinkEmail({
-          organizationName: organization?.name || "",
-          magicLinkUrl,
-        }),
-        tags: [{ name: "kind", value: "mentor-magic-link" }],
-      });
-    })
-    .catch((err) =>
-      logger.warn("mentor.email_failed", { error: String(err?.message || err) }),
-    );
 
   // New invites have no founder assignments yet, so cohortIds is [].
   return apiSuccess(res, { mentor: mapMentor(mentor, user, []) }, 201);
@@ -438,51 +308,6 @@ export const getMentorById = async (req, res) => {
 export const deleteMentorById = async (req, res) => {
   await MentorProfile.findByIdAndDelete(req.params.mentorId);
   return apiSuccess(res, { deleted: true });
-};
-
-/**
- * PUT /mentors/:mentorId — Step 2.10.
- *
- * Org admins update a mentor's `expertise` (CSV string or array) and / or
- * `status` (`active` | `revoked`). At least one field must be provided.
- * Assigned founders are intentionally NOT editable here — assign/unassign
- * endpoints remain the source of truth for that relationship.
- */
-export const updateMentorById = async (req, res) => {
-  const body = req.body || {};
-  const update = {};
-
-  if (Object.prototype.hasOwnProperty.call(body, "expertise")) {
-    update.expertise = Array.isArray(body.expertise)
-      ? body.expertise.map((s) => String(s).trim()).filter(Boolean)
-      : typeof body.expertise === "string"
-        ? body.expertise.split(",").map((s) => s.trim()).filter(Boolean)
-        : [];
-  }
-
-  if (Object.prototype.hasOwnProperty.call(body, "status")) {
-    if (!["active", "revoked"].includes(body.status)) {
-      return apiError(res, "status must be 'active' or 'revoked'.", 400);
-    }
-    update.status = body.status;
-  }
-
-  if (Object.keys(update).length === 0) {
-    return apiError(res, "Provide at least one of: expertise, status.", 400);
-  }
-
-  const mentor = await MentorProfile.findByIdAndUpdate(
-    req.params.mentorId,
-    update,
-    { new: true, runValidators: true },
-  );
-  if (!mentor) return apiError(res, "Mentor not found.", 404);
-
-  const user = mentor.userId
-    ? await User.findById(mentor.userId).select("name email avatarUrl").lean()
-    : null;
-  const cohortIds = await cohortIdsForFounders(mentor.assignedFounders || []);
-  return apiSuccess(res, { mentor: mapMentor(mentor, user, cohortIds) });
 };
 
 export const getMentorAssignedFounders = async (req, res) => {

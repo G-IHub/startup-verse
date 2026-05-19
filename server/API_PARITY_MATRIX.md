@@ -67,7 +67,7 @@ Envelope standard:
 | `/admin/nuclear-reset` | Canonical | Yes + admin | none | deterministic 501 with `COMPAT_NOT_IMPLEMENTED` | Implemented |
 | `/admin/mega-nuclear-reset` | Canonical | Yes + admin | none | deterministic 501 with `COMPAT_NOT_IMPLEMENTED` | Implemented |
 | `/google/*` (status, oauth, meet, disconnect) | Canonical | Yes (mixed) | OAuth / Meet payloads | **Off by default** (`GOOGLE_INTEGRATION_ENABLED`); `503`/`501` when disabled or not wired | [`google.routes.js`](./src/routes/google.routes.js) |
-| `/emails/test` | Canonical | Yes | none | transport probe (`sent`, `transport`); product sends via invitations/mentors + `emailService` | [`emails.routes.js`](./src/routes/emails.routes.js) |
+| `/emails/*` | Canonical | Yes | email payloads | placeholder send ack | [`emails.routes.js`](./src/routes/emails.routes.js) |
 | `/migrate/*` + `/migrations/*` | Canonical | Yes + admin | migration payloads | Idempotent admin migrations (org-invitation split, etc.); destructive admin nukes remain `501` elsewhere | [`migrations.routes.js`](./src/routes/migrations.routes.js) |
 
 ## Compatibility router removal (2026-04-11)

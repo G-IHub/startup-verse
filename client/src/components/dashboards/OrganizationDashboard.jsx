@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect } from "react";
 import { Button } from "../ui/button";
 import { Badge } from "../ui/badge";
 import {
@@ -7,7 +7,6 @@ import {
   Plus,
   ArrowRight,
   Settings,
-  LogOut,
   LayoutGrid,
   Pencil,
   Trash2,
@@ -45,7 +44,6 @@ import {
   EmptyStateBlock,
   ListRow,
 } from "../organizations/_primitives";
-import { useOrgRealtime } from "../../hooks/useOrgRealtime";
 
 export default function OrganizationDashboard({
   user,
@@ -114,7 +112,7 @@ export default function OrganizationDashboard({
       setCohorts([]);
     }
   };
-  const loadCohorts = useCallback(async (orgId) => {
+  const loadCohorts = async (orgId) => {
     try {
       const cohortsData = await getOrganizationCohorts(orgId);
 
@@ -142,14 +140,7 @@ export default function OrganizationDashboard({
       setCohorts([]);
       setSelectedCohort(null);
     }
-  }, [selectedCohort]);
-
-  useOrgRealtime(selectedOrg?.id, null, {
-    onCohort: () => {
-      if (selectedOrg?.id) loadCohorts(selectedOrg.id);
-    },
-  });
-
+  };
   const handleDeleteCohort = async () => {
     if (!cohortToDelete) return;
     const cohort = cohortToDelete;
@@ -243,17 +234,6 @@ export default function OrganizationDashboard({
               <Plus className="mr-2 h-4 w-4" />
               Create Organization
             </Button>
-            {onLogout && (
-              <Button
-                type="button"
-                variant="outline"
-                onClick={onLogout}
-                className="mt-3 h-9 rounded-input border border-surface-border font-body text-[13px] font-medium text-text-body hover:border-destructive hover:text-destructive"
-              >
-                <LogOut className="mr-2 h-4 w-4" />
-                Sign out
-              </Button>
-            )}
           </SectionCard.Body>
         </SectionCard>
         <CreateOrganizationModal
@@ -281,20 +261,6 @@ export default function OrganizationDashboard({
             <>
               {!selectedCohort ? (
                 <div className="p-4 md:p-6 max-w-6xl mx-auto space-y-4">
-                  {onLogout && (
-                    <div className="flex justify-end">
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={onLogout}
-                        className="h-9 rounded-input border border-surface-border bg-white font-body text-[13px] font-medium text-text-body hover:border-destructive hover:text-destructive"
-                      >
-                        <LogOut className="mr-2 h-4 w-4" />
-                        Sign out
-                      </Button>
-                    </div>
-                  )}
                   <GradientHero
                     eyebrow={orgTypeLabel.toUpperCase()}
                     title={selectedOrg.name}

@@ -7,7 +7,7 @@ import { toast } from "sonner";
 import ThemeToggle from "../ThemeToggle";
 import VerticalSidebar from "./VerticalSidebar";
 import NotificationCenter from "../notifications/NotificationCenter";
-import { MobileActionDock, PageHeader, PageViewport } from "../shell";
+import { MobileActionDock, PageViewport } from "../shell/PageScaffold";
 import {
   LogOut,
   ChevronDown,
@@ -341,48 +341,55 @@ export default function AppLayoutHybrid({
           }
         >
           <PageViewport>
-            {user.role === "organization-admin" ? (
-              <div className="flex items-center gap-3 py-2">
+            <div className="flex items-center gap-3 py-2">
+              {user.role === "organization-admin" ? (
                 <h1 className="text-headline-small text-primary">StartupVerse</h1>
-              </div>
-            ) : (
-              <PageHeader
-                variant="appBar"
-                title={pageMeta.title}
-                description={pageMeta.description}
-                titleClassName={
-                  isInboxPage || isTeamDashboardPage
-                    ? "truncate font-heading text-sm font-bold text-[#0d0d0d]"
-                    : undefined
-                }
-                descriptionClassName={
-                  isInboxPage || isTeamDashboardPage
-                    ? "truncate font-body text-xs font-normal text-[#4a4a5a]"
-                    : undefined
-                }
-                leading={
-                  <Button
+              ) : (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-9 w-9 p-0 md:hidden transition-colors duration-200 ease-in-out [&_svg]:text-text-body"
+                  onClick={() => setIsMobileMenuOpen(true)}
+                >
+                  <Menu className="h-5 w-5" />
+                </Button>
+              )}
+              {user.role !== "organization-admin" ? (
+                <div className="min-w-0">
+                  <p
+                    className={
+                      isInboxPage || isTeamDashboardPage
+                        ? "truncate font-heading text-sm font-bold text-[#0d0d0d]"
+                        : "truncate font-heading text-sm font-bold text-text-heading"
+                    }
+                  >
+                    {pageMeta.title}
+                  </p>
+                  <p
+                    className={
+                      isInboxPage || isTeamDashboardPage
+                        ? "truncate font-body text-xs font-normal text-[#4a4a5a]"
+                        : "truncate font-body text-xs text-text-body"
+                    }
+                  >
+                    {pageMeta.description}
+                  </p>
+                </div>
+              ) : null}
+              <div className="flex-1" />
+              <div className="flex items-center gap-2">
+                <div data-tour="theme-toggle">
+                  <ThemeToggle
                     variant="ghost"
                     size="sm"
-                    className="h-9 w-9 p-0 md:hidden transition-colors duration-200 ease-in-out [&_svg]:text-text-body"
-                    onClick={() => setIsMobileMenuOpen(true)}
-                  >
-                    <Menu className="h-5 w-5" />
-                  </Button>
-                }
-                actions={
-                  <>
-                    <div data-tour="theme-toggle">
-                      <ThemeToggle
-                        variant="ghost"
-                        size="sm"
-                        className="transition-colors duration-200 ease-in-out hover:bg-surface-page [&_svg]:text-text-body"
-                      />
-                    </div>
-                    <NotificationCenter onNavigate={onPageChange} />
-                    <div data-tour="profile-menu">
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild={true}>
+                    className="transition-colors duration-200 ease-in-out hover:bg-surface-page [&_svg]:text-text-body"
+                  />
+                </div>
+                <NotificationCenter onNavigate={onPageChange} />
+                {user.role !== "organization-admin" && (
+                  <div data-tour="profile-menu">
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild={true}>
                         <Button
                           variant="ghost"
                           size="sm"
@@ -473,12 +480,11 @@ export default function AppLayoutHybrid({
                           Sign Out
                         </DropdownMenuItem>
                       </DropdownMenuContent>
-                      </DropdownMenu>
-                    </div>
-                  </>
-                }
-              />
-            )}
+                    </DropdownMenu>
+                  </div>
+                )}
+              </div>
+            </div>
           </PageViewport>
         </header>
         <main className="flex-1 overflow-auto">

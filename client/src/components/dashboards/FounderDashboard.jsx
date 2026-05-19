@@ -28,7 +28,6 @@ import OutcomeSelectionModal from "../execution-engine/OutcomeSelectionModal";
 import MilestoneDetailView from "../execution-engine/MilestoneDetailView";
 import IntentCaptureModal from "../execution-engine/IntentCaptureModal";
 import { WeeklyReviewModal } from "../execution-engine/WeeklyReviewModal";
-import ExecutionScoreBreakdownDialog from "../execution-engine/ExecutionScoreBreakdownDialog";
 import StageLearningModal from "../learning/StageLearningModal";
 import StageRoadmapModal from "../roadmap/StageRoadmapModal";
 import CohortMembershipBadge from "../organizations/CohortMembershipBadge";
@@ -296,6 +295,8 @@ function ExecutionScoreInlineCard({ userId }) {
   const loadScore = useExecutionScoreStore((state) => state.load);
   const loading = storeLoading && !scoreData;
   const [showBreakdown, setShowBreakdown] = React.useState(false);
+  const [showShareOptions, setShowShareOptions] = React.useState(false);
+  const [copySuccess, setCopySuccess] = React.useState(false);
   React.useEffect(() => {
     if (userId && String(storeUserId) !== String(userId)) {
       loadScore(userId).catch(() => {});
@@ -306,6 +307,46 @@ function ExecutionScoreInlineCard({ userId }) {
     if (score >= 60) return "text-primary";
     if (score >= 40) return "text-status-warning";
     return "text-primary";
+  };
+  const generateShareText = () => {
+    const percentileText =
+      scoreData.percentile >= 90
+        ? "Top 10%"
+        : scoreData.percentile >= 75
+          ? "Top 25%"
+          : scoreData.percentile >= 50
+            ? "Top 50%"
+            : "Building momentum";
+    const changeText =
+      scoreData.weeklyChange > 0
+        ? `📈 +${scoreData.weeklyChange} this week`
+        : "";
+    return `🚀 Execution Score: ${scoreData.score}/100 ${changeText}
+${percentileText} among founders in the 12-Week Execution Challenge
+
+Proving execution beats ideas. Join the challenge:
+https://startupverse.com/12-week-challenge
+
+#BuildInPublic #FounderJourney #StartupExecution #12WeekChallenge`;
+  };
+  const handleShare = async (platform) => {
+    const shareText = generateShareText();
+    const url = "https://startupverse.com/12-week-challenge";
+    if (platform === "twitter") {
+      const twitterUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText)}`;
+      window.open(twitterUrl, "_blank");
+    } else if (platform === "linkedin") {
+      const linkedinUrl = `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(url)}`;
+      window.open(linkedinUrl, "_blank");
+      // Note: LinkedIn doesn't support pre-filled text, user will need to paste
+      navigator.clipboard.writeText(shareText);
+      toast.success("Share text copied! Paste it in your LinkedIn post");
+    } else if (platform === "copy") {
+      navigator.clipboard.writeText(shareText);
+      setCopySuccess(true);
+      toast.success("Share text copied to clipboard!");
+      setTimeout(() => setCopySuccess(false), 2000);
+    }
   };
   return (
     <>
@@ -367,11 +408,184 @@ function ExecutionScoreInlineCard({ userId }) {
           )}
         </CardContent>
       </Card>
-      <ExecutionScoreBreakdownDialog
-        open={showBreakdown}
-        onOpenChange={setShowBreakdown}
-        scoreData={scoreData}
-      />
+      {showBreakdown && scoreData && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 sv-modal-backdrop"
+          onClick={() => setShowBreakdown(false)}
+        >
+          <Card
+            className="sv-modal-panel w-full max-w-md rounded-[16px] border-0 shadow-modal"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Zap className="w-5 h-5 text-primary" />
+                Execution Score Breakdown
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="text-center p-4 bg-muted rounded-lg">
+                <div
+                  className={`text-5xl font-bold ${getScoreColor(scoreData.score)}`}
+                >
+                  {scoreData.score}
+                  <span className="text-xl text-muted-foreground">/100</span>
+                </div>
+                {scoreData.weeklyChange !== 0 && (
+                  <div
+                    className={`flex items-center gap-1 justify-center mt-2 ${scoreData.weeklyChange > 0 ? "text-green-600" : "text-red-600"}`}
+                  >
+                    {scoreData.weeklyChange > 0 ? (
+                      <TrendingUp className="w-4 h-4" />
+                    ) : (
+                      <TrendingUp className="w-4 h-4 rotate-180" />
+                    )}
+                    <span>
+                      {scoreData.weeklyChange > 0 ? "+" : ""}
+                      {scoreData.weeklyChange}
+                      {" this week"}
+                    </span>
+                  </div>
+                )}
+              </div>
+              <div className="space-y-3">
+                <div>
+                  <div className="flex justify-between items-center mb-1">
+                    <span className="text-xs text-muted-foreground">
+                      Weekly Completion
+                    </span>
+                    <span className="text-xs font-medium">
+                      {scoreData.breakdown.weeklyCompletion}/100
+                    </span>
+                  </div>
+                  <Progress
+                    value={scoreData.breakdown.weeklyCompletion}
+                    className="h-1.5"
+                  />
+                </div>
+                <div>
+                  <div className="flex justify-between items-center mb-1">
+                    <span className="text-xs text-muted-foreground">
+                      Outcome Quality
+                    </span>
+                    <span className="text-xs font-medium">
+                      {scoreData.breakdown.outcomeQuality}/100
+                    </span>
+                  </div>
+                  <Progress
+                    value={scoreData.breakdown.outcomeQuality}
+                    className="h-1.5"
+                  />
+                </div>
+                <div>
+                  <div className="flex justify-between items-center mb-1">
+                    <span className="text-xs text-muted-foreground">
+                      Consistency
+                    </span>
+                    <span className="text-xs font-medium">
+                      {scoreData.breakdown.consistency}/100
+                    </span>
+                  </div>
+                  <Progress
+                    value={scoreData.breakdown.consistency}
+                    className="h-1.5"
+                  />
+                </div>
+                <div>
+                  <div className="flex justify-between items-center mb-1">
+                    <span className="text-xs text-muted-foreground">
+                      Progression
+                    </span>
+                    <span className="text-xs font-medium">
+                      {scoreData.breakdown.progression}/100
+                    </span>
+                  </div>
+                  <Progress
+                    value={scoreData.breakdown.progression}
+                    className="h-1.5"
+                  />
+                </div>
+              </div>
+              {!showShareOptions ? (
+                <Button
+                  variant="default"
+                  className="w-full"
+                  onClick={() => setShowShareOptions(true)}
+                >
+                  <Share2 className="w-4 h-4 mr-2" />
+                  Share My Progress
+                </Button>
+              ) : (
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      className="flex-1"
+                      onClick={() => handleShare("twitter")}
+                    >
+                      <svg
+                        className="w-4 h-4 mr-2"
+                        viewBox="0 0 24 24"
+                        fill="currentColor"
+                      >
+                        <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
+                      </svg>
+                      Twitter/X
+                    </Button>
+                    <Button
+                      variant="outline"
+                      className="flex-1"
+                      onClick={() => handleShare("linkedin")}
+                    >
+                      <svg
+                        className="w-4 h-4 mr-2"
+                        viewBox="0 0 24 24"
+                        fill="currentColor"
+                      >
+                        <path d="M20.5 2h-17A1.5 1.5 0 002 3.5v17A1.5 1.5 0 003.5 22h17a1.5 1.5 0 001.5-1.5v-17A1.5 1.5 0 0020.5 2zM8 19H5v-9h3zM6.5 8.25A1.75 1.75 0 118.3 6.5a1.78 1.78 0 01-1.8 1.75zM19 19h-3v-4.74c0-1.42-.6-1.93-1.38-1.93A1.74 1.74 0 0013 14.19a.66.66 0 000 .14V19h-3v-9h2.9v1.3a3.11 3.11 0 012.7-1.4c1.55 0 3.36.86 3.36 3.66z" />
+                      </svg>
+                      LinkedIn
+                    </Button>
+                  </div>
+                  <Button
+                    variant="outline"
+                    className="w-full"
+                    onClick={() => handleShare("copy")}
+                  >
+                    {copySuccess ? (
+                      <>
+                        <Check className="w-4 h-4 mr-2 text-green-600" />
+                        Copied!
+                      </>
+                    ) : (
+                      <>
+                        <Copy className="w-4 h-4 mr-2" />
+                        Copy Share Text
+                      </>
+                    )}
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    className="w-full text-xs"
+                    onClick={() => setShowShareOptions(false)}
+                  >
+                    Back
+                  </Button>
+                </div>
+              )}
+              {!showShareOptions && (
+                <Button
+                  variant="outline"
+                  className="w-full"
+                  onClick={() => setShowBreakdown(false)}
+                >
+                  Close
+                </Button>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      )}
     </>
   );
 }

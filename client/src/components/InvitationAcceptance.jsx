@@ -70,17 +70,6 @@ function CohortInvitationPanel({ invitation, onCancel, onCohortResolved }) {
       });
       const json = await res.json().catch(() => ({}));
       if (!res.ok) {
-        // Step 2.13: surface withdrawn / expired states clearly instead of a
-        // generic error toast.
-        if (res.status === 409 && json?.code === "INVITATION_CANCELLED") {
-          toast.error("This invitation was withdrawn by the organiser.");
-          onCohortResolved?.();
-          return;
-        }
-        if (res.status === 410 && json?.code === "INVITATION_EXPIRED") {
-          toast.error("This invitation has expired. Ask the organiser to resend it.");
-          return;
-        }
         throw new Error(json.message || "Could not update invitation");
       }
       toast.success(
