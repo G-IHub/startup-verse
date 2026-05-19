@@ -53,7 +53,7 @@ const cohortInvitationSchema = new mongoose.Schema(
     status: {
       type: String,
       enum: {
-        values: ["pending", "accepted", "declined", "expired"],
+        values: ["pending", "accepted", "declined", "expired", "cancelled"],
         message: "{VALUE} is not a valid cohort invitation status",
       },
       default: "pending",
@@ -69,6 +69,7 @@ const cohortInvitationSchema = new mongoose.Schema(
       ref: "User",
     },
     respondedAt: { type: Date, default: null },
+    lastSentAt: { type: Date, default: null },
     metadata: { type: mongoose.Schema.Types.Mixed, default: {} },
   },
   { timestamps: true },

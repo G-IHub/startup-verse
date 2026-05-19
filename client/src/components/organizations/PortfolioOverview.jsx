@@ -42,10 +42,10 @@ const STATUS_ICON = {
 };
 
 const FACTOR_LABELS = {
-  weeklyExecution: { label: "Execution", icon: Activity, max: 30 },
+  weeklyExecution: { label: "Execution", icon: Activity, max: 20 },
   taskCompletion: { label: "Tasks", icon: ListChecks, max: 25 },
   teamActivity: { label: "Team", icon: Users, max: 25 },
-  milestoneProgress: { label: "Milestones", icon: Target, max: 20 },
+  milestoneProgress: { label: "Milestones", icon: Target, max: 30 },
 };
 
 function FilterButton({ active, onClick, children }) {

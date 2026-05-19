@@ -185,11 +185,32 @@ organizationsRouter.delete(
 );
 
 organizationsRouter.get(
+  "/cohorts/:cohortId/badge-counts",
+  requireAuth,
+  requireOrgAdmin,
+  asyncHandler(cohortWorkspaceController.getCohortBadgeCounts),
+);
+organizationsRouter.get(
+  "/cohorts/:cohortId/export",
+  requireAuth,
+  requireOrgAdmin,
+  asyncHandler(cohortWorkspaceController.getCohortExport),
+);
+organizationsRouter.get(
   "/cohorts/:cohortId/members",
   requireAuth,
   requireCohortReadAccess,
   asyncHandler(organizationsController.getCohortMembers),
 );
 organizationsRouter.post("/cohorts/:cohortId/members", requireAuth, requireOrgAdmin, asyncHandler(organizationsController.manageCohortMember));
+
+// Step 2.9 — per-startup snapshot. Authorization (founder/team-member/mentor/
+// org-admin) is enforced inside the controller because no single existing
+// middleware composes these four roles cleanly.
+organizationsRouter.get(
+  "/startups/:id/snapshot",
+  requireAuth,
+  asyncHandler(organizationsController.getStartupSnapshot),
+);
 
 export default organizationsRouter;

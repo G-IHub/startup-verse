@@ -29,6 +29,9 @@ jobs:
       MONGODB_CONNECTION_URI: "mongodb://127.0.0.1:27017"
       MONGODB_DB_NAME: startupverse_ci
       RUN_CONTRACT_HTTP_FLOWS: "1"
+      EMAIL_DRIVER: log
+      RATE_LIMIT_DISABLED: "true"
+      PUBLIC_APP_URL: "http://localhost:5173"
     defaults:
       run:
         working-directory: server
@@ -45,6 +48,22 @@ jobs:
       - run: npm run export:client-api-call-catalog
       - run: npm run export:client-api-inventory
       - run: npm run test:alignment-gate
+      - name: Org permissions audit (static)
+        run: npm run test:step-3-6-permissions-audit
+      - name: Deprecated helpers smoke
+        run: npm run test:step-3-7-deprecated-helpers
+      - name: Org permissions HTTP matrix
+        run: npm run test:step-3-6-permissions
+        env:
+          RUN_ORG_PERMISSION_HTTP_FLOWS: "1"
+      - name: Invitation lifecycle HTTP
+        run: npm run test:step-2-13-invitations
+        env:
+          RUN_INVITATION_HTTP: "1"
+      - name: Sentry wiring smoke
+        run: npm run test:step-7-2-sentry
+      - name: Google OAuth wiring smoke
+        run: npm run test:step-9-1-google
       - name: Client build
         working-directory: client
         run: npm ci && npm run build

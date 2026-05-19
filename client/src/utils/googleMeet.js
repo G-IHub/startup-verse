@@ -1,11 +1,9 @@
 /**
- * GOOGLE MEET UTILITIES
- * Helper functions for Google Meet integration
+ * Google Meet helpers (status + instant meeting when OAuth is configured).
  */
 import { toast } from "sonner";
 import { API_BASE_URL } from "../config/apiBase.js";
 
-// Default fetch options for cookie-based auth
 const defaultOptions = {
   credentials: "include",
   headers: {
@@ -13,30 +11,27 @@ const defaultOptions = {
   },
 };
 
-/**
- * Check if user has connected their Google account
- */
-export async function isGoogleConnected(userId) {
-  try {
-    const response = await fetch(
-      `${API_BASE_URL}/google/status/${userId}`,
-      defaultOptions,
-    );
-
-    if (!response.ok) return false;
-
-    const payload = await response.json();
-    const data = payload?.data || {};
-    return data.enabled === true && data.connected === true;
-  } catch (error) {
-    console.error("Error checking Google connection:", error);
-    return false;
+function unwrapStatusData(payload) {
+  if (
+    payload &&
+    typeof payload === "object" &&
+    payload.success === true &&
+    Object.prototype.hasOwnProperty.call(payload, "data")
+  ) {
+    return payload.data;
   }
+  return payload?.data ?? payload ?? {};
 }
 
 /**
- * Get Google connection details
+ * True when server reports OAuth is wired and user is connected (not placeholder).
  */
+export async function isGoogleConnected(userId) {
+  const status = await getGoogleConnectionStatus(userId);
+  return Boolean(status.connected);
+}
+
+/** Full status from GET /google/status/:userId */
 export async function getGoogleConnectionStatus(userId) {
   try {
     const response = await fetch(
@@ -44,99 +39,98 @@ export async function getGoogleConnectionStatus(userId) {
       defaultOptions,
     );
 
-    if (!response.ok) return { connected: false };
+    if (!response.ok) return { connected: false, meetAvailable: false };
 
-    const payload = await response.json();
-    return payload?.data || { connected: false };
+    const data = unwrapStatusData(await response.json());
+    const enabled = data.enabled === true;
+    const placeholder = data.placeholder === true;
+    const meetAvailable = enabled && !placeholder;
+    return {
+      ...data,
+      meetAvailable,
+      connected: meetAvailable && Boolean(data.connected),
+    };
   } catch (error) {
     console.error("Error getting Google status:", error);
-    return { connected: false };
+    return { connected: false, meetAvailable: false };
   }
 }
 
 /**
- * Create a scheduled Google Meet link
- */
-export async function createGoogleMeet(params) {
-  try {
-    const response = await fetch(
-      `${API_BASE_URL}/google/create-meeting`,
-      {
-        ...defaultOptions,
-        method: "POST",
-        body: JSON.stringify(params),
-      },
-    );
-
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.error || "Failed to create meeting");
-    }
-
-    return await response.json();
-  } catch (error) {
-    console.error("Error creating Google Meet:", error);
-    return {
-      success: false,
-      error:
-        error instanceof Error ? error.message : "Failed to create meeting",
-    };
-  }
-}
-
-/**
- * Create an instant Google Meet link (for Virtual Office)
+ * Instant Meet (Virtual Office / Mentor portal).
  */
 export async function createInstantGoogleMeet(userId, roomName) {
+  const status = await getGoogleConnectionStatus(userId);
+  if (!status.meetAvailable) {
+    return {
+      success: false,
+      error: status.message || "Google Meet is not available on this server yet.",
+    };
+  }
+  if (!status.connected) {
+    return {
+      success: false,
+      error: "Connect your Google account before starting a meeting.",
+    };
+  }
+
   try {
     const response = await fetch(
       `${API_BASE_URL}/google/instant-meeting/${userId}`,
       {
         ...defaultOptions,
         method: "POST",
-        body: JSON.stringify({ roomName }),
+        body: JSON.stringify({
+          title: roomName || "StartupVerse Meeting",
+          roomName: roomName || undefined,
+        }),
       },
     );
 
+    const payload = await response.json();
     if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.error || "Failed to create instant meeting");
+      const message =
+        payload?.message ||
+        payload?.error ||
+        "Instant Google Meet failed.";
+      return { success: false, error: message };
     }
 
-    return await response.json();
+    const data = unwrapStatusData(payload);
+    const meetLink = data.meetLink || data.meetingUrl || "";
+    if (!meetLink) {
+      return { success: false, error: "No Meet link returned from server." };
+    }
+    return { success: true, meetLink, eventId: data.eventId || null };
   } catch (error) {
     console.error("Error creating instant Google Meet:", error);
     return {
       success: false,
-      error:
-        error instanceof Error
-          ? error.message
-          : "Failed to create instant meeting",
+      error: error instanceof Error ? error.message : "Network error",
     };
   }
 }
 
-/**
- * Prompt user to connect Google if not connected
- */
-export async function ensureGoogleConnected(userId, userType) {
-  const connected = await isGoogleConnected(userId);
-
-  if (!connected) {
-    toast.error("Please connect your Google account first", {
-      description:
-        "Go to Settings to connect your Google Calendar for automatic meeting links",
+export async function ensureGoogleConnected(userId) {
+  const status = await getGoogleConnectionStatus(userId);
+  if (!status.meetAvailable) {
+    toast.error("Google Meet is not available on this server yet", {
+      description: status.message || "OAuth integration is not configured.",
       duration: 5000,
     });
     return false;
   }
-
+  if (!status.connected) {
+    toast.error("Please connect your Google account first", {
+      description:
+        "Open settings and connect Google Calendar for meeting links.",
+      duration: 5000,
+    });
+    return false;
+  }
   return true;
 }
 
-/**
- * Open Google Meet in new window
- */
 export function openGoogleMeet(meetLink) {
   window.open(meetLink, "_blank", "noopener,noreferrer");
 }

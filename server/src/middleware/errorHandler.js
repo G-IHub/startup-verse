@@ -1,3 +1,4 @@
+import { captureSentryException } from "../config/sentry.js";
 import { error as apiError } from "../utils/apiResponse.js";
 
 export default function errorHandler(err, req, res, next) {
@@ -20,6 +21,10 @@ export default function errorHandler(err, req, res, next) {
   } else if (err?.name === "CastError") {
     statusCode = 400;
     message = `Invalid value for ${err.path}.`;
+  }
+
+  if (statusCode >= 500) {
+    captureSentryException(err);
   }
 
   return apiError(res, message, statusCode, errors);

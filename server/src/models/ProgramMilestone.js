@@ -56,6 +56,7 @@ const programMilestoneSchema = new mongoose.Schema(
 );
 
 programMilestoneSchema.index({ cohortId: 1, dueDate: 1 });
+programMilestoneSchema.index({ title: "text", description: "text" });
 
 const ProgramMilestone =
   mongoose.models.ProgramMilestone ||

@@ -6,6 +6,12 @@ import OrganizationAdmin from "../models/OrganizationAdmin.js";
 import Startup from "../models/Startup.js";
 import User from "../models/User.js";
 import { error as apiError, success as apiSuccess } from "../utils/apiResponse.js";
+import {
+  parseListQuery,
+  paginatedSuccess,
+  listDocuments,
+  buildSearchFilter,
+} from "../utils/listQuery.js";
 import { userHasOrganizationScope } from "../utils/orgParticipantAccess.js";
 import { emitRealtime } from "../services/realtime.service.js";
 import { SOCKET_EVENTS } from "../realtime/events.js";
@@ -134,26 +140,27 @@ export const listOrganizationMessages = async (req, res) => {
     return apiError(res, "Invalid organization identifier.", 400);
   }
 
+  const listOptions = parseListQuery(req, {
+    allowedSortFields: ["createdAt", "updatedAt", "subject"],
+    extraFilterKeys: ["messageType"],
+  });
+
   const userRole = String(req.user.role || "").toLowerCase();
   const isPlatformAdmin = req.user.isAdmin === true || userRole === "admin";
 
-  const fetchAll = () =>
-    Message.find({ organizationId })
-      .sort({ createdAt: -1 })
-      .limit(500)
-      .lean();
+  const baseFilter = { organizationId };
+  if (listOptions.status) {
+    baseFilter.messageType = listOptions.status;
+  } else if (listOptions.extraFilters.messageType) {
+    baseFilter.messageType = listOptions.extraFilters.messageType;
+  }
 
-  let rows;
-  if (isPlatformAdmin) {
-    rows = await fetchAll();
-  } else {
+  if (!isPlatformAdmin) {
     const isOrgAdmin = await OrganizationAdmin.exists({
       organizationId,
       userId: req.user.id,
     });
-    if (isOrgAdmin) {
-      rows = await fetchAll();
-    } else {
+    if (!isOrgAdmin) {
       const inScope = await userHasOrganizationScope(
         req.user.id,
         organizationId,
@@ -165,15 +172,20 @@ export const listOrganizationMessages = async (req, res) => {
           403,
         );
       }
-      rows = await Message.find({
-        organizationId,
-        $or: [{ toUserId: req.user.id }, { fromUserId: req.user.id }],
-      })
-        .sort({ createdAt: -1 })
-        .limit(500)
-        .lean();
+      baseFilter.$or = [{ toUserId: req.user.id }, { fromUserId: req.user.id }];
     }
   }
+
+  const searchFilter = listOptions.q
+    ? buildSearchFilter(listOptions.q, ["subject", "body"])
+    : null;
+
+  const { items: rows, total } = await listDocuments(Message, {
+    baseFilter,
+    listOptions,
+    searchFilter,
+    mapRow: (row) => row,
+  });
 
   const userIds = new Set();
   for (const row of rows) {
@@ -182,7 +194,8 @@ export const listOrganizationMessages = async (req, res) => {
   }
   const userMap = await buildUserEnrichmentMap([...userIds]);
 
-  return apiSuccess(res, rows.map((row) => enrichedMessageDto(row, userMap)));
+  const items = rows.map((row) => enrichedMessageDto(row, userMap));
+  return paginatedSuccess(res, items, total, listOptions);
 };
 
 export const bulkSendOrgMessages = async (req, res) => {

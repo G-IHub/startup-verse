@@ -5,12 +5,20 @@ import Cohort from "../models/Cohort.js";
 import OrganizationAdmin from "../models/OrganizationAdmin.js";
 import User from "../models/User.js";
 import { error as apiError, success as apiSuccess } from "../utils/apiResponse.js";
+import {
+  parseListQuery,
+  paginatedSuccess,
+  listDocumentsWithSearch,
+  listDocuments,
+  buildSearchFilter,
+} from "../utils/listQuery.js";
 import { createNotification, broadcastNotification } from "../services/notificationService.js";
 import {
   DELIVERABLE_TYPES,
   DELIVERABLE_SUBMISSION_STATUSES,
 } from "../utils/enums.js";
 import { emitRealtime } from "../services/realtime.service.js";
+import { emitToOrganization } from "../realtime/emitOrg.js";
 import { SOCKET_EVENTS } from "../realtime/events.js";
 import { organizationRoom } from "../realtime/rooms.js";
 
@@ -168,11 +176,21 @@ export const getFounderDeliverables = async (req, res) => {
 export const getCohortDeliverables = async (req, res) => {
   const includeArchived =
     req.query?.includeArchived === "1" || req.query?.includeArchived === "true";
-  const filter = { cohortId: req.params.cohortId };
-  if (!includeArchived) filter.archived = { $ne: true };
+  const listOptions = parseListQuery(req, {
+    allowedSortFields: ["createdAt", "dueDate", "title"],
+  });
+  const baseFilter = { cohortId: req.params.cohortId };
+  if (!includeArchived) baseFilter.archived = { $ne: true };
 
-  const deliverables = await Deliverable.find(filter).sort({ createdAt: -1 });
-  return apiSuccess(res, deliverables.map(mapDeliverable));
+  const { items, total } = await listDocumentsWithSearch(Deliverable, {
+    baseFilter,
+    listOptions,
+    textSearch: true,
+    regexFields: ["title", "description"],
+    mapRow: mapDeliverable,
+    lean: false,
+  });
+  return paginatedSuccess(res, items, total, listOptions);
 };
 
 export const createDeliverable = async (req, res) => {
@@ -195,7 +213,15 @@ export const createCohortDeliverable = async (req, res) => {
     ...coerced,
     createdBy: req.user.id,
   });
-  return apiSuccess(res, mapDeliverable(deliverable), 201);
+  const dto = mapDeliverable(deliverable);
+  const orgId = await organizationIdForDeliverable(deliverable);
+  if (orgId) {
+    emitToOrganization(orgId, SOCKET_EVENTS.DELIVERABLE_CREATED, {
+      ...dto,
+      cohortId: String(req.params.cohortId),
+    });
+  }
+  return apiSuccess(res, dto, 201);
 };
 
 /** PUT /cohorts/:cohortId/deliverables/:deliverableId */
@@ -323,8 +349,27 @@ export const submitDeliverable = async (req, res) => {
 };
 
 export const getSubmissions = async (req, res) => {
-  const submissions = await DeliverableSubmission.find({ deliverableId: req.params.deliverableId }).sort({ createdAt: -1 });
-  return apiSuccess(res, submissions);
+  const listOptions = parseListQuery(req, {
+    allowedSortFields: ["createdAt", "status", "updatedAt"],
+  });
+  const baseFilter = { deliverableId: req.params.deliverableId };
+  if (
+    listOptions.status &&
+    DELIVERABLE_SUBMISSION_STATUSES.includes(listOptions.status)
+  ) {
+    baseFilter.status = listOptions.status;
+  }
+  const searchFilter = listOptions.q
+    ? buildSearchFilter(listOptions.q, ["content", "feedback"])
+    : null;
+  const { items, total } = await listDocuments(DeliverableSubmission, {
+    baseFilter,
+    listOptions,
+    searchFilter,
+    mapRow: (s) => (s.toObject ? s.toObject() : s),
+    lean: false,
+  });
+  return paginatedSuccess(res, items, total, listOptions);
 };
 
 export const reviewSubmission = async (req, res) => {
@@ -374,6 +419,23 @@ export const reviewSubmission = async (req, res) => {
     }
   } catch (err) {
     console.error("[reviewSubmission] notify founder failed:", err.message);
+  }
+
+  try {
+    const deliverable = await Deliverable.findById(submission.deliverableId).lean();
+    if (deliverable) {
+      const orgId = await organizationIdForDeliverable(deliverable);
+      if (orgId) {
+        emitToOrganization(orgId, SOCKET_EVENTS.DELIVERABLE_UPDATED, {
+          deliverableId: String(submission.deliverableId),
+          cohortId: deliverable.cohortId ? String(deliverable.cohortId) : null,
+          submissionId: String(submission._id),
+          submissionStatus: submission.status,
+        });
+      }
+    }
+  } catch (err) {
+    console.error("[reviewSubmission] org realtime emit failed:", err.message);
   }
 
   return apiSuccess(res, submission);

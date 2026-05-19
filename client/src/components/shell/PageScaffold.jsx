@@ -13,22 +13,48 @@ export function PageHeader({
   title,
   description,
   actions,
+  leading = null,
   className,
+  titleClassName,
+  descriptionClassName,
+  /** page = in-content header; appBar = top utility row inside AppLayoutHybrid */
+  variant = "page",
 }) {
+  const isAppBar = variant === "appBar";
+  const titleClass = cn(
+    isAppBar
+      ? "truncate font-heading text-sm font-bold text-text-heading"
+      : "truncate text-headline-large",
+    titleClassName,
+  );
+  const descriptionClass = cn(
+    isAppBar
+      ? "truncate font-body text-xs text-text-body"
+      : "mt-1 text-body-medium text-muted-foreground",
+    descriptionClassName,
+  );
+  const TitleTag = isAppBar ? "p" : "h1";
+
   return (
     <div
       className={cn(
-        "flex flex-col gap-3 border-b border-border/70 bg-background/80 py-3 sm:py-4",
-        "sm:flex-row sm:items-center sm:justify-between",
+        isAppBar
+          ? "flex w-full items-center gap-3 py-2"
+          : [
+              "flex flex-col gap-3 border-b border-border/70 bg-background/80 py-3 sm:py-4",
+              "sm:flex-row sm:items-center sm:justify-between",
+            ],
         className,
       )}
     >
-      <div className="min-w-0">
-        <h1 className="truncate text-headline-large">{title}</h1>
-        {description ? (
-          <p className="mt-1 text-body-medium text-muted-foreground">{description}</p>
-        ) : null}
-      </div>
+      {leading}
+      {title || description ? (
+        <div className="min-w-0">
+          {title ? <TitleTag className={titleClass}>{title}</TitleTag> : null}
+          {description ? <p className={descriptionClass}>{description}</p> : null}
+        </div>
+      ) : null}
+      {isAppBar ? <div className="flex-1" aria-hidden="true" /> : null}
       {actions ? <div className="flex items-center gap-2">{actions}</div> : null}
     </div>
   );
@@ -82,4 +108,3 @@ export function MobileActionDock({ children }) {
     </div>
   );
 }
-

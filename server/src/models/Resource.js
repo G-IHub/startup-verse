@@ -33,6 +33,7 @@ const resourceSchema = new mongoose.Schema(
 resourceSchema.index({ cohortId: 1, createdAt: -1 });
 resourceSchema.index({ type: 1, stageId: 1 });
 resourceSchema.index({ cohortId: 1, category: 1, type: 1 });
+resourceSchema.index({ title: "text", description: "text", tags: "text" });
 
 const Resource = mongoose.models.Resource || mongoose.model("Resource", resourceSchema);
 

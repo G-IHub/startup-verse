@@ -2,6 +2,16 @@
  * Organization helpers — HTTP API only.
  *
  * All organization operations use the Express/MongoDB backend via `organizationApi`.
+ *
+ * Removed in Step 3.7 (use these instead):
+ * - getAllOrganizations → getUserOrganizations
+ * - getOrganizationMembers / getOrganizationMembersByOrg → organizationApi org admin routes
+ * - getAllCohorts → getOrganizationCohorts
+ * - updateCohortStats → server stats on getCohort / getCohortMembers / portfolio-health
+ * - getAllCohortInvitations / getCohortInvitations → organizationApi.listCohortInvitations
+ * - getAllCohortMemberships / getCohortMemberships / createCohortMembership → getCohortMembers; accept invite on server
+ * - calculateStartupStatus → progress.activityStatus on member rows
+ * - createCohortInvitation → createInvitation
  */
 
 import * as orgApi from "./api/organizationApi";
@@ -68,26 +78,6 @@ export async function getOrganization(orgId) {
     console.error("❌ Failed to fetch organization:", error);
     return null;
   }
-}
-
-// Helper function for backward compatibility
-export function getAllOrganizations() {
-  console.warn(
-    "⚠️ getAllOrganizations() is deprecated - use getUserOrganizations() instead",
-  );
-  return [];
-}
-
-export function getOrganizationMembers(userId) {
-  console.warn("⚠️ getOrganizationMembers() is not yet implemented in backend");
-  return [];
-}
-
-export function getOrganizationMembersByOrg(organizationId) {
-  console.warn(
-    "⚠️ getOrganizationMembersByOrg() is not yet implemented in backend",
-  );
-  return [];
 }
 
 export async function isOrganizationAdmin(userId, organizationId) {
@@ -198,19 +188,6 @@ export async function getCohort(cohortId) {
   }
 }
 
-// Helper function for backward compatibility
-export function getAllCohorts() {
-  console.warn(
-    "⚠️ getAllCohorts() is deprecated - use getOrganizationCohorts() instead",
-  );
-  return [];
-}
-
-export function updateCohortStats(cohortId) {
-  console.warn("⚠️ updateCohortStats() is not yet implemented in backend");
-  // Stats are calculated on the backend when fetching cohort members
-}
-
 // ==========================================
 // INVITATION MANAGEMENT
 // ==========================================
@@ -285,41 +262,6 @@ export async function respondToInvitation(invitationId, founderId, status) {
   }
 }
 
-// Helper functions for backward compatibility
-export function getAllCohortInvitations() {
-  console.warn("⚠️ getAllCohortInvitations() is deprecated");
-  return [];
-}
-
-export function getCohortInvitations(cohortId) {
-  console.warn(
-    "⚠️ getCohortInvitations() is deprecated - invitations are fetched per founder",
-  );
-  return [];
-}
-
-export async function createCohortInvitation(
-  cohortId,
-  organizationId,
-  startupId,
-  founderEmail,
-  founderName,
-  startupName,
-  sentBy,
-  message,
-) {
-  return createInvitation(
-    cohortId,
-    organizationId,
-    startupId,
-    founderEmail,
-    founderName,
-    startupName,
-    sentBy,
-    message,
-  );
-}
-
 // ==========================================
 // COHORT MEMBERSHIP
 // ==========================================
@@ -348,19 +290,6 @@ export async function getStartupSnapshot(founderId) {
     console.error("❌ Failed to fetch startup snapshot:", error);
     return null;
   }
-}
-
-// Helper functions for backward compatibility
-export function getAllCohortMemberships() {
-  console.warn("⚠️ getAllCohortMemberships() is deprecated");
-  return [];
-}
-
-export function getCohortMemberships(cohortId) {
-  console.warn(
-    "⚠️ getCohortMemberships() is deprecated - use getCohortMembers() instead",
-  );
-  return [];
 }
 
 export async function getStartupMemberships(startupId) {
@@ -399,28 +328,6 @@ export async function getStartupMemberships(startupId) {
   }
 }
 
-export function createCohortMembership(
-  cohortId,
-  organizationId,
-  startupId,
-  invitationId,
-) {
-  console.warn(
-    "⚠️ createCohortMembership() is handled automatically when accepting invitations",
-  );
-  return {
-    id: "",
-    cohortId,
-    organizationId,
-    founderId: startupId,
-    founderEmail: "",
-    founderName: "",
-    startupName: "",
-    joinedAt: new Date().toISOString(),
-    leftAt: null,
-  };
-}
-
 // ==========================================
 // USER SEARCH
 // ==========================================
@@ -451,81 +358,6 @@ export async function searchUserByEmail(email) {
     console.error("❌ Failed to search user:", error);
     return null;
   }
-}
-
-// ==========================================
-// EXPORT / REPORTING (Deprecated - moved to backend)
-// ==========================================
-
-export async function generateCohortExport(cohortId) {
-  console.warn(
-    "⚠️ generateCohortExport() should be implemented as backend route",
-  );
-
-  try {
-    const cohort = await getCohort(cohortId);
-    const members = await getCohortMembers(cohortId);
-    const organization = cohort
-      ? await getOrganization(cohort.organizationId)
-      : null;
-
-    if (!cohort || !organization) return null;
-
-    return {
-      cohort: {
-        name: cohort.name,
-        organization: organization.name,
-        startDate: cohort.startDate,
-        endDate: cohort.endDate,
-        exportedAt: new Date().toISOString(),
-      },
-      startups: members.map((m) => ({
-        name: m.startupName || "Unnamed Startup",
-        founder: m.founderName || "",
-        stage: m.currentStage || m.startup?.stage || "",
-        teamSize: m.progress?.teamSize ?? 1,
-        status: m.progress?.activityStatus || "unknown",
-        lastActivity: m.progress?.lastActive || "Never",
-        weeklyStreak: m.progress?.weeklyOutcomeStreak ?? 0,
-      })),
-    };
-  } catch (error) {
-    console.error("❌ Failed to generate cohort export:", error);
-    return null;
-  }
-}
-
-export function exportToCSV(data) {
-  const header =
-    "Startup Name,Founder,Stage,Team Size,Status,Last Activity,Weekly Streak\n";
-  const rows = data.startups
-    .map(
-      (s) =>
-        `"${s.name}","${s.founder}","${s.stage}",${s.teamSize},"${s.status}","${s.lastActivity}",${s.weeklyStreak}`,
-    )
-    .join("\n");
-
-  return header + rows;
-}
-
-export function downloadCSV(data, filename) {
-  const csv = exportToCSV(data);
-  const blob = new Blob([csv], { type: "text/csv" });
-  const url = window.URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = `${filename}.csv`;
-  a.click();
-  window.URL.revokeObjectURL(url);
-}
-
-// ==========================================
-// ACTIVITY STATUS (Calculated on backend)
-// ==========================================
-
-export function calculateStartupStatus(startupId, organizationId) {
-  console.warn("⚠️ calculateStartupStatus() is now calculated on the backend");
-  return "active";
 }
 
 // ==========================================
