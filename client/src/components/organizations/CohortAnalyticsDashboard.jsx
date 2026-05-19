@@ -1,7 +1,7 @@
 /**
  * COHORT ANALYTICS - Comprehensive metrics dashboard
  */
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { API_BASE_URL } from "../../config/apiBase.js";
 import {
   BarChart3,
@@ -16,7 +16,19 @@ import {
   Inbox,
   Award,
 } from "lucide-react";
+import {
+  ResponsiveContainer,
+  AreaChart,
+  Area,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  Tooltip,
+  CartesianGrid,
+} from "recharts";
 import { unwrapData } from "../../utils/apiEnvelope";
+import { Button } from "../ui/button";
 import {
   StatTile,
   SectionCard,
@@ -24,8 +36,17 @@ import {
   BrandProgress,
   EmptyStateBlock,
 } from "./_primitives";
+import { cn } from "../ui/utils";
 
 const API_BASE = API_BASE_URL;
+const CHART_PRIMARY = "#3A5AFE";
+const CHART_SUCCESS = "#00c896";
+
+const RANGE_OPTIONS = [
+  { id: "30d", label: "30 days" },
+  { id: "90d", label: "90 days" },
+  { id: "all", label: "All time" },
+];
 
 const defaultOptions = {
   credentials: "include",
@@ -59,19 +80,45 @@ function ProgressRow({ label, value, max, tone = "info" }) {
   );
 }
 
+function RangeChip({ active, onClick, children }) {
+  return (
+    <Button
+      size="sm"
+      type="button"
+      onClick={onClick}
+      className={cn(
+        "h-8 rounded-input font-body text-[12px] font-medium",
+        active
+          ? "bg-primary text-white hover:bg-primary-hover"
+          : "border border-surface-border bg-white text-text-body hover:bg-primary-tint hover:text-primary",
+      )}
+    >
+      {children}
+    </Button>
+  );
+}
+
+function ChartEmpty({ message }) {
+  return (
+    <p className="py-10 text-center font-body text-[13px] text-text-muted">{message}</p>
+  );
+}
+
+function seriesHasData(rows, key) {
+  return Array.isArray(rows) && rows.some((r) => Number(r[key]) > 0);
+}
+
 export default function CohortAnalyticsDashboard({ cohortId }) {
   const [analytics, setAnalytics] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [range, setRange] = useState("90d");
 
-  useEffect(() => {
-    loadAnalytics();
-  }, [cohortId]);
-
-  const loadAnalytics = async () => {
+  const loadAnalytics = useCallback(async () => {
+    if (!cohortId) return;
     try {
       setLoading(true);
       const response = await fetch(
-        `${API_BASE}/cohorts/${cohortId}/analytics/overview`,
+        `${API_BASE}/cohorts/${cohortId}/analytics/overview?range=${encodeURIComponent(range)}`,
         { ...defaultOptions },
       );
       if (!response.ok) throw new Error("Failed to fetch analytics");
@@ -79,10 +126,15 @@ export default function CohortAnalyticsDashboard({ cohortId }) {
       setAnalytics(inner.analytics);
     } catch (error) {
       console.error("Error loading analytics:", error);
+      setAnalytics(null);
     } finally {
       setLoading(false);
     }
-  };
+  }, [cohortId, range]);
+
+  useEffect(() => {
+    loadAnalytics();
+  }, [loadAnalytics]);
 
   if (loading) {
     return (
@@ -114,18 +166,43 @@ export default function CohortAnalyticsDashboard({ cohortId }) {
 
   const aggregate = analytics.aggregateMetrics || {};
   const program = analytics.programMetrics || {};
+  const trends = analytics.trends || {};
+  const engagement = [...(trends.engagementByWeek || [])].reverse();
+  const velocity = [...(trends.milestoneVelocityByWeek || [])].reverse();
+  const streakHist = trends.weeklyOutcomeStreakHistogram || [];
+
+  const rangeNote =
+    analytics.range === "all"
+      ? "All time"
+      : analytics.range === "30d"
+        ? "Last 30 days"
+        : "Last 90 days";
 
   return (
     <div className="space-y-4 font-body">
-      <SectionHeader
-        icon={BarChart3}
-        title="Analytics &amp; Insights"
-        description={
-          typeof analytics.recentJoinsLast30Days === "number"
-            ? `Key metrics across all ${analytics.cohortSize} active startups · ${analytics.recentJoinsLast30Days} joined in the last 30 days`
-            : `Key metrics across all ${analytics.cohortSize} active startups`
-        }
-      />
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <SectionHeader
+          icon={BarChart3}
+          title="Analytics &amp; Insights"
+          description={
+            typeof analytics.recentJoinsLast30Days === "number"
+              ? `Key metrics across all ${analytics.cohortSize} active startups · ${analytics.recentJoinsLast30Days} joined in the last 30 days`
+              : `Key metrics across all ${analytics.cohortSize} active startups`
+          }
+          className="flex-1"
+        />
+        <div className="flex flex-wrap gap-2 shrink-0">
+          {RANGE_OPTIONS.map((opt) => (
+            <RangeChip
+              key={opt.id}
+              active={range === opt.id}
+              onClick={() => setRange(opt.id)}
+            >
+              {opt.label}
+            </RangeChip>
+          ))}
+        </div>
+      </div>
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <StatTile
@@ -154,7 +231,7 @@ export default function CohortAnalyticsDashboard({ cohortId }) {
           icon={TrendingUp}
           label="Weekly Outcomes"
           value={aggregate.totalWeeklyOutcomes}
-          note="Logged this cycle"
+          note={rangeNote}
         />
       </div>
 
@@ -167,7 +244,7 @@ export default function CohortAnalyticsDashboard({ cohortId }) {
                 Task Completion
               </span>
             }
-            description="Total vs completed tasks across the cohort"
+            description={`Total vs completed tasks · ${rangeNote.toLowerCase()}`}
           />
           <SectionCard.Body>
             <div className="space-y-3">
@@ -207,7 +284,7 @@ export default function CohortAnalyticsDashboard({ cohortId }) {
                 Milestone Progress
               </span>
             }
-            description="Total vs completed milestones across the cohort"
+            description={`Total vs completed milestones · ${rangeNote.toLowerCase()}`}
           />
           <SectionCard.Body>
             <div className="space-y-3">
@@ -285,35 +362,115 @@ export default function CohortAnalyticsDashboard({ cohortId }) {
         </SectionCard.Body>
       </SectionCard>
 
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+        <SectionCard>
+          <SectionCard.Header
+            title={
+              <span className="inline-flex items-center gap-2">
+                <Activity className="h-4 w-4 text-primary" />
+                Engagement trend
+              </span>
+            }
+            description="Team activity events per week (last 8 weeks)"
+          />
+          <SectionCard.Body>
+            {seriesHasData(engagement, "activityCount") ? (
+              <ResponsiveContainer width="100%" height={240}>
+                <AreaChart data={engagement}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#e8ecf4" />
+                  <XAxis dataKey="label" tick={{ fontSize: 11 }} />
+                  <YAxis allowDecimals={false} tick={{ fontSize: 11 }} />
+                  <Tooltip />
+                  <Area
+                    type="monotone"
+                    dataKey="activityCount"
+                    stroke={CHART_PRIMARY}
+                    fill={CHART_PRIMARY}
+                    fillOpacity={0.2}
+                    name="Activities"
+                  />
+                </AreaChart>
+              </ResponsiveContainer>
+            ) : (
+              <ChartEmpty message="No team activity in the last 8 weeks." />
+            )}
+          </SectionCard.Body>
+        </SectionCard>
+
+        <SectionCard>
+          <SectionCard.Header
+            title={
+              <span className="inline-flex items-center gap-2">
+                <Target className="h-4 w-4 text-[#00c896]" />
+                Milestone velocity
+              </span>
+            }
+            description="Milestones completed per week (last 8 weeks)"
+          />
+          <SectionCard.Body>
+            {seriesHasData(velocity, "completedCount") ? (
+              <ResponsiveContainer width="100%" height={240}>
+                <BarChart data={velocity}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#e8ecf4" />
+                  <XAxis dataKey="label" tick={{ fontSize: 11 }} />
+                  <YAxis allowDecimals={false} tick={{ fontSize: 11 }} />
+                  <Tooltip />
+                  <Bar
+                    dataKey="completedCount"
+                    fill={CHART_SUCCESS}
+                    name="Completed"
+                    radius={[4, 4, 0, 0]}
+                  />
+                </BarChart>
+              </ResponsiveContainer>
+            ) : (
+              <ChartEmpty message="No milestone completions in the last 8 weeks." />
+            )}
+          </SectionCard.Body>
+        </SectionCard>
+      </div>
+
       <SectionCard>
         <SectionCard.Header
           title={
             <span className="inline-flex items-center gap-2">
-              <Activity className="h-4 w-4 text-primary" />
-              Weekly Execution
+              <TrendingUp className="h-4 w-4 text-primary" />
+              Execution streaks
             </span>
           }
-          description="Outcome logging across the cohort"
+          description="Founders by current weekly-outcome streak length"
         />
         <SectionCard.Body>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            <div className="rounded-input bg-surface-page p-4">
-              <div className="font-body text-[12px] text-text-muted">
-                Total Weekly Outcomes
-              </div>
-              <div className="font-heading text-[20px] font-bold text-primary">
-                {aggregate.totalWeeklyOutcomes}
-              </div>
-            </div>
-            <div className="rounded-input bg-surface-page p-4">
-              <div className="font-body text-[12px] text-text-muted">
-                Avg Per Startup
-              </div>
-              <div className="font-heading text-[20px] font-bold text-[#00c896]">
-                {aggregate.avgWeeklyOutcomesPerStartup}
-              </div>
-            </div>
-          </div>
+          {seriesHasData(streakHist, "founderCount") ? (
+            <ResponsiveContainer width="100%" height={240}>
+              <BarChart data={streakHist}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#e8ecf4" />
+                <XAxis
+                  dataKey="streakWeeks"
+                  tick={{ fontSize: 11 }}
+                  label={{
+                    value: "Streak (weeks)",
+                    position: "insideBottom",
+                    offset: -4,
+                    fontSize: 11,
+                  }}
+                />
+                <YAxis allowDecimals={false} tick={{ fontSize: 11 }} />
+                <Tooltip
+                  formatter={(value) => [value, "Founders"]}
+                  labelFormatter={(w) => `${w} week${w === 1 ? "" : "s"}`}
+                />
+                <Bar
+                  dataKey="founderCount"
+                  fill={CHART_PRIMARY}
+                  name="Founders"
+                  radius={[4, 4, 0, 0]}
+                />
+              </BarChart>
+            </ResponsiveContainer>
+          ) : (
+            <ChartEmpty message="No qualifying weekly outcomes yet." />
+          )}
         </SectionCard.Body>
       </SectionCard>
     </div>

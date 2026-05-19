@@ -26,7 +26,7 @@ import { toast } from "sonner";
 import { Dialog, DialogContent } from "../ui/dialog";
 import GoogleAccountConnect from "../shared/GoogleAccountConnect";
 import {
-  isGoogleConnected,
+  getGoogleConnectionStatus,
   createInstantGoogleMeet,
 } from "../../utils/googleMeet";
 import { unwrapData } from "../../utils/apiEnvelope";
@@ -46,6 +46,7 @@ export default function MentorPortal({ mentor, onLogout }) {
   const [showJoinMeetingDialog, setShowJoinMeetingDialog] = useState(false);
   const [meetingRoomLink, setMeetingRoomLink] = useState("");
   const [googleConnected, setGoogleConnected] = useState(false);
+  const [googleMeetAvailable, setGoogleMeetAvailable] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [creatingMeeting, setCreatingMeeting] = useState(false);
   useEffect(() => {
@@ -73,18 +74,25 @@ export default function MentorPortal({ mentor, onLogout }) {
   };
   const checkGoogleConnection = async () => {
     try {
-      const connected = await isGoogleConnected(mentor.id);
-      setGoogleConnected(connected);
+      const status = await getGoogleConnectionStatus(mentor.id);
+      setGoogleMeetAvailable(Boolean(status.meetAvailable));
+      setGoogleConnected(Boolean(status.connected));
     } catch (error) {
       console.error("Error checking Google connection:", error);
       setGoogleConnected(false);
+      setGoogleMeetAvailable(false);
     }
   };
   const joinVirtualOffice = async (founderId, founderName) => {
     try {
-      // Check if Google account is connected
-      const connected = await isGoogleConnected(mentor.id);
-      if (!connected) {
+      if (!googleMeetAvailable) {
+        toast.info("Google Meet is not available on this server yet.", {
+          description: "Virtual Office will open when OAuth is configured.",
+        });
+        return;
+      }
+      const status = await getGoogleConnectionStatus(mentor.id);
+      if (!status.connected) {
         toast.error("Please connect your Google account first", {
           description:
             "Click the Settings button in the header to connect Google Calendar",
@@ -296,6 +304,12 @@ export default function MentorPortal({ mentor, onLogout }) {
                           size="sm"
                           onClick={() =>
                             joinVirtualOffice(founder.id, founder.name)
+                          }
+                          disabled={!googleMeetAvailable || creatingMeeting}
+                          title={
+                            googleMeetAvailable
+                              ? "Start a Google Meet session"
+                              : "Google Meet is not configured on this server"
                           }
                           className="flex-1 gap-1 h-7 text-[9px]"
                         >

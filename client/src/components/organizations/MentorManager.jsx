@@ -1,7 +1,7 @@
 /**
  * MENTOR MANAGER - Invite and manage mentors for cohorts
  */
-import React, { useState, useEffect } from "react";
+import React, { useState, useCallback } from "react";
 import { API_BASE_URL } from "../../config/apiBase.js";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
@@ -13,9 +13,19 @@ import {
   Trash2,
   CheckCircle,
   Clock,
+  Pencil,
+  X as XIcon,
+  Save as SaveIcon,
+  Search,
 } from "lucide-react";
 import { toast } from "sonner";
 import { unwrapData } from "../../utils/apiEnvelope";
+import {
+  updateMentor,
+  getOrganizationMentorsPage,
+} from "../../utils/api/organizationApi";
+import { useOrgListQuery } from "../../hooks/useOrgListQuery";
+import PaginationControls from "../shared/PaginationControls";
 import {
   SectionCard,
   CollapsibleFormCard,
@@ -35,8 +45,7 @@ const PRIMARY_BUTTON =
   "h-9 rounded-input bg-primary font-body text-[13px] font-semibold text-white shadow-[0_4px_16px_rgba(58,90,254,0.25)] hover:bg-primary-hover";
 
 export default function MentorManager({ organizationId, cohorts, isAdmin }) {
-  const [mentors, setMentors] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [statusFilter, setStatusFilter] = useState("");
   const [showInviteForm, setShowInviteForm] = useState(false);
   const [formData, setFormData] = useState({
     email: "",
@@ -44,26 +53,68 @@ export default function MentorManager({ organizationId, cohorts, isAdmin }) {
     expertise: "",
   });
   const [inviting, setInviting] = useState(false);
+  // Step 2.10: inline edit for expertise + status on each mentor row.
+  const [editingMentorId, setEditingMentorId] = useState(null);
+  const [editForm, setEditForm] = useState({ expertise: "", status: "active" });
+  const [savingMentorEdit, setSavingMentorEdit] = useState(false);
 
-  useEffect(() => {
-    loadMentors();
-  }, [organizationId]);
+  const {
+    items: mentors,
+    total,
+    limit,
+    loading,
+    q: searchQuery,
+    setSearch,
+    currentPage,
+    totalPages,
+    hasNext,
+    hasPrev,
+    goToPage,
+    nextPage,
+    prevPage,
+    refresh,
+  } = useOrgListQuery({
+    fetchFn: useCallback(
+      (params) =>
+        getOrganizationMentorsPage(organizationId, {
+          ...params,
+          status: statusFilter || undefined,
+        }),
+      [organizationId, statusFilter],
+    ),
+    initialLimit: 25,
+  });
 
-  const loadMentors = async () => {
+  const beginEditMentor = (mentor) => {
+    setEditingMentorId(mentor.id);
+    setEditForm({
+      expertise: Array.isArray(mentor.expertise)
+        ? mentor.expertise.join(", ")
+        : String(mentor.expertise || ""),
+      status: mentor.status === "revoked" ? "revoked" : "active",
+    });
+  };
+
+  const cancelEditMentor = () => {
+    setEditingMentorId(null);
+    setEditForm({ expertise: "", status: "active" });
+  };
+
+  const saveEditMentor = async (mentorId) => {
     try {
-      setLoading(true);
-      const response = await fetch(
-        `${API_BASE}/organizations/${organizationId}/mentors`,
-        defaultOptions,
-      );
-      if (!response.ok) throw new Error("Failed to fetch mentors");
-      const inner = unwrapData(await response.json());
-      setMentors(inner.mentors || []);
+      setSavingMentorEdit(true);
+      await updateMentor(mentorId, {
+        expertise: editForm.expertise,
+        status: editForm.status,
+      });
+      toast.success("Mentor updated.");
+      cancelEditMentor();
+      refresh();
     } catch (error) {
-      console.error("Error loading mentors:", error);
-      toast.error("Failed to load mentors");
+      console.error("Error updating mentor:", error);
+      toast.error(error?.message || "Failed to update mentor");
     } finally {
-      setLoading(false);
+      setSavingMentorEdit(false);
     }
   };
 
@@ -86,10 +137,26 @@ export default function MentorManager({ organizationId, cohorts, isAdmin }) {
           }),
         },
       );
-      if (!response.ok) throw new Error("Failed to invite mentor");
-      unwrapData(await response.json());
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        // Step 2.10: branch on stable server error codes so admins see why
+        // an invite failed, not a generic "Failed to invite mentor" toast.
+        if (response.status === 404 && payload?.code === "NOT_A_REGISTERED_USER") {
+          toast.error(
+            "That email isn't on StartupVerse yet. Ask them to sign up first, then try again.",
+          );
+          return;
+        }
+        if (response.status === 409 && payload?.code === "MENTOR_ALREADY_LINKED") {
+          toast.warning("That user is already a mentor for this organisation.");
+          return;
+        }
+        toast.error(payload?.message || "Failed to invite mentor");
+        return;
+      }
+      unwrapData(payload);
       toast.success(
-        "Mentor linked to your organization. They must use a registered StartupVerse email.",
+        "Mentor invited. We've emailed them a magic link to access the mentor portal.",
       );
       setFormData({
         email: "",
@@ -97,7 +164,7 @@ export default function MentorManager({ organizationId, cohorts, isAdmin }) {
         expertise: "",
       });
       setShowInviteForm(false);
-      loadMentors();
+      refresh();
     } catch (error) {
       console.error("Error inviting mentor:", error);
       toast.error("Failed to invite mentor");
@@ -115,7 +182,7 @@ export default function MentorManager({ organizationId, cohorts, isAdmin }) {
       });
       if (!response.ok) throw new Error("Failed to delete mentor");
       toast.success("Mentor removed successfully");
-      loadMentors();
+      refresh();
     } catch (error) {
       console.error("Error deleting mentor:", error);
       toast.error("Failed to remove mentor");
@@ -235,6 +302,39 @@ export default function MentorManager({ organizationId, cohorts, isAdmin }) {
         </form>
       </CollapsibleFormCard>
 
+      <SectionCard>
+        <SectionCard.Body className="p-3">
+          <div className="flex flex-col gap-2 md:flex-row md:items-center">
+            <div className="relative flex-1">
+              <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-text-muted" />
+              <Input
+                value={searchQuery}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search mentors by name or email..."
+                className="pl-8 font-body text-[13px]"
+              />
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {["", "active", "pending", "revoked"].map((s) => (
+                <button
+                  key={s || "all"}
+                  type="button"
+                  onClick={() => setStatusFilter(s)}
+                  className={cn(
+                    "inline-flex items-center rounded-full border-0 px-[10px] py-[2px] font-body text-[11px] font-semibold capitalize transition-colors",
+                    statusFilter === s
+                      ? "bg-primary text-white"
+                      : "bg-primary-tint text-primary hover:bg-primary/20",
+                  )}
+                >
+                  {s || "all"}
+                </button>
+              ))}
+            </div>
+          </div>
+        </SectionCard.Body>
+      </SectionCard>
+
       {loading ? (
         <SectionCard>
           <SectionCard.Body className="p-8 text-center">
@@ -308,31 +408,107 @@ export default function MentorManager({ organizationId, cohorts, isAdmin }) {
                         </p>
                       </div>
                     </div>
-                    <Button
-                      size="sm"
-                      onClick={() => handleDeleteMentor(mentor.id)}
-                      className="h-9 w-9 shrink-0 rounded-input p-0 text-[#ff4f6b] hover:bg-[#fff1f2]"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
+                    <div className="flex shrink-0 items-center gap-1">
+                      {editingMentorId === mentor.id ? null : (
+                        <Button
+                          size="sm"
+                          onClick={() => beginEditMentor(mentor)}
+                          className="h-9 w-9 rounded-input p-0 text-text-muted hover:bg-primary-tint hover:text-primary"
+                          aria-label="Edit mentor"
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                      )}
+                      <Button
+                        size="sm"
+                        onClick={() => handleDeleteMentor(mentor.id)}
+                        className="h-9 w-9 rounded-input p-0 text-[#ff4f6b] hover:bg-[#fff1f2]"
+                        aria-label="Remove mentor"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
                   </div>
 
-                  {expertise && (
-                    <p className="mb-2 font-body text-[13px] text-text-body">
-                      {expertise}
-                    </p>
+                  {editingMentorId === mentor.id ? (
+                    <div className="mb-3 space-y-2 rounded-input border border-surface-border bg-surface-page p-3">
+                      <div>
+                        <label className="mb-1 block font-body text-[12px] font-semibold uppercase tracking-wide text-text-muted">
+                          Expertise
+                        </label>
+                        <Textarea
+                          value={editForm.expertise}
+                          onChange={(e) =>
+                            setEditForm((prev) => ({
+                              ...prev,
+                              expertise: e.target.value,
+                            }))
+                          }
+                          placeholder="e.g., Product Strategy, Sales, Fundraising"
+                          className="min-h-[50px] font-body text-[13px]"
+                        />
+                      </div>
+                      <div>
+                        <label className="mb-1 block font-body text-[12px] font-semibold uppercase tracking-wide text-text-muted">
+                          Status
+                        </label>
+                        <select
+                          value={editForm.status}
+                          onChange={(e) =>
+                            setEditForm((prev) => ({
+                              ...prev,
+                              status: e.target.value,
+                            }))
+                          }
+                          className="h-9 w-full rounded-input border border-surface-border bg-white px-2 font-body text-[13px]"
+                        >
+                          <option value="active">Active</option>
+                          <option value="revoked">Revoked</option>
+                        </select>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          size="sm"
+                          type="button"
+                          onClick={() => saveEditMentor(mentor.id)}
+                          disabled={savingMentorEdit}
+                          className={PRIMARY_BUTTON}
+                        >
+                          <SaveIcon className="mr-2 h-3.5 w-3.5" />
+                          {savingMentorEdit ? "Saving…" : "Save"}
+                        </Button>
+                        <Button
+                          size="sm"
+                          type="button"
+                          onClick={cancelEditMentor}
+                          disabled={savingMentorEdit}
+                          className="h-9 rounded-input bg-transparent font-body text-[13px] font-semibold text-text-muted hover:bg-surface-page"
+                        >
+                          <XIcon className="mr-2 h-3.5 w-3.5" />
+                          Cancel
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <>
+                      {expertise && (
+                        <p className="mb-2 font-body text-[13px] text-text-body">
+                          {expertise}
+                        </p>
+                      )}
+
+                      <div className="mb-2 flex flex-wrap items-center gap-2">
+                        <StatusBadge
+                          status={isActive ? "active" : "invited"}
+                          icon={isActive ? CheckCircle : Clock}
+                        />
+                        <StatusBadge
+                          tone="info"
+                          label={`${cohortCount} Cohorts`}
+                        />
+                      </div>
+                    </>
                   )}
-
-                  <div className="mb-2 flex flex-wrap items-center gap-2">
-                    <StatusBadge
-                      status={isActive ? "active" : "invited"}
-                      icon={isActive ? CheckCircle : Clock}
-                    />
-                    <StatusBadge
-                      tone="info"
-                      label={`${cohortCount} Cohorts`}
-                    />
-                  </div>
 
                   {mentor.lastLoginAt && (
                     <p className="font-body text-[12px] text-text-muted">
@@ -350,6 +526,20 @@ export default function MentorManager({ organizationId, cohorts, isAdmin }) {
             );
           })}
         </div>
+      )}
+
+      {!loading && total > limit && (
+        <PaginationControls
+          currentPage={currentPage}
+          totalPages={totalPages}
+          hasNext={hasNext}
+          hasPrev={hasPrev}
+          onNext={nextPage}
+          onPrev={prevPage}
+          onGoToPage={goToPage}
+          totalItems={total}
+          pageSize={limit}
+        />
       )}
     </div>
   );

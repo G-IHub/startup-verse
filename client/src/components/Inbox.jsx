@@ -664,23 +664,31 @@ export default function Inbox({ user, onBack, initialTab = "received", onNavigat
     setIsSending(true);
     try {
       const response = await fetch(
-        `${API_BASE_URL}/messages/send-from-founder`,
+        `${API_BASE_URL}/messages/founder-to-org`,
         {
           ...defaultOptions,
           method: "POST",
           body: JSON.stringify({
-            cohortId: cohort.id,
             organizationId: cohort.organizationId,
-            founderId: userId,
-            founderName: user?.name || "Unknown",
-            startupName: user?.companyName || user?.name + "'s Startup" || "Startup",
+            cohortId: cohort.id,
             subject: orgMessageData.subject,
-            message: orgMessageData.message,
+            body: orgMessageData.message,
           }),
         },
       );
-      if (!response.ok) throw new Error("Failed to send message");
-      toast.success("Message sent to organization!");
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        if (response.status === 403 && payload?.code === "NOT_A_COHORT_MEMBER") {
+          toast.error("You're not in any cohort yet for this organisation.");
+          return;
+        }
+        if (response.status === 422 && payload?.code === "ORG_HAS_NO_ADMINS") {
+          toast.error("This organisation hasn't set up an admin contact yet.");
+          return;
+        }
+        throw new Error(payload?.message || "Failed to send message");
+      }
+      toast.success("Message sent to your accelerator.");
       setOrgMessageData({
         cohortId: "",
         subject: "",

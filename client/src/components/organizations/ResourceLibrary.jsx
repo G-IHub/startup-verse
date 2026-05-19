@@ -1,7 +1,7 @@
 /**
  * RESOURCE LIBRARY - Upload and organize templates, guides, and resources
  */
-import React, { useState, useEffect } from "react";
+import React, { useState, useCallback } from "react";
 import { API_BASE_URL } from "../../config/apiBase.js";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
@@ -30,6 +30,9 @@ import {
   MoreVertical,
 } from "lucide-react";
 import { unwrapData } from "../../utils/apiEnvelope";
+import { useOrgListQuery } from "../../hooks/useOrgListQuery";
+import { getCohortResourcesPage } from "../../utils/api/organizationApi";
+import PaginationControls from "../shared/PaginationControls";
 import { toastError } from "../../utils/toastError";
 import { toast } from "sonner";
 import { uploadFile } from "../../utils/api/uploadApi";
@@ -124,10 +127,7 @@ export default function ResourceLibrary({
   userId,
   isAdmin,
 }) {
-  const [resources, setResources] = useState([]);
-  const [loading, setLoading] = useState(true);
   const [showCreateForm, setShowCreateForm] = useState(false);
-  const [searchQuery, setSearchQuery] = useState("");
   const [filterCategory, setFilterCategory] = useState("all");
   const [filterType, setFilterType] = useState("all");
   // Non-null editingResourceId puts the form into edit mode (PUT instead of POST)
@@ -145,26 +145,33 @@ export default function ResourceLibrary({
   };
   const [formData, setFormData] = useState(emptyForm);
 
-  useEffect(() => {
-    loadResources();
-  }, [cohortId]);
-
-  const loadResources = async () => {
-    try {
-      setLoading(true);
-      const response = await fetch(
-        `${API_BASE}/cohorts/${cohortId}/resources`,
-        { ...defaultOptions },
-      );
-      if (!response.ok) throw new Error("Failed to fetch resources");
-      const inner = unwrapData(await response.json());
-      setResources(inner.resources || []);
-    } catch (error) {
-      console.error("Error loading resources:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
+  const {
+    items: resources,
+    total,
+    limit,
+    loading,
+    q: searchQuery,
+    setSearch,
+    currentPage,
+    totalPages,
+    hasNext,
+    hasPrev,
+    goToPage,
+    nextPage,
+    prevPage,
+    refresh,
+  } = useOrgListQuery({
+    fetchFn: useCallback(
+      (params) =>
+        getCohortResourcesPage(cohortId, {
+          ...params,
+          category: filterCategory !== "all" ? filterCategory : undefined,
+          type: filterType !== "all" ? filterType : undefined,
+        }),
+      [cohortId, filterCategory, filterType],
+    ),
+    initialLimit: 25,
+  });
 
   const handleSubmitResource = async (e) => {
     e.preventDefault();
@@ -204,7 +211,7 @@ export default function ResourceLibrary({
       setFormData(emptyForm);
       setEditingResourceId(null);
       setShowCreateForm(false);
-      loadResources();
+      refresh();
       toast.success(isEdit ? "Resource updated" : "Resource added");
     } catch (error) {
       console.error(
@@ -274,7 +281,7 @@ export default function ResourceLibrary({
         throw err;
       }
       setResourceToDelete(null);
-      loadResources();
+      refresh();
       toast.success("Resource deleted");
     } catch (error) {
       console.error("Error deleting resource:", error);
@@ -284,21 +291,8 @@ export default function ResourceLibrary({
     }
   };
 
-  const filteredResources = resources.filter((resource) => {
-    const matchesSearch =
-      resource.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      resource.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      resource.tags.some((tag) =>
-        tag.toLowerCase().includes(searchQuery.toLowerCase()),
-      );
-    const matchesCategory =
-      filterCategory === "all" || resource.category === filterCategory;
-    const matchesType = filterType === "all" || resource.type === filterType;
-    return matchesSearch && matchesCategory && matchesType;
-  });
-
-  const categories = Array.from(new Set(resources.map((r) => r.category)));
-  const types = Array.from(new Set(resources.map((r) => r.type)));
+  const categories = Object.keys(CATEGORY_ICON);
+  const types = Object.keys(TYPE_ICON);
 
   return (
     <div className="space-y-4 font-body">
@@ -481,7 +475,7 @@ export default function ResourceLibrary({
               <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-text-muted" />
               <Input
                 value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
+                onChange={(e) => setSearch(e.target.value)}
                 placeholder="Search resources..."
                 className="pl-8 font-body text-[13px]"
               />
@@ -544,7 +538,7 @@ export default function ResourceLibrary({
             </div>
           </SectionCard.Body>
         </SectionCard>
-      ) : filteredResources.length === 0 ? (
+      ) : resources.length === 0 ? (
         <SectionCard>
           <SectionCard.Body className="p-0">
             <EmptyStateBlock
@@ -578,7 +572,7 @@ export default function ResourceLibrary({
         </SectionCard>
       ) : (
         <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3">
-          {filteredResources.map((resource) => {
+          {resources.map((resource) => {
             const TypeIcon = TYPE_ICON[resource.type] || FileText;
             const CategoryIcon =
               CATEGORY_ICON[resource.category] || FileText;
@@ -676,12 +670,18 @@ export default function ResourceLibrary({
         </div>
       )}
 
-      {!loading && filteredResources.length > 0 && (
-        <div className="text-center">
-          <p className="font-body text-[12px] text-text-muted">
-            Showing {filteredResources.length} of {resources.length} resources
-          </p>
-        </div>
+      {!loading && total > limit && (
+        <PaginationControls
+          currentPage={currentPage}
+          totalPages={totalPages}
+          hasNext={hasNext}
+          hasPrev={hasPrev}
+          onNext={nextPage}
+          onPrev={prevPage}
+          onGoToPage={goToPage}
+          totalItems={total}
+          pageSize={limit}
+        />
       )}
 
       <AlertDialog

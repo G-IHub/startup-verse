@@ -1,7 +1,7 @@
 /**
  * MENTOR ASSIGNMENT MANAGER - Flexible Mentorship Management
  */
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { API_BASE_URL } from "../../config/apiBase.js";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
@@ -22,6 +22,12 @@ import { toast } from "sonner";
 import { Dialog, DialogContent } from "../ui/dialog";
 import { unwrapData } from "../../utils/apiEnvelope";
 import {
+  getOrganizationMentorsPage,
+  getCohortMembersPage,
+} from "../../utils/api/organizationApi";
+import { useOrgListQuery } from "../../hooks/useOrgListQuery";
+import PaginationControls from "../shared/PaginationControls";
+import {
   SectionCard,
   SectionHeader,
   StatusBadge,
@@ -41,17 +47,24 @@ const PRIMARY_BUTTON =
 const OUTLINE_BUTTON =
   "h-9 rounded-input border border-surface-border bg-white font-body text-[13px] font-medium text-text-body hover:bg-primary-tint hover:text-primary";
 
+function mapMemberToFounder(member) {
+  return {
+    id: member.founderId,
+    name: member.founderName || member.name,
+    email: member.founderEmail || member.email,
+    startupName: member.startupName || "Unknown Startup",
+    startupStage: member.currentStage || "ideation",
+  };
+}
+
 export default function MentorAssignmentManager({
   cohortId,
   organizationId,
   cohorts,
   isAdmin,
 }) {
-  const [mentors, setMentors] = useState([]);
-  const [founders, setFounders] = useState([]);
   const [assignments, setAssignments] = useState({});
-  const [loading, setLoading] = useState(true);
-  const [searchQuery, setSearchQuery] = useState("");
+  const [assignmentsLoading, setAssignmentsLoading] = useState(false);
   const [selectedMentor, setSelectedMentor] = useState(null);
   const [assigning, setAssigning] = useState(false);
   const [showInviteForm, setShowInviteForm] = useState(false);
@@ -60,9 +73,129 @@ export default function MentorAssignmentManager({
   const [showJoinMeetingDialog, setShowJoinMeetingDialog] = useState(false);
   const [meetingToJoin, setMeetingToJoin] = useState(null);
 
+  const {
+    items: mentorItems,
+    total: mentorsTotal,
+    limit: mentorsLimit,
+    loading: mentorsLoading,
+    q: mentorSearchQuery,
+    setSearch: setMentorSearch,
+    currentPage: mentorsCurrentPage,
+    totalPages: mentorsTotalPages,
+    hasNext: mentorsHasNext,
+    hasPrev: mentorsHasPrev,
+    goToPage: mentorsGoToPage,
+    nextPage: mentorsNextPage,
+    prevPage: mentorsPrevPage,
+    refresh: refreshMentors,
+  } = useOrgListQuery({
+    fetchFn: useCallback(
+      (params) => getOrganizationMentorsPage(organizationId, params),
+      [organizationId],
+    ),
+    initialLimit: 25,
+  });
+
+  const mentors = useMemo(
+    () =>
+      mentorItems.map((m) => ({
+        ...m,
+        id: String(m.id || m._id),
+      })),
+    [mentorItems],
+  );
+
+  const {
+    items: memberItems,
+    total: membersTotal,
+    limit: membersLimit,
+    loading: membersLoading,
+    q: founderSearchQuery,
+    setSearch: setFounderSearch,
+    currentPage: membersCurrentPage,
+    totalPages: membersTotalPages,
+    hasNext: membersHasNext,
+    hasPrev: membersHasPrev,
+    goToPage: membersGoToPage,
+    nextPage: membersNextPage,
+    prevPage: membersPrevPage,
+  } = useOrgListQuery({
+    fetchFn: useCallback(
+      (params) => getCohortMembersPage(cohortId, params),
+      [cohortId],
+    ),
+    initialLimit: 25,
+    autoFetch: Boolean(selectedMentor),
+  });
+
+  const founderRows = useMemo(
+    () => memberItems.map(mapMemberToFounder),
+    [memberItems],
+  );
+
+  const mentorIdsKey = useMemo(
+    () =>
+      mentors
+        .map((m) => m.id)
+        .filter(Boolean)
+        .sort()
+        .join(","),
+    [mentors],
+  );
+
   useEffect(() => {
-    loadData();
-  }, [cohortId, organizationId]);
+    if (!mentorIdsKey) {
+      setAssignments({});
+      return undefined;
+    }
+
+    let cancelled = false;
+
+    async function loadAssignments() {
+      setAssignmentsLoading(true);
+      try {
+        const ids = mentorIdsKey.split(",").filter(Boolean);
+        const results = await Promise.all(
+          ids.map(async (mid) => {
+            const assignRes = await fetch(
+              `${API_BASE}/mentors/${mid}/assigned-founders`,
+              defaultOptions,
+            );
+            const assignInner = unwrapData(await assignRes.json());
+            const founderIds =
+              assignInner.founderIds ||
+              (assignInner.founders || []).map((f) => f.id);
+            return [mid, founderIds || []];
+          }),
+        );
+        if (!cancelled) {
+          setAssignments(Object.fromEntries(results));
+        }
+      } catch (error) {
+        console.error("Error loading assignments:", error);
+        if (!cancelled) {
+          toast.error("Failed to load mentor assignments");
+        }
+      } finally {
+        if (!cancelled) {
+          setAssignmentsLoading(false);
+        }
+      }
+    }
+
+    loadAssignments();
+    return () => {
+      cancelled = true;
+    };
+  }, [mentorIdsKey]);
+
+  useEffect(() => {
+    if (!selectedMentor) return;
+    const ids = new Set(mentors.map((m) => m.id));
+    if (!ids.has(String(selectedMentor))) {
+      setSelectedMentor(null);
+    }
+  }, [mentors, selectedMentor]);
 
   const generateMentorRoomLink = (mentorId) => {
     const roomName = `Mentor-${mentorId}`;
@@ -73,58 +206,6 @@ export default function MentorAssignmentManager({
     const link = generateMentorRoomLink(mentorId);
     navigator.clipboard.writeText(link);
     toast.success("Meeting link copied to clipboard!");
-  };
-
-  const loadData = async () => {
-    try {
-      setLoading(true);
-
-      const mentorsRes = await fetch(
-        `${API_BASE}/organizations/${organizationId}/mentors`,
-        defaultOptions,
-      );
-      const mentorsInner = unwrapData(await mentorsRes.json());
-      const mentorList = mentorsInner.mentors || [];
-      setMentors(mentorList);
-
-      const foundersRes = await fetch(
-        `${API_BASE}/cohorts/${cohortId}/members`,
-        defaultOptions,
-      );
-      const foundersRaw = unwrapData(await foundersRes.json());
-      const memberRows = Array.isArray(foundersRaw)
-        ? foundersRaw
-        : foundersRaw.members || [];
-
-      const transformedFounders = memberRows.map((member) => ({
-        id: member.founderId,
-        name: member.founderName || member.name,
-        email: member.founderEmail || member.email,
-        startupName: member.startupName || "Unknown Startup",
-        startupStage: member.currentStage || "ideation",
-      }));
-      setFounders(transformedFounders);
-
-      const assignmentsMap = {};
-      for (const mentor of mentorList) {
-        const mid = mentor.id || mentor._id;
-        const assignRes = await fetch(
-          `${API_BASE}/mentors/${mid}/assigned-founders`,
-          defaultOptions,
-        );
-        const assignInner = unwrapData(await assignRes.json());
-        const ids =
-          assignInner.founderIds ||
-          (assignInner.founders || []).map((f) => f.id);
-        assignmentsMap[mid] = ids || [];
-      }
-      setAssignments(assignmentsMap);
-    } catch (error) {
-      console.error("Error loading data:", error);
-      toast.error("Failed to load data");
-    } finally {
-      setLoading(false);
-    }
   };
 
   const handleAssignFounder = async (mentorId, founderId) => {
@@ -184,15 +265,6 @@ export default function MentorAssignmentManager({
   const isAssigned = (mentorId, founderId) =>
     assignments[mentorId]?.includes(founderId) || false;
 
-  const filteredFounders = founders.filter((f) => {
-    const q = searchQuery.toLowerCase();
-    return (
-      (f.name || "").toLowerCase().includes(q) ||
-      (f.email || "").toLowerCase().includes(q) ||
-      (f.startupName || "").toLowerCase().includes(q)
-    );
-  });
-
   const sortedMentors = [...mentors].sort((a, b) => {
     if (a.status === "active" && b.status !== "active") return -1;
     if (a.status !== "active" && b.status === "active") return 1;
@@ -218,18 +290,10 @@ export default function MentorAssignmentManager({
           payload.message || payload.error || "Failed to invite mentor",
         );
       }
-      const inner = unwrapData(payload);
-      const serverMentor = inner.mentor || inner;
-      if (serverMentor && (serverMentor.id || serverMentor._id)) {
-        setMentors((prev) => {
-          const id = String(serverMentor.id || serverMentor._id);
-          const without = prev.filter((m) => String(m.id) !== id);
-          return [...without, { ...serverMentor, id }];
-        });
-      }
       toast.success("Mentor invited successfully!");
       setShowInviteForm(false);
       setInviteEmail("");
+      refreshMentors();
     } catch (error) {
       console.error("Error inviting mentor:", error);
       toast.error(`Failed to invite mentor: ${error.message}`);
@@ -238,7 +302,10 @@ export default function MentorAssignmentManager({
     }
   };
 
-  if (loading) {
+  const mentorsInitialLoading =
+    mentorsLoading && mentorItems.length === 0;
+
+  if (mentorsInitialLoading) {
     return (
       <SectionCard>
         <SectionCard.Body className="p-8 text-center">
@@ -250,7 +317,7 @@ export default function MentorAssignmentManager({
     );
   }
 
-  if (mentors.length === 0) {
+  if (!mentorsLoading && mentorsTotal === 0) {
     return (
       <SectionCard>
         <SectionCard.Body className="p-0">
@@ -305,6 +372,16 @@ export default function MentorAssignmentManager({
             }
           />
           <SectionCard.Body className="space-y-2">
+            <div className="relative">
+              <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-text-muted" />
+              <Input
+                value={mentorSearchQuery}
+                onChange={(e) => setMentorSearch(e.target.value)}
+                placeholder="Search mentors..."
+                className="pl-8 font-body text-[13px]"
+              />
+            </div>
+
             {showInviteForm && (
               <div className="space-y-2 rounded-input bg-surface-page p-3">
                 <p className="font-heading text-[13px] font-semibold text-text-heading">
@@ -343,6 +420,12 @@ export default function MentorAssignmentManager({
                 </div>
               </div>
             )}
+
+            {mentorsLoading && mentorItems.length > 0 ? (
+              <p className="py-2 text-center font-body text-[12px] text-text-muted">
+                Updating mentors...
+              </p>
+            ) : null}
 
             {activeMentors.length > 0 && (
               <>
@@ -385,7 +468,9 @@ export default function MentorAssignmentManager({
                       <div className="mt-1.5 flex items-center gap-1">
                         <UsersRound className="h-3 w-3 text-primary" />
                         <span className="font-body text-[12px] font-medium text-primary">
-                          {assignments[mentor.id]?.length || 0} founders in group
+                          {assignmentsLoading
+                            ? "…"
+                            : `${assignments[mentor.id]?.length || 0} founders in group`}
                         </span>
                       </div>
                     </button>
@@ -440,13 +525,41 @@ export default function MentorAssignmentManager({
                         </div>
                         <StatusBadge
                           tone="info"
-                          label={`${assignments[mentor.id]?.length || 0} assigned`}
+                          label={
+                            assignmentsLoading
+                              ? "…"
+                              : `${assignments[mentor.id]?.length || 0} assigned`
+                          }
                         />
                       </div>
                     </button>
                   );
                 })}
               </>
+            )}
+
+            {!mentorsLoading && mentors.length === 0 && (
+              <EmptyStateBlock
+                variant="compact"
+                icon={Search}
+                tone="info"
+                title="No mentors match"
+                description="Try a different search term"
+              />
+            )}
+
+            {!mentorsLoading && mentorsTotal > mentorsLimit && (
+              <PaginationControls
+                currentPage={mentorsCurrentPage}
+                totalPages={mentorsTotalPages}
+                hasNext={mentorsHasNext}
+                hasPrev={mentorsHasPrev}
+                onNext={mentorsNextPage}
+                onPrev={mentorsPrevPage}
+                onGoToPage={mentorsGoToPage}
+                totalItems={mentorsTotal}
+                pageSize={mentorsLimit}
+              />
             )}
           </SectionCard.Body>
         </SectionCard>
@@ -482,8 +595,8 @@ export default function MentorAssignmentManager({
               <div className="relative mb-2">
                 <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-text-muted" />
                 <Input
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
+                  value={founderSearchQuery}
+                  onChange={(e) => setFounderSearch(e.target.value)}
                   placeholder="Search founders..."
                   className="pl-8 font-body text-[13px]"
                 />
@@ -498,7 +611,11 @@ export default function MentorAssignmentManager({
                 title="No mentor selected"
                 description="Select a mentor from the left to view and manage their mentorship group"
               />
-            ) : filteredFounders.length === 0 ? (
+            ) : membersLoading && founderRows.length === 0 ? (
+              <div className="animate-pulse p-6 text-center font-body text-[13px] text-text-muted">
+                Loading founders...
+              </div>
+            ) : founderRows.length === 0 ? (
               <EmptyStateBlock
                 variant="compact"
                 icon={Search}
@@ -570,7 +687,7 @@ export default function MentorAssignmentManager({
                   </div>
                 )}
 
-                {filteredFounders.map((founder) => {
+                {founderRows.map((founder) => {
                   const assigned = isAssigned(selectedMentor, founder.id);
                   return (
                     <div
@@ -649,6 +766,20 @@ export default function MentorAssignmentManager({
                     </div>
                   );
                 })}
+
+                {!membersLoading && membersTotal > membersLimit && (
+                  <PaginationControls
+                    currentPage={membersCurrentPage}
+                    totalPages={membersTotalPages}
+                    hasNext={membersHasNext}
+                    hasPrev={membersHasPrev}
+                    onNext={membersNextPage}
+                    onPrev={membersPrevPage}
+                    onGoToPage={membersGoToPage}
+                    totalItems={membersTotal}
+                    pageSize={membersLimit}
+                  />
+                )}
               </>
             )}
           </SectionCard.Body>

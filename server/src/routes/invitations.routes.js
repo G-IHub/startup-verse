@@ -1,6 +1,7 @@
 import { Router } from "express";
 import asyncHandler from "../utils/asyncHandler.js";
 import requireAuth from "../middleware/requireAuth.js";
+import requireOrgAdmin from "../middleware/requireOrgAdmin.js";
 import * as invitationsController from "../controllers/invitations.controller.js";
 
 const invitationsRouter = Router();
@@ -10,6 +11,14 @@ invitationsRouter.get("/invitations/founder/:founderId", requireAuth, asyncHandl
 invitationsRouter.get("/invitations/token/:token", asyncHandler(invitationsController.getInvitationByToken));
 invitationsRouter.post("/invitations/token/:token/accept", asyncHandler(invitationsController.acceptInvitationByToken));
 invitationsRouter.post("/invitations/:invitationId/respond", requireAuth, asyncHandler(invitationsController.respondToInvitation));
+invitationsRouter.post("/invitations/:invitationId/cancel", requireAuth, asyncHandler(invitationsController.cancelInvitation));
+invitationsRouter.post("/invitations/:invitationId/resend", requireAuth, asyncHandler(invitationsController.resendInvitation));
+invitationsRouter.get(
+  "/cohorts/:cohortId/invitations",
+  requireAuth,
+  requireOrgAdmin,
+  asyncHandler(invitationsController.listCohortInvitations),
+);
 
 invitationsRouter.post("/invitations/send", requireAuth, asyncHandler(invitationsController.sendFounderTalentInvitation));
 invitationsRouter.get("/invitations/sent/:founderId", requireAuth, asyncHandler(invitationsController.getSentFounderTalentInvitations));

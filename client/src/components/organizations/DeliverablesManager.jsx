@@ -1,7 +1,7 @@
 /**
  * DELIVERABLES MANAGER - Create, track, and review startup deliverables
  */
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import { API_BASE_URL } from "../../config/apiBase.js";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
@@ -28,8 +28,16 @@ import {
   Pencil,
   Trash2,
   MoreVertical,
+  Search,
 } from "lucide-react";
 import { unwrapData } from "../../utils/apiEnvelope";
+import { useOrgListQuery } from "../../hooks/useOrgListQuery";
+import { useOrgRealtime } from "../../hooks/useOrgRealtime";
+import {
+  getCohortDeliverablesPage,
+  getDeliverableSubmissionsPage,
+} from "../../utils/api/organizationApi";
+import PaginationControls from "../shared/PaginationControls";
 import { toastError } from "../../utils/toastError";
 import { toast } from "sonner";
 import {
@@ -86,21 +94,13 @@ const PRIMARY_BUTTON =
 const OUTLINE_BUTTON =
   "h-9 rounded-input border border-surface-border bg-white font-body text-[13px] font-medium text-text-body hover:bg-primary-tint hover:text-primary";
 
-function asDeliverableList(inner) {
-  if (Array.isArray(inner)) return inner;
-  return inner?.deliverables || [];
-}
-
 export default function DeliverablesManager({
   cohortId,
   organizationId,
   userId,
   isAdmin,
 }) {
-  const [deliverables, setDeliverables] = useState([]);
   const [selectedDeliverable, setSelectedDeliverable] = useState(null);
-  const [submissions, setSubmissions] = useState([]);
-  const [loading, setLoading] = useState(true);
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [reviewingSubmission, setReviewingSubmission] = useState(null);
   const [includeArchived, setIncludeArchived] = useState(false);
@@ -122,70 +122,90 @@ export default function DeliverablesManager({
     feedback: "",
   });
 
-  useEffect(() => {
-    loadDeliverables();
-  }, [cohortId, includeArchived]);
+  const {
+    items: deliverableRows,
+    total,
+    limit,
+    loading,
+    q,
+    setSearch,
+    currentPage,
+    totalPages,
+    hasNext,
+    hasPrev,
+    goToPage,
+    nextPage,
+    prevPage,
+    refresh: refreshDeliverables,
+  } = useOrgListQuery({
+    fetchFn: useCallback(
+      (params) =>
+        getCohortDeliverablesPage(cohortId, {
+          ...params,
+          includeArchived: includeArchived ? "1" : undefined,
+        }),
+      [cohortId, includeArchived],
+    ),
+    initialLimit: 25,
+  });
 
-  useEffect(() => {
-    if (selectedDeliverable) {
-      const sid = selectedDeliverable.id || selectedDeliverable._id;
-      if (sid) loadSubmissions(sid);
-    }
-  }, [selectedDeliverable]);
+  const deliverables = deliverableRows.map((d) => ({
+    ...d,
+    id: d.id || d._id,
+  }));
 
-  const loadDeliverables = async () => {
-    try {
-      setLoading(true);
-      const qs = includeArchived ? "?includeArchived=1" : "";
-      const response = await fetch(
-        `${API_BASE}/cohorts/${cohortId}/deliverables${qs}`,
-        { ...defaultOptions },
-      );
-      if (!response.ok) throw new Error("Failed to fetch deliverables");
-      const list = asDeliverableList(unwrapData(await response.json()));
-      const normalized = list.map((d) => ({
-        ...d,
-        id: d.id || d._id,
-      }));
-      setDeliverables(normalized);
-      // Keep selection in sync when filter changes hide the previously selected
-      // deliverable.
-      const selectedId = String(
-        selectedDeliverable?.id || selectedDeliverable?._id || "",
-      );
-      const stillVisible = normalized.find((d) => String(d.id) === selectedId);
-      if (!stillVisible) {
-        setSelectedDeliverable(normalized[0] || null);
-      } else {
-        setSelectedDeliverable(stillVisible);
+  const selectedDeliverableId =
+    selectedDeliverable?.id || selectedDeliverable?._id || null;
+
+  const selectedDeliverableIdRef = useRef(selectedDeliverableId);
+  selectedDeliverableIdRef.current = selectedDeliverableId;
+
+  useOrgRealtime(organizationId, cohortId, {
+    onDeliverable: (payload) => {
+      refreshDeliverables().catch(() => {});
+      const dId = payload?.deliverableId || payload?.id;
+      if (
+        dId &&
+        selectedDeliverableIdRef.current &&
+        String(dId) === String(selectedDeliverableIdRef.current)
+      ) {
+        refreshSubmissions().catch(() => {});
       }
-    } catch (error) {
-      console.error("Error loading deliverables:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
+    },
+  });
 
-  const loadSubmissions = async (deliverableId) => {
-    try {
-      const response = await fetch(
-        `${API_BASE}/deliverables/${deliverableId}/submissions`,
-        defaultOptions,
-      );
-      if (!response.ok) throw new Error("Failed to fetch submissions");
-      const raw = unwrapData(await response.json());
-      const list = Array.isArray(raw) ? raw : raw.submissions || [];
-      setSubmissions(
-        list.map((s) => ({
-          ...s,
-          id: s._id || s.id,
-          feedback: s.feedback || s.review?.feedback || "",
-        })),
-      );
-    } catch (error) {
-      console.error("Error loading submissions:", error);
+  useEffect(() => {
+    if (!deliverables.length) {
+      setSelectedDeliverable(null);
+      return;
     }
-  };
+    const selectedId = String(selectedDeliverableId || "");
+    const stillVisible = deliverables.find((d) => String(d.id) === selectedId);
+    if (!stillVisible) {
+      setSelectedDeliverable(deliverables[0]);
+    }
+  }, [deliverables, selectedDeliverableId]);
+
+  const {
+    items: submissionRows,
+    total: submissionsTotal,
+    limit: submissionsLimit,
+    loading: submissionsLoading,
+    refresh: refreshSubmissions,
+  } = useOrgListQuery({
+    fetchFn: useCallback(
+      (params) => getDeliverableSubmissionsPage(selectedDeliverableId, params),
+      [selectedDeliverableId],
+    ),
+    initialLimit: 25,
+    autoFetch: Boolean(selectedDeliverableId),
+  });
+
+  const submissions = submissionRows.map((s) => ({
+    ...s,
+    id: s._id || s.id,
+    feedback: s.feedback || s.review?.feedback || "",
+  }));
 
   const handleSubmitDeliverable = async (e) => {
     e.preventDefault();
@@ -223,7 +243,7 @@ export default function DeliverablesManager({
       setFormData(emptyForm);
       setEditingDeliverableId(null);
       setShowCreateForm(false);
-      loadDeliverables();
+      await refreshDeliverables();
       toast.success(isEdit ? "Deliverable updated" : "Deliverable created");
     } catch (error) {
       console.error(
@@ -274,7 +294,7 @@ export default function DeliverablesManager({
         throw err;
       }
       setDeliverableToArchive(null);
-      loadDeliverables();
+      await refreshDeliverables();
       toast.success("Deliverable archived");
     } catch (error) {
       console.error("Error archiving deliverable:", error);
@@ -301,7 +321,7 @@ export default function DeliverablesManager({
         throw err;
       }
       setDeliverableToDelete(null);
-      loadDeliverables();
+      await refreshDeliverables();
       toast.success("Deliverable deleted");
     } catch (error) {
       console.error("Error deleting deliverable:", error);
@@ -333,9 +353,8 @@ export default function DeliverablesManager({
       }
       setReviewingSubmission(null);
       setReviewData({ status: "approved", feedback: "" });
-      if (selectedDeliverable) {
-        const sid = selectedDeliverable.id || selectedDeliverable._id;
-        if (sid) loadSubmissions(sid);
+      if (selectedDeliverableId) {
+        await refreshSubmissions();
       }
     } catch (error) {
       console.error("Error reviewing submission:", error);
@@ -464,6 +483,20 @@ export default function DeliverablesManager({
         </div>
       )}
 
+      <SectionCard>
+        <SectionCard.Body className="p-3">
+          <div className="relative">
+            <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-text-muted" />
+            <Input
+              value={q}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search deliverables…"
+              className="pl-8 font-body text-[13px]"
+            />
+          </div>
+        </SectionCard.Body>
+      </SectionCard>
+
       {loading ? (
         <SectionCard>
           <SectionCard.Body className="p-8 text-center">
@@ -472,14 +505,14 @@ export default function DeliverablesManager({
             </div>
           </SectionCard.Body>
         </SectionCard>
-      ) : deliverables.length === 0 ? (
+      ) : total === 0 ? (
         <SectionCard>
           <SectionCard.Body className="p-0">
             <EmptyStateBlock
               variant="centered"
               icon={FileText}
               tone="info"
-              title="No deliverables yet"
+              title={q ? "No matching deliverables" : "No deliverables yet"}
               description={
                 isAdmin
                   ? "Create deliverables to collect work from startups"
@@ -624,6 +657,19 @@ export default function DeliverablesManager({
                 </div>
               );
             })}
+            {!loading && total > limit && (
+              <PaginationControls
+                currentPage={currentPage}
+                totalPages={totalPages}
+                hasNext={hasNext}
+                hasPrev={hasPrev}
+                onNext={nextPage}
+                onPrev={prevPage}
+                onGoToPage={goToPage}
+                totalItems={total}
+                pageSize={limit}
+              />
+            )}
           </div>
 
           <div className="md:col-span-2">
@@ -658,10 +704,14 @@ export default function DeliverablesManager({
                   <div className="mt-3">
                     <h4 className="mb-2 flex items-center gap-1.5 font-heading text-[14px] font-bold text-text-heading">
                       <Users className="h-4 w-4 text-primary" />
-                      Submissions ({submissions.length})
+                      Submissions ({submissionsTotal})
                     </h4>
 
-                    {submissions.length === 0 ? (
+                    {submissionsLoading ? (
+                      <div className="py-4 text-center font-body text-[13px] text-text-muted animate-pulse">
+                        Loading submissions…
+                      </div>
+                    ) : submissions.length === 0 ? (
                       <EmptyStateBlock
                         variant="compact"
                         icon={Inbox}

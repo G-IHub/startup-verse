@@ -25,6 +25,7 @@ import {
   CalendarDays,
 } from "lucide-react";
 import { unwrapData } from "../../utils/apiEnvelope";
+import { normalizeListPage } from "../../utils/api/listQuery";
 
 const API_BASE = API_BASE_URL;
 
@@ -62,7 +63,7 @@ export default function OrganizationAgenda({
           const inner = unwrapData(await response.json());
 
           // Add cohort name to each event
-          return (inner.events || []).map((event) => ({
+          return normalizeListPage(inner, "events").items.map((event) => ({
             ...event,
             cohortName: cohort.name,
           }));

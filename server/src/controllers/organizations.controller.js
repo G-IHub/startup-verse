@@ -7,6 +7,11 @@ import ProgramMilestone from "../models/ProgramMilestone.js";
 import User from "../models/User.js";
 import { error as apiError, success as apiSuccess } from "../utils/apiResponse.js";
 import { loadCohortMembersEnriched } from "../utils/cohortMemberAggregation.js";
+import { parseListQuery, paginatedSuccess, listDocumentsWithSearch } from "../utils/listQuery.js";
+import {
+  loadStartupSnapshot,
+  canViewStartupSnapshot,
+} from "../utils/startupSnapshot.js";
 import {
   computeCohortStats,
   computeCohortStatsBatch,
@@ -85,8 +90,7 @@ function mapProgramMilestone(doc) {
 
 // Mirrors the schema cap so we 400 early with a friendly message instead of
 // letting Mongoose throw a generic validation error. Logos are URLs (either
-// an absolute https URL from Cloudinary or a relative `/uploads/...` path
-// from the disk driver). Base64 payloads are no longer accepted - clients
+// an absolute https URL from Cloudinary). Base64 payloads are no longer accepted - clients
 // must upload via `POST /uploads` first and forward the returned URL.
 const MAX_LOGO_URL_CHARS = 1000;
 function normalizeLogoUrl(rawLogo) {
@@ -426,8 +430,32 @@ export const deleteCohort = async (req, res) => {
 };
 
 export const getCohortMembers = async (req, res) => {
-  const members = await loadCohortMembersEnriched(req.params.cohortId);
-  return apiSuccess(res, members);
+  const listOptions = parseListQuery(req, {
+    defaultSortBy: "joinedAt",
+    allowedSortFields: ["joinedAt", "createdAt", "status"],
+    defaultSortOrder: "desc",
+  });
+  const result = await loadCohortMembersEnriched(req.params.cohortId, listOptions);
+  return paginatedSuccess(res, result.items, result.total, {
+    limit: result.limit,
+    skip: result.skip,
+  });
+};
+
+/**
+ * GET /startups/:id/snapshot — Step 2.9.
+ *
+ * `:id` may be a Startup `_id` (canonical) or the founder's User `_id`
+ * (legacy callers). Access is granted to the founder, any team member,
+ * mentors assigned to the founder, and admins of any organisation whose
+ * cohort currently contains the founder.
+ */
+export const getStartupSnapshot = async (req, res) => {
+  const snapshot = await loadStartupSnapshot(req.params.id);
+  if (!snapshot) return apiError(res, "Startup not found.", 404);
+  const allowed = await canViewStartupSnapshot(req.user, snapshot);
+  if (!allowed) return apiError(res, "Forbidden.", 403);
+  return apiSuccess(res, snapshot);
 };
 
 export const manageCohortMember = async (req, res) => {
@@ -476,10 +504,23 @@ export const getCohortIdsForFounder = async (req, res) => {
 };
 
 export const getProgramMilestonesByCohort = async (req, res) => {
-  const rows = await ProgramMilestone.find({ cohortId: req.params.cohortId })
-    .sort({ dueDate: 1 })
-    .lean();
-  return apiSuccess(res, { milestones: rows.map(mapProgramMilestone) });
+  const listOptions = parseListQuery(req, {
+    defaultSortBy: "dueDate",
+    allowedSortFields: ["dueDate", "createdAt", "title", "week"],
+    defaultSortOrder: "asc",
+  });
+  const baseFilter = { cohortId: req.params.cohortId };
+  if (listOptions.status) {
+    baseFilter.category = listOptions.status;
+  }
+  const { items, total } = await listDocumentsWithSearch(ProgramMilestone, {
+    baseFilter,
+    listOptions,
+    textSearch: true,
+    regexFields: ["title", "description"],
+    mapRow: mapProgramMilestone,
+  });
+  return paginatedSuccess(res, items, total, listOptions);
 };
 
 /**

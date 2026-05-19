@@ -1,7 +1,7 @@
 /**
  * EVENT MANAGER - Create and manage cohort events
  */
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { API_BASE_URL } from "../../config/apiBase.js";
 import {
   Dialog,
@@ -41,13 +41,16 @@ import {
   Target,
   Pencil,
   Trash2,
+  Search,
 } from "lucide-react";
-import { notifyEventCreated } from "../../utils/eventNotifications";
 import { toast } from "sonner";
 import { toastError } from "../../utils/toastError";
 import MiniCalendar from "../calendar/MiniCalendar";
 import { getOrganizationCalendarEvents } from "../../utils/calendarIntegration";
 import { unwrapData } from "../../utils/apiEnvelope";
+import { useOrgListQuery } from "../../hooks/useOrgListQuery";
+import { getCohortEventsPage } from "../../utils/api/organizationApi";
+import PaginationControls from "../shared/PaginationControls";
 import {
   SectionCard,
   SectionHeader,
@@ -122,9 +125,7 @@ export default function EventManager({
   userId,
   isAdmin,
 }) {
-  const [events, setEvents] = useState([]);
   const [allCalendarItems, setAllCalendarItems] = useState([]);
-  const [loading, setLoading] = useState(true);
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [agendaFilter, setAgendaFilter] = useState("all");
   const [selectedAgenda, setSelectedAgenda] = useState(null);
@@ -146,8 +147,35 @@ export default function EventManager({
   };
   const [formData, setFormData] = useState(emptyForm);
 
+  const {
+    items: eventRows,
+    total,
+    limit,
+    loading,
+    q,
+    setSearch,
+    currentPage,
+    totalPages,
+    hasNext,
+    hasPrev,
+    goToPage,
+    nextPage,
+    prevPage,
+    refresh,
+  } = useOrgListQuery({
+    fetchFn: useCallback(
+      (params) => getCohortEventsPage(cohortId, params),
+      [cohortId],
+    ),
+    initialLimit: 25,
+  });
+
+  const events = eventRows.map((e) => ({
+    ...e,
+    id: e.id || e._id,
+  }));
+
   useEffect(() => {
-    loadEvents();
     loadAllCalendarItems();
   }, [cohortId, organizationId]);
 
@@ -157,23 +185,6 @@ export default function EventManager({
       setAllCalendarItems(items);
     } catch (error) {
       console.error("Error loading calendar items:", error);
-    }
-  };
-
-  const loadEvents = async () => {
-    try {
-      setLoading(true);
-      const response = await fetch(`${API_BASE}/cohorts/${cohortId}/events`, {
-        ...defaultOptions,
-      });
-      if (!response.ok) throw new Error("Failed to fetch events");
-      const payload = await response.json();
-      const inner = unwrapData(payload);
-      setEvents(inner.events || []);
-    } catch (error) {
-      console.error("Error loading events:", error);
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -214,25 +225,16 @@ export default function EventManager({
         err.status = response.status;
         throw err;
       }
-      const result = unwrapData(responseJson);
-      const event = result.event;
+      unwrapData(responseJson);
 
-      if (!isEdit) {
-        await notifyEventCreated(cohortId, organizationId, {
-          id: event?.id || event?._id,
-          title: formData.title,
-          startTime: formData.startTime,
-          eventType: formData.eventType,
-          location: formData.location,
-          isVirtual: formData.isVirtual,
-          createdBy: userId,
-        });
-      }
+      // Step 2.12: server-side fanout in createCohortEvent now broadcasts
+      // cohort-event-created notifications to active cohort members. The
+      // client no longer fires this manually to avoid double notifications.
 
       setFormData(emptyForm);
       setEditingEventId(null);
       setShowCreateForm(false);
-      loadEvents();
+      await refresh();
       loadAllCalendarItems();
       toast.success(
         isEdit ? "Event updated successfully!" : "Event created successfully!",
@@ -304,7 +306,7 @@ export default function EventManager({
       }
       setEventToDelete(null);
       setSelectedAgenda(null);
-      loadEvents();
+      await refresh();
       loadAllCalendarItems();
       toast.success("Event deleted");
     } catch (error) {
@@ -533,6 +535,20 @@ export default function EventManager({
         </CollapsibleFormCard>
       )}
 
+      <SectionCard>
+        <SectionCard.Body className="p-3">
+          <div className="relative">
+            <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-text-muted" />
+            <Input
+              value={q}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search events…"
+              className="pl-8 font-body text-[13px]"
+            />
+          </div>
+        </SectionCard.Body>
+      </SectionCard>
+
       {loading ? (
         <SectionCard>
           <SectionCard.Body className="p-8 text-center">
@@ -541,14 +557,14 @@ export default function EventManager({
             </div>
           </SectionCard.Body>
         </SectionCard>
-      ) : events.length === 0 ? (
+      ) : total === 0 ? (
         <SectionCard>
           <SectionCard.Body className="p-0">
             <EmptyStateBlock
               variant="centered"
               icon={CalendarIcon}
               tone="info"
-              title="No events scheduled yet"
+              title={q ? "No matching events" : "No events scheduled yet"}
               description={
                 isAdmin
                   ? "Create events to bring your cohort together"
@@ -675,6 +691,20 @@ export default function EventManager({
             </div>
           </div>
         </div>
+      )}
+
+      {!loading && total > limit && (
+        <PaginationControls
+          currentPage={currentPage}
+          totalPages={totalPages}
+          hasNext={hasNext}
+          hasPrev={hasPrev}
+          onNext={nextPage}
+          onPrev={prevPage}
+          onGoToPage={goToPage}
+          totalItems={total}
+          pageSize={limit}
+        />
       )}
 
       <Dialog

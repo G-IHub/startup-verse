@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import mongoose from "mongoose";
 import Event from "../models/Event.js";
 import Announcement from "../models/Announcement.js";
 import Resource from "../models/Resource.js";
@@ -14,10 +15,33 @@ import TeamMemberProfile from "../models/TeamMemberProfile.js";
 import Startup from "../models/Startup.js";
 import User from "../models/User.js";
 import { error as apiError, success as apiSuccess } from "../utils/apiResponse.js";
+import {
+  parseListQuery,
+  paginatedSuccess,
+  listDocumentsWithSearch,
+} from "../utils/listQuery.js";
+import { publicAppUrl } from "../utils/publicAppUrl.js";
 import { broadcastNotification } from "../services/notificationService.js";
 import { emitRealtime } from "../services/realtime.service.js";
+import { emitToOrganization } from "../realtime/emitOrg.js";
 import { SOCKET_EVENTS } from "../realtime/events.js";
 import { organizationRoom } from "../realtime/rooms.js";
+import { logger } from "../config/logger.js";
+import { loadPortfolioHealthAggregates } from "../utils/loadPortfolioHealthAggregates.js";
+import { buildPortfolioRow } from "../utils/portfolioHealthScoring.js";
+import { parseAnalyticsRange } from "../utils/parseAnalyticsRange.js";
+import { loadCohortAnalyticsTrends } from "../utils/cohortAnalyticsTrends.js";
+import { computeCohortBadgeCounts } from "../utils/cohortBadgeCounts.js";
+import {
+  loadCohortMembersForExport,
+  EXPORT_MAX_MEMBERS,
+} from "../utils/cohortMemberAggregation.js";
+import {
+  buildCohortExportDocument,
+  exportRowsToCsv,
+  sanitizeExportFilename,
+} from "../utils/cohortExport.js";
+import Organization from "../models/Organization.js";
 
 function mapEvent(e) {
   const o = e.toObject ? e.toObject() : e;
@@ -98,13 +122,9 @@ function toFiniteNumberOrNull(raw) {
  * fabricates these.
  */
 function defaultVirtualMeetingUrl() {
-  const base =
-    process.env.PUBLIC_APP_URL ||
-    process.env.CLIENT_URL ||
-    process.env.FRONTEND_URL ||
-    "";
+  const base = publicAppUrl();
   const room = `Event-${randomUUID().slice(0, 8)}`;
-  return base ? `${base.replace(/\/$/, "")}/join/${room}` : `/join/${room}`;
+  return base ? `${base}/join/${room}` : `/join/${room}`;
 }
 
 /**
@@ -179,8 +199,24 @@ function coerceResourcePayload(body, { isUpdate = false } = {}) {
 }
 
 export const listCohortEvents = async (req, res) => {
-  const rows = await Event.find({ cohortId: req.params.cohortId }).sort({ startsAt: 1 });
-  return apiSuccess(res, { events: rows.map(mapEvent) });
+  const listOptions = parseListQuery(req, {
+    defaultSortBy: "startsAt",
+    allowedSortFields: ["startsAt", "endsAt", "createdAt", "title"],
+    defaultSortOrder: "asc",
+    extraFilterKeys: ["eventType"],
+  });
+  const baseFilter = { cohortId: req.params.cohortId };
+  if (listOptions.extraFilters.eventType) {
+    baseFilter.eventType = listOptions.extraFilters.eventType;
+  }
+  const { items, total } = await listDocumentsWithSearch(Event, {
+    baseFilter,
+    listOptions,
+    textSearch: true,
+    regexFields: ["title", "description"],
+    mapRow: mapEvent,
+  });
+  return paginatedSuccess(res, items, total, listOptions);
 };
 
 export const createCohortEvent = async (req, res) => {
@@ -198,7 +234,61 @@ export const createCohortEvent = async (req, res) => {
     ...coerced,
     createdBy: body.createdBy || req.user?.id || null,
   });
-  return apiSuccess(res, { event: mapEvent(event) }, 201);
+
+  // Step 2.12 — fire-and-forget broadcast to active cohort members. Failures
+  // must not block the API response.
+  const cohortIdForBroadcast = event.cohortId ? String(event.cohortId) : null;
+  if (cohortIdForBroadcast) {
+    Promise.resolve()
+      .then(async () => {
+        const memberships = await CohortMembership.find(
+          { cohortId: cohortIdForBroadcast, status: "active" },
+          { founderId: 1 },
+        ).lean();
+        const founderIds = memberships
+          .map((m) => m.founderId)
+          .filter(Boolean)
+          .map(String);
+        if (!founderIds.length) return null;
+        const startTimeIso = event.startsAt
+          ? new Date(event.startsAt).toISOString()
+          : "";
+        return broadcastNotification(founderIds, {
+          type: "cohort-event-created",
+          title: `New event: ${event.title}`,
+          message: `${event.eventType || "Event"}${startTimeIso ? ` scheduled for ${startTimeIso}` : ""}`,
+          actionUrl: `/dashboard?view=calendar&event=${event._id}`,
+          metadata: {
+            eventId: String(event._id),
+            cohortId: cohortIdForBroadcast,
+            eventType: event.eventType || "",
+            startTime: event.startsAt,
+            isVirtual: Boolean(event.isVirtual),
+          },
+        });
+      })
+      .catch((err) =>
+        logger.warn("event.notify_failed", {
+          eventId: String(event._id),
+          error: String(err?.message || err),
+        }),
+      );
+  }
+
+  const dto = mapEvent(event);
+  const orgId = cohortIdForBroadcast
+    ? await resolveCohortOrgId(event, cohortIdForBroadcast)
+    : event.organizationId
+      ? String(event.organizationId)
+      : null;
+  if (orgId) {
+    emitToOrganization(orgId, SOCKET_EVENTS.EVENT_CREATED, {
+      ...dto,
+      cohortId: cohortIdForBroadcast,
+    });
+  }
+
+  return apiSuccess(res, { event: dto }, 201);
 };
 
 /** PUT /cohorts/:cohortId/events/:eventId */
@@ -266,8 +356,21 @@ export const deleteCohortEvent = async (req, res) => {
 };
 
 export const listCohortAnnouncements = async (req, res) => {
-  const rows = await Announcement.find({ cohortId: req.params.cohortId }).sort({ createdAt: -1 });
-  return apiSuccess(res, { announcements: rows.map(mapAnnouncement) });
+  const listOptions = parseListQuery(req, {
+    allowedSortFields: ["createdAt", "title", "priority"],
+  });
+  const baseFilter = { cohortId: req.params.cohortId };
+  if (listOptions.status) {
+    baseFilter.priority = listOptions.status;
+  }
+  const { items, total } = await listDocumentsWithSearch(Announcement, {
+    baseFilter,
+    listOptions,
+    textSearch: true,
+    regexFields: ["title", "body"],
+    mapRow: mapAnnouncement,
+  });
+  return paginatedSuccess(res, items, total, listOptions);
 };
 
 export const createCohortAnnouncement = async (req, res) => {
@@ -309,7 +412,16 @@ export const createCohortAnnouncement = async (req, res) => {
     console.error("[createCohortAnnouncement] notify failed:", err.message);
   }
 
-  return apiSuccess(res, { announcement: mapAnnouncement(announcement) }, 201);
+  const dto = mapAnnouncement(announcement);
+  const orgId = await resolveCohortOrgId(announcement, cohortId);
+  if (orgId) {
+    emitToOrganization(orgId, SOCKET_EVENTS.ANNOUNCEMENT_CREATED, {
+      ...dto,
+      cohortId: String(cohortId),
+    });
+  }
+
+  return apiSuccess(res, { announcement: dto }, 201);
 };
 
 async function resolveCohortOrgId(announcement, cohortId) {
@@ -408,23 +520,112 @@ export const markAnnouncementRead = async (req, res) => {
   return apiSuccess(res, { marked: true, id: String(announcementId), readCount });
 };
 
-export const listCohortResources = async (req, res) => {
-  const rows = await Resource.find({ cohortId: req.params.cohortId }).sort({
-    createdAt: -1,
+/** GET /cohorts/:cohortId/badge-counts — org-admin sidebar badges (Step 2.1). */
+export const getCohortBadgeCounts = async (req, res) => {
+  const cohortId = req.params.cohortId;
+  if (!mongoose.Types.ObjectId.isValid(String(cohortId))) {
+    return apiError(res, "Invalid cohortId.", 400);
+  }
+
+  const cohort = await Cohort.findOne({ _id: cohortId, deletedAt: null })
+    .select("_id")
+    .lean();
+  if (!cohort) {
+    return apiError(res, "Cohort not found.", 404);
+  }
+
+  const counts = await computeCohortBadgeCounts(cohortId, req.user.id);
+  return apiSuccess(res, counts);
+};
+
+/** GET /cohorts/:cohortId/export — org-admin cohort CSV/JSON export (Step 4.1). */
+export const getCohortExport = async (req, res) => {
+  const cohortId = req.params.cohortId;
+  if (!mongoose.Types.ObjectId.isValid(String(cohortId))) {
+    return apiError(res, "Invalid cohortId.", 400);
+  }
+
+  const formatRaw = String(req.query?.format || "csv").trim().toLowerCase();
+  if (formatRaw !== "csv" && formatRaw !== "json") {
+    return apiError(res, "format must be csv or json.", 400);
+  }
+
+  const cohort = await Cohort.findOne({ _id: cohortId, deletedAt: null }).lean();
+  if (!cohort) {
+    return apiError(res, "Cohort not found.", 404);
+  }
+
+  const org = cohort.organizationId
+    ? await Organization.findById(cohort.organizationId).select("name").lean()
+    : null;
+
+  const { items, total } = await loadCohortMembersForExport(cohortId);
+  const document = buildCohortExportDocument({
+    cohort,
+    organizationName: org?.name || "",
+    members: items,
   });
-  return apiSuccess(res, { resources: rows.map(mapResource) });
+
+  if (total > EXPORT_MAX_MEMBERS) {
+    res.setHeader("X-Export-Truncated", "true");
+  }
+
+  if (formatRaw === "json") {
+    return apiSuccess(res, document);
+  }
+
+  const csv = exportRowsToCsv(document.startups);
+  const filename = `${sanitizeExportFilename(cohort.name)}-export.csv`;
+  res.setHeader("Content-Type", "text/csv; charset=utf-8");
+  res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+  return res.send(csv);
+};
+
+export const listCohortResources = async (req, res) => {
+  const listOptions = parseListQuery(req, {
+    allowedSortFields: ["createdAt", "title", "category", "type"],
+    extraFilterKeys: ["category", "type"],
+  });
+  const baseFilter = { cohortId: req.params.cohortId };
+  if (listOptions.extraFilters.category) {
+    baseFilter.category = listOptions.extraFilters.category;
+  }
+  if (listOptions.extraFilters.type) {
+    baseFilter.type = listOptions.extraFilters.type;
+  }
+
+  const { items, total } = await listDocumentsWithSearch(Resource, {
+    baseFilter,
+    listOptions,
+    textSearch: true,
+    regexFields: ["title", "description", "tags"],
+    mapRow: mapResource,
+  });
+  return paginatedSuccess(res, items, total, listOptions);
 };
 
 export const createCohortResource = async (req, res) => {
   const body = req.body || {};
   const coerced = coerceResourcePayload(body, { isUpdate: false });
+  const cohortId = req.params.cohortId || body.cohortId;
   const resource = await Resource.create({
-    cohortId: req.params.cohortId || body.cohortId,
+    cohortId,
     founderId: body.founderId || null,
     ...coerced,
     createdBy: body.createdBy || req.user?.id || null,
   });
-  return apiSuccess(res, { resource: mapResource(resource) }, 201);
+  const dto = mapResource(resource);
+  const cohortOrg = await Cohort.findOne({ _id: cohortId, deletedAt: null })
+    .select("organizationId")
+    .lean();
+  const orgId = cohortOrg?.organizationId ? String(cohortOrg.organizationId) : null;
+  if (orgId) {
+    emitToOrganization(orgId, SOCKET_EVENTS.RESOURCE_CREATED, {
+      ...dto,
+      cohortId: String(cohortId),
+    });
+  }
+  return apiSuccess(res, { resource: dto }, 201);
 };
 
 /** PUT /cohorts/:cohortId/resources/:resourceId */
@@ -483,17 +684,30 @@ export const deleteCohortResource = async (req, res) => {
 
 export const getCohortAnalyticsOverview = async (req, res) => {
   const cohortId = req.params.cohortId;
+  const { range, since } = parseAnalyticsRange(req.query);
+
   const members = await CohortMembership.find({ cohortId }).lean();
   const activeMembers = members.filter(
     (m) => !m.status || m.status === "active",
   );
   const founderIds = activeMembers.map((m) => m.founderId).filter(Boolean);
   const startupIds = activeMembers.map((m) => m.startupId).filter(Boolean);
+  const founderIdStrings = founderIds.map((id) => String(id));
+  const startupIdStrings = startupIds.map((id) => String(id));
   const cohortSize = activeMembers.length;
   const thirtyDaysAgo = Date.now() - 30 * 86400000;
   const recentJoins = activeMembers.filter(
     (m) => m.joinedAt && new Date(m.joinedAt).getTime() >= thirtyDaysAgo,
   ).length;
+
+  const taskFilter = { startupId: { $in: startupIds } };
+  const outcomeFilter = { founderId: { $in: founderIds } };
+  const milestoneFilter = { founderId: { $in: founderIds } };
+  if (since) {
+    taskFilter.updatedAt = { $gte: since };
+    outcomeFilter.weekOf = { $gte: since };
+    milestoneFilter.updatedAt = { $gte: since };
+  }
 
   const [
     totalTeamMembers,
@@ -504,15 +718,20 @@ export const getCohortAnalyticsOverview = async (req, res) => {
     completedMilestones,
     totalProgramMilestones,
     totalDeliverables,
+    trends,
   ] = await Promise.all([
     TeamMemberProfile.countDocuments({ startupId: { $in: startupIds } }),
-    WeeklyOutcome.countDocuments({ founderId: { $in: founderIds } }),
-    Task.countDocuments({ startupId: { $in: startupIds } }),
-    Task.countDocuments({ startupId: { $in: startupIds }, status: "completed" }),
-    Milestone.countDocuments({ founderId: { $in: founderIds } }),
-    Milestone.countDocuments({ founderId: { $in: founderIds }, status: "completed" }),
+    WeeklyOutcome.countDocuments(outcomeFilter),
+    Task.countDocuments(taskFilter),
+    Task.countDocuments({ ...taskFilter, status: "completed" }),
+    Milestone.countDocuments(milestoneFilter),
+    Milestone.countDocuments({ ...milestoneFilter, status: "completed" }),
     ProgramMilestone.countDocuments({ cohortId }),
     Deliverable.countDocuments({ cohortId }),
+    loadCohortAnalyticsTrends({
+      founderIds: founderIdStrings,
+      startupIds: startupIdStrings,
+    }),
   ]);
 
   const deliverableDocs = await Deliverable.find({ cohortId }).select("_id");
@@ -533,6 +752,7 @@ export const getCohortAnalyticsOverview = async (req, res) => {
   const analytics = {
     cohortSize,
     recentJoinsLast30Days: recentJoins,
+    range,
     aggregateMetrics: {
       totalTeamMembers,
       avgTeamSize: cohortSize === 0 ? 0 : Math.round((totalTeamMembers / cohortSize) * 10) / 10,
@@ -552,50 +772,26 @@ export const getCohortAnalyticsOverview = async (req, res) => {
       totalSubmissions,
       submissionRate,
     },
+    trends,
   };
 
   return apiSuccess(res, { analytics });
 };
 
-const defaultFactors = () => ({
-  weeklyExecution: 15,
-  taskCompletion: 12,
-  teamActivity: 15,
-  milestoneProgress: 10,
-});
-
 export const getCohortPortfolioHealth = async (req, res) => {
   const cohortId = req.params.cohortId;
-  const members = await CohortMembership.find({ cohortId }).lean();
-  const founderIds = members.map((m) => m.founderId).filter(Boolean);
+  const { founderIds, aggregatesByFounderId, displayByFounderId } =
+    await loadPortfolioHealthAggregates(cohortId);
 
-  const startups = await Startup.find({ founderId: { $in: founderIds } }).lean();
-  const users = await User.find({ _id: { $in: founderIds } }).lean();
-  const userById = new Map(users.map((u) => [String(u._id), u]));
-
-  const portfolio = [];
-  for (const founderId of founderIds) {
-    const fid = String(founderId);
-    const startup = startups.find((s) => String(s.founderId) === fid);
-    const user = userById.get(fid);
-    const total = await Task.countDocuments({ founderId });
-    const completed = await Task.countDocuments({ founderId, status: "completed" });
-    const score = total === 0 ? 50 : Math.round((completed / total) * 100);
-    let status = "healthy";
-    if (score < 40) status = "critical";
-    else if (score < 70) status = "warning";
-
-    portfolio.push({
+  const portfolio = founderIds.map((fid) => {
+    const display = displayByFounderId.get(fid) || {};
+    return buildPortfolioRow({
       founderId: fid,
-      startupName: startup?.name || "Unnamed Startup",
-      founderName: user?.name || user?.email || "Founder",
-      health: {
-        status,
-        score,
-        factors: defaultFactors(),
-      },
+      startupName: display.startupName || "Unnamed Startup",
+      founderName: display.founderName || "Founder",
+      aggregates: aggregatesByFounderId.get(fid),
     });
-  }
+  });
 
   const healthy = portfolio.filter((p) => p.health.status === "healthy").length;
   const warning = portfolio.filter((p) => p.health.status === "warning").length;

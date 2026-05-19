@@ -17,11 +17,21 @@ import Activity from "../models/Activity.js";
 import Message from "../models/Message.js";
 import { error as apiError, success as apiSuccess } from "../utils/apiResponse.js";
 import { sendTokenResponse } from "../utils/sendToken.js";
+import { publicAppUrl } from "../utils/publicAppUrl.js";
 import { emitRealtime } from "../services/realtime.service.js";
 import { createNotification, broadcastNotification } from "../services/notificationService.js";
+import { sendEmail } from "../services/emailService.js";
+import { renderCohortInvitationEmail } from "../services/emailTemplates/cohortInvitation.js";
+import { logger } from "../config/logger.js";
 import { SOCKET_EVENTS } from "../realtime/events.js";
+import { emitToOrganization } from "../realtime/emitOrg.js";
 import { startupRoom, userRoom } from "../realtime/rooms.js";
 import { mapActivityToDto } from "../utils/activityDto.js";
+import {
+  parseListQuery,
+  paginatedSuccess,
+  listDocumentsWithSearch,
+} from "../utils/listQuery.js";
 
 const isAdmin = (req) => req.user?.isAdmin === true;
 const isSelfOrAdmin = (req, userId) => isAdmin(req) || req.user?.id === String(userId);
@@ -191,6 +201,45 @@ async function isOrgAdminFor(userId, organizationId) {
   return Boolean(exists);
 }
 
+const RESEND_COOLDOWN_MS = 5 * 60 * 1000;
+
+// Step 2.13: shared helper for create + resend so the email payload stays
+// identical. Fire-and-forget — failures must never bubble back to the API.
+function emitCohortInvitationChanged(invitation) {
+  const orgId = invitation?.organizationId ? String(invitation.organizationId) : null;
+  if (!orgId) return;
+  emitToOrganization(orgId, SOCKET_EVENTS.COHORT_INVITATION_CHANGED, {
+    invitationId: String(invitation._id),
+    cohortId: invitation.cohortId ? String(invitation.cohortId) : null,
+    status: invitation.status,
+  });
+}
+
+function sendCohortInvitationEmail({ invitation, cohort, inviterName }) {
+  const base = publicAppUrl();
+  const inviteUrl = `${base}/invitation/${invitation.token}`;
+  Promise.resolve()
+    .then(async () => {
+      const organization = cohort?.organizationId
+        ? await Organization.findById(cohort.organizationId, { name: 1 }).lean()
+        : null;
+      return sendEmail({
+        to: invitation.email,
+        ...renderCohortInvitationEmail({
+          organizationName: organization?.name || "",
+          cohortName: cohort?.name || "",
+          inviterName: inviterName || "",
+          inviteUrl,
+          message: invitation.message || "",
+        }),
+        tags: [{ name: "kind", value: "cohort-invitation" }],
+      });
+    })
+    .catch((err) =>
+      logger.warn("invitation.email_failed", { error: String(err?.message || err) }),
+    );
+}
+
 // Blueprint §6.10 — org → founder cohort invitation create.
 export const createInvitation = async (req, res) => {
   const cohortId = req.body?.cohortId;
@@ -267,6 +316,7 @@ export const createInvitation = async (req, res) => {
     status: "pending",
     invitedBy: req.user.id,
     metadata,
+    lastSentAt: new Date(),
   });
 
   // If the invitee is an existing user, drop a notification immediately.
@@ -284,6 +334,15 @@ export const createInvitation = async (req, res) => {
       },
     }).catch(() => null);
   }
+
+  sendCohortInvitationEmail({
+    invitation,
+    cohort,
+    inviterName: req.user?.name || "",
+  });
+
+  emitCohortInvitationChanged(invitation);
+
   return apiSuccess(res, invitation, 201);
 };
 
@@ -426,13 +485,28 @@ export const respondToInvitation = async (req, res) => {
     if (!canAccessInvitation(req, cohortInvite)) {
       return apiError(res, "Forbidden.", 403);
     }
+    if (cohortInvite.status === "cancelled") {
+      return apiError(
+        res,
+        "This invitation was withdrawn by the organiser.",
+        409,
+        undefined,
+        "INVITATION_CANCELLED",
+      );
+    }
     if (cohortInvite.status !== "pending") {
-      return apiError(res, "Invitation is no longer pending.", 409);
+      return apiError(
+        res,
+        "Invitation is no longer pending.",
+        409,
+        undefined,
+        "INVITATION_NOT_PENDING",
+      );
     }
     if (cohortInvite.expiresAt && cohortInvite.expiresAt < new Date()) {
       cohortInvite.status = "expired";
       await cohortInvite.save();
-      return apiError(res, "Invitation has expired.", 410);
+      return apiError(res, "Invitation has expired.", 410, undefined, "INVITATION_EXPIRED");
     }
     cohortInvite.status = requestedStatus;
     cohortInvite.respondedAt = new Date();
@@ -477,6 +551,8 @@ export const respondToInvitation = async (req, res) => {
       }
     }
 
+    emitCohortInvitationChanged(cohortInvite);
+
     return apiSuccess(res, cohortInvite);
   }
 
@@ -508,6 +584,204 @@ export const respondToInvitation = async (req, res) => {
   }
 
   return apiSuccess(res, invitation);
+};
+
+// Step 2.13 — admin-only helper used by cancel/resend.
+async function requireOrgAdminForInvitation(req, invitation) {
+  if (!invitation?.organizationId) return false;
+  if (isAdmin(req)) return true;
+  return isOrgAdminFor(req.user?.id, invitation.organizationId);
+}
+
+// Step 2.13 — POST /invitations/:invitationId/cancel
+export const cancelInvitation = async (req, res) => {
+  const invitationId = req.params.invitationId;
+  if (!mongoose.Types.ObjectId.isValid(String(invitationId))) {
+    return apiError(res, "Invitation not found.", 404, undefined, "INVITATION_NOT_FOUND");
+  }
+  const invitation = await CohortInvitation.findById(invitationId);
+  if (!invitation) {
+    return apiError(res, "Invitation not found.", 404, undefined, "INVITATION_NOT_FOUND");
+  }
+  const allowed = await requireOrgAdminForInvitation(req, invitation);
+  if (!allowed) {
+    return apiError(
+      res,
+      "Forbidden. Only organisation admins can cancel this invitation.",
+      403,
+      undefined,
+      "INVITATION_FORBIDDEN",
+    );
+  }
+  if (invitation.status !== "pending") {
+    return apiError(
+      res,
+      "Invitation is no longer pending.",
+      409,
+      undefined,
+      "INVITATION_NOT_PENDING",
+    );
+  }
+
+  invitation.status = "cancelled";
+  invitation.respondedAt = new Date();
+  await invitation.save();
+
+  if (invitation.founderId) {
+    const cohort = invitation.cohortId
+      ? await Cohort.findById(invitation.cohortId, { name: 1 }).lean()
+      : null;
+    createNotification({
+      userId: invitation.founderId,
+      type: "cohort-invitation-cancelled",
+      title: "Invitation withdrawn",
+      message: `Your invitation to "${cohort?.name || "a cohort"}" was withdrawn by the organiser.`,
+      actionUrl: "/dashboard",
+      metadata: {
+        invitationId: String(invitation._id),
+        cohortId: String(invitation.cohortId || ""),
+      },
+    }).catch((err) =>
+      logger.warn("invitation.cancel_notify_failed", {
+        error: String(err?.message || err),
+      }),
+    );
+  }
+
+  emitCohortInvitationChanged(invitation);
+
+  return apiSuccess(res, invitation);
+};
+
+// Step 2.13 — POST /invitations/:invitationId/resend
+export const resendInvitation = async (req, res) => {
+  const invitationId = req.params.invitationId;
+  if (!mongoose.Types.ObjectId.isValid(String(invitationId))) {
+    return apiError(res, "Invitation not found.", 404, undefined, "INVITATION_NOT_FOUND");
+  }
+  const invitation = await CohortInvitation.findById(invitationId);
+  if (!invitation) {
+    return apiError(res, "Invitation not found.", 404, undefined, "INVITATION_NOT_FOUND");
+  }
+  const allowed = await requireOrgAdminForInvitation(req, invitation);
+  if (!allowed) {
+    return apiError(
+      res,
+      "Forbidden. Only organisation admins can resend this invitation.",
+      403,
+      undefined,
+      "INVITATION_FORBIDDEN",
+    );
+  }
+  if (invitation.status !== "pending") {
+    return apiError(
+      res,
+      "Invitation is no longer pending.",
+      409,
+      undefined,
+      "INVITATION_NOT_PENDING",
+    );
+  }
+
+  const lastSent = invitation.lastSentAt || invitation.createdAt;
+  const elapsed = Date.now() - new Date(lastSent).getTime();
+  if (elapsed < RESEND_COOLDOWN_MS) {
+    const retryAfterSeconds = Math.ceil((RESEND_COOLDOWN_MS - elapsed) / 1000);
+    return apiError(
+      res,
+      "Please wait before resending this invitation.",
+      429,
+      [{ retryAfterSeconds }],
+      "INVITATION_RESEND_TOO_SOON",
+    );
+  }
+
+  invitation.token = crypto.randomUUID();
+  invitation.expiresAt = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000);
+  invitation.lastSentAt = new Date();
+  await invitation.save();
+
+  const cohort = invitation.cohortId
+    ? await Cohort.findById(invitation.cohortId, { name: 1, organizationId: 1 }).lean()
+    : null;
+  sendCohortInvitationEmail({
+    invitation,
+    cohort,
+    inviterName: req.user?.name || "",
+  });
+
+  return apiSuccess(res, invitation);
+};
+
+function mapCohortInvitationRow(row, usersMap) {
+  const founder = row.founderId ? usersMap.get(String(row.founderId)) : null;
+  const invitedBy = row.invitedBy ? usersMap.get(String(row.invitedBy)) : null;
+  return {
+    id: String(row._id),
+    cohortId: String(row.cohortId || ""),
+    organizationId: row.organizationId ? String(row.organizationId) : "",
+    founderId: row.founderId ? String(row.founderId) : "",
+    founderName: founder?.name || row.metadata?.founderName || "",
+    email: row.email || "",
+    message: row.message || "",
+    status: row.status,
+    token: row.token,
+    expiresAt: row.expiresAt,
+    respondedAt: row.respondedAt,
+    lastSentAt: row.lastSentAt,
+    createdAt: row.createdAt,
+    invitedBy: invitedBy
+      ? { id: String(invitedBy._id), name: invitedBy.name || "" }
+      : row.invitedBy
+        ? { id: String(row.invitedBy), name: "" }
+        : null,
+    metadata: row.metadata || {},
+  };
+}
+
+// Step 2.13 / 3.1 — GET /cohorts/:cohortId/invitations (paginated)
+export const listCohortInvitations = async (req, res) => {
+  const cohortId = req.params.cohortId;
+  if (!mongoose.Types.ObjectId.isValid(String(cohortId))) {
+    return apiError(res, "Cohort not found.", 404);
+  }
+  const cohort = await Cohort.findOne({ _id: cohortId, deletedAt: null })
+    .select("organizationId")
+    .lean();
+  if (!cohort) {
+    return apiError(res, "Cohort not found.", 404);
+  }
+  if (!isAdmin(req)) {
+    const allowed = await isOrgAdminFor(req.user?.id, cohort.organizationId);
+    if (!allowed) {
+      return apiError(res, "Forbidden.", 403);
+    }
+  }
+
+  const listOptions = parseListQuery(req, {
+    defaultSortBy: "createdAt",
+    allowedSortFields: ["createdAt", "lastSentAt", "expiresAt", "status", "email"],
+    defaultSortOrder: "desc",
+  });
+
+  const status = listOptions.status || "pending";
+  const baseFilter = { cohortId };
+  if (status && status !== "all") baseFilter.status = status;
+
+  // ?q matches email/message only; founder display name lives on User (join deferred).
+  const { items: rows, total } = await listDocumentsWithSearch(CohortInvitation, {
+    baseFilter,
+    listOptions,
+    regexFields: ["email", "message"],
+    mapRow: (r) => r,
+  });
+
+  const founderIds = rows.map((r) => r.founderId).filter(Boolean);
+  const invitedByIds = rows.map((r) => r.invitedBy).filter(Boolean);
+  const usersMap = await loadUsersMap([...founderIds, ...invitedByIds]);
+  const items = rows.map((row) => mapCohortInvitationRow(row, usersMap));
+
+  return paginatedSuccess(res, items, total, listOptions);
 };
 
 export const sendFounderTalentInvitation = async (req, res) => {
