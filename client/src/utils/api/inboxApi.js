@@ -45,14 +45,29 @@ export async function getOrganizationInvitations(founderId) {
   const result = await apiRequest(`/invitations/founder/${founderId}`);
   console.log("✅ [InboxAPI] Organization invitations received:", result);
 
-  const invitations = result.invitations || [];
+  let invitations = [];
+  if (Array.isArray(result)) {
+    invitations = result;
+  } else if (result && typeof result === "object") {
+    invitations = result.invitations || result.items || [];
+  }
+
+  const normalized = invitations.map((inv) => {
+    if (!inv || typeof inv !== "object") return inv;
+    const out = { ...inv };
+    if (out._id != null && out.id == null) {
+      out.id = String(out._id);
+    }
+    return out;
+  });
+
   console.log(
     "📊 [InboxAPI] Parsed invitations count:",
-    invitations.length,
-    invitations,
+    normalized.length,
+    normalized,
   );
 
-  return invitations;
+  return normalized;
 }
 
 // Respond to organization invitation

@@ -24,7 +24,8 @@ export async function checkEmailConfiguration() {
       ...defaultOptions,
     });
     const data = await response.json();
-    return data.configured === true;
+    const inner = data?.data ?? data;
+    return inner?.configured === true || inner?.sent === true;
   } catch (error) {
     console.error("Failed to check email configuration:", error);
     return false;
@@ -129,17 +130,21 @@ export async function sendWelcomeEmail(params) {
  */
 export function getEmailSetupInstructions() {
   return `
-📧 EMAIL SETUP REQUIRED
+📧 EMAIL SETUP (Mailtrap SMTP)
 
-To send team invitation emails, you need to configure Resend API:
+1. Create a Mailtrap sandbox inbox at https://mailtrap.io
+2. Copy SMTP host, port, username, and password
+3. Add to server/.env:
+   EMAIL_TRANSPORT=smtp
+   SMTP_HOST=sandbox.smtp.mailtrap.io
+   SMTP_PORT=2525
+   SMTP_USER=...
+   SMTP_PASS=...
+   EMAIL_FROM=StartupVerse <noreply@startupverse.test>
+   PUBLIC_APP_URL=http://localhost:3000
+4. Restart the API server
 
-1. Go to https://resend.com and sign up (FREE - 100 emails/day)
-2. Create an API key in your dashboard
-3. Configure backend environment variable: RESEND_API_KEY = your_api_key
-4. Redeploy your backend service
-6. Reload StartupVerse
-
-See /EMAIL_SYSTEM_COMPLETE.md for detailed instructions.
+Cohort invites send email automatically from the server when an org admin invites a founder.
   `.trim();
 }
 

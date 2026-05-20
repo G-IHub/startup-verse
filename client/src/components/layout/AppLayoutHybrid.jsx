@@ -176,8 +176,12 @@ export default function AppLayoutHybrid({
             return;
           }
           const interestsData = await interestsRes.json();
-          const pendingInterests =
-            interestsData.interests?.filter((item) => item.status === "pending") || [];
+          const interestList = Array.isArray(interestsData?.data)
+            ? interestsData.data
+            : interestsData?.interests || [];
+          const pendingInterests = interestList.filter(
+            (item) => item.status === "pending",
+          );
 
           const orgInvitationsRes = await fetch(
             `${API_BASE_URL}/invitations/founder/${user.id}`,
@@ -188,10 +192,12 @@ export default function AppLayoutHybrid({
           let pendingOrgInvitations = 0;
           if (orgInvitationsRes.ok) {
             const orgInvitationsData = await orgInvitationsRes.json();
-            const pendingOrg =
-              orgInvitationsData.invitations?.filter(
-                (inv) => inv.status === "pending",
-              ) || [];
+            const orgInviteList = Array.isArray(orgInvitationsData?.data)
+              ? orgInvitationsData.data
+              : orgInvitationsData?.invitations || [];
+            const pendingOrg = orgInviteList.filter(
+              (inv) => inv.status === "pending",
+            );
             pendingOrgInvitations = pendingOrg.length;
           }
           setUnreadMessagesCount(pendingInterests.length + pendingOrgInvitations);

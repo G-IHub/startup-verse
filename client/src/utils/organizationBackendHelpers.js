@@ -337,6 +337,19 @@ export async function getCohortMembers(cohortId) {
   }
 }
 
+export async function getAvailableStartups(cohortId, options = {}) {
+  console.log("📤 Fetching available startups from API:", cohortId);
+
+  try {
+    const result = await orgApi.getAvailableStartups(cohortId, options);
+    console.log(`✅ Found ${result.items.length} available startups`);
+    return result;
+  } catch (error) {
+    console.error("❌ Failed to fetch available startups:", error);
+    throw error;
+  }
+}
+
 export async function getStartupSnapshot(founderId) {
   console.log("📤 Fetching startup snapshot from API:", founderId);
 

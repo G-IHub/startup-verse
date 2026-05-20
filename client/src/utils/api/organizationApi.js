@@ -249,6 +249,23 @@ export async function getCohortMembers(cohortId) {
   return mapList(unwrapData(result));
 }
 
+export async function getAvailableStartups(cohortId, { q, page, pageSize } = {}) {
+  const params = new URLSearchParams();
+  if (q) params.set("q", q);
+  if (page) params.set("page", String(page));
+  if (pageSize) params.set("pageSize", String(pageSize));
+  const query = params.toString();
+  const endpoint = `/cohorts/${cohortId}/available-startups${query ? `?${query}` : ""}`;
+  const result = await apiCall(endpoint);
+  const data = unwrapData(result);
+  return {
+    items: mapList(data?.items || []),
+    total: Number(data?.total) || 0,
+    page: Number(data?.page) || 1,
+    pageSize: Number(data?.pageSize) || 50,
+  };
+}
+
 export async function getFounderMemberships(founderId) {
   const result = await apiCall(`/memberships/founder/${founderId}`);
   const data = unwrapData(result);

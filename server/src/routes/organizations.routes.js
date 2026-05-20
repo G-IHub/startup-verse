@@ -190,6 +190,12 @@ organizationsRouter.get(
   requireCohortReadAccess,
   asyncHandler(organizationsController.getCohortMembers),
 );
+organizationsRouter.get(
+  "/cohorts/:cohortId/available-startups",
+  requireAuth,
+  requireOrgAdmin,
+  asyncHandler(organizationsController.getAvailableStartupsForCohort),
+);
 organizationsRouter.post("/cohorts/:cohortId/members", requireAuth, requireOrgAdmin, asyncHandler(organizationsController.manageCohortMember));
 
 export default organizationsRouter;
