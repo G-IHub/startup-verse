@@ -6,8 +6,8 @@ Set variables on your **API host** (not in git). The React app needs **`VITE_API
 
 | Role | URL | Env vars |
 |------|-----|----------|
-| Frontend | `https://startupverse.com` | `PUBLIC_APP_URL`, `CORS_ORIGIN` |
-| API | `https://api.startupverse.com` | `VITE_API_URL` = `https://api.startupverse.com/api/v1` |
+| Frontend | `https://www.startupverse.space` (and apex if used) | `PUBLIC_APP_URL`, `CORS_ORIGIN` |
+| API | `https://api.startupverse.space` | `VITE_API_URL` = `https://api.startupverse.space/api/v1` |
 
 Copy-paste templates:
 
@@ -16,7 +16,9 @@ Copy-paste templates:
 
 If users can open both `www` and apex, keep both in `CORS_ORIGIN` (see template). Prefer one canonical URL in `PUBLIC_APP_URL` (apex is fine).
 
-`startupverse.com` + `api.startupverse.com` share the same site (registrable domain), so HttpOnly cookies work with `credentials: include`.
+`startupverse.space` + `api.startupverse.space` share the same site (registrable domain), so HttpOnly cookies work with `credentials: include`.
+
+**CORS login failures:** If the browser shows “blocked by CORS policy” from `https://www.startupverse.space`, Railway `CORS_ORIGIN` must list that exact origin (and `https://startupverse.space` if users can open apex). `www` and non-`www` are different origins.
 
 ## 2. Server (API) — required
 

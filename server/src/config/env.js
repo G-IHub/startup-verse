@@ -27,11 +27,42 @@ function parsePort(rawPort) {
   return parsed;
 }
 
+function stripOriginQuotes(value) {
+  return value.replace(/^["']+|["']+$/g, "").trim();
+}
+
+/** Apex and www are different browser origins; pair them when one is listed. */
+function expandWwwOriginPairs(origins) {
+  const expanded = new Set(origins);
+
+  for (const origin of origins) {
+    try {
+      const url = new URL(origin);
+      if (!url.protocol.startsWith("http")) continue;
+
+      const host = url.hostname;
+      if (host.startsWith("www.")) {
+        url.hostname = host.slice(4);
+        expanded.add(url.origin);
+      } else {
+        url.hostname = `www.${host}`;
+        expanded.add(url.origin);
+      }
+    } catch {
+      // keep only the literal origin
+    }
+  }
+
+  return [...expanded];
+}
+
 function parseCorsOrigins(rawOrigin) {
-  const origins = rawOrigin
-    .split(",")
-    .map((item) => item.trim())
-    .filter(Boolean);
+  const origins = expandWwwOriginPairs(
+    rawOrigin
+      .split(",")
+      .map((item) => stripOriginQuotes(item.trim()))
+      .filter(Boolean),
+  );
 
   if (origins.length === 0) {
     throw new Error("CORS_ORIGIN must contain at least one origin.");
