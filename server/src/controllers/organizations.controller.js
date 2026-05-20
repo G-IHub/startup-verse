@@ -7,6 +7,7 @@ import ProgramMilestone from "../models/ProgramMilestone.js";
 import User from "../models/User.js";
 import { error as apiError, success as apiSuccess } from "../utils/apiResponse.js";
 import { loadCohortMembersEnriched } from "../utils/cohortMemberAggregation.js";
+import { loadAvailableStartupsForCohort } from "../utils/cohortAvailableStartups.js";
 import {
   computeCohortStats,
   computeCohortStatsBatch,
@@ -428,6 +429,24 @@ export const deleteCohort = async (req, res) => {
 export const getCohortMembers = async (req, res) => {
   const members = await loadCohortMembersEnriched(req.params.cohortId);
   return apiSuccess(res, members);
+};
+
+export const getAvailableStartupsForCohort = async (req, res) => {
+  const cohort = await Cohort.findOne({
+    _id: req.params.cohortId,
+    deletedAt: null,
+  });
+  if (!cohort) {
+    return apiError(res, "Cohort not found.", 404);
+  }
+
+  const { q, page, pageSize } = req.query || {};
+  const result = await loadAvailableStartupsForCohort(req.params.cohortId, {
+    q,
+    page,
+    pageSize,
+  });
+  return apiSuccess(res, result);
 };
 
 export const manageCohortMember = async (req, res) => {

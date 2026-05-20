@@ -9,6 +9,21 @@ import process from "node:process";
 import request from "supertest";
 import mongoose from "mongoose";
 
+/** Auth returns JWT in HttpOnly cookie; Bearer header is also supported by requireAuth. */
+function extractAuthToken(res) {
+  const fromBody = res.body?.data?.token;
+  if (typeof fromBody === "string" && fromBody.length > 10) {
+    return fromBody;
+  }
+  const setCookie = res.headers["set-cookie"];
+  const cookies = Array.isArray(setCookie) ? setCookie : setCookie ? [setCookie] : [];
+  for (const entry of cookies) {
+    const match = /^token=([^;]+)/.exec(String(entry));
+    if (match?.[1]) return match[1];
+  }
+  return null;
+}
+
 async function main() {
   if (process.env.RUN_CONTRACT_HTTP_FLOWS !== "1") {
     console.log("Phase 1 HTTP contract flows SKIP (set RUN_CONTRACT_HTTP_FLOWS=1 and Mongo env)");
@@ -31,8 +46,8 @@ async function main() {
   });
   assert.equal(signup.status, 201);
   assert.equal(signup.body?.success, true);
-  const token = signup.body?.data?.token;
-  assert.ok(typeof token === "string" && token.length > 10);
+  const token = extractAuthToken(signup);
+  assert.ok(typeof token === "string" && token.length > 10, "expected JWT in cookie or body");
   const userA = signup.body?.data?.user;
   const userAId = userA?._id ?? userA?.id;
   assert.ok(userAId);
@@ -123,8 +138,8 @@ async function main() {
     password,
   });
   assert.equal(adminSignin.status, 200);
-  const adminToken = adminSignin.body?.data?.token;
-  assert.ok(typeof adminToken === "string" && adminToken.length > 10);
+  const adminToken = extractAuthToken(adminSignin);
+  assert.ok(typeof adminToken === "string" && adminToken.length > 10, "expected admin JWT in cookie or body");
 
   const adminCrossUserCreate = await request(app)
     .post("/api/v1/notifications/streak-at-risk")

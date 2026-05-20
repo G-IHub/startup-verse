@@ -6,140 +6,116 @@ import {
   CardHeader,
   CardTitle,
 } from "./ui/card";
-import { Button } from "./ui/button";
-import { PasswordInput } from "./ui/password-input";
 import { Alert, AlertDescription, AlertTitle } from "./ui/alert";
 import { Mail, CheckCircle2, AlertCircle, ExternalLink } from "lucide-react";
 import { post } from "../utils/backendClient.js";
 
 /**
- * Email Setup Prompt
- * Guides users to set up Resend API key for email functionality
+ * Email Setup Prompt — Mailtrap SMTP (server/.env)
  */
 export default function EmailSetupPrompt() {
-  const [apiKey, setApiKey] = useState("");
   const [isConfigured, setIsConfigured] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState("");
-  const [success, setSuccess] = useState("");
+  const [statusMessage, setStatusMessage] = useState("");
+
   useEffect(() => {
     checkConfiguration();
   }, []);
+
   const checkConfiguration = async () => {
     try {
       const envelope = await post("/emails/test", {});
-      setIsConfigured(Boolean(envelope?.data?.sent));
+      const data = envelope?.data || {};
+      setIsConfigured(Boolean(data.sent));
+      setStatusMessage(data.message || "");
     } catch (error) {
       console.error("Failed to check email configuration:", error);
     }
   };
-  const handleSetup = () => {
-    if (!apiKey.trim()) {
-      setError("Please enter your Resend API key");
-      return;
-    }
-    setError("");
-    setSuccess(
-      "API key copied. Add RESEND_API_KEY to your server environment (e.g. server/.env) and restart the API.",
-    );
 
-    // Copy to clipboard
-    navigator.clipboard.writeText(apiKey);
-  };
   if (isConfigured) {
-    return null; // Don't show if already configured
+    return null;
   }
+
   return (
     <Card className="border-blue-200 dark:border-blue-800">
       <CardHeader>
         <div className="flex items-center gap-2">
           <Mail className="w-5 h-5 text-blue-600" />
-          <CardTitle>Email Service Setup Required</CardTitle>
+          <CardTitle>Email (Mailtrap SMTP) setup</CardTitle>
         </div>
         <CardDescription>
-          Enable team invitations and email notifications
+          Cohort invites and notifications are sent via SMTP configured on the API
+          server.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
         <Alert>
           <AlertCircle className="h-4 w-4" />
-          <AlertTitle>Setup Needed</AlertTitle>
+          <AlertTitle>Server configuration required</AlertTitle>
           <AlertDescription>
-            To send team invitation emails and notifications, you need to
-            configure the Resend API key.
+            Add Mailtrap SMTP credentials to{" "}
+            <code className="bg-muted px-1 rounded">server/.env</code> and restart
+            the API. Cohort invitation emails are sent automatically when an org
+            admin invites a founder.
           </AlertDescription>
         </Alert>
-        <div className="space-y-4">
+
+        {statusMessage && (
+          <Alert>
+            <AlertDescription className="text-sm">{statusMessage}</AlertDescription>
+          </Alert>
+        )}
+
+        <div className="space-y-4 text-sm text-muted-foreground">
           <div>
-            <h4 className="font-semibold mb-2">
-              Step 1: Get your Resend API Key
+            <h4 className="font-semibold mb-2 text-foreground">
+              Step 1: Mailtrap sandbox inbox
             </h4>
-            <ol className="list-decimal list-inside space-y-2 text-sm text-muted-foreground">
+            <ol className="list-decimal list-inside space-y-2">
               <li>
-                {"Go to "}
+                Open{" "}
                 <a
-                  href="https://resend.com"
+                  href="https://mailtrap.io"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="text-blue-600 hover:underline inline-flex items-center gap-1"
                 >
-                  {"resend.com "}
+                  mailtrap.io
                   <ExternalLink className="w-3 h-3" />
-                </a>
+                </a>{" "}
+                and create a sandbox inbox.
               </li>
-              <li>Sign up for a free account (100 emails/day free)</li>
-              <li>Create an API key in your dashboard</li>
-              <li>Copy the API key (starts with "re_")</li>
+              <li>Copy SMTP credentials (host, port, username, password).</li>
             </ol>
           </div>
           <div>
-            <h4 className="font-semibold mb-2">Step 2: Configure the API server</h4>
-            <ol className="list-decimal list-inside space-y-2 text-sm text-muted-foreground">
-              <li>Open your server environment file (for example <code className="bg-muted px-1 rounded">server/.env</code>)</li>
-              <li>
-                {"Set "}
-                <code className="bg-muted px-1 rounded">RESEND_API_KEY</code>
-                {" to your Resend key"}
-              </li>
-              <li>Restart the Node process so the new variable loads</li>
-            </ol>
+            <h4 className="font-semibold mb-2 text-foreground">
+              Step 2: server/.env
+            </h4>
+            <pre className="rounded bg-muted p-3 text-xs overflow-x-auto">
+{`EMAIL_TRANSPORT=smtp
+SMTP_HOST=sandbox.smtp.mailtrap.io
+SMTP_PORT=2525
+SMTP_USER=your_mailtrap_user
+SMTP_PASS=your_mailtrap_password
+EMAIL_FROM=StartupVerse <noreply@startupverse.test>
+PUBLIC_APP_URL=http://localhost:3000`}
+            </pre>
           </div>
-          {error && (
-            <Alert variant="destructive">
-              <AlertCircle className="h-4 w-4" />
-              <AlertDescription>{error}</AlertDescription>
-            </Alert>
-          )}
-          {success && (
-            <Alert>
-              <CheckCircle2 className="h-4 w-4 text-green-600" />
-              <AlertDescription className="text-green-600">
-                {success}
-              </AlertDescription>
-            </Alert>
-          )}
-          <div className="flex gap-2 items-end">
-            <div className="flex-1">
-              <label className="text-sm font-medium mb-2 block">
-                Resend API Key (for reference)
-              </label>
-              <PasswordInput
-                autoComplete="off"
-                placeholder="Paste your Resend API key (starts with re_)"
-                value={apiKey}
-                onChange={(e) => setApiKey(e.target.value)}
-                className="font-mono text-sm"
-              />
-            </div>
-            <Button onClick={handleSetup} disabled={isLoading || !apiKey}>
-              Copy Instructions
-            </Button>
+          <div>
+            <h4 className="font-semibold mb-2 text-foreground">Step 3: Restart API</h4>
+            <p>
+              Restart the Node server, then sign in and use{" "}
+              <code className="bg-muted px-1 rounded">POST /emails/test</code> or
+              send a cohort invite to verify messages appear in Mailtrap.
+            </p>
           </div>
-          <p className="text-xs text-muted-foreground">
-            💡 Once configured, reload this page. The setup prompt will
-            disappear automatically.
-          </p>
         </div>
+
+        <p className="text-xs text-muted-foreground flex items-center gap-1">
+          <CheckCircle2 className="w-3 h-3" />
+          This prompt hides automatically once SMTP sends successfully.
+        </p>
       </CardContent>
     </Card>
   );

@@ -22,7 +22,6 @@ import {
   Clock,
   MessageSquare,
   User as UserIconLucide,
-  Briefcase,
   UserPlus,
   ArrowLeft,
   Inbox as InboxIcon,
@@ -48,6 +47,16 @@ const defaultOptions = {
     "Content-Type": "application/json",
   },
 };
+
+const INBOX_CARD_BASE =
+  "cursor-pointer border-0 rounded-[14px] bg-white shadow-[0_2px_12px_rgba(0,0,0,0.06)] transition-all duration-200 ease hover:shadow-[0_4px_20px_rgba(58,90,254,0.10)]";
+const INBOX_CARD_UNREAD = "ring-1 ring-[#3a5afe]/20";
+const INBOX_AVATAR_FALLBACK =
+  "rounded-[10px] bg-[#3a5afe] font-body text-sm font-bold text-white";
+const INBOX_PRIMARY_BTN =
+  "h-9 rounded-input bg-primary font-body text-[13px] font-semibold text-white shadow-[0_4px_16px_rgba(58,90,254,0.25)] hover:bg-primary-hover";
+const INBOX_OUTLINE_BTN =
+  "h-9 rounded-input border border-surface-border bg-white font-body text-[13px] font-medium text-text-body hover:bg-primary-tint hover:text-primary";
 
 // Normalize MongoDB _id to id so all item.id references work
 const normalizeItem = (item) => {
@@ -366,10 +375,13 @@ export default function Inbox({ user, onBack, initialTab = "received", onNavigat
           );
           if (response.ok) {
             const messagesData = await response.json();
-            setOrgMessages(messagesData.messages || []);
+            const messageList = Array.isArray(messagesData?.data)
+              ? messagesData.data
+              : messagesData?.messages || messagesData?.data?.messages || [];
+            setOrgMessages(messageList);
             console.log(
               "📨 [Inbox-Founder] Organization messages loaded:",
-              messagesData.messages?.length || 0,
+              messageList.length,
             );
           }
         } catch (error) {
@@ -885,7 +897,7 @@ export default function Inbox({ user, onBack, initialTab = "received", onNavigat
             return (
               <Card
                 key={orgMsg.id}
-                className={`cursor-pointer hover:shadow-md transition-all duration-200 ${isNewMessage ? "border-primary/50 bg-primary/5" : ""}`}
+                className={`${INBOX_CARD_BASE} ${isNewMessage ? INBOX_CARD_UNREAD : ""}`}
                 onClick={() => {
                   setSelectedItem(orgMsg);
                   markAsRead(orgMsg.id);
@@ -894,47 +906,43 @@ export default function Inbox({ user, onBack, initialTab = "received", onNavigat
                 <CardContent className="p-4">
                   <div className="flex items-start gap-4">
                     <div className="relative">
-                      <Avatar className="w-12 h-12">
-                        <AvatarFallback className="bg-blue-100 dark:bg-blue-900/30 text-blue-900 dark:text-blue-100 font-semibold">
-                          <Building2 className="w-6 h-6" />
+                      <Avatar className="h-12 w-12">
+                        <AvatarFallback className={INBOX_AVATAR_FALLBACK}>
+                          <Building2 className="h-5 w-5" />
                         </AvatarFallback>
                       </Avatar>
                       {isNewMessage && (
-                        <div className="absolute -top-1 -right-1 w-3 h-3 bg-primary rounded-full ring-2 ring-background" />
+                        <div className="absolute -right-1 -top-1 h-3 w-3 rounded-full bg-[#3a5afe] ring-2 ring-white" />
                       )}
                     </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-start justify-between gap-2 mb-1">
-                        <div className="flex items-center gap-2 flex-1">
-                          <Mail className="w-4 h-4 text-blue-600 flex-shrink-0" />
-                          <h4
-                            className={`${isNewMessage ? "font-bold" : "font-medium"}`}
-                          >
+                    <div className="min-w-0 flex-1">
+                      <div className="mb-1 flex items-start justify-between gap-2">
+                        <div className="flex flex-1 items-center gap-2">
+                          <Mail className="h-4 w-4 flex-shrink-0 text-[#3a5afe]" />
+                          <h4 className="font-heading text-base font-semibold text-[#0d0d0d]">
                             {orgMsg.subject}
                           </h4>
                         </div>
                         {isNewMessage && (
-                          <Badge variant="default" className="text-[10px] px-2">
+                          <Badge className="rounded-full border-0 bg-[#e8ebff] px-2 py-0 font-body text-[10px] font-semibold text-[#3a5afe] shadow-none">
                             NEW
                           </Badge>
                         )}
                       </div>
-                      <p className="text-xs text-muted-foreground mb-2">
-                        {"From: "}
-                        <span className="font-medium text-blue-600">
+                      <p className="mb-2 font-body text-xs text-[#4a4a5a]">
+                        From{" "}
+                        <span className="font-medium text-[#3a5afe]">
                           {orgMsg.sentByName || "Organization"}
                         </span>
                       </p>
-                      <p
-                        className={`text-sm line-clamp-2 mb-2 ${isNewMessage ? "font-medium" : ""}`}
-                      >
+                      <p className="mb-2 line-clamp-2 font-body text-sm text-[#4a4a5a]">
                         {orgMsg.message}
                       </p>
-                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                        <Calendar className="w-3 h-3" />
+                      <div className="flex items-center gap-2 font-body text-xs text-[#a0a0b0]">
+                        <Calendar className="h-3 w-3" />
                         <span
                           className={
-                            isNewMessage ? "font-semibold text-primary" : ""
+                            isNewMessage ? "font-semibold text-[#3a5afe]" : ""
                           }
                         >
                           {formatDateTime(orgMsg.sentAt)}
@@ -962,7 +970,7 @@ export default function Inbox({ user, onBack, initialTab = "received", onNavigat
             return (
               <Card
                 key={orgInvite.id}
-                className={`cursor-pointer hover:shadow-md transition-all duration-200 ${isNewMessage ? "border-primary/50 bg-primary/5" : ""}`}
+                className={`${INBOX_CARD_BASE} ${isNewMessage ? INBOX_CARD_UNREAD : ""}`}
                 onClick={() => {
                   setSelectedItem(orgInvite);
                   markAsRead(orgInvite.id);
@@ -972,51 +980,44 @@ export default function Inbox({ user, onBack, initialTab = "received", onNavigat
                 <CardContent className="p-4">
                   <div className="flex items-start gap-4">
                     <div className="relative">
-                      <Avatar className="w-12 h-12">
-                        <AvatarFallback className="bg-green-100 dark:bg-green-900/30 text-green-900 dark:text-green-100 font-semibold">
+                      <Avatar className="h-12 w-12">
+                        <AvatarFallback className={INBOX_AVATAR_FALLBACK}>
                           {(orgInvite.organizationName || "O")[0].toUpperCase()}
                         </AvatarFallback>
                       </Avatar>
                       {isNewMessage && (
-                        <div className="absolute -top-1 -right-1 w-3 h-3 bg-primary rounded-full ring-2 ring-background" />
+                        <div className="absolute -right-1 -top-1 h-3 w-3 rounded-full bg-[#3a5afe] ring-2 ring-white" />
                       )}
                     </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-start justify-between gap-2 mb-1">
-                        <div className="flex items-center gap-2 flex-1">
-                          <Briefcase className="w-4 h-4 text-green-600 flex-shrink-0" />
-                          <h4
-                            className={`${isNewMessage ? "font-bold" : "font-medium"}`}
-                          >
-                            Organization Invitation
+                    <div className="min-w-0 flex-1">
+                      <div className="mb-1 flex items-start justify-between gap-2">
+                        <div className="flex flex-1 items-center gap-2">
+                          <Building2 className="h-4 w-4 flex-shrink-0 text-[#3a5afe]" />
+                          <h4 className="font-heading text-base font-semibold text-[#0d0d0d]">
+                            Cohort invitation
                           </h4>
                         </div>
                         {getStatusBadge(orgInvite.status)}
                       </div>
-                      <div className="flex items-center gap-2 mb-2 flex-wrap">
-                        <Briefcase className="w-3 h-3 text-muted-foreground" />
-                        <p className="text-xs text-muted-foreground">
-                          <span className="font-medium text-green-600">
-                            {orgInvite.organizationName || "Organization"}
-                          </span>
-                          {" • "}
-                          <span className="font-medium">
-                            {orgInvite.cohortName || "Cohort"}
-                          </span>
-                        </p>
-                      </div>
+                      <p className="mb-2 font-body text-xs text-[#4a4a5a]">
+                        <span className="font-medium text-[#3a5afe]">
+                          {orgInvite.organizationName || "Organization"}
+                        </span>
+                        {" · "}
+                        <span className="font-medium text-[#0d0d0d]">
+                          {orgInvite.cohortName || "Cohort"}
+                        </span>
+                      </p>
                       {orgInvite.message && (
-                        <p
-                          className={`text-sm line-clamp-2 mb-2 ${isNewMessage ? "font-medium" : ""}`}
-                        >
+                        <p className="mb-2 line-clamp-2 font-body text-sm text-[#4a4a5a]">
                           {orgInvite.message}
                         </p>
                       )}
-                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                        <Calendar className="w-3 h-3" />
+                      <div className="flex items-center gap-2 font-body text-xs text-[#a0a0b0]">
+                        <Calendar className="h-3 w-3" />
                         <span
                           className={
-                            isNewMessage ? "font-semibold text-primary" : ""
+                            isNewMessage ? "font-semibold text-[#3a5afe]" : ""
                           }
                         >
                           {formatDateTime(
@@ -1026,10 +1027,7 @@ export default function Inbox({ user, onBack, initialTab = "received", onNavigat
                           )}
                         </span>
                         {isNewMessage && (
-                          <Badge
-                            variant="default"
-                            className="ml-2 h-5 text-[10px] px-2"
-                          >
+                          <Badge className="ml-2 rounded-full border-0 bg-[#e8ebff] px-2 py-0 font-body text-[10px] font-semibold text-[#3a5afe] shadow-none">
                             NEW
                           </Badge>
                         )}
@@ -1418,88 +1416,91 @@ export default function Inbox({ user, onBack, initialTab = "received", onNavigat
           open={!!selectedItem}
           onOpenChange={() => setSelectedItem(null)}
         >
-          <DialogContent className="max-w-lg">
+          <DialogContent className="max-w-lg rounded-card border-0 shadow-soft">
             <DialogHeader>
-              <DialogTitle className="flex items-center gap-2">
-                <Briefcase className="w-5 h-5 text-green-600" />
-                Organization Invitation
+              <DialogTitle className="flex items-center gap-2 font-heading text-[18px] font-bold text-text-heading">
+                <Building2 className="h-5 w-5 text-primary" />
+                Cohort invitation
               </DialogTitle>
-              <DialogDescription>
-                {"Join "}
-                {orgInvite.cohortName || "this cohort"}
-                {" in "}
-                {orgInvite.organizationName || "this organization"}
+              <DialogDescription className="font-body text-[13px] text-text-body">
+                Join{" "}
+                <span className="font-medium text-text-heading">
+                  {orgInvite.cohortName || "this cohort"}
+                </span>{" "}
+                with{" "}
+                <span className="font-medium text-text-heading">
+                  {orgInvite.organizationName || "this organization"}
+                </span>
               </DialogDescription>
             </DialogHeader>
-            <div className="space-y-4">
-              <div className="p-4 bg-gradient-to-br from-green-50 to-blue-50 dark:from-green-950/20 dark:to-blue-950/20 rounded-lg border border-green-200 dark:border-green-800">
-                <div className="flex items-start gap-3 mb-3">
-                  <Avatar className="w-12 h-12">
-                    <AvatarFallback className="bg-green-100 dark:bg-green-900/30 text-green-900 dark:text-green-100 font-semibold text-lg">
+            <div className="space-y-4 font-body">
+              <div className="rounded-input border border-primary/20 bg-primary-tint p-4">
+                <div className="mb-3 flex items-start gap-3">
+                  <Avatar className="h-12 w-12">
+                    <AvatarFallback className={INBOX_AVATAR_FALLBACK}>
                       {(orgInvite.organizationName || "O")[0].toUpperCase()}
                     </AvatarFallback>
                   </Avatar>
-                  <div className="flex-1">
-                    <h3 className="font-bold text-lg text-green-900 dark:text-green-100">
+                  <div className="min-w-0 flex-1">
+                    <h3 className="font-heading text-[16px] font-semibold text-text-heading">
                       {orgInvite.organizationName || "Organization"}
                     </h3>
-                    <p className="text-sm text-green-700 dark:text-green-300">
+                    <p className="font-body text-[13px] text-primary">
                       {orgInvite.cohortName || "Cohort"}
                     </p>
                   </div>
+                  {getStatusBadge(orgInvite.status)}
                 </div>
                 {orgInvite.message && (
-                  <div className="mt-3 pt-3 border-t border-green-200 dark:border-green-800">
-                    <p className="text-sm text-muted-foreground mb-1 font-medium">
-                      Message:
+                  <div className="mt-3 border-t border-primary/15 pt-3">
+                    <p className="mb-1 font-body text-[12px] font-medium text-text-muted">
+                      Message
                     </p>
-                    <p className="text-sm">{orgInvite.message}</p>
+                    <p className="font-body text-[13px] text-text-body">
+                      {orgInvite.message}
+                    </p>
                   </div>
                 )}
-                <div className="mt-3 pt-3 border-t border-green-200 dark:border-green-800">
-                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                    <Calendar className="w-3 h-3" />
-                    <span>
-                      {"Invited on "}
-                      {formatDateTime(orgInvite.sentAt || orgInvite.createdAt)}
-                    </span>
-                  </div>
+                <div className="mt-3 flex items-center gap-2 border-t border-primary/15 pt-3 font-body text-[12px] text-text-muted">
+                  <Calendar className="h-3 w-3" />
+                  <span>
+                    {formatDateTime(orgInvite.sentAt || orgInvite.createdAt)}
+                  </span>
                 </div>
               </div>
               {orgInvite.status === "pending" ? (
-                <div className="space-y-2">
-                  <p className="text-sm text-muted-foreground text-center">
-                    Accept this invitation to join the cohort and access
-                    exclusive resources, mentorship, and networking
-                    opportunities.
+                <div className="space-y-3">
+                  <p className="text-center font-body text-[13px] text-text-body">
+                    Accept to join the cohort. Your program gets read-only access
+                    to execution progress to support your journey.
                   </p>
                   <div className="flex gap-2">
                     <Button
                       onClick={() =>
                         handleRespondToOrgInvitation(orgInvite, "accept")
                       }
-                      className="flex-1 bg-green-600 hover:bg-green-700"
+                      className={`flex-1 ${INBOX_PRIMARY_BTN}`}
                       disabled={isSending}
                     >
                       {isSending ? (
-                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                       ) : (
-                        <CheckCircle2 className="w-4 h-4 mr-2" />
+                        <CheckCircle2 className="mr-2 h-4 w-4" />
                       )}
-                      Accept Invitation
+                      Accept invitation
                     </Button>
                     <Button
                       onClick={() =>
                         handleRespondToOrgInvitation(orgInvite, "decline")
                       }
-                      className="flex-1"
+                      className={`flex-1 ${INBOX_OUTLINE_BTN}`}
                       variant="outline"
                       disabled={isSending}
                     >
                       {isSending ? (
-                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                       ) : (
-                        <XCircle className="w-4 h-4 mr-2" />
+                        <XCircle className="mr-2 h-4 w-4" />
                       )}
                       Decline
                     </Button>
@@ -1507,22 +1508,26 @@ export default function Inbox({ user, onBack, initialTab = "received", onNavigat
                 </div>
               ) : (
                 <div
-                  className={`p-4 rounded-lg border ${orgInvite.status === "accepted" ? "bg-green-50 dark:bg-green-950/20 border-green-200 dark:border-green-800" : "bg-red-50 dark:bg-red-950/20 border-red-200 dark:border-red-800"}`}
+                  className={`rounded-input border p-4 ${
+                    orgInvite.status === "accepted"
+                      ? "border-[#00c896]/30 bg-[#d1fae5]/40"
+                      : "border-[#ff4f6b]/30 bg-[#fff1f2]/60"
+                  }`}
                 >
-                  <div className="flex items-center gap-2 mb-2">
+                  <div className="mb-2 flex items-center gap-2">
                     {orgInvite.status === "accepted" ? (
-                      <CheckCircle2 className="w-5 h-5 text-green-600 dark:text-green-400" />
+                      <CheckCircle2 className="h-5 w-5 text-[#00c896]" />
                     ) : (
-                      <XCircle className="w-5 h-5 text-red-600 dark:text-red-400" />
+                      <XCircle className="h-5 w-5 text-[#ff4f6b]" />
                     )}
-                    <p className="font-semibold">
+                    <p className="font-heading text-[14px] font-semibold text-text-heading">
                       {orgInvite.status === "accepted"
-                        ? "Invitation Accepted"
-                        : "Invitation Declined"}
+                        ? "Invitation accepted"
+                        : "Invitation declined"}
                     </p>
                   </div>
                   {orgInvite.respondedAt && (
-                    <p className="text-xs text-muted-foreground">
+                    <p className="font-body text-[12px] text-text-muted">
                       {formatDateTime(orgInvite.respondedAt)}
                     </p>
                   )}
@@ -2072,20 +2077,22 @@ export default function Inbox({ user, onBack, initialTab = "received", onNavigat
         </div>
       </div>
       {isFounderInboxUser && founderCohorts.length > 0 && (
-        <Card className="mb-4">
-          <CardContent className="p-3 flex items-center justify-between">
+        <Card className="mb-4 rounded-card border-0 bg-white shadow-soft">
+          <CardContent className="flex items-center justify-between p-4">
             <div>
-              <p className="text-sm font-medium">Message Your Organization</p>
-              <p className="text-xs text-muted-foreground">
+              <p className="font-heading text-[14px] font-semibold text-text-heading">
+                Message your organization
+              </p>
+              <p className="font-body text-[12px] text-text-muted">
                 Contact your accelerator or program
               </p>
             </div>
             <Button
               size="sm"
               onClick={() => setShowOrgMessageComposer(true)}
-              className="gap-2"
+              className={`gap-2 ${INBOX_PRIMARY_BTN}`}
             >
-              <Building2 className="w-4 h-4" />
+              <Building2 className="h-4 w-4" />
               Compose
             </Button>
           </CardContent>

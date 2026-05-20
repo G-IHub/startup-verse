@@ -17,6 +17,7 @@ import {
 } from "./_primitives";
 import CohortHomePage from "./CohortHomePage";
 import InviteStartupModal from "./InviteStartupModal";
+import AvailableStartupsPanel from "./AvailableStartupsPanel";
 import StartupSnapshotModal from "./StartupSnapshotModal";
 import PortfolioOverview from "./PortfolioOverview";
 import ProgramMilestones from "./ProgramMilestones";
@@ -52,6 +53,7 @@ export default function CohortDashboardWithSidebar({
   const [startups, setStartups] = useState([]);
   const [selectedStartup, setSelectedStartup] = useState(null);
   const [showInviteModal, setShowInviteModal] = useState(false);
+  const [inviteModalMode, setInviteModalMode] = useState("browse");
   const [showSnapshotModal, setShowSnapshotModal] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -137,7 +139,10 @@ export default function CohortDashboardWithSidebar({
           <CohortHomePage
             cohort={cohort}
             onNavigate={setCurrentPage}
-            onInviteClick={() => setShowInviteModal(true)}
+            onInviteClick={() => {
+              setInviteModalMode("browse");
+              setShowInviteModal(true);
+            }}
             isAdmin={isAdmin}
             organizationName={organizationName}
             organizationType={organizationType}
@@ -227,7 +232,10 @@ export default function CohortDashboardWithSidebar({
                 isAdmin ? (
                   <Button
                     size="sm"
-                    onClick={() => setShowInviteModal(true)}
+                    onClick={() => {
+                      setInviteModalMode("browse");
+                      setShowInviteModal(true);
+                    }}
                     className="h-9 rounded-input bg-primary font-body text-[13px] font-semibold text-white shadow-[0_4px_16px_rgba(58,90,254,0.20)] hover:bg-primary-hover"
                   >
                     <Plus className="mr-2 h-4 w-4" />
@@ -238,25 +246,27 @@ export default function CohortDashboardWithSidebar({
             />
             <SectionCard.Body>
               {startups.length === 0 ? (
-                <EmptyStateBlock
-                  variant="centered"
-                  icon={Rocket}
-                  tone="info"
-                  title="No startups yet"
-                  description='Click "Invite Startup" to add startups to this cohort'
-                  action={
-                    isAdmin ? (
-                      <Button
-                        size="sm"
-                        onClick={() => setShowInviteModal(true)}
-                        className="h-9 rounded-input bg-primary font-body text-[13px] font-semibold text-white shadow-[0_4px_16px_rgba(58,90,254,0.20)] hover:bg-primary-hover"
-                      >
-                        <Plus className="mr-2 h-4 w-4" />
-                        Invite Startup
-                      </Button>
-                    ) : null
-                  }
-                />
+                isAdmin ? (
+                  <AvailableStartupsPanel
+                    cohortId={cohortId}
+                    cohortName={cohort?.name}
+                    organizationId={organizationId}
+                    userId={userId}
+                    onInviteSuccess={loadData}
+                    onInviteByEmail={() => {
+                      setInviteModalMode("email");
+                      setShowInviteModal(true);
+                    }}
+                  />
+                ) : (
+                  <EmptyStateBlock
+                    variant="centered"
+                    icon={Rocket}
+                    tone="info"
+                    title="No startups yet"
+                    description="This cohort has no startup members."
+                  />
+                )
               ) : (
                 <div className="space-y-2">
                   {startups.map((startup) => (
@@ -384,7 +394,10 @@ export default function CohortDashboardWithSidebar({
                 {currentPage === "home" && (
                   <Button
                     size="sm"
-                    onClick={() => setShowInviteModal(true)}
+                    onClick={() => {
+                      setInviteModalMode("browse");
+                      setShowInviteModal(true);
+                    }}
                     className="h-9 rounded-input bg-primary font-body text-[13px] font-semibold text-white shadow-[0_4px_16px_rgba(58,90,254,0.20)] hover:bg-primary-hover"
                   >
                     <Plus className="w-4 h-4 mr-2" />
@@ -397,7 +410,10 @@ export default function CohortDashboardWithSidebar({
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={() => setShowInviteModal(true)}
+                        onClick={() => {
+                          setInviteModalMode("browse");
+                          setShowInviteModal(true);
+                        }}
                         className="h-9 rounded-input border border-surface-border bg-white font-body text-[13px] font-medium text-text-body hover:border-primary hover:text-primary hidden sm:flex"
                       >
                         <Plus className="w-4 h-4 mr-2" />
@@ -426,6 +442,7 @@ export default function CohortDashboardWithSidebar({
       <InviteStartupModal
         isOpen={showInviteModal}
         onClose={() => setShowInviteModal(false)}
+        initialMode={inviteModalMode}
         cohortId={cohortId}
         cohortName={cohort.name}
         organizationId={organizationId}

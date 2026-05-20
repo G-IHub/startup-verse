@@ -22,6 +22,11 @@ import { createNotification, broadcastNotification } from "../services/notificat
 import { SOCKET_EVENTS } from "../realtime/events.js";
 import { startupRoom, userRoom } from "../realtime/rooms.js";
 import { mapActivityToDto } from "../utils/activityDto.js";
+import {
+  getAppBaseUrl,
+  sendCohortInvitationEmail,
+} from "../services/emailService.js";
+import { logger } from "../config/logger.js";
 
 const isAdmin = (req) => req.user?.isAdmin === true;
 const isSelfOrAdmin = (req, userId) => isAdmin(req) || req.user?.id === String(userId);
@@ -269,13 +274,38 @@ export const createInvitation = async (req, res) => {
     metadata,
   });
 
+  const organization = cohort.organizationId
+    ? await Organization.findById(cohort.organizationId, { name: 1 }).lean()
+    : null;
+  const organizationName = organization?.name || "";
+  const cohortName = cohort.name || "a cohort";
+  const founderName =
+    metadata.founderName ||
+    (typeof req.body?.founderName === "string" ? req.body.founderName.trim() : "");
+
+  const inviteUrl = `${getAppBaseUrl()}/?invitation=${invitation.token}`;
+  sendCohortInvitationEmail({
+    to: normalizedEmail,
+    founderName,
+    cohortName,
+    organizationName,
+    message: invitation.message,
+    inviteUrl,
+  }).catch((err) => {
+    logger.warn("cohort-invite-email failed", {
+      invitationId: String(invitation._id),
+      to: normalizedEmail,
+      message: err?.message,
+    });
+  });
+
   // If the invitee is an existing user, drop a notification immediately.
   if (invitation.founderId) {
     await createNotification({
       userId: invitation.founderId,
       type: "cohort-invitation",
       title: "You've been invited to a cohort",
-      message: `Join "${cohort.name || "a cohort"}" via the invitation link.`,
+      message: `Join "${cohortName}" via the invitation link.`,
       actionUrl: `/?invitation=${invitation.token}`,
       metadata: {
         invitationId: String(invitation._id),
@@ -286,6 +316,52 @@ export const createInvitation = async (req, res) => {
   }
   return apiSuccess(res, invitation, 201);
 };
+
+async function enrichCohortInvitationsForList(invites) {
+  if (!invites?.length) return [];
+
+  const cohortIds = [
+    ...new Set(invites.map((inv) => String(inv.cohortId || "")).filter(Boolean)),
+  ];
+  const orgIds = [
+    ...new Set(
+      invites.map((inv) => String(inv.organizationId || "")).filter(Boolean),
+    ),
+  ];
+
+  const [cohorts, organizations] = await Promise.all([
+    cohortIds.length
+      ? Cohort.find({ _id: { $in: cohortIds } }).select("name").lean()
+      : [],
+    orgIds.length
+      ? Organization.find({ _id: { $in: orgIds } }).select("name").lean()
+      : [],
+  ]);
+
+  const cohortNameById = new Map(
+    cohorts.map((cohort) => [String(cohort._id), cohort.name || ""]),
+  );
+  const orgNameById = new Map(
+    organizations.map((org) => [String(org._id), org.name || ""]),
+  );
+
+  return invites.map((inv) => {
+    const cohortId = inv.cohortId ? String(inv.cohortId) : "";
+    const organizationId = inv.organizationId ? String(inv.organizationId) : "";
+    return {
+      ...inv,
+      id: String(inv._id),
+      cohortName:
+        cohortNameById.get(cohortId) ||
+        inv.metadata?.cohortName ||
+        "Cohort",
+      organizationName:
+        orgNameById.get(organizationId) ||
+        inv.metadata?.organizationName ||
+        "Organization",
+    };
+  });
+}
 
 // Blueprint §14: GET /invitations/founder/:founderId — cohort invitations for a founder.
 export const getFounderInvitations = async (req, res) => {
@@ -304,7 +380,16 @@ export const getFounderInvitations = async (req, res) => {
       .sort({ createdAt: -1 })
       .lean(),
   ]);
-  return apiSuccess(res, [...cohortInvites, ...legacyOrgInvites]);
+
+  const enrichedCohort = await enrichCohortInvitationsForList(cohortInvites);
+  const enrichedLegacy = legacyOrgInvites.map((inv) => ({
+    ...inv,
+    id: String(inv._id),
+    cohortName: inv.metadata?.cohortName || "Cohort",
+    organizationName: inv.metadata?.organizationName || "Organization",
+  }));
+
+  return apiSuccess(res, [...enrichedCohort, ...enrichedLegacy]);
 };
 
 // Blueprint §14: GET /invitations/token/:token
