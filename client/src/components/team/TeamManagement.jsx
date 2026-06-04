@@ -88,7 +88,7 @@ export default function TeamManagement({
   ];
 
   // Calculate stats
-  const activeMembers = teamMembers.filter((m) => m.status === "active").length;
+  const activeMembers = teamMembers.filter((m) => m.isOnline).length;
   const avgPerformance = Math.round(
     teamMembers.reduce((acc, m) => acc + m.performance, 0) / teamMembers.length,
   );
@@ -173,14 +173,14 @@ export default function TeamManagement({
     }
   };
   return (
-    <div className="h-full flex flex-col bg-gray-50 dark:bg-gray-950">
-      <div className="bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 px-4 py-2">
+    <div className="h-full flex flex-col bg-gray-50">
+      <div className="bg-white border-b border-gray-200 px-4 py-2">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-lg font-semibold text-gray-900 dark:text-white">
+            <h1 className="text-lg font-semibold text-gray-900">
               Team Management
             </h1>
-            <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+            <p className="text-xs text-gray-500 mt-0.5">
               {teamMembers.length}
               {" team members • "}
               {activeMembers}
@@ -291,7 +291,7 @@ export default function TeamManagement({
         onValueChange={setActiveTab}
         className="flex-1 flex flex-col"
       >
-        <TabsList className="grid w-full grid-cols-4 h-9 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 rounded-none">
+        <TabsList className="grid w-full grid-cols-4 h-9 bg-white border-b border-gray-200 rounded-none">
           <TabsTrigger
             value="overview"
             className="text-xs data-[state=active]:bg-[#3A5AFE]/10 data-[state=active]:text-[#3A5AFE]"
@@ -331,14 +331,14 @@ export default function TeamManagement({
           className="flex-1 overflow-auto p-3 space-y-2 m-0"
         >
           <div className="grid grid-cols-4 gap-2">
-            <Card className="border-gray-200 dark:border-gray-800">
+            <Card className="border-gray-200">
               <CardContent className="p-2.5">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-[10px] text-gray-500 dark:text-gray-400">
+                    <p className="text-[10px] text-gray-500">
                       Total Members
                     </p>
-                    <p className="text-xl font-bold text-gray-900 dark:text-white mt-0.5">
+                    <p className="text-xl font-bold text-gray-900 mt-0.5">
                       {teamMembers.length}
                     </p>
                   </div>
@@ -348,14 +348,14 @@ export default function TeamManagement({
                 </div>
               </CardContent>
             </Card>
-            <Card className="border-gray-200 dark:border-gray-800">
+            <Card className="border-gray-200">
               <CardContent className="p-2.5">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-[10px] text-gray-500 dark:text-gray-400">
+                    <p className="text-[10px] text-gray-500">
                       Avg Performance
                     </p>
-                    <p className="text-xl font-bold text-gray-900 dark:text-white mt-0.5">
+                    <p className="text-xl font-bold text-gray-900 mt-0.5">
                       {avgPerformance}%
                     </p>
                   </div>
@@ -365,14 +365,14 @@ export default function TeamManagement({
                 </div>
               </CardContent>
             </Card>
-            <Card className="border-gray-200 dark:border-gray-800">
+            <Card className="border-gray-200">
               <CardContent className="p-2.5">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-[10px] text-gray-500 dark:text-gray-400">
+                    <p className="text-[10px] text-gray-500">
                       Tasks Done
                     </p>
-                    <p className="text-xl font-bold text-gray-900 dark:text-white mt-0.5">
+                    <p className="text-xl font-bold text-gray-900 mt-0.5">
                       {totalTasksCompleted}
                     </p>
                   </div>
@@ -382,14 +382,14 @@ export default function TeamManagement({
                 </div>
               </CardContent>
             </Card>
-            <Card className="border-gray-200 dark:border-gray-800">
+            <Card className="border-gray-200">
               <CardContent className="p-2.5">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-[10px] text-gray-500 dark:text-gray-400">
+                    <p className="text-[10px] text-gray-500">
                       Goals Done
                     </p>
-                    <p className="text-xl font-bold text-gray-900 dark:text-white mt-0.5">
+                    <p className="text-xl font-bold text-gray-900 mt-0.5">
                       {completedGoals}/{teamGoals.length}
                     </p>
                   </div>
@@ -431,11 +431,11 @@ export default function TeamManagement({
             {filteredMembers.map((member) => (
               <Card
                 key={member.id}
-                className="border-gray-200 dark:border-gray-800 hover:shadow-md transition-shadow"
+                className="border-gray-200 hover:shadow-md transition-shadow"
               >
                 <CardContent className="p-2.5">
                   <div className="flex items-start gap-2">
-                    <Avatar className="w-10 h-10 border-2 border-white dark:border-gray-800">
+                    <Avatar className="w-10 h-10 border-2 border-white">
                       <AvatarImage src={member.avatar} />
                       <AvatarFallback className="text-xs">
                         {member.name
@@ -447,10 +447,10 @@ export default function TeamManagement({
                     <div className="flex-1 min-w-0">
                       <div className="flex items-start justify-between gap-1">
                         <div className="min-w-0">
-                          <h4 className="text-xs font-semibold text-gray-900 dark:text-white truncate">
+                          <h4 className="text-xs font-semibold text-gray-900 truncate">
                             {member.name}
                           </h4>
-                          <p className="text-[10px] text-gray-500 dark:text-gray-400 truncate">
+                          <p className="text-[10px] text-gray-500 truncate">
                             {member.role}
                           </p>
                         </div>
@@ -461,44 +461,44 @@ export default function TeamManagement({
                         </Badge>
                       </div>
                       <div className="space-y-1 mt-2">
-                        <div className="flex items-center gap-1 text-[10px] text-gray-500 dark:text-gray-400">
+                        <div className="flex items-center gap-1 text-[10px] text-gray-500">
                           <Briefcase className="w-3 h-3" />
                           <span className="truncate">{member.department}</span>
                         </div>
-                        <div className="flex items-center gap-1 text-[10px] text-gray-500 dark:text-gray-400">
+                        <div className="flex items-center gap-1 text-[10px] text-gray-500">
                           <MapPin className="w-3 h-3" />
                           <span className="truncate">{member.location}</span>
                         </div>
-                        <div className="flex items-center gap-1 text-[10px] text-gray-500 dark:text-gray-400">
+                        <div className="flex items-center gap-1 text-[10px] text-gray-500">
                           <Globe className="w-3 h-3" />
                           <span>{member.workType}</span>
                         </div>
                       </div>
                       <div className="mt-2 space-y-1">
                         <div className="flex items-center justify-between">
-                          <span className="text-[10px] text-gray-500 dark:text-gray-400">
+                          <span className="text-[10px] text-gray-500">
                             Performance
                           </span>
-                          <span className="text-[10px] font-semibold text-gray-900 dark:text-white">
+                          <span className="text-[10px] font-semibold text-gray-900">
                             {member.performance}%
                           </span>
                         </div>
                         <Progress value={member.performance} className="h-1" />
                       </div>
                       <div className="mt-2 grid grid-cols-2 gap-1.5 text-center">
-                        <div className="bg-gray-50 dark:bg-gray-800 rounded px-1.5 py-1">
-                          <p className="text-[10px] text-gray-500 dark:text-gray-400">
+                        <div className="bg-gray-50 rounded px-1.5 py-1">
+                          <p className="text-[10px] text-gray-500">
                             Tasks
                           </p>
-                          <p className="text-xs font-semibold text-gray-900 dark:text-white">
+                          <p className="text-xs font-semibold text-gray-900">
                             {member.tasksCompleted}/{member.totalTasks}
                           </p>
                         </div>
-                        <div className="bg-gray-50 dark:bg-gray-800 rounded px-1.5 py-1">
-                          <p className="text-[10px] text-gray-500 dark:text-gray-400">
+                        <div className="bg-gray-50 rounded px-1.5 py-1">
+                          <p className="text-[10px] text-gray-500">
                             Hours
                           </p>
-                          <p className="text-xs font-semibold text-gray-900 dark:text-white">
+                          <p className="text-xs font-semibold text-gray-900">
                             {member.hoursThisWeek}h
                           </p>
                         </div>
@@ -542,15 +542,15 @@ export default function TeamManagement({
           value="invitations"
           className="flex-1 overflow-auto p-3 space-y-2 m-0"
         >
-          <Card className="border-gray-200 dark:border-gray-800">
+          <Card className="border-gray-200">
             <CardHeader className="p-2.5 pb-0">
               <CardTitle className="text-sm">Pending Invitations</CardTitle>
             </CardHeader>
             <CardContent className="p-2.5">
               {pendingInvitations.length === 0 ? (
                 <div className="text-center py-6">
-                  <Mail className="w-10 h-10 text-gray-300 dark:text-gray-600 mx-auto mb-2" />
-                  <p className="text-xs text-gray-500 dark:text-gray-400">
+                  <Mail className="w-10 h-10 text-gray-300 mx-auto mb-2" />
+                  <p className="text-xs text-gray-500">
                     No pending invitations
                   </p>
                   <Button
@@ -567,17 +567,17 @@ export default function TeamManagement({
                   {pendingInvitations.map((invitation) => (
                     <div
                       key={invitation.id}
-                      className="flex items-center justify-between p-2 bg-gray-50 dark:bg-gray-800 rounded border border-gray-200 dark:border-gray-700"
+                      className="flex items-center justify-between p-2 bg-gray-50 rounded border border-gray-200"
                     >
                       <div className="flex items-center gap-2">
                         <div className="w-8 h-8 rounded-full bg-[#3A5AFE]/10 flex items-center justify-center">
                           <Mail className="w-4 h-4 text-[#3A5AFE]" />
                         </div>
                         <div>
-                          <p className="text-xs font-medium text-gray-900 dark:text-white">
+                          <p className="text-xs font-medium text-gray-900">
                             {invitation.email}
                           </p>
-                          <p className="text-[10px] text-gray-500 dark:text-gray-400">
+                          <p className="text-[10px] text-gray-500">
                             {invitation.role}
                             {" • "}
                             {invitation.department}
@@ -609,7 +609,7 @@ export default function TeamManagement({
               )}
             </CardContent>
           </Card>
-          <Card className="border-gray-200 dark:border-gray-800">
+          <Card className="border-gray-200">
             <CardHeader className="p-2.5 pb-0">
               <CardTitle className="text-sm">Recent Activity</CardTitle>
             </CardHeader>
@@ -620,14 +620,14 @@ export default function TeamManagement({
                   .map((invitation) => (
                     <div
                       key={invitation.id}
-                      className="flex items-center gap-2 p-2 bg-green-50 dark:bg-green-900/10 rounded border border-green-200 dark:border-green-800"
+                      className="flex items-center gap-2 p-2 bg-green-50 rounded border border-green-200"
                     >
                       <CheckCircle className="w-4 h-4 text-green-600" />
                       <div className="flex-1">
-                        <p className="text-xs font-medium text-gray-900 dark:text-white">
+                        <p className="text-xs font-medium text-gray-900">
                           {invitation.email}
                         </p>
-                        <p className="text-[10px] text-gray-500 dark:text-gray-400">
+                        <p className="text-[10px] text-gray-500">
                           {"Accepted invitation • "}
                           {invitation.role}
                         </p>
@@ -648,7 +648,7 @@ export default function TeamManagement({
           value="performance"
           className="flex-1 overflow-auto p-3 space-y-2 m-0"
         >
-          <Card className="border-gray-200 dark:border-gray-800">
+          <Card className="border-gray-200">
             <CardHeader className="p-2.5 pb-0">
               <div className="flex items-center justify-between">
                 <CardTitle className="text-sm">Team Goals</CardTitle>
@@ -666,12 +666,12 @@ export default function TeamManagement({
                 {teamGoals.map((goal) => (
                   <div
                     key={goal.id}
-                    className="p-2 bg-gray-50 dark:bg-gray-800 rounded border border-gray-200 dark:border-gray-700"
+                    className="p-2 bg-gray-50 rounded border border-gray-200"
                   >
                     <div className="flex items-start justify-between mb-1.5">
                       <div className="flex-1">
                         <div className="flex items-center gap-1.5">
-                          <h4 className="text-xs font-semibold text-gray-900 dark:text-white">
+                          <h4 className="text-xs font-semibold text-gray-900">
                             {goal.title}
                           </h4>
                           <Badge
@@ -681,14 +681,14 @@ export default function TeamManagement({
                           </Badge>
                         </div>
                         <div className="flex items-center gap-3 mt-1">
-                          <div className="flex items-center gap-1 text-[10px] text-gray-500 dark:text-gray-400">
+                          <div className="flex items-center gap-1 text-[10px] text-gray-500">
                             <Calendar className="w-3 h-3" />
                             <span>
                               {"Due "}
                               {goal.dueDate.toLocaleDateString()}
                             </span>
                           </div>
-                          <div className="flex items-center gap-1 text-[10px] text-gray-500 dark:text-gray-400">
+                          <div className="flex items-center gap-1 text-[10px] text-gray-500">
                             <Users className="w-3 h-3" />
                             <span>
                               {goal.assignedTo.length}
@@ -703,10 +703,10 @@ export default function TeamManagement({
                     </div>
                     <div className="space-y-1">
                       <div className="flex items-center justify-between">
-                        <span className="text-[10px] text-gray-500 dark:text-gray-400">
+                        <span className="text-[10px] text-gray-500">
                           Progress
                         </span>
-                        <span className="text-[10px] font-semibold text-gray-900 dark:text-white">
+                        <span className="text-[10px] font-semibold text-gray-900">
                           {goal.progress}%
                         </span>
                       </div>
@@ -718,7 +718,7 @@ export default function TeamManagement({
             </CardContent>
           </Card>
           <div className="grid grid-cols-2 gap-2">
-            <Card className="border-gray-200 dark:border-gray-800">
+            <Card className="border-gray-200">
               <CardHeader className="p-2.5 pb-0">
                 <CardTitle className="text-sm">Top Performers</CardTitle>
               </CardHeader>
@@ -741,10 +741,10 @@ export default function TeamManagement({
                           </AvatarFallback>
                         </Avatar>
                         <div className="flex-1 min-w-0">
-                          <p className="text-xs font-medium text-gray-900 dark:text-white truncate">
+                          <p className="text-xs font-medium text-gray-900 truncate">
                             {member.name}
                           </p>
-                          <p className="text-[10px] text-gray-500 dark:text-gray-400">
+                          <p className="text-[10px] text-gray-500">
                             {member.role}
                           </p>
                         </div>
@@ -758,7 +758,7 @@ export default function TeamManagement({
                 </div>
               </CardContent>
             </Card>
-            <Card className="border-gray-200 dark:border-gray-800">
+            <Card className="border-gray-200">
               <CardHeader className="p-2.5 pb-0">
                 <CardTitle className="text-sm">Department Stats</CardTitle>
               </CardHeader>
@@ -784,14 +784,14 @@ export default function TeamManagement({
                           <div className="flex items-center justify-between mb-1">
                             <div className="flex items-center gap-1.5">
                               <Briefcase className="w-3 h-3 text-gray-400" />
-                              <span className="text-xs font-medium text-gray-900 dark:text-white">
+                              <span className="text-xs font-medium text-gray-900">
                                 {dept}
                               </span>
-                              <span className="text-[10px] text-gray-500 dark:text-gray-400">
+                              <span className="text-[10px] text-gray-500">
                                 ({deptMembers.length})
                               </span>
                             </div>
-                            <span className="text-xs font-semibold text-gray-900 dark:text-white">
+                            <span className="text-xs font-semibold text-gray-900">
                               {avgPerf}%
                             </span>
                           </div>
@@ -803,45 +803,45 @@ export default function TeamManagement({
               </CardContent>
             </Card>
           </div>
-          <Card className="border-gray-200 dark:border-gray-800">
+          <Card className="border-gray-200">
             <CardHeader className="p-2.5 pb-0">
               <CardTitle className="text-sm">Team Activity This Week</CardTitle>
             </CardHeader>
             <CardContent className="p-2.5">
               <div className="grid grid-cols-4 gap-2">
-                <div className="text-center p-2 bg-gray-50 dark:bg-gray-800 rounded">
+                <div className="text-center p-2 bg-gray-50 rounded">
                   <Activity className="w-5 h-5 text-[#3A5AFE] mx-auto mb-1" />
-                  <p className="text-lg font-bold text-gray-900 dark:text-white">
+                  <p className="text-lg font-bold text-gray-900">
                     {teamMembers.reduce((acc, m) => acc + m.hoursThisWeek, 0)}
                   </p>
-                  <p className="text-[10px] text-gray-500 dark:text-gray-400">
+                  <p className="text-[10px] text-gray-500">
                     Total Hours
                   </p>
                 </div>
-                <div className="text-center p-2 bg-gray-50 dark:bg-gray-800 rounded">
+                <div className="text-center p-2 bg-gray-50 rounded">
                   <CheckCircle className="w-5 h-5 text-[#2ECC71] mx-auto mb-1" />
-                  <p className="text-lg font-bold text-gray-900 dark:text-white">
+                  <p className="text-lg font-bold text-gray-900">
                     {totalTasksCompleted}
                   </p>
-                  <p className="text-[10px] text-gray-500 dark:text-gray-400">
+                  <p className="text-[10px] text-gray-500">
                     Tasks Done
                   </p>
                 </div>
-                <div className="text-center p-2 bg-gray-50 dark:bg-gray-800 rounded">
+                <div className="text-center p-2 bg-gray-50 rounded">
                   <Target className="w-5 h-5 text-orange-600 mx-auto mb-1" />
-                  <p className="text-lg font-bold text-gray-900 dark:text-white">
+                  <p className="text-lg font-bold text-gray-900">
                     {completedGoals}/{teamGoals.length}
                   </p>
-                  <p className="text-[10px] text-gray-500 dark:text-gray-400">
+                  <p className="text-[10px] text-gray-500">
                     Goals Done
                   </p>
                 </div>
-                <div className="text-center p-2 bg-gray-50 dark:bg-gray-800 rounded">
+                <div className="text-center p-2 bg-gray-50 rounded">
                   <Star className="w-5 h-5 text-yellow-600 mx-auto mb-1" />
-                  <p className="text-lg font-bold text-gray-900 dark:text-white">
+                  <p className="text-lg font-bold text-gray-900">
                     {avgPerformance}%
                   </p>
-                  <p className="text-[10px] text-gray-500 dark:text-gray-400">
+                  <p className="text-[10px] text-gray-500">
                     Avg Score
                   </p>
                 </div>

@@ -33,10 +33,10 @@ export function WeekHistoryPanel({ history, onViewWeek, maxItems = 10 }) {
     });
   };
   const getCompletionColor = (rate) => {
-    if (rate >= 90) return "text-green-600 dark:text-green-400";
-    if (rate >= 70) return "text-blue-600 dark:text-blue-400";
-    if (rate >= 50) return "text-yellow-600 dark:text-yellow-400";
-    return "text-orange-600 dark:text-orange-400";
+    if (rate >= 90) return "text-green-600";
+    if (rate >= 70) return "text-blue-600";
+    if (rate >= 50) return "text-yellow-600";
+    return "text-orange-600";
   };
   const getStatusBadge = (status) => {
     switch (status) {
@@ -44,7 +44,7 @@ export function WeekHistoryPanel({ history, onViewWeek, maxItems = 10 }) {
         return (
           <Badge
             variant="outline"
-            className="bg-green-50 text-green-700 dark:bg-green-950 dark:text-green-300 border-green-200 dark:border-green-800"
+            className="bg-green-50 text-green-700 border-green-200"
           >
             <CheckCircle2 className="size-3 mr-1" />
             Completed
@@ -54,7 +54,7 @@ export function WeekHistoryPanel({ history, onViewWeek, maxItems = 10 }) {
         return (
           <Badge
             variant="outline"
-            className="bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300 border-blue-200 dark:border-blue-800"
+            className="bg-blue-50 text-blue-700 border-blue-200"
           >
             <Clock className="size-3 mr-1" />
             In Progress
@@ -64,7 +64,7 @@ export function WeekHistoryPanel({ history, onViewWeek, maxItems = 10 }) {
         return (
           <Badge
             variant="outline"
-            className="bg-gray-50 text-gray-700 dark:bg-gray-950 dark:text-gray-300 border-gray-200 dark:border-gray-800"
+            className="bg-gray-50 text-gray-700 border-gray-200"
           >
             Abandoned
           </Badge>
@@ -84,7 +84,7 @@ export function WeekHistoryPanel({ history, onViewWeek, maxItems = 10 }) {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+          <div className="text-center py-8 text-gray-500">
             <Calendar className="size-12 mx-auto mb-3 opacity-30" />
             <p className="text-sm">No completed weeks yet</p>
             <p className="text-xs mt-1">
@@ -119,8 +119,8 @@ export function WeekHistoryPanel({ history, onViewWeek, maxItems = 10 }) {
                     className={cn(
                       "p-4 rounded-lg border transition-all cursor-pointer",
                       isExpanded
-                        ? "bg-blue-50 dark:bg-blue-950/30 border-blue-200 dark:border-blue-800"
-                        : "bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 hover:border-blue-200 dark:hover:border-blue-800",
+                        ? "bg-blue-50 border-blue-200"
+                        : "bg-white border-gray-200 hover:border-blue-200",
                     )}
                     onClick={() =>
                       setExpandedWeek(isExpanded ? null : week.weekId)
@@ -137,18 +137,18 @@ export function WeekHistoryPanel({ history, onViewWeek, maxItems = 10 }) {
                         </div>
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 mb-1">
-                            <span className="text-sm font-semibold text-gray-900 dark:text-gray-100">
+                            <span className="text-sm font-semibold text-gray-900">
                               {"Week "}
                               {week.weekNumber}
                             </span>
                             {getStatusBadge(week.outcome.status)}
                           </div>
-                          <p className="text-xs text-gray-600 dark:text-gray-400 mb-2">
+                          <p className="text-xs text-gray-600 mb-2">
                             {formatDate(week.startDate)}
                             {" - "}
                             {formatDate(week.endDate)}
                           </p>
-                          <p className="text-sm text-gray-800 dark:text-gray-200 truncate">
+                          <p className="text-sm text-gray-800 truncate">
                             {week.outcome.title}
                           </p>
                         </div>
@@ -162,7 +162,7 @@ export function WeekHistoryPanel({ history, onViewWeek, maxItems = 10 }) {
                         >
                           {Math.round(week.completionRate)}%
                         </div>
-                        <div className="text-xs text-gray-500 dark:text-gray-400">
+                        <div className="text-xs text-gray-500">
                           completion
                         </div>
                       </div>
@@ -172,37 +172,37 @@ export function WeekHistoryPanel({ history, onViewWeek, maxItems = 10 }) {
                         <Separator className="my-3" />
                         <div className="space-y-3">
                           {week.outcome.description && (
-                            <p className="text-sm text-gray-700 dark:text-gray-300">
+                            <p className="text-sm text-gray-700">
                               {week.outcome.description}
                             </p>
                           )}
                           <div className="grid grid-cols-2 gap-3">
-                            <div className="p-3 bg-white dark:bg-gray-900/50 rounded-lg border border-gray-200 dark:border-gray-700">
+                            <div className="p-3 bg-white rounded-lg border border-gray-200">
                               <div className="flex items-center gap-2 mb-1">
-                                <Target className="size-4 text-blue-600 dark:text-blue-400" />
-                                <span className="text-xs font-medium text-gray-600 dark:text-gray-400">
+                                <Target className="size-4 text-blue-600" />
+                                <span className="text-xs font-medium text-gray-600">
                                   Milestones
                                 </span>
                               </div>
-                              <div className="text-lg font-bold text-gray-900 dark:text-gray-100">
+                              <div className="text-lg font-bold text-gray-900">
                                 {week.milestones.completed}/
                                 {week.milestones.total}
                               </div>
                             </div>
-                            <div className="p-3 bg-white dark:bg-gray-900/50 rounded-lg border border-gray-200 dark:border-gray-700">
+                            <div className="p-3 bg-white rounded-lg border border-gray-200">
                               <div className="flex items-center gap-2 mb-1">
-                                <CheckCircle2 className="size-4 text-green-600 dark:text-green-400" />
-                                <span className="text-xs font-medium text-gray-600 dark:text-gray-400">
+                                <CheckCircle2 className="size-4 text-green-600" />
+                                <span className="text-xs font-medium text-gray-600">
                                   Tasks
                                 </span>
                               </div>
-                              <div className="text-lg font-bold text-gray-900 dark:text-gray-100">
+                              <div className="text-lg font-bold text-gray-900">
                                 {week.tasks.completed}/{week.tasks.total}
                               </div>
                             </div>
                           </div>
                           {week.outcome.completedAt && (
-                            <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
+                            <div className="flex items-center gap-2 text-xs text-gray-500">
                               <Award className="size-3" />
                               {"Completed "}
                               {new Date(
@@ -239,7 +239,7 @@ export function WeekHistoryPanel({ history, onViewWeek, maxItems = 10 }) {
           </div>
           {history.length > maxItems && (
             <div className="mt-4 text-center">
-              <p className="text-sm text-gray-500 dark:text-gray-400">
+              <p className="text-sm text-gray-500">
                 {"Showing "}
                 {maxItems}
                 {" of "}

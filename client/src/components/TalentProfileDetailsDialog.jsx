@@ -71,7 +71,7 @@ export default function TalentProfileDetailsDialog({
               </DialogDescription>
               <div className="flex flex-wrap items-center gap-3 text-sm">
                 {talent.match && (
-                  <div className="flex items-center gap-1 bg-yellow-50 dark:bg-yellow-950/20 px-3 py-1.5 rounded-full">
+                  <div className="flex items-center gap-1 bg-yellow-50 px-3 py-1.5 rounded-full">
                     <Star className="w-4 h-4 text-yellow-500 fill-yellow-500" />
                     <span className="font-semibold text-primary">
                       {talent.match}%
@@ -122,7 +122,7 @@ export default function TalentProfileDetailsDialog({
                   <Target className="w-5 h-5 text-primary" />
                   What I'm Looking For
                 </h3>
-                <div className="p-4 bg-blue-50 dark:bg-blue-950/20 rounded-lg border border-blue-200 dark:border-blue-800">
+                <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
                   <p className="text-muted-foreground leading-relaxed">
                     {talent.lookingFor}
                   </p>
@@ -307,8 +307,8 @@ export default function TalentProfileDetailsDialog({
                       key={cert.id}
                       className="flex items-start gap-3 p-3 border rounded-lg"
                     >
-                      <div className="w-10 h-10 rounded-full bg-green-100 dark:bg-green-950 flex items-center justify-center flex-shrink-0">
-                        <Award className="w-5 h-5 text-green-600 dark:text-green-400" />
+                      <div className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center flex-shrink-0">
+                        <Award className="w-5 h-5 text-green-600" />
                       </div>
                       <div className="flex-1 min-w-0">
                         <h4 className="font-semibold">{cert.name}</h4>

@@ -422,7 +422,7 @@ export default function FounderJourney({ user, onNavigate }) {
       </div>
       {expandedStage === "team-building" && (
         <Card className="border-2 border-primary/50 shadow-lg">
-          <CardHeader className="bg-gradient-to-br from-primary/5 to-purple-50 dark:from-primary/10 dark:to-purple-950/20">
+          <CardHeader className="bg-gradient-to-br from-primary/5 to-purple-50">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <div className="w-12 h-12 rounded-full bg-primary text-white flex items-center justify-center">
@@ -453,12 +453,12 @@ export default function FounderJourney({ user, onNavigate }) {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <Button
                   onClick={() => setHasTeam("yes")}
-                  className="h-auto p-6 bg-white dark:bg-gray-800 hover:bg-blue-50 dark:hover:bg-blue-950/30 text-foreground border-2 hover:border-primary transition-all justify-start"
+                  className="h-auto p-6 bg-white hover:bg-blue-50 text-foreground border-2 hover:border-primary transition-all justify-start"
                   variant="outline"
                 >
                   <div className="flex items-start gap-4 w-full">
-                    <div className="w-12 h-12 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center flex-shrink-0">
-                      <UserPlus className="w-6 h-6 text-green-600 dark:text-green-400" />
+                    <div className="w-12 h-12 rounded-full bg-green-100 flex items-center justify-center flex-shrink-0">
+                      <UserPlus className="w-6 h-6 text-green-600" />
                     </div>
                     <div className="text-left flex-1">
                       <p className="font-semibold mb-1">Yes, I have a team</p>
@@ -471,11 +471,11 @@ export default function FounderJourney({ user, onNavigate }) {
                 </Button>
                 <Button
                   onClick={() => setHasTeam("no")}
-                  className="h-auto p-6 bg-white dark:bg-gray-800 hover:bg-blue-50 dark:hover:bg-blue-950/30 text-foreground border-2 hover:border-primary transition-all justify-start"
+                  className="h-auto p-6 bg-white hover:bg-blue-50 text-foreground border-2 hover:border-primary transition-all justify-start"
                   variant="outline"
                 >
                   <div className="flex items-start gap-4 w-full">
-                    <div className="w-12 h-12 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center flex-shrink-0">
+                    <div className="w-12 h-12 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0">
                       <Search className="w-6 h-6 text-primary" />
                     </div>
                     <div className="text-left flex-1">
@@ -610,7 +610,7 @@ export default function FounderJourney({ user, onNavigate }) {
                     Back
                   </Button>
                 </div>
-                <Card className="border-2 border-primary/30 bg-gradient-to-br from-primary/10 to-purple-100 dark:from-primary/20 dark:to-purple-950/40">
+                <Card className="border-2 border-primary/30 bg-gradient-to-br from-primary/10 to-purple-100">
                   <CardContent className="p-6 space-y-4">
                     <div className="flex items-start gap-3">
                       <Sparkles className="w-8 h-8 text-primary flex-shrink-0" />

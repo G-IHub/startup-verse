@@ -110,7 +110,7 @@ export default function NotificationDebugPanel() {
   }
 
   return (
-    <Card className="fixed bottom-4 right-4 p-4 w-80 bg-yellow-50 dark:bg-yellow-900/20 border-yellow-300 dark:border-yellow-700 z-50">
+    <Card className="fixed bottom-4 right-4 p-4 w-80 bg-yellow-50 border-yellow-300 z-50">
       <div className="flex items-center gap-2 mb-3">
         <Bug className="w-4 h-4 text-yellow-600" />
         <h3 className="font-semibold text-sm">Notification Debug Panel</h3>
@@ -141,7 +141,7 @@ export default function NotificationDebugPanel() {
       </div>
 
       {result && (
-        <div className="mt-3 p-2 bg-white dark:bg-gray-800 rounded text-xs font-mono break-words">
+        <div className="mt-3 p-2 bg-white rounded text-xs font-mono break-words">
           {result}
         </div>
       )}

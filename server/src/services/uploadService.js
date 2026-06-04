@@ -22,27 +22,56 @@ function normalizeScope(scope) {
   return SCOPE_PATTERN.test(raw) ? raw : "general";
 }
 
+function cloudinaryResourceType(mimeType, originalName) {
+  const mt = String(mimeType || "").toLowerCase();
+  const name = String(originalName || "").toLowerCase();
+  if (mt.startsWith("image/")) return "image";
+  if (mt.startsWith("video/")) return "video";
+  if (
+    mt === "application/pdf" ||
+    name.endsWith(".pdf") ||
+    mt.includes("wordprocessingml") ||
+    mt === "application/msword" ||
+    name.endsWith(".doc") ||
+    name.endsWith(".docx") ||
+    mt === "text/plain" ||
+    name.endsWith(".txt")
+  ) {
+    return "raw";
+  }
+  return "auto";
+}
+
 async function uploadViaCloudinary({ buffer, mimeType, originalName, scope }) {
   const cloudinary = getCloudinary();
+  const resourceType = cloudinaryResourceType(mimeType, originalName);
   return new Promise((resolve, reject) => {
     const stream = cloudinary.uploader.upload_stream(
       {
         folder: `startupverse/${scope}`,
-        resource_type: "auto",
+        resource_type: resourceType,
         use_filename: true,
         unique_filename: true,
         filename_override: originalName || undefined,
+        access_mode: "public",
+        type: "upload",
       },
       (err, result) => {
         if (err) return reject(err);
+        const resolvedMime =
+          mimeType ||
+          (result.format === "pdf"
+            ? "application/pdf"
+            : result.resource_type === "video"
+              ? `video/${result.format || "mp4"}`
+              : result.resource_type === "image"
+                ? `image/${result.format || "jpeg"}`
+                : "application/octet-stream");
         resolve({
           url: result.secure_url,
           key: result.public_id,
-          mimeType:
-            mimeType ||
-            (result.resource_type
-              ? `${result.resource_type}/${result.format || "octet-stream"}`
-              : "application/octet-stream"),
+          resourceType: result.resource_type || resourceType,
+          mimeType: resolvedMime,
           size: result.bytes,
         });
       },

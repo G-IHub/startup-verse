@@ -223,7 +223,7 @@ export default function ProfileCompletionReminder({
     return (
       <div className="fixed bottom-6 right-6 z-50 animate-in slide-in-from-bottom-4">
         <Card
-          className="border-2 border-yellow-500 shadow-xl max-w-xs cursor-pointer hover:shadow-2xl transition-all hover:scale-105 bg-gradient-to-br from-yellow-50 to-orange-50 dark:from-yellow-950/30 dark:to-orange-950/30"
+          className="border-2 border-yellow-500 shadow-xl max-w-xs cursor-pointer hover:shadow-2xl transition-all hover:scale-105 bg-gradient-to-br from-yellow-50 to-orange-50"
           onClick={handleMaximize}
         >
           <CardContent className="p-4">
@@ -304,13 +304,13 @@ export default function ProfileCompletionReminder({
                 return (
                   <div
                     key={segment.id}
-                    className={`flex items-center gap-2 p-2 rounded-md transition-colors ${segment.isComplete ? "bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-800" : "bg-muted/50 hover:bg-muted"}`}
+                    className={`flex items-center gap-2 p-2 rounded-md transition-colors ${segment.isComplete ? "bg-green-50 border border-green-200" : "bg-muted/50 hover:bg-muted"}`}
                   >
                     <div
-                      className={`p-1 rounded ${segment.isComplete ? "bg-green-100 dark:bg-green-900/30" : "bg-background"}`}
+                      className={`p-1 rounded ${segment.isComplete ? "bg-green-100" : "bg-background"}`}
                     >
                       <Icon
-                        className={`w-3.5 h-3.5 ${segment.isComplete ? "text-green-600 dark:text-green-400" : "text-primary"}`}
+                        className={`w-3.5 h-3.5 ${segment.isComplete ? "text-green-600" : "text-primary"}`}
                       />
                     </div>
                     <span
@@ -319,7 +319,7 @@ export default function ProfileCompletionReminder({
                       {segment.label}
                     </span>
                     {segment.isComplete ? (
-                      <CheckCircle2 className="w-4 h-4 text-green-600 dark:text-green-400 flex-shrink-0" />
+                      <CheckCircle2 className="w-4 h-4 text-green-600 flex-shrink-0" />
                     ) : (
                       <div className="w-4 h-4 rounded-full border-2 border-muted-foreground flex-shrink-0" />
                     )}

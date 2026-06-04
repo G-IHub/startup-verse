@@ -8,7 +8,7 @@ import { Plus, X } from "lucide-react";
 export function TaskPillPreview({ index, text, compact = false }) {
   return (
     <div
-      className="flex items-center gap-1.5 rounded-full border border-primary/22 bg-primary/[0.05] py-0.5 pl-1 pr-2 shadow-sm dark:border-primary/30 dark:bg-primary/[0.08]"
+      className="flex items-center gap-1.5 rounded-full border border-primary/22 bg-primary/[0.05] py-0.5 pl-1 pr-2 shadow-sm"
       role="presentation"
     >
       <div
@@ -88,7 +88,7 @@ export default function MilestoneTaskFieldList({
             key={idx}
             className={
               rowClassName ||
-              "flex items-center gap-2 rounded-full border border-primary/22 bg-primary/[0.05] py-1 pl-1.5 pr-1 shadow-sm dark:border-primary/30 dark:bg-primary/[0.08]"
+              "flex items-center gap-2 rounded-full border border-primary/22 bg-primary/[0.05] py-1 pl-1.5 pr-1 shadow-sm"
             }
           >
             <div
@@ -106,7 +106,7 @@ export default function MilestoneTaskFieldList({
               placeholder="Task description"
               className={
                 inputClassName ||
-                "h-9 flex-1 border-0 bg-transparent px-2 shadow-none focus-visible:ring-0 focus-visible:ring-offset-0 dark:bg-transparent"
+                "h-9 flex-1 border-0 bg-transparent px-2 shadow-none focus-visible:ring-0 focus-visible:ring-offset-0"
               }
             />
             <Button

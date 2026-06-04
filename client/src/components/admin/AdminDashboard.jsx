@@ -73,7 +73,7 @@ export default function AdminDashboard() {
   }
   return (
     <div className="min-h-screen bg-background">
-      <div className="border-b bg-purple-50 dark:bg-purple-950/20">
+      <div className="border-b bg-purple-50">
         <div className="container mx-auto px-4 py-6">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
@@ -103,10 +103,10 @@ export default function AdminDashboard() {
             </div>
             <Badge
               variant="outline"
-              className="gap-2 bg-purple-100 dark:bg-purple-900/40 border-purple-300 dark:border-purple-700"
+              className="gap-2 bg-purple-100 border-purple-300"
             >
-              <Shield className="w-4 h-4 text-purple-600 dark:text-purple-400" />
-              <span className="text-purple-700 dark:text-purple-300 font-semibold">
+              <Shield className="w-4 h-4 text-purple-600" />
+              <span className="text-purple-700 font-semibold">
                 {"Admin: "}
                 {user.name}
               </span>
@@ -267,10 +267,10 @@ export default function AdminDashboard() {
                   <span className="text-sm">Backend Connection</span>
                   <Badge
                     variant="outline"
-                    className="gap-1 bg-green-50 dark:bg-green-950/30 border-green-200 dark:border-green-800"
+                    className="gap-1 bg-green-50 border-green-200"
                   >
                     <CheckCircle2 className="w-3 h-3 text-green-600" />
-                    <span className="text-green-700 dark:text-green-300">
+                    <span className="text-green-700">
                       Connected
                     </span>
                   </Badge>
@@ -280,10 +280,10 @@ export default function AdminDashboard() {
                   <span className="text-sm">Auth System</span>
                   <Badge
                     variant="outline"
-                    className="gap-1 bg-green-50 dark:bg-green-950/30 border-green-200 dark:border-green-800"
+                    className="gap-1 bg-green-50 border-green-200"
                   >
                     <CheckCircle2 className="w-3 h-3 text-green-600" />
-                    <span className="text-green-700 dark:text-green-300">
+                    <span className="text-green-700">
                       Active
                     </span>
                   </Badge>
@@ -293,10 +293,10 @@ export default function AdminDashboard() {
                   <span className="text-sm">Debug Panels</span>
                   <Badge
                     variant="outline"
-                    className="gap-1 bg-green-50 dark:bg-green-950/30 border-green-200 dark:border-green-800"
+                    className="gap-1 bg-green-50 border-green-200"
                   >
                     <CheckCircle2 className="w-3 h-3 text-green-600" />
-                    <span className="text-green-700 dark:text-green-300">
+                    <span className="text-green-700">
                       Loaded
                     </span>
                   </Badge>
@@ -422,8 +422,8 @@ export default function AdminDashboard() {
                 <div className="space-y-2">
                   <div className="flex items-center justify-between p-3 border rounded-lg">
                     <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 bg-purple-100 dark:bg-purple-900/30 rounded-full flex items-center justify-center">
-                        <Shield className="w-5 h-5 text-purple-600 dark:text-purple-400" />
+                      <div className="w-10 h-10 bg-purple-100 rounded-full flex items-center justify-center">
+                        <Shield className="w-5 h-5 text-purple-600" />
                       </div>
                       <div>
                         <div className="font-semibold">{user.name}</div>
@@ -434,9 +434,9 @@ export default function AdminDashboard() {
                     </div>
                     <Badge
                       variant="outline"
-                      className="bg-purple-50 dark:bg-purple-950/30 border-purple-200 dark:border-purple-800"
+                      className="bg-purple-50 border-purple-200"
                     >
-                      <span className="text-purple-700 dark:text-purple-300">
+                      <span className="text-purple-700">
                         Platform Admin
                       </span>
                     </Badge>
@@ -483,9 +483,9 @@ export default function AdminDashboard() {
                     </div>
                     <Badge
                       variant="outline"
-                      className="bg-green-50 dark:bg-green-950/30 border-green-200 dark:border-green-800"
+                      className="bg-green-50 border-green-200"
                     >
-                      <span className="text-green-700 dark:text-green-300">
+                      <span className="text-green-700">
                         Enabled
                       </span>
                     </Badge>
@@ -500,9 +500,9 @@ export default function AdminDashboard() {
                     </div>
                     <Badge
                       variant="outline"
-                      className="bg-orange-50 dark:bg-orange-950/30 border-orange-200 dark:border-orange-800"
+                      className="bg-orange-50 border-orange-200"
                     >
-                      <span className="text-orange-700 dark:text-orange-300">
+                      <span className="text-orange-700">
                         Use Admin Page
                       </span>
                     </Badge>
@@ -517,9 +517,9 @@ export default function AdminDashboard() {
                     </div>
                     <Badge
                       variant="outline"
-                      className="bg-green-50 dark:bg-green-950/30 border-green-200 dark:border-green-800"
+                      className="bg-green-50 border-green-200"
                     >
-                      <span className="text-green-700 dark:text-green-300">
+                      <span className="text-green-700">
                         Enabled
                       </span>
                     </Badge>

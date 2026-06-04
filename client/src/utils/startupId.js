@@ -14,14 +14,24 @@
  */
 
 export function getStartupId(user) {
-  const resolvedId = user._id ?? user.id;
-  if (user.role === "founder") {
-    // Founders ARE the startup - use their ID
+  if (!user) return "";
+  const resolvedId = String(user._id ?? user.id ?? "");
+  const role = String(user.role || "");
+
+  if (role === "founder") {
     return resolvedId;
   }
 
-  // Team members, talent, etc. - use their startup/founder reference
-  return user.startupId || user.founderId || resolvedId;
+  const founderRef = String(
+    user.founderId || user.founder_id || user.startupId || user.startup_id || "",
+  );
+
+  // Team members must share the founder's startup bucket — never use their own user id.
+  if (role === "team-member" || role === "team") {
+    return founderRef;
+  }
+
+  return founderRef || resolvedId;
 }
 
 /**

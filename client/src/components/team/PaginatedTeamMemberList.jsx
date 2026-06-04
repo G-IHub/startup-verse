@@ -187,7 +187,7 @@ export function PaginatedTeamMemberList({
                       </AvatarFallback>
                     </Avatar>
                     <div
-                      className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-background ${member.status === "online" ? "bg-green-500" : member.status === "away" ? "bg-yellow-500" : "bg-gray-400"}`}
+                      className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-background ${member.isOnline ? "bg-green-500" : "bg-gray-400"}`}
                     />
                   </div>
                   <div className="flex-1 min-w-0">
@@ -240,16 +240,12 @@ export function PaginatedTeamMemberList({
                     <Clock className="w-3.5 h-3.5 text-blue-600" />
                     <span>{member.tasksInProgress || 0}</span>
                   </div>
-                  {member.status && (
-                    <Badge
-                      variant={
-                        member.status === "online" ? "default" : "secondary"
-                      }
-                      className="text-[10px] px-1.5 py-0 h-5"
-                    >
-                      {member.status}
-                    </Badge>
-                  )}
+                  <Badge
+                    variant={member.isOnline ? "default" : "secondary"}
+                    className="text-[10px] px-1.5 py-0 h-5"
+                  >
+                    {member.isOnline ? "Online" : "Offline"}
+                  </Badge>
                 </div>
                 <div className="pt-2 flex gap-1.5">
                   <Button

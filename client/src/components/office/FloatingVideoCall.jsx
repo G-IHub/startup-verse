@@ -138,7 +138,7 @@ export default function FloatingVideoCall({
               </div>
             </div>
           </div>
-          <div className="w-full h-full bg-slate-900 p-4">
+          <div className="w-full h-full bg-card border border-border p-4">
             <div
               className={`grid gap-3 h-full ${participants.length === 1 ? "grid-cols-1" : participants.length === 2 ? "grid-cols-2" : participants.length <= 4 ? "grid-cols-2" : participants.length <= 6 ? "grid-cols-3" : "grid-cols-4"}`}
             >

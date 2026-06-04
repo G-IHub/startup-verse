@@ -196,7 +196,7 @@ export default function OnboardingModal({ onClose, onLoadSampleData }) {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="p-3 bg-muted/50 border border-border/50 rounded-lg">
               <div className="flex items-start gap-3">
-                <div className="w-8 h-8 rounded-full bg-blue-100 dark:bg-blue-950 flex items-center justify-center flex-shrink-0 text-blue-600">
+                <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0 text-blue-600">
                   1
                 </div>
                 <div className="min-w-0">
@@ -210,7 +210,7 @@ export default function OnboardingModal({ onClose, onLoadSampleData }) {
             </div>
             <div className="p-3 bg-muted/50 border border-border/50 rounded-lg">
               <div className="flex items-start gap-3">
-                <div className="w-8 h-8 rounded-full bg-blue-100 dark:bg-blue-950 flex items-center justify-center flex-shrink-0 text-blue-600">
+                <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0 text-blue-600">
                   2
                 </div>
                 <div className="min-w-0">
@@ -226,7 +226,7 @@ export default function OnboardingModal({ onClose, onLoadSampleData }) {
             </div>
             <div className="p-3 bg-muted/50 border border-border/50 rounded-lg">
               <div className="flex items-start gap-3">
-                <div className="w-8 h-8 rounded-full bg-blue-100 dark:bg-blue-950 flex items-center justify-center flex-shrink-0 text-blue-600">
+                <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0 text-blue-600">
                   3
                 </div>
                 <div className="min-w-0">
@@ -240,7 +240,7 @@ export default function OnboardingModal({ onClose, onLoadSampleData }) {
             </div>
             <div className="p-3 bg-muted/50 border border-border/50 rounded-lg">
               <div className="flex items-start gap-3">
-                <div className="w-8 h-8 rounded-full bg-blue-100 dark:bg-blue-950 flex items-center justify-center flex-shrink-0 text-blue-600">
+                <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0 text-blue-600">
                   4
                 </div>
                 <div className="min-w-0">
@@ -254,7 +254,7 @@ export default function OnboardingModal({ onClose, onLoadSampleData }) {
             </div>
             <div className="p-3 bg-muted/50 border border-border/50 rounded-lg sm:col-span-2">
               <div className="flex items-start gap-3">
-                <div className="w-8 h-8 rounded-full bg-blue-100 dark:bg-blue-950 flex items-center justify-center flex-shrink-0 text-blue-600">
+                <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0 text-blue-600">
                   5
                 </div>
                 <div className="min-w-0">
@@ -267,7 +267,7 @@ export default function OnboardingModal({ onClose, onLoadSampleData }) {
               </div>
             </div>
           </div>
-          <div className="p-3 bg-yellow-50 dark:bg-yellow-950/20 border border-yellow-200 dark:border-yellow-900 rounded-lg">
+          <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
             <p className="text-sm">
               <strong>Pro Tip:</strong>
               {' Click "Save Progress" regularly to ensure your work is saved!'}

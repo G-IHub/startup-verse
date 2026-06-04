@@ -33,6 +33,7 @@ import {
   validateFounderStartupFields,
 } from "../domains/founder/founderProfileConfig";
 import { persistedTalentToFormInitialData } from "../utils/talentProfileCompletion";
+import { AUTH_CARD, authBtnPrimary } from "./auth/AuthPrimitives";
 
 /** Panel width from trigger + longest option; opaque surface scrolls as one block */
 function computeMenuPanelBox(buttonRect, optionStrings, gap = 4, pad = 12) {
@@ -707,12 +708,6 @@ export default function ProfileCompletionModal({
     }
   };
   const isPage = variant === "page";
-  const pageShellBackgroundStyle = isPage
-    ? {
-        background:
-          "radial-gradient(ellipse at 60% 10%, rgba(58,90,254,0.07) 0%, transparent 60%), radial-gradient(ellipse at 10% 80%, rgba(124,77,255,0.05) 0%, transparent 50%), #f4f5ff",
-      }
-    : undefined;
 
   const onboardingControlClass = isPage
     ? "rounded-[10px] border-[1.5px] border-surface-border bg-white font-body text-sm text-text-heading placeholder:text-text-muted placeholder:text-sm transition-all duration-200 ease-in-out outline-none focus-visible:ring-0 focus-visible:border-primary focus-visible:shadow-focus"
@@ -725,11 +720,10 @@ export default function ProfileCompletionModal({
       ref={(el) => {
         setDropdownPortalHost((prev) => (prev === el ? prev : el));
       }}
-      style={pageShellBackgroundStyle}
       className={
         isPage
-          ? "min-h-screen"
-          : "fixed inset-0 z-50 flex items-start justify-center p-4 sm:pt-8"
+          ? "min-h-screen bg-surface-page font-body"
+          : "fixed inset-0 z-50 flex items-start justify-center bg-surface-page/80 p-4 font-body sm:pt-8"
       }
     >
       {!isPage ? <div className="absolute inset-0 sv-modal-backdrop" /> : null}
@@ -743,34 +737,24 @@ export default function ProfileCompletionModal({
         <div
           className={
             isPage
-              ? "flex flex-col overflow-visible rounded-[20px] border-0 bg-white shadow-[0_4px_32px_rgba(58,90,254,0.10)]"
-              : "sv-modal-panel relative flex max-h-[90vh] w-full flex-col overflow-hidden rounded-[16px] border-0 shadow-modal"
+              ? cn(AUTH_CARD, "flex flex-col overflow-visible")
+              : cn(AUTH_CARD, "relative flex max-h-[90vh] w-full flex-col overflow-hidden shadow-modal")
           }
         >
           <div
             className={cn(
-              "flex shrink-0 items-start justify-between border-b bg-white p-4 sm:p-5",
-              isPage
-                ? "rounded-t-[20px] border-surface-border"
-                : "border-[#e2e4f0]",
+              "flex shrink-0 items-start justify-between border-b border-surface-border bg-surface-card p-4 sm:p-5",
+              isPage ? "rounded-t-card" : "",
             )}
           >
             <div className="flex-1">
               <h2
-                className={
-                  isPage
-                    ? "font-heading mb-0.5 text-2xl font-extrabold text-text-heading"
-                    : "font-heading mb-0.5 text-lg font-bold text-[#0d0d0d]"
-                }
+                className="mb-0.5 font-heading text-lg font-extrabold text-text-heading md:text-2xl"
               >
                 Complete Your Profile
               </h2>
               <p
-                className={
-                  isPage
-                    ? "font-body text-sm font-normal text-text-body"
-                    : "text-xs text-muted-foreground"
-                }
+                className="font-body text-xs font-normal text-text-body md:text-sm"
               >
                 {role === "founder"
                   ? "Tell us about your startup to get personalized guidance"
@@ -1123,11 +1107,7 @@ export default function ProfileCompletionModal({
               <Button
                 type="submit"
                 disabled={loading}
-                className={
-                  isPage
-                    ? "w-full !rounded-[10px] border-0 !bg-gradient-to-br !from-primary !to-accent px-8 font-body text-[15px] font-semibold !text-white shadow-[0_4px_20px_rgba(58,90,254,0.25)] transition-opacity duration-200 ease-in-out hover:!bg-gradient-to-br hover:!from-primary hover:!to-accent hover:!opacity-[0.92] focus-visible:ring-2 focus-visible:ring-primary/35 sm:w-auto"
-                    : "w-full px-8 sm:w-auto"
-                }
+                className={`w-full sm:w-auto ${authBtnPrimary}`}
               >
                 {loading ? "Saving..." : "Complete Profile"}
               </Button>

@@ -2,8 +2,6 @@
 
 /* StartupVerse design system foundation */
 
-@custom-variant dark (&:is(.dark *));
-
 :root {
   /* Canonical palette (design tokens) */
   --primary: #3a5afe;
@@ -131,75 +129,6 @@
   --spacing-6: 3rem;
 }
 
-.dark {
-  /* Dark mode */
-  --background: #0b1220;
-  --foreground: #e5edf9;
-  --surface: #101a2e;
-  --surface-variant: #17233b;
-  --outline: #253653;
-  --text-heading: #f4f4f8;
-  --text-body: #e5edf9;
-  --text-muted: #9fb1ca;
-  --text-primary: var(--text-body);
-  --text-secondary: #9fb1ca;
-  --text-disabled: #80868b;
-
-  --bg-page: var(--background);
-  --bg-surface: var(--surface);
-
-  /* Cards in Dark Mode */
-  --card: #101a2e;
-  --card-foreground: #e5edf9;
-  --popover: #101a2e;
-  --popover-foreground: #e5edf9;
-
-  --primary: #3a5afe;
-  --primary-hover: #536dfe;
-  --primary-dark: #e8ebff;
-  --primary-tint: rgba(58, 90, 254, 0.14);
-  --primary-foreground: #ffffff;
-  --secondary: #17233b;
-  --secondary-foreground: #e5edf9;
-  --muted: #17233b;
-  --muted-foreground: #9fb1ca;
-  --accent: #7c4dff;
-  --accent-tint: rgba(124, 77, 255, 0.14);
-  --accent-dark: #b388ff;
-  --accent-foreground: #ffffff;
-  --destructive: #ff4f6b;
-  --destructive-foreground: #ffffff;
-  --success: #00c896;
-  --success-foreground: #04120e;
-  --warning: #ffb300;
-  --warning-foreground: #1a1400;
-  --error: #ff4f6b;
-
-  /* Borders in Dark Mode */
-  --border: rgba(165, 192, 227, 0.2);
-  --input: #101a2e;
-  --input-background: #101a2e;
-  --ring: #3a5afe;
-
-  /* Elevation in Dark Mode (no shadows, use borders) */
-  --elevation-0: none;
-  --elevation-1: 0 0 0 1px rgba(255, 255, 255, 0.08);
-  --elevation-2: 0 0 0 1px rgba(255, 255, 255, 0.08);
-  --elevation-3: 0 0 0 1px rgba(255, 255, 255, 0.12);
-  --elevation-4: 0 0 0 1px rgba(255, 255, 255, 0.12);
-
-  --shadow-soft: 0 2px 12px rgba(0, 0, 0, 0.25);
-  --shadow-focus: 0 0 0 2px rgba(58, 90, 254, 0.22);
-  --shadow-card: 0 4px 24px rgba(0, 0, 0, 0.35);
-
-  /* Sidebar Dark Mode */
-  --sidebar: #0b1220;
-  --sidebar-foreground: #9fb1ca;
-  --sidebar-selected: rgba(58, 90, 254, 0.12);
-  --sidebar-selected-text: #8ab4ff;
-  --sidebar-border: rgba(165, 192, 227, 0.2);
-}
-
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
@@ -272,11 +201,6 @@
     color: #4a4a5a;
   }
 
-  .dark html {
-    background-color: var(--background);
-    color: var(--foreground);
-  }
-
   h1,
   h2,
   h3,
@@ -285,15 +209,6 @@
   h6 {
     font-family: "Sora", ui-sans-serif, system-ui, sans-serif;
     color: #0d0d0d;
-  }
-
-  .dark h1,
-  .dark h2,
-  .dark h3,
-  .dark h4,
-  .dark h5,
-  .dark h6 {
-    color: var(--text-heading);
   }
 
   input,
@@ -1132,6 +1047,26 @@
   box-shadow: 0 0 0 2px rgba(58, 90, 254, 0.12) !important;
 }
 
+/* Solid primary fills — white labels (login, CTAs, badges, default Button) */
+[data-slot="button"].bg-primary,
+[data-slot="badge"].bg-primary:not([class*="bg-primary/"]),
+button.bg-primary:not([class*="bg-primary/"]),
+a.bg-primary:not([class*="bg-primary/"]) {
+  color: #ffffff !important;
+}
+
+[data-slot="button"].bg-primary svg,
+[data-slot="badge"].bg-primary svg,
+button.bg-primary svg {
+  color: currentColor;
+}
+
+/* Chat bubbles & other explicit primary surfaces */
+.bg-primary.text-primary-foreground,
+.bg-primary:not([class*="bg-primary/"]):is(.rounded-lg, .rounded-full, .rounded-pill) {
+  color: #ffffff;
+}
+
 /* Footer buttons (dialog / alert / sheet / drawer) */
 :is(
     [data-slot="dialog-footer"],
@@ -1402,15 +1337,6 @@
   color: #5c5c6e !important;
 }
 
-.dark :is(.sv-modal-panel) .sv-priority-chip[data-priority="high"],
-.dark :is(.sv-modal-panel) .sv-priority-chip[data-priority="medium"] {
-  color: #e8ebff !important;
-}
-
-.dark :is(.sv-modal-panel) .sv-priority-chip[data-priority="low"] {
-  color: #b8c4dc !important;
-}
-
 :is(
     [data-slot="dialog-content"],
     [data-slot="alert-dialog-content"],
@@ -1523,4 +1449,49 @@
 #poll-duration::-webkit-outer-spin-button {
   -webkit-appearance: none;
   margin: 0;
+}
+
+/* Compact, modern toast styling */
+.toaster [data-sonner-toast] {
+  position: relative;
+  min-height: 0 !important;
+  gap: 0.5rem !important;
+  padding: 0.55rem 0.65rem !important;
+}
+
+.toaster [data-sonner-toast]::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0.4rem;
+  bottom: 0.4rem;
+  width: 2px;
+  border-radius: 999px;
+  background: transparent;
+}
+
+.toaster [data-sonner-toast][data-type="success"]::before {
+  background: var(--success);
+}
+
+.toaster [data-sonner-toast][data-type="error"]::before {
+  background: var(--error);
+}
+
+.toaster [data-sonner-toast][data-type="warning"]::before {
+  background: var(--warning);
+}
+
+.toaster [data-sonner-toast][data-type="info"]::before,
+.toaster [data-sonner-toast][data-type="default"]::before {
+  background: var(--primary);
+}
+
+.toaster [data-title] {
+  line-height: 1.25rem !important;
+}
+
+.toaster [data-description] {
+  margin-top: 0.1rem !important;
+  line-height: 1.1rem !important;
 }

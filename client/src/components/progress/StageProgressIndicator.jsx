@@ -133,7 +133,7 @@ export default function StageProgressIndicator({
             )}
           </div>
           <div className="grid grid-cols-2 gap-3">
-            <div className="p-3 bg-blue-50 dark:bg-blue-950/20 rounded-lg border">
+            <div className="p-3 bg-blue-50 rounded-lg border">
               <div className="flex items-center gap-2 mb-2">
                 <TrendingUp className="w-4 h-4 text-blue-600" />
                 <span className="text-xs font-semibold">Weekly Outcomes</span>
@@ -145,7 +145,7 @@ export default function StageProgressIndicator({
                 outcomes completed
               </p>
             </div>
-            <div className="p-3 bg-purple-50 dark:bg-purple-950/20 rounded-lg border">
+            <div className="p-3 bg-purple-50 rounded-lg border">
               <div className="flex items-center gap-2 mb-2">
                 <CheckCircle2 className="w-4 h-4 text-purple-600" />
                 <span className="text-xs font-semibold">Template Tasks</span>
@@ -156,14 +156,14 @@ export default function StageProgressIndicator({
               <p className="text-xs text-muted-foreground">milestones done</p>
             </div>
           </div>
-          <div className="p-3 bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-950/20 dark:to-emerald-950/20 rounded-lg border border-green-200 dark:border-green-800">
+          <div className="p-3 bg-gradient-to-r from-green-50 to-emerald-50 rounded-lg border border-green-200">
             <div className="flex items-start gap-2">
               <Sparkles className="w-4 h-4 text-green-600 flex-shrink-0 mt-0.5" />
               <div className="flex-1">
-                <p className="text-sm font-semibold text-green-900 dark:text-green-100 mb-1">
+                <p className="text-sm font-semibold text-green-900 mb-1">
                   How to Complete This Stage
                 </p>
-                <ul className="text-xs text-green-800 dark:text-green-200 space-y-1">
+                <ul className="text-xs text-green-800 space-y-1">
                   {currentStageInfo.completionCriteria
                     .slice(0, 3)
                     .map((criteria, idx) => (
@@ -173,13 +173,13 @@ export default function StageProgressIndicator({
                       </li>
                     ))}
                 </ul>
-                <p className="text-xs text-green-700 dark:text-green-300 mt-2 italic">
+                <p className="text-xs text-green-700 mt-2 italic">
                   💡 Just describe these in your weekly outcomes!
                 </p>
               </div>
             </div>
           </div>
-          <div className="flex items-center justify-between p-3 bg-orange-50 dark:bg-orange-950/20 rounded-lg border border-orange-200 dark:border-orange-800">
+          <div className="flex items-center justify-between p-3 bg-orange-50 rounded-lg border border-orange-200">
             <div className="flex items-center gap-2">
               <Award className="w-4 h-4 text-orange-600" />
               <span className="text-sm font-medium">Estimated Duration</span>
@@ -211,7 +211,7 @@ export default function StageProgressIndicator({
           </CardContent>
         </Card>
       )}
-      <div className="p-3 bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-950/20 dark:to-purple-950/20 rounded-lg border">
+      <div className="p-3 bg-gradient-to-r from-blue-50 to-purple-50 rounded-lg border">
         <div className="flex items-start gap-2">
           <Info className="w-4 h-4 text-blue-600 flex-shrink-0 mt-0.5" />
           <div className="text-xs text-muted-foreground">

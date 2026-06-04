@@ -85,8 +85,8 @@ export default function CompensationStatusCard({ status, contract }) {
                 <span
                   className={
                     isOnTrack
-                      ? "text-green-600 dark:text-green-400"
-                      : "text-orange-600 dark:text-orange-400"
+                      ? "text-green-600"
+                      : "text-orange-600"
                   }
                 >
                   {"Threshold: "}
@@ -94,7 +94,7 @@ export default function CompensationStatusCard({ status, contract }) {
                 </span>
               </div>
               {performance.blockedTasks > 0 && (
-                <div className="mt-2 flex items-center justify-between text-xs p-2 bg-red-50 dark:bg-red-950/20 rounded">
+                <div className="mt-2 flex items-center justify-between text-xs p-2 bg-red-50 rounded">
                   <span className="text-muted-foreground">
                     {performance.blockedTasks}
                     {" task"}
@@ -107,9 +107,9 @@ export default function CompensationStatusCard({ status, contract }) {
                 </div>
               )}
               {!isOnTrack && tasksRemaining > 0 && (
-                <div className="mt-2 flex items-start gap-2 p-2 bg-orange-50 dark:bg-orange-950/20 rounded text-xs">
-                  <AlertCircle className="w-4 h-4 text-orange-600 dark:text-orange-400 flex-shrink-0 mt-0.5" />
-                  <span className="text-orange-700 dark:text-orange-300">
+                <div className="mt-2 flex items-start gap-2 p-2 bg-orange-50 rounded text-xs">
+                  <AlertCircle className="w-4 h-4 text-orange-600 flex-shrink-0 mt-0.5" />
+                  <span className="text-orange-700">
                     {"Complete "}
                     {tasksRemaining}
                     {" more task"}
@@ -119,9 +119,9 @@ export default function CompensationStatusCard({ status, contract }) {
                 </div>
               )}
               {isOnTrack && (
-                <div className="mt-2 flex items-start gap-2 p-2 bg-green-50 dark:bg-green-950/20 rounded text-xs">
-                  <CheckCircle2 className="w-4 h-4 text-green-600 dark:text-green-400 flex-shrink-0 mt-0.5" />
-                  <span className="text-green-700 dark:text-green-300">
+                <div className="mt-2 flex items-start gap-2 p-2 bg-green-50 rounded text-xs">
+                  <CheckCircle2 className="w-4 h-4 text-green-600 flex-shrink-0 mt-0.5" />
+                  <span className="text-green-700">
                     On track! Keep up the great work
                   </span>
                 </div>
@@ -157,7 +157,7 @@ export default function CompensationStatusCard({ status, contract }) {
                 <div className="grid grid-cols-2 gap-2 pt-2 border-t">
                   <div>
                     <div className="text-xs text-muted-foreground">Vested</div>
-                    <div className="text-sm font-semibold text-green-600 dark:text-green-400">
+                    <div className="text-sm font-semibold text-green-600">
                       {equity.vestedEquity}% ✅
                     </div>
                   </div>
@@ -171,8 +171,8 @@ export default function CompensationStatusCard({ status, contract }) {
                   </div>
                 </div>
                 {!equity.cliffPassed && equity.cliffDate && (
-                  <div className="p-2 bg-blue-50 dark:bg-blue-950/20 rounded text-xs">
-                    <div className="flex items-center gap-1 text-blue-700 dark:text-blue-300">
+                  <div className="p-2 bg-blue-50 rounded text-xs">
+                    <div className="flex items-center gap-1 text-blue-700">
                       <Clock className="w-3 h-3" />
                       <span>
                         {"Cliff period: "}
@@ -296,15 +296,15 @@ export default function CompensationStatusCard({ status, contract }) {
         </CardContent>
       </Card>
       {performance && !isOnTrack && (
-        <Card className="bg-gradient-to-r from-orange-50 to-red-50 dark:from-orange-950/20 dark:to-red-950/20 border-orange-200 dark:border-orange-800">
+        <Card className="bg-gradient-to-r from-orange-50 to-red-50 border-orange-200">
           <CardContent className="p-3">
             <div className="flex items-start gap-2">
-              <AlertCircle className="w-5 h-5 text-orange-600 dark:text-orange-400 flex-shrink-0 mt-0.5" />
+              <AlertCircle className="w-5 h-5 text-orange-600 flex-shrink-0 mt-0.5" />
               <div>
-                <p className="text-sm font-medium text-orange-900 dark:text-orange-100 mb-1">
+                <p className="text-sm font-medium text-orange-900 mb-1">
                   Boost Your Performance
                 </p>
-                <p className="text-xs text-orange-700 dark:text-orange-300">
+                <p className="text-xs text-orange-700">
                   {equity &&
                     `Complete ${tasksRemaining} more tasks to unlock equity vesting. `}
                   {payment &&
@@ -317,15 +317,15 @@ export default function CompensationStatusCard({ status, contract }) {
         </Card>
       )}
       {performance && isOnTrack && (
-        <Card className="bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-950/20 dark:to-emerald-950/20 border-green-200 dark:border-green-800">
+        <Card className="bg-gradient-to-r from-green-50 to-emerald-50 border-green-200">
           <CardContent className="p-3">
             <div className="flex items-start gap-2">
-              <Award className="w-5 h-5 text-green-600 dark:text-green-400 flex-shrink-0 mt-0.5" />
+              <Award className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" />
               <div>
-                <p className="text-sm font-medium text-green-900 dark:text-green-100 mb-1">
+                <p className="text-sm font-medium text-green-900 mb-1">
                   Excellent Work! 🎉
                 </p>
-                <p className="text-xs text-green-700 dark:text-green-300">
+                <p className="text-xs text-green-700">
                   {"You're above the "}
                   {threshold}% threshold.{equity && ` Your equity is vesting!`}
                   {payment && ` Your payment is secured!`} Keep up the momentum!

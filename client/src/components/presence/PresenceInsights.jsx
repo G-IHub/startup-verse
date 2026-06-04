@@ -1,10 +1,14 @@
 import { motion } from "motion/react";
 import { Users, Video, Phone, Zap, TrendingUp } from "lucide-react";
+function isUserOnline(user) {
+  return Boolean(user?.isOnline || user?.connection === "online");
+}
+
 export function PresenceInsights({ users }) {
-  const activeUsers = users.filter((u) => u.status === "active").length;
+  const activeUsers = users.filter((u) => isUserOnline(u)).length;
   const inCallUsers = users.filter((u) => u.activity === "in-call").length;
   const cameraOnUsers = users.filter(
-    (u) => u.cameraEnabled && u.status === "active",
+    (u) => u.cameraEnabled && isUserOnline(u),
   ).length;
   const workingUsers = users.filter((u) => u.activity === "working").length;
   const insights = [
@@ -43,11 +47,11 @@ export function PresenceInsights({ users }) {
         opacity: 1,
         y: 0,
       }}
-      className="fixed bottom-4 right-4 z-30 bg-white/95 dark:bg-gray-800/95 backdrop-blur-md rounded-xl shadow-xl border border-gray-200 dark:border-gray-700 p-4 max-w-xs"
+      className="fixed bottom-4 right-4 z-30 bg-white/95 backdrop-blur-md rounded-xl shadow-xl border border-gray-200 p-4 max-w-xs"
     >
       <div className="flex items-center gap-2 mb-3">
-        <TrendingUp className="w-4 h-4 text-blue-600 dark:text-blue-400" />
-        <h3 className="text-sm text-gray-900 dark:text-white m-0">
+        <TrendingUp className="w-4 h-4 text-blue-600" />
+        <h3 className="text-sm text-gray-900 m-0">
           Team Pulse
         </h3>
       </div>
@@ -66,7 +70,7 @@ export function PresenceInsights({ users }) {
             transition={{
               delay: index * 0.1,
             }}
-            className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-2"
+            className="bg-gray-50 rounded-lg p-2"
           >
             <div className="flex items-center gap-2 mb-1">
               <div
@@ -78,12 +82,12 @@ export function PresenceInsights({ users }) {
               >
                 {insight.icon}
               </div>
-              <span className="text-xs text-gray-600 dark:text-gray-300">
+              <span className="text-xs text-gray-600">
                 {insight.label}
               </span>
             </div>
             <motion.div
-              className="text-2xl text-gray-900 dark:text-white"
+              className="text-2xl text-gray-900"
               key={insight.value}
               initial={{
                 scale: 1.3,
@@ -104,19 +108,19 @@ export function PresenceInsights({ users }) {
           </motion.div>
         ))}
       </div>
-      <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-600">
+      <div className="mt-3 pt-3 border-t border-gray-200">
         <div className="flex items-center justify-between mb-1">
-          <span className="text-xs text-gray-600 dark:text-gray-300">
+          <span className="text-xs text-gray-600">
             Team Energy
           </span>
-          <span className="text-xs font-medium text-gray-900 dark:text-white">
+          <span className="text-xs font-medium text-gray-900">
             {users.length > 0
               ? Math.round((activeUsers / users.length) * 100)
               : 0}
             %
           </span>
         </div>
-        <div className="w-full h-2 bg-gray-200 dark:bg-gray-600 rounded-full overflow-hidden">
+        <div className="w-full h-2 bg-gray-200 rounded-full overflow-hidden">
           <motion.div
             className="h-full bg-gradient-to-r from-blue-500 to-purple-500 rounded-full"
             initial={{

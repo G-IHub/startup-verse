@@ -9,6 +9,9 @@ import { wipeLegacyStartupVerseStorage } from "./utils/clearLegacyClientStorage"
 applyConsolePolicy();
 wipeLegacyStartupVerseStorage();
 
+// Light-only: strip legacy dark class from persisted HTML (old theme toggle)
+document.documentElement.classList.remove("dark");
+
 createRoot(document.getElementById("root")).render(
   <StrictMode>
     <BrowserRouter>

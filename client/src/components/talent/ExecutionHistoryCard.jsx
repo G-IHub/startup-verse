@@ -100,59 +100,59 @@ export default function ExecutionHistoryCard({
           </p>
         </div>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          <div className="p-3 bg-green-50 dark:bg-green-950/20 rounded-lg border border-green-200 dark:border-green-900">
+          <div className="p-3 bg-green-50 rounded-lg border border-green-200">
             <div className="flex items-center gap-2 mb-1">
               <CheckCircle2 className="w-4 h-4 text-green-600" />
-              <p className="text-xs text-green-700 dark:text-green-400 font-medium">
+              <p className="text-xs text-green-700 font-medium">
                 Completed
               </p>
             </div>
-            <p className="text-2xl font-bold text-green-900 dark:text-green-100">
+            <p className="text-2xl font-bold text-green-900">
               {history.tasksCompleted}
             </p>
-            <p className="text-xs text-green-600 dark:text-green-500 mt-0.5">
+            <p className="text-xs text-green-600 mt-0.5">
               {history.completionRate}% rate
             </p>
           </div>
-          <div className="p-3 bg-blue-50 dark:bg-blue-950/20 rounded-lg border border-blue-200 dark:border-blue-900">
+          <div className="p-3 bg-blue-50 rounded-lg border border-blue-200">
             <div className="flex items-center gap-2 mb-1">
               <Clock className="w-4 h-4 text-blue-600" />
-              <p className="text-xs text-blue-700 dark:text-blue-400 font-medium">
+              <p className="text-xs text-blue-700 font-medium">
                 In Progress
               </p>
             </div>
-            <p className="text-2xl font-bold text-blue-900 dark:text-blue-100">
+            <p className="text-2xl font-bold text-blue-900">
               {history.tasksInProgress}
             </p>
-            <p className="text-xs text-blue-600 dark:text-blue-500 mt-0.5">
+            <p className="text-xs text-blue-600 mt-0.5">
               active now
             </p>
           </div>
-          <div className="p-3 bg-purple-50 dark:bg-purple-950/20 rounded-lg border border-purple-200 dark:border-purple-900">
+          <div className="p-3 bg-purple-50 rounded-lg border border-purple-200">
             <div className="flex items-center gap-2 mb-1">
               <Target className="w-4 h-4 text-purple-600" />
-              <p className="text-xs text-purple-700 dark:text-purple-400 font-medium">
+              <p className="text-xs text-purple-700 font-medium">
                 Milestones
               </p>
             </div>
-            <p className="text-2xl font-bold text-purple-900 dark:text-purple-100">
+            <p className="text-2xl font-bold text-purple-900">
               {history.uniqueMilestonesCount}
             </p>
-            <p className="text-xs text-purple-600 dark:text-purple-500 mt-0.5">
+            <p className="text-xs text-purple-600 mt-0.5">
               contributed
             </p>
           </div>
-          <div className="p-3 bg-orange-50 dark:bg-orange-950/20 rounded-lg border border-orange-200 dark:border-orange-900">
+          <div className="p-3 bg-orange-50 rounded-lg border border-orange-200">
             <div className="flex items-center gap-2 mb-1">
               <Zap className="w-4 h-4 text-orange-600" />
-              <p className="text-xs text-orange-700 dark:text-orange-400 font-medium">
+              <p className="text-xs text-orange-700 font-medium">
                 Streak
               </p>
             </div>
-            <p className="text-2xl font-bold text-orange-900 dark:text-orange-100">
+            <p className="text-2xl font-bold text-orange-900">
               {history.currentStreak}
             </p>
-            <p className="text-xs text-orange-600 dark:text-orange-500 mt-0.5">
+            <p className="text-xs text-orange-600 mt-0.5">
               {history.currentStreak === 1 ? "week" : "weeks"}
             </p>
           </div>

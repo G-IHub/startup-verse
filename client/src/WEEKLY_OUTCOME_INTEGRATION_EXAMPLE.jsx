@@ -188,7 +188,7 @@ function FounderDashboardExample() {
           {tasks.map((task) => (
             <div
               key={task.id}
-              className="p-4 bg-white dark:bg-gray-800 rounded-lg border"
+              className="p-4 bg-white rounded-lg border"
             >
               <div className="flex items-start justify-between gap-3">
                 <div className="flex-1">
@@ -201,7 +201,7 @@ function FounderDashboardExample() {
                     />
                   </div>
                   {task.description && (
-                    <p className="text-sm text-gray-600 dark:text-gray-400">
+                    <p className="text-sm text-gray-600">
                       {task.description}
                     </p>
                   )}

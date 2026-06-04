@@ -191,16 +191,16 @@ export function GoogleMeetCall({
         </div>
       </div>
       <div className="flex-1 flex flex-col items-center justify-center p-8">
-        <div className="w-full max-w-6xl bg-white dark:bg-gray-900 rounded-xl shadow-2xl overflow-hidden">
+        <div className="w-full max-w-6xl bg-white rounded-xl shadow-2xl overflow-hidden">
           <div className="p-8 text-center space-y-4">
-            <div className="w-20 h-20 rounded-full bg-[#3A5AFE]/10 dark:bg-[#3A5AFE]/20 flex items-center justify-center mx-auto">
+            <div className="w-20 h-20 rounded-full bg-[#3A5AFE]/10 flex items-center justify-center mx-auto">
               <Video className="w-10 h-10 text-[#3A5AFE]" />
             </div>
             <div>
-              <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
+              <h2 className="text-2xl font-bold text-gray-900 mb-2">
                 Google Meet Session Active
               </h2>
-              <p className="text-gray-600 dark:text-gray-400">
+              <p className="text-gray-600">
                 Click the button below to join or open the meeting
               </p>
             </div>
@@ -209,7 +209,7 @@ export function GoogleMeetCall({
                 {participants.map((participant) => (
                   <div
                     key={participant.id}
-                    className="flex items-center gap-2 px-3 py-1.5 bg-gray-100 dark:bg-gray-800 rounded-full"
+                    className="flex items-center gap-2 px-3 py-1.5 bg-gray-100 rounded-full"
                   >
                     {participant.avatar ? (
                       <img
@@ -222,7 +222,7 @@ export function GoogleMeetCall({
                         {participant.name.charAt(0).toUpperCase()}
                       </div>
                     )}
-                    <span className="text-sm text-gray-900 dark:text-white">
+                    <span className="text-sm text-gray-900">
                       {participant.name}
                     </span>
                   </div>
@@ -237,7 +237,7 @@ export function GoogleMeetCall({
                 <ExternalLink className="w-5 h-5" />
                 Open Google Meet
               </Button>
-              <p className="text-xs text-gray-500 dark:text-gray-400">
+              <p className="text-xs text-gray-500">
                 {"Meeting Link: "}
                 <a
                   href={meetLink}

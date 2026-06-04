@@ -161,7 +161,7 @@ export default function IntentCaptureModal({
         <CardContent className="space-y-6">
           {step === "input" && (
             <>
-              <div className="p-4 bg-gradient-to-r from-primary/10 to-purple-50 dark:from-primary/20 dark:to-purple-950/20 rounded-lg border border-primary/20">
+              <div className="p-4 bg-gradient-to-r from-primary/10 to-purple-50 rounded-lg border border-primary/20">
                 <div className="flex gap-3">
                   <Lightbulb className="w-5 h-5 text-primary flex-shrink-0 mt-0.5" />
                   <div className="text-sm">
@@ -202,7 +202,7 @@ export default function IntentCaptureModal({
                       key={index}
                       type="button"
                       onClick={() => handleUseExample(example)}
-                      className="group w-full rounded-xl border border-primary/20 bg-card p-3 text-left shadow-sm transition-all hover:border-primary/35 hover:bg-primary/[0.03] hover:shadow dark:border-primary/25 dark:hover:border-primary/45 dark:hover:bg-primary/[0.06]"
+                      className="group w-full rounded-xl border border-primary/20 bg-card p-3 text-left shadow-sm transition-all hover:border-primary/35 hover:bg-primary/[0.03] hover:shadow"
                     >
                       <div className="flex items-center justify-between gap-3">
                         <span className="text-sm text-card-foreground">
@@ -214,7 +214,7 @@ export default function IntentCaptureModal({
                   ))}
                 </div>
               </div>
-              <div className="flex gap-3 border-t border-primary/12 pt-4 dark:border-primary/20">
+              <div className="flex gap-3 border-t border-primary/12 pt-4">
                 <Button variant="outline" onClick={onClose} className="flex-1">
                   Cancel
                 </Button>
@@ -245,10 +245,10 @@ export default function IntentCaptureModal({
                   variant="outline"
                   className={
                     parsedIntent.confidence >= 0.8
-                      ? "border-green-500 text-green-700 dark:text-green-400"
+                      ? "border-green-500 text-green-700"
                       : parsedIntent.confidence >= 0.6
-                        ? "border-yellow-500 text-yellow-700 dark:text-yellow-400"
-                        : "border-orange-500 text-orange-700 dark:text-orange-400"
+                        ? "border-yellow-500 text-yellow-700"
+                        : "border-orange-500 text-orange-700"
                   }
                 >
                   <TrendingUp className="w-3 h-3 mr-1" />
@@ -340,7 +340,7 @@ export default function IntentCaptureModal({
                   {milestoneDrafts.map((draft, index) => (
                     <div
                       key={index}
-                      className="rounded-xl border border-primary/15 bg-card p-3 shadow-sm dark:border-primary/22"
+                      className="rounded-xl border border-primary/15 bg-card p-3 shadow-sm"
                     >
                       <div className="flex items-start gap-3">
                         <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary/10 text-sm font-semibold text-primary">
@@ -381,11 +381,11 @@ export default function IntentCaptureModal({
                 </div>
               </div>
               {refinements.length > 0 && parsedIntent.confidence < 0.8 && (
-                <div className="p-3 bg-yellow-50 dark:bg-yellow-950/20 rounded-lg border border-yellow-200 dark:border-yellow-900">
-                  <p className="text-sm font-medium text-yellow-900 dark:text-yellow-100 mb-2">
+                <div className="p-3 bg-yellow-50 rounded-lg border border-yellow-200">
+                  <p className="text-sm font-medium text-yellow-900 mb-2">
                     💡 Suggestions to improve:
                   </p>
-                  <ul className="text-sm text-yellow-800 dark:text-yellow-200 space-y-1">
+                  <ul className="text-sm text-yellow-800 space-y-1">
                     {refinements.map((suggestion, index) => (
                       <li key={index} className="flex items-start gap-2">
                         <span>•</span>
@@ -413,7 +413,7 @@ export default function IntentCaptureModal({
                 </p>
                 <p className="text-sm italic">"{parsedIntent.originalInput}"</p>
               </div>
-              <div className="flex gap-3 border-t border-primary/12 pt-4 dark:border-primary/20">
+              <div className="flex gap-3 border-t border-primary/12 pt-4">
                 <Button
                   variant="outline"
                   onClick={() => {

@@ -21,7 +21,6 @@ import { cn } from "./utils";
 // Format: { THEME_NAME: CSS_SELECTOR }
 const THEMES = {
   light: "",
-  dark: ".dark",
 };
 const ChartContext = React.createContext(null);
 function useChart() {

@@ -40,6 +40,7 @@ import {
   validateFounderStartupFields,
 } from "../domains/founder/founderProfileConfig";
 import { persistedTalentToFormInitialData } from "../utils/talentProfileCompletion";
+import { AUTH_CARD, authBtnOutline } from "./auth/AuthPrimitives";
 
 const industryOptions = FOUNDER_INDUSTRY_OPTIONS;
 const audienceOptions = FOUNDER_TARGET_AUDIENCE_OPTIONS;
@@ -676,16 +677,18 @@ export default function ProfileCompletionForm({
         variant="ghost"
         size="sm"
         onClick={onBack}
-        className="mb-4 h-8 px-3 text-xs"
+        className={`mb-4 h-8 px-3 text-xs ${authBtnOutline}`}
         disabled={loading}
       >
         <ArrowLeft className="w-3.5 h-3.5 mr-1.5" />
         Back
       </Button>
-      <Card className="w-full shadow-none border-none bg-transparent">
-        <CardHeader className="border-b border-border p-4">
-          <CardTitle className="text-lg">Complete Your Profile</CardTitle>
-          <CardDescription className="text-xs">
+      <Card className={AUTH_CARD}>
+        <CardHeader className="border-b border-surface-border p-4 md:p-5">
+          <CardTitle className="font-heading text-lg font-extrabold text-text-heading">
+            Complete Your Profile
+          </CardTitle>
+          <CardDescription className="font-body text-xs text-text-muted md:text-sm">
             {role === "founder"
               ? "Tell us about your startup to get personalized guidance"
               : role === "talent"

@@ -65,10 +65,10 @@ function priorityFlagClass(p) {
 /** Surfaces only — label color forced in CSS (see `.sv-priority-chip` in globals) so modal/theme tokens can’t turn it white */
 function priorityBadgeClass(p) {
   if (p === "high")
-    return "border-primary/35 bg-primary/12 font-semibold dark:border-primary/45 dark:bg-primary/22";
+    return "border-primary/35 bg-primary/12 font-semibold";
   if (p === "low")
-    return "border-border/90 bg-muted/50 font-medium dark:bg-muted/40";
-  return "border-primary/35 bg-[#e8ebff] font-semibold dark:border-primary/40 dark:bg-primary/18";
+    return "border-border/90 bg-muted/50 font-medium";
+  return "border-primary/35 bg-[#e8ebff] font-semibold";
 }
 
 function priorityLabelFor(p) {
@@ -79,11 +79,11 @@ function priorityLabelFor(p) {
 /** Background tint per task status — avoids heavy per-row borders inside grouped lists */
 function taskRowSurfaceClass(task) {
   if (task.status === "completed")
-    return "bg-emerald-50/50 dark:bg-emerald-950/25";
+    return "bg-emerald-50/50";
   if (task.status === "blocked")
-    return "bg-orange-50/35 dark:bg-orange-950/15";
+    return "bg-orange-50/35";
   if (task.status === "in-progress")
-    return "bg-primary/[0.06] dark:bg-primary/[0.09]";
+    return "bg-primary/[0.06]";
   return "";
 }
 
@@ -452,7 +452,7 @@ export default function MilestoneDetailView({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sv-modal-backdrop">
       <Card className="sv-modal-panel max-h-[82vh] w-full max-w-[min(100%,26rem)] overflow-y-auto rounded-[14px] border-0 shadow-modal sm:max-w-[28rem]">
-        <CardHeader className="flex-shrink-0 border-b border-primary/12 pb-2 pt-3 dark:border-primary/18">
+        <CardHeader className="flex-shrink-0 border-b border-primary/12 pb-2 pt-3">
           <div className="flex items-start justify-between gap-2">
             <div className="min-w-0 flex-1">
               <CardTitle className="flex items-center gap-2 text-sm font-semibold leading-snug md:text-[15px]">
@@ -480,8 +480,8 @@ export default function MilestoneDetailView({
             </Button>
           </div>
         </CardHeader>
-        <CardContent className="min-h-0 flex-1 space-y-2.5 overflow-y-auto px-3 py-2.5 scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-transparent dark:scrollbar-thumb-gray-700 md:space-y-3 md:px-4 md:py-3">
-          <div className="rounded-xl border border-primary/15 bg-primary/[0.04] p-2.5 dark:border-primary/20 dark:bg-primary/[0.07]">
+        <CardContent className="min-h-0 flex-1 space-y-2.5 overflow-y-auto px-3 py-2.5 scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-transparent md:space-y-3 md:px-4 md:py-3">
+          <div className="rounded-xl border border-primary/15 bg-primary/[0.04] p-2.5">
             <div className="mb-1.5 flex items-center justify-between gap-2">
               <span className="text-xs font-medium text-card-foreground">
                 Overall progress
@@ -511,10 +511,10 @@ export default function MilestoneDetailView({
               return (
                 <div
                   key={milestone.id}
-                  className="overflow-x-clip overflow-y-visible rounded-lg border border-primary/15 dark:border-primary/22"
+                  className="overflow-x-clip overflow-y-visible rounded-lg border border-primary/15"
                 >
                   <div
-                    className={`transition-colors ${rowStatus === "completed" ? "bg-emerald-50/85 dark:bg-emerald-950/20" : rowStatus === "in-progress" ? "bg-primary/[0.04]" : "bg-card"} px-3 py-2`}
+                    className={`transition-colors ${rowStatus === "completed" ? "bg-emerald-50/85" : rowStatus === "in-progress" ? "bg-primary/[0.04]" : "bg-card"} px-3 py-2`}
                   >
                     <div className="flex min-w-0 items-start gap-1.5 md:gap-2">
                       <button
@@ -629,8 +629,8 @@ export default function MilestoneDetailView({
                     </div>
                   </div>
                   {isExpanded && (
-                    <div className="border-t border-primary/10 bg-muted/25 px-2 pb-2 pt-1.5 dark:border-primary/15 dark:bg-muted/10 md:px-2.5 md:pb-2.5 md:pt-2">
-                      <div className="overflow-hidden rounded-lg border border-primary/12 bg-card dark:border-primary/18">
+                    <div className="border-t border-primary/10 bg-muted/25 px-2 pb-2 pt-1.5 md:px-2.5 md:pb-2.5 md:pt-2">
+                      <div className="overflow-hidden rounded-lg border border-primary/12 bg-card">
                       {milestoneTasks.length === 0 ? (
                         <p className="px-3 py-5 text-center text-[11px] text-muted-foreground md:text-xs">
                           No tasks in this milestone yet. Add one below.
@@ -698,7 +698,7 @@ export default function MilestoneDetailView({
                                   {task.status === "in-progress" && (
                                     <Badge
                                       variant="outline"
-                                      className="border-primary/28 bg-primary/[0.06] text-primary-dark dark:text-primary-tint"
+                                      className="border-primary/28 bg-primary/[0.06] text-primary-dark"
                                     >
                                       In Progress
                                     </Badge>
@@ -732,8 +732,8 @@ export default function MilestoneDetailView({
                                 </div>
                                 {task.status === "blocked" &&
                                   task.blockerNote && (
-                                    <div className="mt-2 p-2 bg-orange-100 dark:bg-orange-950/30 rounded text-xs">
-                                      <p className="text-orange-900 dark:text-orange-100">
+                                    <div className="mt-2 p-2 bg-orange-100 rounded text-xs">
+                                      <p className="text-orange-900">
                                         {task.blockerNote}
                                       </p>
                                     </div>
@@ -885,7 +885,7 @@ export default function MilestoneDetailView({
                                           style={{ zIndex: idx + 1 }}
                                           title={person.name || undefined}
                                         >
-                                          <Avatar className="h-7 w-7 border-2 border-background bg-muted shadow-sm dark:border-border">
+                                          <Avatar className="h-7 w-7 border-2 border-background bg-muted shadow-sm">
                                             {person.avatar ? (
                                               <AvatarImage
                                                 src={person.avatar}
@@ -907,7 +907,7 @@ export default function MilestoneDetailView({
                                         title={`${assignees.length - ASSIGNEE_STACK_MAX} more`}
                                       >
                                       <Avatar
-                                        className="h-7 w-7 border-2 border-background bg-muted-foreground/20 text-foreground shadow-sm dark:border-border"
+                                        className="h-7 w-7 border-2 border-background bg-muted-foreground/20 text-foreground shadow-sm"
                                       >
                                         <AvatarFallback className="px-0 text-[9px] font-semibold tabular-nums">
                                           +
@@ -979,7 +979,7 @@ export default function MilestoneDetailView({
                           type="button"
                           size="sm"
                           variant="secondary"
-                          className="h-8 shrink-0 border border-primary/15 bg-card text-xs hover:bg-primary/[0.06] dark:border-primary/22 sm:w-auto"
+                          className="h-8 shrink-0 border border-primary/15 bg-card text-xs hover:bg-primary/[0.06] sm:w-auto"
                           disabled={
                             committing ||
                             !String(
@@ -1026,7 +1026,7 @@ export default function MilestoneDetailView({
             </Button>
           </div>
         </CardContent>
-        <div className="flex shrink-0 flex-wrap justify-end gap-2 border-t border-primary/12 bg-muted/20 px-3 py-2.5 dark:border-primary/18 md:py-3">
+        <div className="flex shrink-0 flex-wrap justify-end gap-2 border-t border-primary/12 bg-muted/20 px-3 py-2.5 md:py-3">
           <Button
             type="button"
             variant="outline"
@@ -1159,7 +1159,7 @@ export default function MilestoneDetailView({
             <div className="px-4 pb-1 pt-4">
               <div className="flex gap-3">
                 <div
-                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-destructive/10 text-destructive dark:bg-destructive/15"
+                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-destructive/10 text-destructive"
                   aria-hidden
                 >
                   <AlertTriangle className="h-5 w-5" strokeWidth={2} />
@@ -1186,13 +1186,13 @@ export default function MilestoneDetailView({
             </div>
             <div
               data-slot="dialog-footer"
-              className="flex flex-col gap-2 border-t border-primary/12 px-4 py-3 dark:border-primary/18 sm:flex-row sm:justify-end sm:gap-2"
+              className="flex flex-col gap-2 border-t border-primary/12 px-4 py-3 sm:flex-row sm:justify-end sm:gap-2"
             >
               <Button
                 type="button"
                 variant="outline"
                 disabled={committing}
-                className="order-2 w-full border-primary/22 bg-card font-semibold hover:bg-primary/[0.04] dark:border-primary/28 sm:order-1 sm:w-auto"
+                className="order-2 w-full border-primary/22 bg-card font-semibold hover:bg-primary/[0.04] sm:order-1 sm:w-auto"
                 onClick={() => setDeleteConfirm(null)}
               >
                 Cancel

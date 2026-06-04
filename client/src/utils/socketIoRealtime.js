@@ -4,10 +4,12 @@
 
 import { io } from "socket.io-client";
 import { getSocketBaseUrl } from "./socketBaseUrl.js";
-import { getConversation } from "./messaging.js";
+import { getConversation, mapMessageDto } from "./messaging.js";
 import { getStartupActivities, getStartupWins } from "./activityApi.js";
 import { getFounderTasks, getTeamMemberTasks } from "./api/taskApi.js";
 import { getStartupAnnouncements } from "./announcementApi.js";
+import { getActiveUsers } from "./presenceApi.js";
+import { normalizePresenceRow } from "../domains/presence/presenceModel.js";
 
 /** Mirrors server/src/realtime/rooms.js */
 export function startupSocketRoom(startupId) {
@@ -52,6 +54,19 @@ export function isRealtimeConnected() {
   return Boolean(SocketEngine.instance?.connected);
 }
 
+/** Subscribe to server presence broadcasts (payloads are hints; prefer GET refresh). */
+export function listenForPresenceChanges(handler) {
+  const socket = SocketEngine.getSocket();
+  socket.on("presence:updated", handler);
+  socket.on("presence:removed", handler);
+  socket.on("connect", handler);
+  return () => {
+    socket.off("presence:updated", handler);
+    socket.off("presence:removed", handler);
+    socket.off("connect", handler);
+  };
+}
+
 function joinRoom(roomId) {
   const socket = SocketEngine.getSocket();
   socket.emit("room:join", roomId);
@@ -90,22 +105,14 @@ function mapTaskDoc(task) {
 
 function mapServerMessageToClient(m) {
   if (!m || typeof m !== "object") return m;
-  const id = m._id != null ? String(m._id) : m.id;
-  const attachments = Array.isArray(m.attachments) ? m.attachments : [];
-  const firstAtt = attachments[0] && typeof attachments[0] === "object" ? attachments[0] : null;
-  return {
-    id,
-    senderId: String(m.senderId || m.fromUserId || ""),
-    recipientId: String(m.recipientId || m.toUserId || ""),
-    content: m.body || m.content || "",
-    timestamp: m.createdAt ? new Date(m.createdAt).getTime() : Date.now(),
-    startupId: m.startupId != null ? String(m.startupId) : m.startupId,
-    read: Boolean(m.readAt),
-    fileUrl: m.fileUrl || firstAtt?.url || "",
-    fileName: m.fileName || firstAtt?.fileName || "",
-    fileSize: m.fileSize ?? firstAtt?.fileSize ?? 0,
-    fileType: m.fileType || firstAtt?.fileType || "",
-  };
+  const mapped = mapMessageDto({
+    ...m,
+    id: m._id != null ? String(m._id) : m.id,
+    fromUserId: m.fromUserId || m.senderId,
+    toUserId: m.toUserId || m.recipientId,
+    body: m.body || m.content,
+  });
+  return mapped || m;
 }
 
 // ========================================
@@ -309,20 +316,35 @@ export function subscribeToMessages(startupId, onUpdate, pollContext = null) {
   const messageRoomId = pollContext?.userId
     ? userSocketRoom(pollContext.userId)
     : startupSocketRoom(startupId);
+  const onCreated = (message) => {
+    const mapped = mapServerMessageToClient(message);
+    if (mapped?.id) seenIds.add(mapped.id);
+    onUpdate({
+      action: "new_message",
+      message: mapped,
+      fromUserId: mapped.senderId,
+      toUserId: mapped.recipientId,
+    });
+  };
+
+  const onUpdated = (payload) => {
+    const mapped = mapServerMessageToClient(payload);
+    onUpdate({
+      action: "message_updated",
+      message: mapped,
+      fromUserId: mapped?.senderId,
+      toUserId: mapped?.recipientId,
+    });
+  };
+
   const coreUnsub = createSubscription(
     messageRoomId,
     "message:created",
-    (message) => {
-      const mapped = mapServerMessageToClient(message);
-      if (mapped?.id) seenIds.add(mapped.id);
-      onUpdate({
-        action: "new_message",
-        message: mapped,
-        fromUserId: mapped.senderId,
-        toUserId: mapped.recipientId,
-      });
-    },
+    onCreated,
   );
+
+  joinRoom(messageRoomId);
+  socket.on("message:updated", onUpdated);
 
   armPollingIfNeeded();
 
@@ -330,6 +352,7 @@ export function subscribeToMessages(startupId, onUpdate, pollContext = null) {
     stopped = true;
     socket.off("connect", onConnect);
     socket.off("disconnect", onDisconnect);
+    socket.off("message:updated", onUpdated);
     clearTimers();
     coreUnsub();
   };
@@ -630,43 +653,36 @@ export function subscribeToPolls(startupId, onUpdate) {
 // PRESENCE — presence:updated / presence:removed
 // ========================================
 
-export function subscribeToPresence(startupId, _userId, _userName, onPresenceChange) {
+export function registerPresenceSocket(startupId, userId) {
   const socket = SocketEngine.getSocket();
   const roomId = startupSocketRoom(startupId);
-  joinRoom(roomId);
-
-  const byUser = new Map();
-
-  const pushList = () => {
-    onPresenceChange(Array.from(byUser.values()));
-  };
-
-  const onUpdated = (p) => {
-    if (!p || String(p.startupId) !== String(startupId)) return;
-    const uid = String(p.userId);
-    byUser.set(uid, {
-      ...p,
-      userId: uid,
-      startupId: String(p.startupId),
-      isOnline: Boolean(p.isOnline),
-      lastSeenAt: p.lastSeenAt || p.updatedAt || new Date().toISOString(),
+  if (userId) {
+    socket.emit("presence:register", {
+      startupId: String(startupId),
+      userId: String(userId),
     });
-    pushList();
+  }
+  joinRoom(roomId);
+}
+
+/** @deprecated Use acquirePresenceFeed from domains/presence/presenceSync.js */
+export function subscribeToPresence(startupId, userId, _userName, onPresenceChange) {
+  registerPresenceSocket(startupId, userId);
+
+  const refresh = async () => {
+    const result = await getActiveUsers(startupId);
+    if (result?.success) onPresenceChange(result.presence || []);
   };
 
-  const onRemoved = (payload) => {
-    if (!payload || String(payload.startupId) !== String(startupId)) return;
-    byUser.delete(String(payload.userId));
-    pushList();
-  };
+  const stopListening = listenForPresenceChanges(() => {
+    void refresh();
+  });
 
-  socket.on("presence:updated", onUpdated);
-  socket.on("presence:removed", onRemoved);
+  void refresh();
 
   return () => {
-    socket.off("presence:updated", onUpdated);
-    socket.off("presence:removed", onRemoved);
-    leaveRoom(roomId);
+    stopListening();
+    leaveRoom(startupSocketRoom(startupId));
   };
 }
 

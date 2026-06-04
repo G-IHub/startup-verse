@@ -1106,7 +1106,7 @@ export default function CompensationSetupWizard({
             </div>
           </div>
         </div>
-        <div className="rounded-2xl border border-amber-500/20 bg-amber-50/60 p-4 dark:bg-amber-950/15">
+        <div className="rounded-2xl border border-amber-500/20 bg-amber-50/60 p-4">
           <div className="flex items-start gap-3">
             <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-amber-500/10 text-amber-600 ring-1 ring-amber-500/20">
               <AlertCircle className="h-4 w-4" />

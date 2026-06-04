@@ -3,12 +3,10 @@ import { API_BASE_URL } from "../config/apiBase.js";
 import { Trash2, AlertTriangle, Database, BarChart3 } from "lucide-react";
 import { Button } from "./ui/button";
 import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "./ui/card";
+  SettingsPanelCard,
+  settingsBtnOutline,
+  settingsBtnDanger,
+} from "./settings/SettingsPrimitives.jsx";
 import {
   Dialog,
   DialogContent,
@@ -95,18 +93,13 @@ export function AdminDatabaseClear() {
   };
   return (
     <>
-      <Card className="border-0 bg-surface-card shadow-soft rounded-card">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 font-heading text-base font-semibold text-status-error">
-            <AlertTriangle className="h-5 w-5 shrink-0" />
-            🔥 Admin: MEGA NUCLEAR WIPE
-          </CardTitle>
-          <CardDescription className="font-body text-text-body">
-            ⚠️ Development Only - Completely wipe database + logout current
-            session
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4 font-body">
+      <SettingsPanelCard
+        icon={AlertTriangle}
+        title="Admin: database wipe"
+        description="Development only — wipes the database and logs you out"
+        className="border-status-error/25"
+      >
+        <div className="space-y-4 font-body">
           <div className="space-y-2">
             <div className="flex items-center justify-between">
               <h4 className="text-sm font-medium text-text-heading">
@@ -115,7 +108,7 @@ export function AdminDatabaseClear() {
               <Button
                 variant="outline"
                 size="sm"
-                className="rounded-input border border-surface-border bg-surface-card font-body font-semibold text-text-body shadow-none transition-colors duration-200 ease-in-out hover:border-primary hover:text-primary"
+                className={settingsBtnOutline}
                 onClick={fetchStats}
                 disabled={isLoadingStats}
               >
@@ -182,40 +175,35 @@ export function AdminDatabaseClear() {
               </div>
             )}
           </div>
-          <div className="rounded-input bg-status-error/5 p-4">
+          <div className="rounded-input border border-status-error/20 bg-status-error/5 p-4">
             <div className="flex items-start gap-3">
               <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-status-error" />
-              <div className="space-y-1 text-sm">
-                <p className="font-semibold text-text-heading">
+              <div className="space-y-1 text-xs md:text-sm">
+                <p className="font-heading text-sm font-semibold text-text-heading">
                   This will permanently delete:
                 </p>
-                <ul className="list-inside list-disc space-y-0.5 text-text-body">
-                  <li>🔥 YOUR CURRENT ACCOUNT (you will be logged out)</li>
-                  <li>All user accounts (founders, team members, talent)</li>
-                  <li>All startup profiles and team data</li>
-                  <li>All tasks, milestones, and outcomes</li>
-                  <li>All messages and notifications</li>
-                  <li>All activities and presence data</li>
-                  <li>All organizations and cohorts</li>
-                  <li>🔥 All persistent browser key/value data (complete reset)</li>
+                <ul className="list-inside list-disc space-y-0.5 font-body text-text-body">
+                  <li>Your current account (you will be logged out)</li>
+                  <li>All user accounts, startups, and team data</li>
+                  <li>Tasks, messages, notifications, and activities</li>
+                  <li>Organizations, cohorts, and browser storage</li>
                 </ul>
-                <p className="mt-2 font-semibold text-status-error">
-                  ⚠️ MEGA NUCLEAR WIPE - This cannot be undone!
+                <p className="mt-2 font-body text-xs font-semibold text-status-error">
+                  This cannot be undone.
                 </p>
               </div>
             </div>
           </div>
           <Button
-            variant="destructive"
-            className="w-full"
+            className={`${settingsBtnDanger} w-full`}
             onClick={() => setShowConfirmDialog(true)}
             disabled={isClearing}
           >
-            <Trash2 className="w-4 h-4 mr-2" />
-            Clear All Database
+            <Trash2 className="mr-2 h-4 w-4" />
+            Clear all database
           </Button>
-        </CardContent>
-      </Card>
+        </div>
+      </SettingsPanelCard>
       <Dialog open={showConfirmDialog} onOpenChange={setShowConfirmDialog}>
         <DialogContent>
           <DialogHeader>
@@ -238,14 +226,14 @@ export function AdminDatabaseClear() {
           <DialogFooter>
             <Button
               variant="outline"
-              className="rounded-input border border-surface-border bg-surface-card font-body font-semibold text-text-body transition-colors duration-200 ease-in-out hover:border-status-error hover:text-status-error"
+              className={settingsBtnOutline}
               onClick={() => setShowConfirmDialog(false)}
               disabled={isClearing}
             >
               Cancel
             </Button>
             <Button
-              variant="destructive"
+              className={settingsBtnDanger}
               onClick={handleClearDatabase}
               disabled={isClearing}
             >

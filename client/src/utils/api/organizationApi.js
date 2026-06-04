@@ -228,7 +228,18 @@ export async function createInvitation(data) {
 
 export async function getFounderInvitations(founderId) {
   const result = await apiCall(`/invitations/founder/${founderId}`);
-  return mapList(unwrapData(result));
+  return mapList(unwrapData(result))
+    .map((inv) => {
+      if (!inv || typeof inv !== "object") return inv;
+      const isOrgInvite =
+        (Boolean(inv.cohortId) && Boolean(inv.organizationId)) ||
+        String(inv.kind || "") === "org-founder";
+      return {
+        ...inv,
+        itemType: isOrgInvite ? "organization-invitation" : "other",
+      };
+    })
+    .filter((inv) => inv?.itemType === "organization-invitation");
 }
 
 export async function respondToInvitation(invitationId, founderId, status) {

@@ -72,10 +72,10 @@ export default function ExecutionScore({
     }
   };
   const getScoreColor = (score) => {
-    if (score >= 80) return "text-green-600 dark:text-green-400";
+    if (score >= 80) return "text-green-600";
     if (score >= 60) return "text-primary";
-    if (score >= 40) return "text-yellow-600 dark:text-yellow-400";
-    return "text-red-600 dark:text-red-400";
+    if (score >= 40) return "text-yellow-600";
+    return "text-red-600";
   };
   const getScoreBgColor = (score) => {
     if (score >= 80) return "bg-green-500/10";
@@ -377,7 +377,7 @@ export default function ExecutionScore({
         <div className="grid md:grid-cols-2 gap-4">
           {scoreData.strengths.length > 0 && (
             <div className="space-y-2">
-              <h4 className="text-sm font-semibold flex items-center gap-2 text-green-600 dark:text-green-400">
+              <h4 className="text-sm font-semibold flex items-center gap-2 text-green-600">
                 <Award className="w-4 h-4" />
                 Strengths
               </h4>
@@ -387,7 +387,7 @@ export default function ExecutionScore({
                     key={index}
                     className="text-xs text-muted-foreground flex items-start gap-2"
                   >
-                    <span className="text-green-600 dark:text-green-400 mt-0.5">
+                    <span className="text-green-600 mt-0.5">
                       ✓
                     </span>
                     {strength}
@@ -398,7 +398,7 @@ export default function ExecutionScore({
           )}
           {scoreData.improvements.length > 0 && (
             <div className="space-y-2">
-              <h4 className="text-sm font-semibold flex items-center gap-2 text-yellow-600 dark:text-yellow-400">
+              <h4 className="text-sm font-semibold flex items-center gap-2 text-yellow-600">
                 <TrendingUp className="w-4 h-4" />
                 Areas to Improve
               </h4>
@@ -408,7 +408,7 @@ export default function ExecutionScore({
                     key={index}
                     className="text-xs text-muted-foreground flex items-start gap-2"
                   >
-                    <span className="text-yellow-600 dark:text-yellow-400 mt-0.5">
+                    <span className="text-yellow-600 mt-0.5">
                       →
                     </span>
                     {improvement}

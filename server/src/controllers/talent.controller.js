@@ -7,6 +7,7 @@ import FounderTalentInvitation from "../models/FounderTalentInvitation.js";
 import { error as apiError, success as apiSuccess } from "../utils/apiResponse.js";
 import { filterTalentProfilesForBrowse } from "../domain/talentBrowseCompletion.js";
 import { attachMatchScores } from "../utils/talentMatching.js";
+import { filterTalentProfilesForFounderBrowse } from "../utils/founderTeamTalentExclusions.js";
 
 export const createOrUpdateProfile = async (req, res) => {
   const requestedUserId = String(req.body?.userId || "").trim();
@@ -66,7 +67,10 @@ export const getProfiles = async (req, res) => {
     .limit(100)
     .populate({ path: "userId", select: "name email" })
     .lean();
-  const profiles = filterTalentProfilesForBrowse(raw);
+  let profiles = filterTalentProfilesForBrowse(raw);
+  if (req.user?.role === "founder" && req.user?.id) {
+    profiles = await filterTalentProfilesForFounderBrowse(profiles, req.user.id);
+  }
   return apiSuccess(res, profiles);
 };
 
@@ -76,7 +80,10 @@ export const browseTalent = async (req, res) => {
     .limit(100)
     .populate({ path: "userId", select: "name email" })
     .lean();
-  const profiles = filterTalentProfilesForBrowse(raw);
+  let profiles = filterTalentProfilesForBrowse(raw);
+  if (req.user?.role === "founder" && req.user?.id) {
+    profiles = await filterTalentProfilesForFounderBrowse(profiles, req.user.id);
+  }
   return apiSuccess(res, profiles);
 };
 

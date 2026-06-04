@@ -1193,7 +1193,7 @@ const TalentProfileForm = forwardRef(function TalentProfileForm(
               <p className="text-xs text-muted-foreground mt-2">
                 PDF, DOC, or DOCX (max 5MB)
               </p>
-              <p className="text-xs text-amber-700 dark:text-amber-500/90 mt-3">
+              <p className="text-xs text-amber-700 mt-3">
                 Resume upload is not saved to your profile yet — only the fields
                 above are stored.
               </p>

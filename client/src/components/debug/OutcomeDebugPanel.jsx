@@ -174,7 +174,7 @@ export function OutcomeDebugPanel({ userId, visible = true }) {
   }, [isExpanded]);
   if (!visible) return null;
   return (
-    <Card className="border-2 border-yellow-500 bg-yellow-50 dark:bg-yellow-950/20">
+    <Card className="border-2 border-yellow-500 bg-yellow-50">
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
@@ -222,19 +222,19 @@ export function OutcomeDebugPanel({ userId, visible = true }) {
             <>
               <Separator />
               <div className="grid grid-cols-3 gap-2 text-xs">
-                <div className="p-2 bg-white dark:bg-gray-900 rounded border">
+                <div className="p-2 bg-white rounded border">
                   <div className="text-muted-foreground">Outcomes</div>
                   <div className="text-lg font-bold">
                     {debugData.outcomes.length}
                   </div>
                 </div>
-                <div className="p-2 bg-white dark:bg-gray-900 rounded border">
+                <div className="p-2 bg-white rounded border">
                   <div className="text-muted-foreground">Tasks</div>
                   <div className="text-lg font-bold">
                     {debugData.tasks.length}
                   </div>
                 </div>
-                <div className="p-2 bg-white dark:bg-gray-900 rounded border">
+                <div className="p-2 bg-white rounded border">
                   <div className="text-muted-foreground">Streak</div>
                   <div className="text-lg font-bold">
                     {debugData.executionData.streak}
@@ -248,7 +248,7 @@ export function OutcomeDebugPanel({ userId, visible = true }) {
                   Issues Detected
                 </h4>
                 {debugData.issues.multipleActiveOutcomes ? (
-                  <div className="p-2 bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-800 rounded">
+                  <div className="p-2 bg-red-50 border border-red-200 rounded">
                     <div className="flex items-start justify-between gap-2">
                       <div className="flex-1">
                         <div className="flex items-center gap-2 mb-1">
@@ -266,7 +266,7 @@ export function OutcomeDebugPanel({ userId, visible = true }) {
                           {debugData.issues.activeOutcomes.map((o) => (
                             <div
                               key={o.id}
-                              className="text-xs bg-white dark:bg-gray-900 p-1 rounded"
+                              className="text-xs bg-white p-1 rounded"
                             >
                               <div className="font-medium">{o.title}</div>
                               <div className="text-muted-foreground">
@@ -290,7 +290,7 @@ export function OutcomeDebugPanel({ userId, visible = true }) {
                     </Button>
                   </div>
                 ) : (
-                  <div className="p-2 bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-800 rounded">
+                  <div className="p-2 bg-green-50 border border-green-200 rounded">
                     <div className="flex items-center gap-2">
                       <CheckCircle2 className="w-4 h-4 text-green-600" />
                       <span className="text-sm">Active outcomes: OK</span>
@@ -298,7 +298,7 @@ export function OutcomeDebugPanel({ userId, visible = true }) {
                   </div>
                 )}
                 {debugData.issues.tasksWithoutOutcomeId > 0 ? (
-                  <div className="p-2 bg-orange-50 dark:bg-orange-950/20 border border-orange-200 dark:border-orange-800 rounded">
+                  <div className="p-2 bg-orange-50 border border-orange-200 rounded">
                     <div className="flex items-start justify-between gap-2">
                       <div className="flex-1">
                         <div className="flex items-center gap-2 mb-1">
@@ -323,7 +323,7 @@ export function OutcomeDebugPanel({ userId, visible = true }) {
                     </Button>
                   </div>
                 ) : (
-                  <div className="p-2 bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-800 rounded">
+                  <div className="p-2 bg-green-50 border border-green-200 rounded">
                     <div className="flex items-center gap-2">
                       <CheckCircle2 className="w-4 h-4 text-green-600" />
                       <span className="text-sm">Task associations: OK</span>
@@ -331,7 +331,7 @@ export function OutcomeDebugPanel({ userId, visible = true }) {
                   </div>
                 )}
                 {debugData.issues.orphanedTasks > 0 ? (
-                  <div className="p-2 bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-800 rounded">
+                  <div className="p-2 bg-red-50 border border-red-200 rounded">
                     <div className="flex items-start justify-between gap-2">
                       <div className="flex-1">
                         <div className="flex items-center gap-2 mb-1">
@@ -357,7 +357,7 @@ export function OutcomeDebugPanel({ userId, visible = true }) {
                     </Button>
                   </div>
                 ) : (
-                  <div className="p-2 bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-800 rounded">
+                  <div className="p-2 bg-green-50 border border-green-200 rounded">
                     <div className="flex items-center gap-2">
                       <CheckCircle2 className="w-4 h-4 text-green-600" />
                       <span className="text-sm">No orphaned tasks</span>
@@ -371,7 +371,7 @@ export function OutcomeDebugPanel({ userId, visible = true }) {
                   <Database className="w-3 h-3 inline mr-1" />
                   View Raw Data
                 </summary>
-                <pre className="mt-2 p-2 bg-gray-100 dark:bg-gray-900 rounded overflow-auto max-h-64 text-[10px]">
+                <pre className="mt-2 p-2 bg-gray-100 rounded overflow-auto max-h-64 text-[10px]">
                   {JSON.stringify(debugData, null, 2)}
                 </pre>
               </details>

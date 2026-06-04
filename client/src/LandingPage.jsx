@@ -35,34 +35,34 @@ export default function LandingPage() {
     }, 3000);
   };
   return (
-    <div className="min-h-screen bg-white dark:bg-gray-900">
-      <nav className="fixed top-0 w-full bg-white/80 dark:bg-gray-900/80 backdrop-blur-lg border-b border-gray-200 dark:border-gray-800 z-50">
+    <div className="min-h-screen bg-white">
+      <nav className="fixed top-0 w-full bg-white/80 backdrop-blur-lg border-b border-gray-200 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
             <div className="flex items-center gap-2">
               <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-[#3A5AFE] to-[#2ECC71] flex items-center justify-center">
                 <Sparkles className="w-5 h-5 text-white" />
               </div>
-              <span className="text-gray-900 dark:text-white">
+              <span className="text-gray-900">
                 StartupVerse
               </span>
             </div>
             <div className="hidden md:flex items-center gap-8">
               <a
                 href="#features"
-                className="text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-colors"
+                className="text-gray-600 hover:text-gray-900 transition-colors"
               >
                 Features
               </a>
               <a
                 href="#pricing"
-                className="text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-colors"
+                className="text-gray-600 hover:text-gray-900 transition-colors"
               >
                 Pricing
               </a>
               <a
                 href="#how-it-works"
-                className="text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-colors"
+                className="text-gray-600 hover:text-gray-900 transition-colors"
               >
                 How It Works
               </a>
@@ -71,7 +71,7 @@ export default function LandingPage() {
               </button>
             </div>
             <button
-              className="md:hidden p-2 text-gray-600 dark:text-gray-300"
+              className="md:hidden p-2 text-gray-600"
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
             >
               {mobileMenuOpen ? (
@@ -82,23 +82,23 @@ export default function LandingPage() {
             </button>
           </div>
           {mobileMenuOpen && (
-            <div className="md:hidden py-4 border-t border-gray-200 dark:border-gray-800">
+            <div className="md:hidden py-4 border-t border-gray-200">
               <div className="flex flex-col gap-4">
                 <a
                   href="#features"
-                  className="text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-colors"
+                  className="text-gray-600 hover:text-gray-900 transition-colors"
                 >
                   Features
                 </a>
                 <a
                   href="#pricing"
-                  className="text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-colors"
+                  className="text-gray-600 hover:text-gray-900 transition-colors"
                 >
                   Pricing
                 </a>
                 <a
                   href="#how-it-works"
-                  className="text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-colors"
+                  className="text-gray-600 hover:text-gray-900 transition-colors"
                 >
                   How It Works
                 </a>
@@ -113,65 +113,65 @@ export default function LandingPage() {
       <section className="pt-32 pb-20 px-4 sm:px-6 lg:px-8">
         <div className="max-w-7xl mx-auto">
           <div className="text-center mb-12">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#3A5AFE]/10 text-[#3A5AFE] dark:bg-[#3A5AFE]/20 mb-6">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#3A5AFE]/10 text-[#3A5AFE] mb-6">
               <Sparkles className="w-4 h-4" />
               <span className="text-sm">
                 Launching Q1 2026 • Join 500+ Founders
               </span>
             </div>
-            <h1 className="text-5xl sm:text-6xl lg:text-7xl text-gray-900 dark:text-white mb-6 max-w-5xl mx-auto">
+            <h1 className="text-5xl sm:text-6xl lg:text-7xl text-gray-900 mb-6 max-w-5xl mx-auto">
               Everything You Need to Build Your{" "}
               <span className="bg-gradient-to-r from-[#3A5AFE] to-[#2ECC71] bg-clip-text text-transparent">
                 Startup
               </span>
             </h1>
-            <p className="text-xl text-gray-600 dark:text-gray-300 mb-12 max-w-3xl mx-auto">
+            <p className="text-xl text-gray-600 mb-12 max-w-3xl mx-auto">
               From idea to launch: Get a proven roadmap, find your perfect team,
               and build together in one immersive Virtual Office—with built-in
               compensation tracking and real-time analytics.
             </p>
             <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 max-w-6xl mx-auto mb-12">
-              <div className="bg-white dark:bg-gray-800 p-6 rounded-xl border-2 border-gray-200 dark:border-gray-700 transition-all hover:shadow-lg">
-                <div className="w-12 h-12 rounded-lg bg-[#3A5AFE]/10 dark:bg-[#3A5AFE]/20 flex items-center justify-center mb-3 mx-auto">
+              <div className="bg-white p-6 rounded-xl border-2 border-gray-200 transition-all hover:shadow-lg">
+                <div className="w-12 h-12 rounded-lg bg-[#3A5AFE]/10 flex items-center justify-center mb-3 mx-auto">
                   <Map className="w-6 h-6 text-[#3A5AFE]" />
                 </div>
-                <h3 className="text-gray-900 dark:text-white mb-2">
+                <h3 className="text-gray-900 mb-2">
                   Startup Roadmap
                 </h3>
-                <p className="text-sm text-gray-600 dark:text-gray-400">
+                <p className="text-sm text-gray-600">
                   6-stage framework from idea to scale
                 </p>
               </div>
-              <div className="bg-white dark:bg-gray-800 p-6 rounded-xl border-2 border-gray-200 dark:border-gray-700 transition-all hover:shadow-lg">
-                <div className="w-12 h-12 rounded-lg bg-[#2ECC71]/10 dark:bg-[#2ECC71]/20 flex items-center justify-center mb-3 mx-auto">
+              <div className="bg-white p-6 rounded-xl border-2 border-gray-200 transition-all hover:shadow-lg">
+                <div className="w-12 h-12 rounded-lg bg-[#2ECC71]/10 flex items-center justify-center mb-3 mx-auto">
                   <Users className="w-6 h-6 text-[#2ECC71]" />
                 </div>
-                <h3 className="text-gray-900 dark:text-white mb-2">
+                <h3 className="text-gray-900 mb-2">
                   Smart Matching
                 </h3>
-                <p className="text-sm text-gray-600 dark:text-gray-400">
+                <p className="text-sm text-gray-600">
                   Algorithm-based team finding
                 </p>
               </div>
-              <div className="bg-white dark:bg-gray-800 p-6 rounded-xl border-2 border-gray-200 dark:border-gray-700 transition-all hover:shadow-lg">
-                <div className="w-12 h-12 rounded-lg bg-[#3A5AFE]/10 dark:bg-[#3A5AFE]/20 flex items-center justify-center mb-3 mx-auto">
+              <div className="bg-white p-6 rounded-xl border-2 border-gray-200 transition-all hover:shadow-lg">
+                <div className="w-12 h-12 rounded-lg bg-[#3A5AFE]/10 flex items-center justify-center mb-3 mx-auto">
                   <Sparkles className="w-6 h-6 text-[#3A5AFE]" />
                 </div>
-                <h3 className="text-gray-900 dark:text-white mb-2">
+                <h3 className="text-gray-900 mb-2">
                   Virtual Office
                 </h3>
-                <p className="text-sm text-gray-600 dark:text-gray-400">
+                <p className="text-sm text-gray-600">
                   Immersive workspace with analytics
                 </p>
               </div>
-              <div className="bg-white dark:bg-gray-800 p-6 rounded-xl border-2 border-gray-200 dark:border-gray-700 transition-all hover:shadow-lg">
-                <div className="w-12 h-12 rounded-lg bg-[#2ECC71]/10 dark:bg-[#2ECC71]/20 flex items-center justify-center mb-3 mx-auto">
+              <div className="bg-white p-6 rounded-xl border-2 border-gray-200 transition-all hover:shadow-lg">
+                <div className="w-12 h-12 rounded-lg bg-[#2ECC71]/10 flex items-center justify-center mb-3 mx-auto">
                   <Wrench className="w-6 h-6 text-[#2ECC71]" />
                 </div>
-                <h3 className="text-gray-900 dark:text-white mb-2">
+                <h3 className="text-gray-900 mb-2">
                   All-in-One
                 </h3>
-                <p className="text-sm text-gray-600 dark:text-gray-400">
+                <p className="text-sm text-gray-600">
                   Replace 5 tools, save $500/month
                 </p>
               </div>
@@ -193,7 +193,7 @@ export default function LandingPage() {
                     onChange={(e) => setEmail(e.target.value)}
                     placeholder="Enter your email"
                     required={true}
-                    className="px-4 py-3 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#3A5AFE] flex-1"
+                    className="px-4 py-3 rounded-lg border border-gray-300 bg-white text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-[#3A5AFE] flex-1"
                   />
                   <button
                     type="submit"
@@ -205,7 +205,7 @@ export default function LandingPage() {
                 </form>
               )}
             </div>
-            <div className="flex items-center justify-center gap-6 text-sm text-gray-600 dark:text-gray-400">
+            <div className="flex items-center justify-center gap-6 text-sm text-gray-600">
               <div className="flex items-center gap-2">
                 <Check className="w-4 h-4 text-[#2ECC71]" />
                 <span>Free for teams up to 5</span>
@@ -218,12 +218,12 @@ export default function LandingPage() {
           </div>
           <div className="relative max-w-5xl mx-auto">
             <div className="absolute inset-0 bg-gradient-to-br from-[#3A5AFE]/20 to-[#2ECC71]/20 rounded-2xl blur-3xl" />
-            <div className="relative bg-white dark:bg-gray-800 rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700 overflow-hidden">
-              <div className="bg-gray-100 dark:bg-gray-900 px-4 py-3 border-b border-gray-200 dark:border-gray-700 flex items-center gap-2">
+            <div className="relative bg-white rounded-2xl shadow-2xl border border-gray-200 overflow-hidden">
+              <div className="bg-gray-100 px-4 py-3 border-b border-gray-200 flex items-center gap-2">
                 <div className="w-3 h-3 rounded-full bg-red-500" />
                 <div className="w-3 h-3 rounded-full bg-yellow-500" />
                 <div className="w-3 h-3 rounded-full bg-green-500" />
-                <span className="ml-4 text-sm text-gray-600 dark:text-gray-400">
+                <span className="ml-4 text-sm text-gray-600">
                   Virtual Office
                 </span>
               </div>
@@ -236,25 +236,25 @@ export default function LandingPage() {
           </div>
         </div>
       </section>
-      <section className="py-20 px-4 sm:px-6 lg:px-8 bg-gray-50 dark:bg-gray-800/50">
+      <section className="py-20 px-4 sm:px-6 lg:px-8 bg-gray-50">
         <div className="max-w-7xl mx-auto">
           <div className="text-center mb-16">
-            <h2 className="text-4xl sm:text-5xl text-gray-900 dark:text-white mb-4">
+            <h2 className="text-4xl sm:text-5xl text-gray-900 mb-4">
               Why Most Startups Fail
             </h2>
-            <p className="text-xl text-gray-600 dark:text-gray-300">
+            <p className="text-xl text-gray-600">
               StartupVerse solves all four critical problems
             </p>
           </div>
           <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
-            <div className="bg-white dark:bg-gray-800 p-6 rounded-xl border border-gray-200 dark:border-gray-700">
+            <div className="bg-white p-6 rounded-xl border border-gray-200">
               <div className="flex items-center gap-3 mb-4">
-                <div className="w-10 h-10 rounded-lg bg-red-100 dark:bg-red-900/20 flex items-center justify-center flex-shrink-0">
-                  <X className="w-5 h-5 text-red-600 dark:text-red-400" />
+                <div className="w-10 h-10 rounded-lg bg-red-100 flex items-center justify-center flex-shrink-0">
+                  <X className="w-5 h-5 text-red-600" />
                 </div>
-                <h3 className="text-gray-900 dark:text-white">No Clear Plan</h3>
+                <h3 className="text-gray-900">No Clear Plan</h3>
               </div>
-              <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+              <p className="text-sm text-gray-600 mb-4">
                 "What should I build first? Am I ready to fundraise?"
               </p>
               <div className="flex items-center gap-2 text-sm">
@@ -264,16 +264,16 @@ export default function LandingPage() {
                 </span>
               </div>
             </div>
-            <div className="bg-white dark:bg-gray-800 p-6 rounded-xl border border-gray-200 dark:border-gray-700">
+            <div className="bg-white p-6 rounded-xl border border-gray-200">
               <div className="flex items-center gap-3 mb-4">
-                <div className="w-10 h-10 rounded-lg bg-red-100 dark:bg-red-900/20 flex items-center justify-center flex-shrink-0">
-                  <X className="w-5 h-5 text-red-600 dark:text-red-400" />
+                <div className="w-10 h-10 rounded-lg bg-red-100 flex items-center justify-center flex-shrink-0">
+                  <X className="w-5 h-5 text-red-600" />
                 </div>
-                <h3 className="text-gray-900 dark:text-white">
+                <h3 className="text-gray-900">
                   Can't Find Team
                 </h3>
               </div>
-              <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+              <p className="text-sm text-gray-600 mb-4">
                 "Need a technical co-founder but LinkedIn isn't working"
               </p>
               <div className="flex items-center gap-2 text-sm">
@@ -283,16 +283,16 @@ export default function LandingPage() {
                 </span>
               </div>
             </div>
-            <div className="bg-white dark:bg-gray-800 p-6 rounded-xl border border-gray-200 dark:border-gray-700">
+            <div className="bg-white p-6 rounded-xl border border-gray-200">
               <div className="flex items-center gap-3 mb-4">
-                <div className="w-10 h-10 rounded-lg bg-red-100 dark:bg-red-900/20 flex items-center justify-center flex-shrink-0">
-                  <X className="w-5 h-5 text-red-600 dark:text-red-400" />
+                <div className="w-10 h-10 rounded-lg bg-red-100 flex items-center justify-center flex-shrink-0">
+                  <X className="w-5 h-5 text-red-600" />
                 </div>
-                <h3 className="text-gray-900 dark:text-white">
+                <h3 className="text-gray-900">
                   Scattered Tools
                 </h3>
               </div>
-              <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+              <p className="text-sm text-gray-600 mb-4">
                 "Team is spread across Slack, Notion, Linear, Zoom..."
               </p>
               <div className="flex items-center gap-2 text-sm">
@@ -302,14 +302,14 @@ export default function LandingPage() {
                 </span>
               </div>
             </div>
-            <div className="bg-white dark:bg-gray-800 p-6 rounded-xl border border-gray-200 dark:border-gray-700">
+            <div className="bg-white p-6 rounded-xl border border-gray-200">
               <div className="flex items-center gap-3 mb-4">
-                <div className="w-10 h-10 rounded-lg bg-red-100 dark:bg-red-900/20 flex items-center justify-center flex-shrink-0">
-                  <X className="w-5 h-5 text-red-600 dark:text-red-400" />
+                <div className="w-10 h-10 rounded-lg bg-red-100 flex items-center justify-center flex-shrink-0">
+                  <X className="w-5 h-5 text-red-600" />
                 </div>
-                <h3 className="text-gray-900 dark:text-white">Burning Cash</h3>
+                <h3 className="text-gray-900">Burning Cash</h3>
               </div>
-              <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+              <p className="text-sm text-gray-600 mb-4">
                 "SaaS subscriptions eating into our runway"
               </p>
               <div className="flex items-center gap-2 text-sm">
@@ -320,12 +320,12 @@ export default function LandingPage() {
           </div>
           <div className="mt-12 max-w-4xl mx-auto">
             <div className="grid md:grid-cols-2 gap-6">
-              <div className="bg-white dark:bg-gray-800 p-6 rounded-xl border border-gray-200 dark:border-gray-700">
-                <h3 className="text-gray-900 dark:text-white mb-4 flex items-center gap-2">
+              <div className="bg-white p-6 rounded-xl border border-gray-200">
+                <h3 className="text-gray-900 mb-4 flex items-center gap-2">
                   <X className="w-5 h-5 text-red-600" />
                   The Old Way
                 </h3>
-                <ul className="space-y-2 text-sm text-gray-600 dark:text-gray-400 mb-4">
+                <ul className="space-y-2 text-sm text-gray-600 mb-4">
                   <li className="flex items-center justify-between">
                     <span>Slack messaging</span>
                     <span>$40/mo</span>
@@ -347,9 +347,9 @@ export default function LandingPage() {
                     <span>$99/mo</span>
                   </li>
                 </ul>
-                <div className="pt-4 border-t border-gray-200 dark:border-gray-700">
+                <div className="pt-4 border-t border-gray-200">
                   <div className="flex items-center justify-between">
-                    <span className="text-gray-900 dark:text-white">
+                    <span className="text-gray-900">
                       Total per month:
                     </span>
                     <span className="text-xl text-red-600">$244</span>
@@ -399,105 +399,105 @@ export default function LandingPage() {
         <div className="max-w-7xl mx-auto">
           <div className="grid lg:grid-cols-2 gap-12 items-center">
             <div>
-              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#3A5AFE]/10 text-[#3A5AFE] dark:bg-[#3A5AFE]/20 mb-4">
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#3A5AFE]/10 text-[#3A5AFE] mb-4">
                 <Map className="w-4 h-4" />
                 <span className="text-sm">Pillar 1: Strategic Guidance</span>
               </div>
-              <h2 className="text-4xl sm:text-5xl text-gray-900 dark:text-white mb-6">
+              <h2 className="text-4xl sm:text-5xl text-gray-900 mb-6">
                 Your Startup Journey Roadmap
               </h2>
-              <p className="text-xl text-gray-600 dark:text-gray-300 mb-8">
+              <p className="text-xl text-gray-600 mb-8">
                 Never wonder what to do next. Follow a proven 6-stage framework
                 from idea validation to product-market fit.
               </p>
               <div className="space-y-4 mb-8">
                 <div className="flex items-start gap-3">
-                  <div className="w-8 h-8 rounded-lg bg-[#3A5AFE]/10 dark:bg-[#3A5AFE]/20 flex items-center justify-center flex-shrink-0 mt-0.5">
+                  <div className="w-8 h-8 rounded-lg bg-[#3A5AFE]/10 flex items-center justify-center flex-shrink-0 mt-0.5">
                     <Lightbulb className="w-4 h-4 text-[#3A5AFE]" />
                   </div>
                   <div>
-                    <h4 className="text-gray-900 dark:text-white mb-1">
+                    <h4 className="text-gray-900 mb-1">
                       Stage 1: Ideation & Validation (1-4 weeks)
                     </h4>
-                    <p className="text-sm text-gray-600 dark:text-gray-400">
+                    <p className="text-sm text-gray-600">
                       Idea Canvas, Market Research, Competitor Analysis,
                       Customer Interviews
                     </p>
                   </div>
                 </div>
                 <div className="flex items-start gap-3">
-                  <div className="w-8 h-8 rounded-lg bg-[#3A5AFE]/10 dark:bg-[#3A5AFE]/20 flex items-center justify-center flex-shrink-0 mt-0.5">
+                  <div className="w-8 h-8 rounded-lg bg-[#3A5AFE]/10 flex items-center justify-center flex-shrink-0 mt-0.5">
                     <FileText className="w-4 h-4 text-[#3A5AFE]" />
                   </div>
                   <div>
-                    <h4 className="text-gray-900 dark:text-white mb-1">
+                    <h4 className="text-gray-900 mb-1">
                       Stage 2: Company Formation (1-2 weeks)
                     </h4>
-                    <p className="text-sm text-gray-600 dark:text-gray-400">
+                    <p className="text-sm text-gray-600">
                       Entity Setup, Founder Agreements, Cap Table, Document
                       Vault
                     </p>
                   </div>
                 </div>
                 <div className="flex items-start gap-3">
-                  <div className="w-8 h-8 rounded-lg bg-[#2ECC71]/10 dark:bg-[#2ECC71]/20 flex items-center justify-center flex-shrink-0 mt-0.5">
+                  <div className="w-8 h-8 rounded-lg bg-[#2ECC71]/10 flex items-center justify-center flex-shrink-0 mt-0.5">
                     <Users className="w-4 h-4 text-[#2ECC71]" />
                   </div>
                   <div>
-                    <h4 className="text-gray-900 dark:text-white mb-1">
+                    <h4 className="text-gray-900 mb-1">
                       Stage 3: Team Building (4-8 weeks)
                     </h4>
-                    <p className="text-sm text-gray-600 dark:text-gray-400">
+                    <p className="text-sm text-gray-600">
                       Smart Matching, Equity Offers, Team Charter, Role
                       Definitions
                     </p>
                   </div>
                 </div>
                 <div className="flex items-start gap-3">
-                  <div className="w-8 h-8 rounded-lg bg-[#3A5AFE]/10 dark:bg-[#3A5AFE]/20 flex items-center justify-center flex-shrink-0 mt-0.5">
+                  <div className="w-8 h-8 rounded-lg bg-[#3A5AFE]/10 flex items-center justify-center flex-shrink-0 mt-0.5">
                     <Rocket className="w-4 h-4 text-[#3A5AFE]" />
                   </div>
                   <div>
-                    <h4 className="text-gray-900 dark:text-white mb-1">
+                    <h4 className="text-gray-900 mb-1">
                       Stage 4: Product Development (8-16 weeks)
                     </h4>
-                    <p className="text-sm text-gray-600 dark:text-gray-400">
+                    <p className="text-sm text-gray-600">
                       Product Roadmap, Sprint Planning, Task Management, Launch
                       Checklist
                     </p>
                   </div>
                 </div>
                 <div className="flex items-start gap-3">
-                  <div className="w-8 h-8 rounded-lg bg-[#2ECC71]/10 dark:bg-[#2ECC71]/20 flex items-center justify-center flex-shrink-0 mt-0.5">
+                  <div className="w-8 h-8 rounded-lg bg-[#2ECC71]/10 flex items-center justify-center flex-shrink-0 mt-0.5">
                     <TrendingUp className="w-4 h-4 text-[#2ECC71]" />
                   </div>
                   <div>
-                    <h4 className="text-gray-900 dark:text-white mb-1">
+                    <h4 className="text-gray-900 mb-1">
                       Stage 5: Go-to-Market (8-12 weeks)
                     </h4>
-                    <p className="text-sm text-gray-600 dark:text-gray-400">
+                    <p className="text-sm text-gray-600">
                       CRM, Sales Pipeline, Marketing Hub, Email Campaigns,
                       Analytics
                     </p>
                   </div>
                 </div>
                 <div className="flex items-start gap-3">
-                  <div className="w-8 h-8 rounded-lg bg-[#3A5AFE]/10 dark:bg-[#3A5AFE]/20 flex items-center justify-center flex-shrink-0 mt-0.5">
+                  <div className="w-8 h-8 rounded-lg bg-[#3A5AFE]/10 flex items-center justify-center flex-shrink-0 mt-0.5">
                     <Target className="w-4 h-4 text-[#3A5AFE]" />
                   </div>
                   <div>
-                    <h4 className="text-gray-900 dark:text-white mb-1">
+                    <h4 className="text-gray-900 mb-1">
                       Stage 6: Operations & Growth (12-24 weeks)
                     </h4>
-                    <p className="text-sm text-gray-600 dark:text-gray-400">
+                    <p className="text-sm text-gray-600">
                       Financial Dashboard, Budget Planning, OKR Tracking,
                       Knowledge Base
                     </p>
                   </div>
                 </div>
               </div>
-              <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-lg">
-                <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
+              <div className="bg-gray-50 p-4 rounded-lg">
+                <div className="flex items-center gap-2 text-sm text-gray-600">
                   <Clock className="w-4 h-4 text-[#2ECC71]" />
                   <span>
                     35-62 weeks total journey • 35+ purpose-built tools • Clear
@@ -507,7 +507,7 @@ export default function LandingPage() {
               </div>
             </div>
             <div className="relative">
-              <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl border border-gray-200 dark:border-gray-700 p-6">
+              <div className="bg-white rounded-2xl shadow-xl border border-gray-200 p-6">
                 <ImageWithFallback
                   src="https://images.unsplash.com/photo-1553028826-f4804a6dba3b?w=800&h=600&fit=crop"
                   alt="Startup Journey Roadmap"
@@ -515,15 +515,15 @@ export default function LandingPage() {
                 />
                 <div className="mt-4 space-y-2">
                   <div className="flex items-center justify-between text-sm">
-                    <span className="text-gray-600 dark:text-gray-400">
+                    <span className="text-gray-600">
                       Overall Progress
                     </span>
-                    <span className="text-gray-900 dark:text-white">
+                    <span className="text-gray-900">
                       3/6 Stages Complete
                     </span>
                   </div>
-                  <div className="h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
-                    <div className="h-full w-1/2 bg-gray-400 dark:bg-gray-500" />
+                  <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
+                    <div className="h-full w-1/2 bg-gray-400" />
                   </div>
                 </div>
               </div>
@@ -531,38 +531,38 @@ export default function LandingPage() {
           </div>
         </div>
       </section>
-      <section className="py-20 px-4 sm:px-6 lg:px-8 bg-gray-50 dark:bg-gray-800/50">
+      <section className="py-20 px-4 sm:px-6 lg:px-8 bg-gray-50">
         <div className="max-w-7xl mx-auto">
           <div className="grid lg:grid-cols-2 gap-12 items-center">
             <div className="order-2 lg:order-1">
-              <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl border border-gray-200 dark:border-gray-700 p-6">
+              <div className="bg-white rounded-2xl shadow-xl border border-gray-200 p-6">
                 <ImageWithFallback
                   src="https://images.unsplash.com/photo-1522071820081-009f0129c71c?w=800&h=600&fit=crop"
                   alt="Smart Team Matching"
                   className="w-full h-auto rounded-lg"
                 />
                 <div className="mt-4 grid grid-cols-3 gap-3">
-                  <div className="text-center p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
-                    <div className="text-2xl text-gray-900 dark:text-white mb-1">
+                  <div className="text-center p-3 bg-gray-50 rounded-lg">
+                    <div className="text-2xl text-gray-900 mb-1">
                       95%
                     </div>
-                    <div className="text-xs text-gray-600 dark:text-gray-400">
+                    <div className="text-xs text-gray-600">
                       Match Score
                     </div>
                   </div>
-                  <div className="text-center p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
-                    <div className="text-2xl text-gray-900 dark:text-white mb-1">
+                  <div className="text-center p-3 bg-gray-50 rounded-lg">
+                    <div className="text-2xl text-gray-900 mb-1">
                       12
                     </div>
-                    <div className="text-xs text-gray-600 dark:text-gray-400">
+                    <div className="text-xs text-gray-600">
                       Skills Match
                     </div>
                   </div>
-                  <div className="text-center p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
-                    <div className="text-2xl text-gray-900 dark:text-white mb-1">
+                  <div className="text-center p-3 bg-gray-50 rounded-lg">
+                    <div className="text-2xl text-gray-900 mb-1">
                       AI
                     </div>
-                    <div className="text-xs text-gray-600 dark:text-gray-400">
+                    <div className="text-xs text-gray-600">
                       Powered
                     </div>
                   </div>
@@ -570,75 +570,75 @@ export default function LandingPage() {
               </div>
             </div>
             <div className="order-1 lg:order-2">
-              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#2ECC71]/10 text-[#2ECC71] dark:bg-[#2ECC71]/20 mb-4">
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#2ECC71]/10 text-[#2ECC71] mb-4">
                 <Users className="w-4 h-4" />
                 <span className="text-sm">Pillar 2: Team Assembly</span>
               </div>
-              <h2 className="text-4xl sm:text-5xl text-gray-900 dark:text-white mb-6">
+              <h2 className="text-4xl sm:text-5xl text-gray-900 mb-6">
                 Smart Team Matching
               </h2>
-              <p className="text-xl text-gray-600 dark:text-gray-300 mb-8">
+              <p className="text-xl text-gray-600 mb-8">
                 Find your perfect co-founder and teammates with AI-powered
                 matching. No more endless LinkedIn searching.
               </p>
               <div className="space-y-6 mb-8">
                 <div className="flex items-start gap-4">
-                  <div className="w-10 h-10 rounded-lg bg-[#2ECC71]/10 dark:bg-[#2ECC71]/20 flex items-center justify-center flex-shrink-0">
+                  <div className="w-10 h-10 rounded-lg bg-[#2ECC71]/10 flex items-center justify-center flex-shrink-0">
                     <Check className="w-5 h-5 text-[#2ECC71]" />
                   </div>
                   <div>
-                    <h4 className="text-gray-900 dark:text-white mb-1">
+                    <h4 className="text-gray-900 mb-1">
                       AI-Powered Matching Algorithm
                     </h4>
-                    <p className="text-sm text-gray-600 dark:text-gray-400">
+                    <p className="text-sm text-gray-600">
                       Match based on skills, experience, values, and startup
                       stage
                     </p>
                   </div>
                 </div>
                 <div className="flex items-start gap-4">
-                  <div className="w-10 h-10 rounded-lg bg-[#2ECC71]/10 dark:bg-[#2ECC71]/20 flex items-center justify-center flex-shrink-0">
+                  <div className="w-10 h-10 rounded-lg bg-[#2ECC71]/10 flex items-center justify-center flex-shrink-0">
                     <Check className="w-5 h-5 text-[#2ECC71]" />
                   </div>
                   <div>
-                    <h4 className="text-gray-900 dark:text-white mb-1">
+                    <h4 className="text-gray-900 mb-1">
                       3 Role Types
                     </h4>
-                    <p className="text-sm text-gray-600 dark:text-gray-400">
+                    <p className="text-sm text-gray-600">
                       Founders, Team Members (full-time), and Talent
                       (contractors)
                     </p>
                   </div>
                 </div>
                 <div className="flex items-start gap-4">
-                  <div className="w-10 h-10 rounded-lg bg-[#2ECC71]/10 dark:bg-[#2ECC71]/20 flex items-center justify-center flex-shrink-0">
+                  <div className="w-10 h-10 rounded-lg bg-[#2ECC71]/10 flex items-center justify-center flex-shrink-0">
                     <Check className="w-5 h-5 text-[#2ECC71]" />
                   </div>
                   <div>
-                    <h4 className="text-gray-900 dark:text-white mb-1">
+                    <h4 className="text-gray-900 mb-1">
                       Equity Offer Builder
                     </h4>
-                    <p className="text-sm text-gray-600 dark:text-gray-400">
+                    <p className="text-sm text-gray-600">
                       Send fair compensation offers with equity calculator
                     </p>
                   </div>
                 </div>
                 <div className="flex items-start gap-4">
-                  <div className="w-10 h-10 rounded-lg bg-[#2ECC71]/10 dark:bg-[#2ECC71]/20 flex items-center justify-center flex-shrink-0">
+                  <div className="w-10 h-10 rounded-lg bg-[#2ECC71]/10 flex items-center justify-center flex-shrink-0">
                     <Check className="w-5 h-5 text-[#2ECC71]" />
                   </div>
                   <div>
-                    <h4 className="text-gray-900 dark:text-white mb-1">
+                    <h4 className="text-gray-900 mb-1">
                       Direct Connections
                     </h4>
-                    <p className="text-sm text-gray-600 dark:text-gray-400">
+                    <p className="text-sm text-gray-600">
                       Message and video call potential co-founders instantly
                     </p>
                   </div>
                 </div>
               </div>
-              <div className="bg-gradient-to-br from-[#2ECC71]/10 to-[#3A5AFE]/10 dark:from-[#2ECC71]/20 dark:to-[#3A5AFE]/20 p-4 rounded-lg border border-[#2ECC71]/20">
-                <p className="text-sm text-gray-700 dark:text-gray-300">
+              <div className="bg-gradient-to-br from-[#2ECC71]/10 to-[#3A5AFE]/10 p-4 rounded-lg border border-[#2ECC71]/20">
+                <p className="text-sm text-gray-700">
                   <span className="text-[#2ECC71]">💡 Pro tip:</span>
                   {
                     " The roadmap guides you on when to hire each role (designer in Stage 4, marketer in Stage 5, etc.)"
@@ -653,105 +653,105 @@ export default function LandingPage() {
         <div className="max-w-7xl mx-auto">
           <div className="grid lg:grid-cols-2 gap-12 items-center">
             <div>
-              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#3A5AFE]/10 text-[#3A5AFE] dark:bg-[#3A5AFE]/20 mb-4">
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#3A5AFE]/10 text-[#3A5AFE] mb-4">
                 <Sparkles className="w-4 h-4" />
                 <span className="text-sm">Pillar 3: Immersive Workspace</span>
               </div>
-              <h2 className="text-4xl sm:text-5xl text-gray-900 dark:text-white mb-6">
+              <h2 className="text-4xl sm:text-5xl text-gray-900 mb-6">
                 Your Virtual Office
               </h2>
-              <p className="text-xl text-gray-600 dark:text-gray-300 mb-8">
+              <p className="text-xl text-gray-600 mb-8">
                 Work like you're in the same room. An immersive digital
                 headquarters where everything happens.
               </p>
               <div className="space-y-6 mb-8">
                 <div className="flex items-start gap-4">
-                  <div className="w-10 h-10 rounded-lg bg-[#3A5AFE]/10 dark:bg-[#3A5AFE]/20 flex items-center justify-center flex-shrink-0">
+                  <div className="w-10 h-10 rounded-lg bg-[#3A5AFE]/10 flex items-center justify-center flex-shrink-0">
                     <Check className="w-5 h-5 text-[#3A5AFE]" />
                   </div>
                   <div>
-                    <h4 className="text-gray-900 dark:text-white mb-1">
+                    <h4 className="text-gray-900 mb-1">
                       Spatial Workspace Design
                     </h4>
-                    <p className="text-sm text-gray-600 dark:text-gray-400">
+                    <p className="text-sm text-gray-600">
                       Not just another dashboard—a real office metaphor with
                       rooms and panels
                     </p>
                   </div>
                 </div>
                 <div className="flex items-start gap-4">
-                  <div className="w-10 h-10 rounded-lg bg-[#3A5AFE]/10 dark:bg-[#3A5AFE]/20 flex items-center justify-center flex-shrink-0">
+                  <div className="w-10 h-10 rounded-lg bg-[#3A5AFE]/10 flex items-center justify-center flex-shrink-0">
                     <Check className="w-5 h-5 text-[#3A5AFE]" />
                   </div>
                   <div>
-                    <h4 className="text-gray-900 dark:text-white mb-1">
+                    <h4 className="text-gray-900 mb-1">
                       Slide-Out Panels
                     </h4>
-                    <p className="text-sm text-gray-600 dark:text-gray-400">
+                    <p className="text-sm text-gray-600">
                       Tasks (⌘T), Messages (⌘M), Team (⌘U)—instant access
                       without switching apps
                     </p>
                   </div>
                 </div>
                 <div className="flex items-start gap-4">
-                  <div className="w-10 h-10 rounded-lg bg-[#3A5AFE]/10 dark:bg-[#3A5AFE]/20 flex items-center justify-center flex-shrink-0">
+                  <div className="w-10 h-10 rounded-lg bg-[#3A5AFE]/10 flex items-center justify-center flex-shrink-0">
                     <Check className="w-5 h-5 text-[#3A5AFE]" />
                   </div>
                   <div>
-                    <h4 className="text-gray-900 dark:text-white mb-1">
+                    <h4 className="text-gray-900 mb-1">
                       Floating Video Calls
                     </h4>
-                    <p className="text-sm text-gray-600 dark:text-gray-400">
+                    <p className="text-sm text-gray-600">
                       Video overlays stay on top while you work—like being in
                       the same room
                     </p>
                   </div>
                 </div>
                 <div className="flex items-start gap-4">
-                  <div className="w-10 h-10 rounded-lg bg-[#3A5AFE]/10 dark:bg-[#3A5AFE]/20 flex items-center justify-center flex-shrink-0">
+                  <div className="w-10 h-10 rounded-lg bg-[#3A5AFE]/10 flex items-center justify-center flex-shrink-0">
                     <Check className="w-5 h-5 text-[#3A5AFE]" />
                   </div>
                   <div>
-                    <h4 className="text-gray-900 dark:text-white mb-1">
+                    <h4 className="text-gray-900 mb-1">
                       Keyboard-First Navigation
                     </h4>
-                    <p className="text-sm text-gray-600 dark:text-gray-400">
+                    <p className="text-sm text-gray-600">
                       Power users love shortcuts—designed for speed and
                       efficiency
                     </p>
                   </div>
                 </div>
                 <div className="flex items-start gap-4">
-                  <div className="w-10 h-10 rounded-lg bg-[#3A5AFE]/10 dark:bg-[#3A5AFE]/20 flex items-center justify-center flex-shrink-0">
+                  <div className="w-10 h-10 rounded-lg bg-[#3A5AFE]/10 flex items-center justify-center flex-shrink-0">
                     <Check className="w-5 h-5 text-[#3A5AFE]" />
                   </div>
                   <div>
-                    <h4 className="text-gray-900 dark:text-white mb-1">
+                    <h4 className="text-gray-900 mb-1">
                       Beautiful Dark Mode
                     </h4>
-                    <p className="text-sm text-gray-600 dark:text-gray-400">
+                    <p className="text-sm text-gray-600">
                       Gorgeous design that works 24/7—easy on the eyes during
                       late-night builds
                     </p>
                   </div>
                 </div>
               </div>
-              <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-lg">
-                <p className="text-sm text-gray-600 dark:text-gray-400">
+              <div className="bg-gray-50 p-4 rounded-lg">
+                <p className="text-sm text-gray-600">
                   "It's not just a tool—it's where your startup lives. Every
                   conversation, every task, every milestone."
                 </p>
               </div>
             </div>
             <div className="relative">
-              <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
-                <div className="bg-gray-100 dark:bg-gray-900 px-4 py-3 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
+              <div className="bg-white rounded-2xl shadow-xl border border-gray-200 overflow-hidden">
+                <div className="bg-gray-100 px-4 py-3 border-b border-gray-200 flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <div className="w-3 h-3 rounded-full bg-red-500" />
                     <div className="w-3 h-3 rounded-full bg-yellow-500" />
                     <div className="w-3 h-3 rounded-full bg-green-500" />
                   </div>
-                  <div className="flex items-center gap-4 text-xs text-gray-600 dark:text-gray-400">
+                  <div className="flex items-center gap-4 text-xs text-gray-600">
                     <span>⌘T Tasks</span>
                     <span>⌘M Messages</span>
                     <span>⌘U Team</span>
@@ -767,55 +767,55 @@ export default function LandingPage() {
           </div>
         </div>
       </section>
-      <section className="py-20 px-4 sm:px-6 lg:px-8 bg-gray-50 dark:bg-gray-800/50">
+      <section className="py-20 px-4 sm:px-6 lg:px-8 bg-gray-50">
         <div className="max-w-7xl mx-auto">
           <div className="text-center mb-12">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#2ECC71]/10 text-[#2ECC71] dark:bg-[#2ECC71]/20 mb-4">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#2ECC71]/10 text-[#2ECC71] mb-4">
               <Wrench className="w-4 h-4" />
               <span className="text-sm">Pillar 4: Cost Efficiency</span>
             </div>
-            <h2 className="text-4xl sm:text-5xl text-gray-900 dark:text-white mb-6">
+            <h2 className="text-4xl sm:text-5xl text-gray-900 mb-6">
               Replace 5 Tools, Save $500/Month
             </h2>
-            <p className="text-xl text-gray-600 dark:text-gray-300 max-w-3xl mx-auto">
+            <p className="text-xl text-gray-600 max-w-3xl mx-auto">
               Stop juggling subscriptions. Everything your startup needs is
               embedded in your Virtual Office.
             </p>
           </div>
           <div className="max-w-5xl mx-auto">
-            <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
+            <div className="bg-white rounded-2xl shadow-xl border border-gray-200 overflow-hidden">
               <div className="overflow-x-auto">
                 <table className="w-full">
                   <thead>
-                    <tr className="bg-gray-50 dark:bg-gray-900">
-                      <th className="px-6 py-4 text-left text-sm text-gray-600 dark:text-gray-400">
+                    <tr className="bg-gray-50">
+                      <th className="px-6 py-4 text-left text-sm text-gray-600">
                         Tool Category
                       </th>
-                      <th className="px-6 py-4 text-left text-sm text-gray-600 dark:text-gray-400">
+                      <th className="px-6 py-4 text-left text-sm text-gray-600">
                         Traditional Stack
                       </th>
-                      <th className="px-6 py-4 text-left text-sm text-gray-600 dark:text-gray-400">
+                      <th className="px-6 py-4 text-left text-sm text-gray-600">
                         Cost/Month
                       </th>
-                      <th className="px-6 py-4 text-left text-sm text-gray-600 dark:text-gray-400">
+                      <th className="px-6 py-4 text-left text-sm text-gray-600">
                         StartupVerse
                       </th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+                  <tbody className="divide-y divide-gray-200">
                     <tr>
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-2">
                           <MessageSquare className="w-4 h-4 text-gray-400" />
-                          <span className="text-sm text-gray-900 dark:text-white">
+                          <span className="text-sm text-gray-900">
                             Messaging
                           </span>
                         </div>
                       </td>
-                      <td className="px-6 py-4 text-sm text-gray-600 dark:text-gray-400">
+                      <td className="px-6 py-4 text-sm text-gray-600">
                         Slack
                       </td>
-                      <td className="px-6 py-4 text-sm text-gray-600 dark:text-gray-400">
+                      <td className="px-6 py-4 text-sm text-gray-600">
                         $40
                       </td>
                       <td className="px-6 py-4">
@@ -831,15 +831,15 @@ export default function LandingPage() {
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-2">
                           <FileText className="w-4 h-4 text-gray-400" />
-                          <span className="text-sm text-gray-900 dark:text-white">
+                          <span className="text-sm text-gray-900">
                             Docs & Wiki
                           </span>
                         </div>
                       </td>
-                      <td className="px-6 py-4 text-sm text-gray-600 dark:text-gray-400">
+                      <td className="px-6 py-4 text-sm text-gray-600">
                         Notion
                       </td>
-                      <td className="px-6 py-4 text-sm text-gray-600 dark:text-gray-400">
+                      <td className="px-6 py-4 text-sm text-gray-600">
                         $50
                       </td>
                       <td className="px-6 py-4">
@@ -855,15 +855,15 @@ export default function LandingPage() {
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-2">
                           <Target className="w-4 h-4 text-gray-400" />
-                          <span className="text-sm text-gray-900 dark:text-white">
+                          <span className="text-sm text-gray-900">
                             Task Management
                           </span>
                         </div>
                       </td>
-                      <td className="px-6 py-4 text-sm text-gray-600 dark:text-gray-400">
+                      <td className="px-6 py-4 text-sm text-gray-600">
                         Linear
                       </td>
-                      <td className="px-6 py-4 text-sm text-gray-600 dark:text-gray-400">
+                      <td className="px-6 py-4 text-sm text-gray-600">
                         $40
                       </td>
                       <td className="px-6 py-4">
@@ -879,15 +879,15 @@ export default function LandingPage() {
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-2">
                           <Video className="w-4 h-4 text-gray-400" />
-                          <span className="text-sm text-gray-900 dark:text-white">
+                          <span className="text-sm text-gray-900">
                             Video Calls
                           </span>
                         </div>
                       </td>
-                      <td className="px-6 py-4 text-sm text-gray-600 dark:text-gray-400">
+                      <td className="px-6 py-4 text-sm text-gray-600">
                         Zoom + Loom
                       </td>
-                      <td className="px-6 py-4 text-sm text-gray-600 dark:text-gray-400">
+                      <td className="px-6 py-4 text-sm text-gray-600">
                         $30
                       </td>
                       <td className="px-6 py-4">
@@ -903,15 +903,15 @@ export default function LandingPage() {
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-2">
                           <Users className="w-4 h-4 text-gray-400" />
-                          <span className="text-sm text-gray-900 dark:text-white">
+                          <span className="text-sm text-gray-900">
                             Recruiting
                           </span>
                         </div>
                       </td>
-                      <td className="px-6 py-4 text-sm text-gray-600 dark:text-gray-400">
+                      <td className="px-6 py-4 text-sm text-gray-600">
                         LinkedIn Premium
                       </td>
-                      <td className="px-6 py-4 text-sm text-gray-600 dark:text-gray-400">
+                      <td className="px-6 py-4 text-sm text-gray-600">
                         $99
                       </td>
                       <td className="px-6 py-4">
@@ -923,8 +923,8 @@ export default function LandingPage() {
                         </div>
                       </td>
                     </tr>
-                    <tr className="bg-gray-50 dark:bg-gray-900">
-                      <td className="px-6 py-4 text-gray-900 dark:text-white">
+                    <tr className="bg-gray-50">
+                      <td className="px-6 py-4 text-gray-900">
                         Total
                       </td>
                       <td className="px-6 py-4" />
@@ -940,48 +940,48 @@ export default function LandingPage() {
               </div>
             </div>
             <div className="mt-8 text-center">
-              <p className="text-2xl text-gray-900 dark:text-white mb-2">
+              <p className="text-2xl text-gray-900 mb-2">
                 {"💰 Save "}
                 <span className="text-[#2ECC71]">$3,108 per year</span>
               </p>
-              <p className="text-sm text-gray-600 dark:text-gray-400">
+              <p className="text-sm text-gray-600">
                 Based on 5-person team. That's runway extending by months, not
                 weeks.
               </p>
             </div>
             <div className="mt-12 grid md:grid-cols-3 gap-6">
               <div className="text-center">
-                <div className="w-12 h-12 rounded-lg bg-[#3A5AFE]/10 dark:bg-[#3A5AFE]/20 flex items-center justify-center mx-auto mb-3">
+                <div className="w-12 h-12 rounded-lg bg-[#3A5AFE]/10 flex items-center justify-center mx-auto mb-3">
                   <Zap className="w-6 h-6 text-[#3A5AFE]" />
                 </div>
-                <h4 className="text-gray-900 dark:text-white mb-2">
+                <h4 className="text-gray-900 mb-2">
                   No Context Switching
                 </h4>
-                <p className="text-sm text-gray-600 dark:text-gray-400">
+                <p className="text-sm text-gray-600">
                   Stop switching between 5 browser tabs. Everything in one
                   workspace.
                 </p>
               </div>
               <div className="text-center">
-                <div className="w-12 h-12 rounded-lg bg-[#2ECC71]/10 dark:bg-[#2ECC71]/20 flex items-center justify-center mx-auto mb-3">
+                <div className="w-12 h-12 rounded-lg bg-[#2ECC71]/10 flex items-center justify-center mx-auto mb-3">
                   <DollarSign className="w-6 h-6 text-[#2ECC71]" />
                 </div>
-                <h4 className="text-gray-900 dark:text-white mb-2">
+                <h4 className="text-gray-900 mb-2">
                   Extend Your Runway
                 </h4>
-                <p className="text-sm text-gray-600 dark:text-gray-400">
+                <p className="text-sm text-gray-600">
                   $3K/year saved = 1+ month of extra runway for bootstrapped
                   teams.
                 </p>
               </div>
               <div className="text-center">
-                <div className="w-12 h-12 rounded-lg bg-[#3A5AFE]/10 dark:bg-[#3A5AFE]/20 flex items-center justify-center mx-auto mb-3">
+                <div className="w-12 h-12 rounded-lg bg-[#3A5AFE]/10 flex items-center justify-center mx-auto mb-3">
                   <Clock className="w-6 h-6 text-[#3A5AFE]" />
                 </div>
-                <h4 className="text-gray-900 dark:text-white mb-2">
+                <h4 className="text-gray-900 mb-2">
                   Save Time
                 </h4>
-                <p className="text-sm text-gray-600 dark:text-gray-400">
+                <p className="text-sm text-gray-600">
                   No onboarding 5 tools. No managing 5 subscriptions. Just
                   build.
                 </p>
@@ -993,10 +993,10 @@ export default function LandingPage() {
       <section id="how-it-works" className="py-20 px-4 sm:px-6 lg:px-8">
         <div className="max-w-5xl mx-auto">
           <div className="text-center mb-16">
-            <h2 className="text-4xl sm:text-5xl text-gray-900 dark:text-white mb-4">
+            <h2 className="text-4xl sm:text-5xl text-gray-900 mb-4">
               How It Works
             </h2>
-            <p className="text-xl text-gray-600 dark:text-gray-300">
+            <p className="text-xl text-gray-600">
               From idea to launch in 4 simple steps
             </p>
           </div>
@@ -1005,10 +1005,10 @@ export default function LandingPage() {
               <div className="w-16 h-16 rounded-full bg-gradient-to-br from-[#3A5AFE] to-[#2ECC71] text-white flex items-center justify-center text-2xl mx-auto mb-4">
                 1
               </div>
-              <h3 className="text-xl text-gray-900 dark:text-white mb-2">
+              <h3 className="text-xl text-gray-900 mb-2">
                 Start Your Journey
               </h3>
-              <p className="text-sm text-gray-600 dark:text-gray-400">
+              <p className="text-sm text-gray-600">
                 Sign up free and choose your current stage (Ideation, Formation,
                 etc.)
               </p>
@@ -1017,10 +1017,10 @@ export default function LandingPage() {
               <div className="w-16 h-16 rounded-full bg-gradient-to-br from-[#3A5AFE] to-[#2ECC71] text-white flex items-center justify-center text-2xl mx-auto mb-4">
                 2
               </div>
-              <h3 className="text-xl text-gray-900 dark:text-white mb-2">
+              <h3 className="text-xl text-gray-900 mb-2">
                 Find Your Team
               </h3>
-              <p className="text-sm text-gray-600 dark:text-gray-400">
+              <p className="text-sm text-gray-600">
                 Use Smart Matching to find co-founders and teammates who fit
               </p>
             </div>
@@ -1028,10 +1028,10 @@ export default function LandingPage() {
               <div className="w-16 h-16 rounded-full bg-gradient-to-br from-[#3A5AFE] to-[#2ECC71] text-white flex items-center justify-center text-2xl mx-auto mb-4">
                 3
               </div>
-              <h3 className="text-xl text-gray-900 dark:text-white mb-2">
+              <h3 className="text-xl text-gray-900 mb-2">
                 Build Together
               </h3>
-              <p className="text-sm text-gray-600 dark:text-gray-400">
+              <p className="text-sm text-gray-600">
                 Work in your Virtual Office with real-time analytics tracking
                 your progress
               </p>
@@ -1040,10 +1040,10 @@ export default function LandingPage() {
               <div className="w-16 h-16 rounded-full bg-[#2ECC71] text-white flex items-center justify-center text-2xl mx-auto mb-4">
                 ✓
               </div>
-              <h3 className="text-xl text-gray-900 dark:text-white mb-2">
+              <h3 className="text-xl text-gray-900 mb-2">
                 Launch Faster
               </h3>
-              <p className="text-sm text-gray-600 dark:text-gray-400">
+              <p className="text-sm text-gray-600">
                 Follow the roadmap, track milestones, and ship your MVP
               </p>
             </div>
@@ -1053,7 +1053,7 @@ export default function LandingPage() {
               Get Started Free
               <ArrowRight className="w-5 h-5" />
             </button>
-            <p className="text-sm text-gray-600 dark:text-gray-400 mt-4">
+            <p className="text-sm text-gray-600 mt-4">
               No credit card required • Free for teams up to 5
             </p>
           </div>
@@ -1061,54 +1061,54 @@ export default function LandingPage() {
       </section>
       <section
         id="pricing"
-        className="py-20 px-4 sm:px-6 lg:px-8 bg-gray-50 dark:bg-gray-800/50"
+        className="py-20 px-4 sm:px-6 lg:px-8 bg-gray-50"
       >
         <div className="max-w-7xl mx-auto">
           <div className="text-center mb-16">
-            <h2 className="text-4xl sm:text-5xl text-gray-900 dark:text-white mb-4">
+            <h2 className="text-4xl sm:text-5xl text-gray-900 mb-4">
               Simple, Transparent Pricing
             </h2>
-            <p className="text-xl text-gray-600 dark:text-gray-300">
+            <p className="text-xl text-gray-600">
               Start free. Scale when you're ready.
             </p>
           </div>
           <div className="grid md:grid-cols-3 gap-8 max-w-5xl mx-auto">
-            <div className="bg-white dark:bg-gray-800 p-8 rounded-2xl border-2 border-gray-200 dark:border-gray-700">
-              <h3 className="text-2xl text-gray-900 dark:text-white mb-2">
+            <div className="bg-white p-8 rounded-2xl border-2 border-gray-200">
+              <h3 className="text-2xl text-gray-900 mb-2">
                 Free
               </h3>
-              <p className="text-gray-600 dark:text-gray-300 mb-6">
+              <p className="text-gray-600 mb-6">
                 Perfect for early-stage startups
               </p>
               <div className="mb-6">
-                <span className="text-5xl text-gray-900 dark:text-white">
+                <span className="text-5xl text-gray-900">
                   $0
                 </span>
-                <span className="text-gray-600 dark:text-gray-400">/month</span>
+                <span className="text-gray-600">/month</span>
               </div>
               <ul className="space-y-3 mb-8">
-                <li className="flex items-center gap-2 text-gray-600 dark:text-gray-300">
+                <li className="flex items-center gap-2 text-gray-600">
                   <Check className="w-5 h-5 text-[#2ECC71]" />
                   Up to 5 team members
                 </li>
-                <li className="flex items-center gap-2 text-gray-600 dark:text-gray-300">
+                <li className="flex items-center gap-2 text-gray-600">
                   <Check className="w-5 h-5 text-[#2ECC71]" />
                   All 6 roadmap stages
                 </li>
-                <li className="flex items-center gap-2 text-gray-600 dark:text-gray-300">
+                <li className="flex items-center gap-2 text-gray-600">
                   <Check className="w-5 h-5 text-[#2ECC71]" />5 team
                   matches/month
                 </li>
-                <li className="flex items-center gap-2 text-gray-600 dark:text-gray-300">
+                <li className="flex items-center gap-2 text-gray-600">
                   <Check className="w-5 h-5 text-[#2ECC71]" />
                   Virtual Office
                 </li>
-                <li className="flex items-center gap-2 text-gray-600 dark:text-gray-300">
+                <li className="flex items-center gap-2 text-gray-600">
                   <Check className="w-5 h-5 text-[#2ECC71]" />
                   Task & messaging
                 </li>
               </ul>
-              <button className="w-full px-6 py-3 rounded-lg border-2 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
+              <button className="w-full px-6 py-3 rounded-lg border-2 border-gray-300 text-gray-900 hover:bg-gray-50 transition-colors">
                 Start Free
               </button>
             </div>
@@ -1152,48 +1152,48 @@ export default function LandingPage() {
                 Start Free Trial
               </button>
             </div>
-            <div className="bg-white dark:bg-gray-800 p-8 rounded-2xl border-2 border-gray-200 dark:border-gray-700">
-              <h3 className="text-2xl text-gray-900 dark:text-white mb-2">
+            <div className="bg-white p-8 rounded-2xl border-2 border-gray-200">
+              <h3 className="text-2xl text-gray-900 mb-2">
                 Growth
               </h3>
-              <p className="text-gray-600 dark:text-gray-300 mb-6">
+              <p className="text-gray-600 mb-6">
                 For scaling teams
               </p>
               <div className="mb-6">
-                <span className="text-5xl text-gray-900 dark:text-white">
+                <span className="text-5xl text-gray-900">
                   $99
                 </span>
-                <span className="text-gray-600 dark:text-gray-400">/month</span>
+                <span className="text-gray-600">/month</span>
               </div>
               <ul className="space-y-3 mb-8">
-                <li className="flex items-center gap-2 text-gray-600 dark:text-gray-300">
+                <li className="flex items-center gap-2 text-gray-600">
                   <Check className="w-5 h-5 text-[#2ECC71]" />
                   Everything in Pro
                 </li>
-                <li className="flex items-center gap-2 text-gray-600 dark:text-gray-300">
+                <li className="flex items-center gap-2 text-gray-600">
                   <Check className="w-5 h-5 text-[#2ECC71]" />
                   Multiple startups/projects
                 </li>
-                <li className="flex items-center gap-2 text-gray-600 dark:text-gray-300">
+                <li className="flex items-center gap-2 text-gray-600">
                   <Check className="w-5 h-5 text-[#2ECC71]" />
                   Custom workflows
                 </li>
-                <li className="flex items-center gap-2 text-gray-600 dark:text-gray-300">
+                <li className="flex items-center gap-2 text-gray-600">
                   <Check className="w-5 h-5 text-[#2ECC71]" />
                   API access
                 </li>
-                <li className="flex items-center gap-2 text-gray-600 dark:text-gray-300">
+                <li className="flex items-center gap-2 text-gray-600">
                   <Check className="w-5 h-5 text-[#2ECC71]" />
                   Dedicated success manager
                 </li>
               </ul>
-              <button className="w-full px-6 py-3 rounded-lg border-2 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
+              <button className="w-full px-6 py-3 rounded-lg border-2 border-gray-300 text-gray-900 hover:bg-gray-50 transition-colors">
                 Contact Sales
               </button>
             </div>
           </div>
           <div className="text-center mt-12">
-            <p className="text-gray-600 dark:text-gray-400">
+            <p className="text-gray-600">
               {"🎁 "}
               <span className="text-[#2ECC71]">Special Launch Offer:</span>
               {" First 100 signups get lifetime Pro access (save $348/year)"}
@@ -1204,21 +1204,21 @@ export default function LandingPage() {
       <section className="py-20 px-4 sm:px-6 lg:px-8">
         <div className="max-w-7xl mx-auto">
           <div className="text-center mb-16">
-            <h2 className="text-4xl sm:text-5xl text-gray-900 dark:text-white mb-4">
+            <h2 className="text-4xl sm:text-5xl text-gray-900 mb-4">
               Loved by Founders
             </h2>
-            <p className="text-xl text-gray-600 dark:text-gray-300">
+            <p className="text-xl text-gray-600">
               Join 500+ startup teams building the future
             </p>
           </div>
           <div className="grid md:grid-cols-3 gap-8">
-            <div className="bg-white dark:bg-gray-800 p-6 rounded-xl border border-gray-200 dark:border-gray-700">
+            <div className="bg-white p-6 rounded-xl border border-gray-200">
               <div className="flex items-center gap-1 mb-4 text-yellow-500">
                 {[...Array(5)].map((_, i) => (
                   <span key={i}>★</span>
                 ))}
               </div>
-              <p className="text-gray-600 dark:text-gray-300 mb-4">
+              <p className="text-gray-600 mb-4">
                 "The roadmap feature is incredible. Finally know what to
                 prioritize instead of just guessing."
               </p>
@@ -1227,22 +1227,22 @@ export default function LandingPage() {
                   SH
                 </div>
                 <div>
-                  <div className="text-sm text-gray-900 dark:text-white">
+                  <div className="text-sm text-gray-900">
                     Sarah H.
                   </div>
-                  <div className="text-xs text-gray-600 dark:text-gray-400">
+                  <div className="text-xs text-gray-600">
                     Founder, FinTech Startup
                   </div>
                 </div>
               </div>
             </div>
-            <div className="bg-white dark:bg-gray-800 p-6 rounded-xl border border-gray-200 dark:border-gray-700">
+            <div className="bg-white p-6 rounded-xl border border-gray-200">
               <div className="flex items-center gap-1 mb-4 text-yellow-500">
                 {[...Array(5)].map((_, i) => (
                   <span key={i}>★</span>
                 ))}
               </div>
-              <p className="text-gray-600 dark:text-gray-300 mb-4">
+              <p className="text-gray-600 mb-4">
                 "Found my technical co-founder in 2 weeks using Smart Matching.
                 Would've taken months on LinkedIn."
               </p>
@@ -1251,22 +1251,22 @@ export default function LandingPage() {
                   MK
                 </div>
                 <div>
-                  <div className="text-sm text-gray-900 dark:text-white">
+                  <div className="text-sm text-gray-900">
                     Michael K.
                   </div>
-                  <div className="text-xs text-gray-600 dark:text-gray-400">
+                  <div className="text-xs text-gray-600">
                     CEO, SaaS Startup
                   </div>
                 </div>
               </div>
             </div>
-            <div className="bg-white dark:bg-gray-800 p-6 rounded-xl border border-gray-200 dark:border-gray-700">
+            <div className="bg-white p-6 rounded-xl border border-gray-200">
               <div className="flex items-center gap-1 mb-4 text-yellow-500">
                 {[...Array(5)].map((_, i) => (
                   <span key={i}>★</span>
                 ))}
               </div>
-              <p className="text-gray-600 dark:text-gray-300 mb-4">
+              <p className="text-gray-600 mb-4">
                 "Saved us $3K/year by replacing Slack, Notion, and Linear. Plus
                 the Virtual Office UX is beautiful."
               </p>
@@ -1275,10 +1275,10 @@ export default function LandingPage() {
                   JL
                 </div>
                 <div>
-                  <div className="text-sm text-gray-900 dark:text-white">
+                  <div className="text-sm text-gray-900">
                     Jessica L.
                   </div>
-                  <div className="text-xs text-gray-600 dark:text-gray-400">
+                  <div className="text-xs text-gray-600">
                     Co-founder, AI Platform
                   </div>
                 </div>
@@ -1287,25 +1287,25 @@ export default function LandingPage() {
           </div>
         </div>
       </section>
-      <section className="py-20 px-4 sm:px-6 lg:px-8 bg-gray-50 dark:bg-gray-800/50">
+      <section className="py-20 px-4 sm:px-6 lg:px-8 bg-gray-50">
         <div className="max-w-4xl mx-auto">
           <div className="text-center mb-16">
-            <h2 className="text-4xl sm:text-5xl text-gray-900 dark:text-white mb-4">
+            <h2 className="text-4xl sm:text-5xl text-gray-900 mb-4">
               Frequently Asked Questions
             </h2>
-            <p className="text-xl text-gray-600 dark:text-gray-300">
+            <p className="text-xl text-gray-600">
               Everything you need to know about StartupVerse's unique features
             </p>
           </div>
           <div className="space-y-6">
-            <div className="bg-white dark:bg-gray-800 p-6 rounded-xl border border-gray-200 dark:border-gray-700">
-              <h3 className="text-xl text-gray-900 dark:text-white mb-3 flex items-start gap-3">
+            <div className="bg-white p-6 rounded-xl border border-gray-200">
+              <h3 className="text-xl text-gray-900 mb-3 flex items-start gap-3">
                 <span className="text-[#3A5AFE] flex-shrink-0">Q:</span>
                 <span>
                   What are the 6 stages in the Startup Journey Roadmap?
                 </span>
               </h3>
-              <p className="text-gray-600 dark:text-gray-300 ml-8">
+              <p className="text-gray-600 ml-8">
                 <span className="text-[#2ECC71]">A:</span>
                 {" The roadmap guides you through: "}
                 <strong>(1) Ideation & Validation</strong>
@@ -1328,14 +1328,14 @@ export default function LandingPage() {
                 }
               </p>
             </div>
-            <div className="bg-white dark:bg-gray-800 p-6 rounded-xl border border-gray-200 dark:border-gray-700">
-              <h3 className="text-xl text-gray-900 dark:text-white mb-3 flex items-start gap-3">
+            <div className="bg-white p-6 rounded-xl border border-gray-200">
+              <h3 className="text-xl text-gray-900 mb-3 flex items-start gap-3">
                 <span className="text-[#3A5AFE] flex-shrink-0">Q:</span>
                 <span>
                   What are the 35+ purpose-built tools included in StartupVerse?
                 </span>
               </h3>
-              <p className="text-gray-600 dark:text-gray-300 ml-8">
+              <p className="text-gray-600 ml-8">
                 <span className="text-[#2ECC71]">A:</span>
                 {" Each roadmap stage unlocks specific tools: "}
                 <strong>Stage 1:</strong>
@@ -1364,15 +1364,15 @@ export default function LandingPage() {
                 }
               </p>
             </div>
-            <div className="bg-white dark:bg-gray-800 p-6 rounded-xl border border-gray-200 dark:border-gray-700">
-              <h3 className="text-xl text-gray-900 dark:text-white mb-3 flex items-start gap-3">
+            <div className="bg-white p-6 rounded-xl border border-gray-200">
+              <h3 className="text-xl text-gray-900 mb-3 flex items-start gap-3">
                 <span className="text-[#3A5AFE] flex-shrink-0">Q:</span>
                 <span>
                   What's the difference between Founders, Team Members, and
                   Talent roles?
                 </span>
               </h3>
-              <p className="text-gray-600 dark:text-gray-300 ml-8">
+              <p className="text-gray-600 ml-8">
                 <span className="text-[#2ECC71]">A:</span>{" "}
                 <strong>Founders</strong>
                 {
@@ -1388,12 +1388,12 @@ export default function LandingPage() {
                 }
               </p>
             </div>
-            <div className="bg-white dark:bg-gray-800 p-6 rounded-xl border border-gray-200 dark:border-gray-700">
-              <h3 className="text-xl text-gray-900 dark:text-white mb-3 flex items-start gap-3">
+            <div className="bg-white p-6 rounded-xl border border-gray-200">
+              <h3 className="text-xl text-gray-900 mb-3 flex items-start gap-3">
                 <span className="text-[#3A5AFE] flex-shrink-0">Q:</span>
                 <span>How do the Virtual Office slide-out panels work?</span>
               </h3>
-              <p className="text-gray-600 dark:text-gray-300 ml-8">
+              <p className="text-gray-600 ml-8">
                 <span className="text-[#2ECC71]">A:</span>
                 {" The Virtual Office has "}
                 <strong>three main panels that slide in from the right</strong>
@@ -1408,14 +1408,14 @@ export default function LandingPage() {
                 }
               </p>
             </div>
-            <div className="bg-white dark:bg-gray-800 p-6 rounded-xl border border-gray-200 dark:border-gray-700">
-              <h3 className="text-xl text-gray-900 dark:text-white mb-3 flex items-start gap-3">
+            <div className="bg-white p-6 rounded-xl border border-gray-200">
+              <h3 className="text-xl text-gray-900 mb-3 flex items-start gap-3">
                 <span className="text-[#3A5AFE] flex-shrink-0">Q:</span>
                 <span>
                   What keyboard shortcuts are available in the Virtual Office?
                 </span>
               </h3>
-              <p className="text-gray-600 dark:text-gray-300 ml-8">
+              <p className="text-gray-600 ml-8">
                 <span className="text-[#2ECC71]">A:</span>
                 {" We're keyboard-first for power users: "}
                 <strong>⌘T</strong>
@@ -1440,12 +1440,12 @@ export default function LandingPage() {
                 }
               </p>
             </div>
-            <div className="bg-white dark:bg-gray-800 p-6 rounded-xl border border-gray-200 dark:border-gray-700">
-              <h3 className="text-xl text-gray-900 dark:text-white mb-3 flex items-start gap-3">
+            <div className="bg-white p-6 rounded-xl border border-gray-200">
+              <h3 className="text-xl text-gray-900 mb-3 flex items-start gap-3">
                 <span className="text-[#3A5AFE] flex-shrink-0">Q:</span>
                 <span>How does the Equity Offer Builder work?</span>
               </h3>
-              <p className="text-gray-600 dark:text-gray-300 ml-8">
+              <p className="text-gray-600 ml-8">
                 <span className="text-[#2ECC71]">A:</span>
                 {" When you find a match and want to make an offer, the "}
                 <strong>Equity Calculator helps you make fair offers</strong>
@@ -1454,15 +1454,15 @@ export default function LandingPage() {
                 }
               </p>
             </div>
-            <div className="bg-white dark:bg-gray-800 p-6 rounded-xl border border-gray-200 dark:border-gray-700">
-              <h3 className="text-xl text-gray-900 dark:text-white mb-3 flex items-start gap-3">
+            <div className="bg-white p-6 rounded-xl border border-gray-200">
+              <h3 className="text-xl text-gray-900 mb-3 flex items-start gap-3">
                 <span className="text-[#3A5AFE] flex-shrink-0">Q:</span>
                 <span>
                   Which exact features replace Slack, Notion, Linear, Zoom, and
                   Loom?
                 </span>
               </h3>
-              <p className="text-gray-600 dark:text-gray-300 ml-8">
+              <p className="text-gray-600 ml-8">
                 <span className="text-[#2ECC71]">A:</span>
                 {" Here's the feature-by-feature replacement: "}
                 <strong>Slack → Messages Panel:</strong>
@@ -1487,15 +1487,15 @@ export default function LandingPage() {
                 }
               </p>
             </div>
-            <div className="bg-white dark:bg-gray-800 p-6 rounded-xl border border-gray-200 dark:border-gray-700">
-              <h3 className="text-xl text-gray-900 dark:text-white mb-3 flex items-start gap-3">
+            <div className="bg-white p-6 rounded-xl border border-gray-200">
+              <h3 className="text-xl text-gray-900 mb-3 flex items-start gap-3">
                 <span className="text-[#3A5AFE] flex-shrink-0">Q:</span>
                 <span>
                   How do I know when I'm ready to move to the next roadmap
                   stage?
                 </span>
               </h3>
-              <p className="text-gray-600 dark:text-gray-300 ml-8">
+              <p className="text-gray-600 ml-8">
                 <span className="text-[#2ECC71]">A:</span>
                 {" Each stage has "}
                 <strong>clear completion criteria</strong>
@@ -1524,14 +1524,14 @@ export default function LandingPage() {
                 }
               </p>
             </div>
-            <div className="bg-white dark:bg-gray-800 p-6 rounded-xl border border-gray-200 dark:border-gray-700">
-              <h3 className="text-xl text-gray-900 dark:text-white mb-3 flex items-start gap-3">
+            <div className="bg-white p-6 rounded-xl border border-gray-200">
+              <h3 className="text-xl text-gray-900 mb-3 flex items-start gap-3">
                 <span className="text-[#3A5AFE] flex-shrink-0">Q:</span>
                 <span>
                   Does StartupVerse include analytics and compensation tracking?
                 </span>
               </h3>
-              <p className="text-gray-600 dark:text-gray-400 ml-8">
+              <p className="text-gray-600 ml-8">
                 <span className="text-[#2ECC71]">A:</span>
                 {" Yes! The platform includes "}
                 <strong>built-in real-time analytics</strong>
@@ -1546,7 +1546,7 @@ export default function LandingPage() {
             </div>
           </div>
           <div className="mt-12 text-center">
-            <p className="text-gray-600 dark:text-gray-400 mb-4">
+            <p className="text-gray-600 mb-4">
               Still have questions about our features?
             </p>
             <button className="px-6 py-3 rounded-lg border-2 border-[#3A5AFE] text-[#3A5AFE] hover:bg-[#3A5AFE] hover:text-white transition-colors">
@@ -1604,7 +1604,7 @@ export default function LandingPage() {
           </div>
         </div>
       </section>
-      <footer className="py-12 px-4 sm:px-6 lg:px-8 bg-gray-900 text-gray-400">
+      <footer className="py-12 px-4 sm:px-6 lg:px-8 bg-primary-dark text-primary-foreground/80">
         <div className="max-w-7xl mx-auto">
           <div className="grid md:grid-cols-4 gap-8 mb-8">
             <div>

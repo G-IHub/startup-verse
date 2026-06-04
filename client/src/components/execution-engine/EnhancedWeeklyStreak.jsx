@@ -49,10 +49,10 @@ export default function EnhancedWeeklyStreak({
   };
   const getStreakBgColor = () => {
     if (streak === 0) return "bg-muted/30";
-    if (hasPartialWeeks) return "bg-yellow-50 dark:bg-yellow-950/20";
-    if (streak >= 10) return "bg-purple-50 dark:bg-purple-950/20"; // Elite
-    if (streak >= 5) return "bg-red-50 dark:bg-red-950/20"; // Hot
-    return "bg-orange-50 dark:bg-orange-950/20"; // Building
+    if (hasPartialWeeks) return "bg-yellow-50";
+    if (streak >= 10) return "bg-purple-50"; // Elite
+    if (streak >= 5) return "bg-red-50"; // Hot
+    return "bg-orange-50"; // Building
   };
   const getStreakIcon = () => {
     if (streak === 0)
@@ -293,7 +293,7 @@ export default function EnhancedWeeklyStreak({
           </p>
           {isStreakAtRisk && streak > 0 && weekProgress < 100 && (
             <motion.div
-              className={`rounded-lg p-2 mb-2 flex items-start gap-2 ${isCritical ? "bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800" : "bg-yellow-50 dark:bg-yellow-950/30 border border-yellow-200 dark:border-yellow-800"}`}
+              className={`rounded-lg p-2 mb-2 flex items-start gap-2 ${isCritical ? "bg-red-50 border border-red-200" : "bg-yellow-50 border border-yellow-200"}`}
               initial={{
                 opacity: 0,
                 y: -10,
@@ -323,14 +323,14 @@ export default function EnhancedWeeklyStreak({
               </motion.div>
               <div className="flex-1">
                 <p
-                  className={`text-[10px] font-semibold ${isCritical ? "text-red-900 dark:text-red-100" : "text-yellow-900 dark:text-yellow-100"}`}
+                  className={`text-[10px] font-semibold ${isCritical ? "text-red-900" : "text-yellow-900"}`}
                 >
                   {isCritical
                     ? `⚠️ URGENT: ${daysLeftInWeek} day${daysLeftInWeek !== 1 ? "s" : ""} to save your ${streak}-week streak!`
                     : `🔔 ${daysLeftInWeek} day${daysLeftInWeek !== 1 ? "s" : ""} left - ${100 - Math.round(weekProgress)}% to go`}
                 </p>
                 <p
-                  className={`text-[9px] ${isCritical ? "text-red-700 dark:text-red-300" : "text-yellow-700 dark:text-yellow-300"}`}
+                  className={`text-[9px] ${isCritical ? "text-red-700" : "text-yellow-700"}`}
                 >
                   Complete this week's outcome to maintain your streak
                 </p>
@@ -339,7 +339,7 @@ export default function EnhancedWeeklyStreak({
           )}
           {streak > 0 && weekProgress >= 100 && (
             <motion.div
-              className="rounded-lg p-2 bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800 flex items-center gap-2"
+              className="rounded-lg p-2 bg-green-50 border border-green-200 flex items-center gap-2"
               initial={{
                 opacity: 0,
                 scale: 0.9,
@@ -353,10 +353,10 @@ export default function EnhancedWeeklyStreak({
                 <Trophy className="w-4 h-4 text-white" />
               </div>
               <div className="flex-1">
-                <p className="text-[10px] font-semibold text-green-900 dark:text-green-100">
+                <p className="text-[10px] font-semibold text-green-900">
                   Week Complete! 🎉
                 </p>
-                <p className="text-[9px] text-green-700 dark:text-green-300">
+                <p className="text-[9px] text-green-700">
                   {"Ready to lock in your "}
                   {streak + 1}-week streak
                 </p>
@@ -365,7 +365,7 @@ export default function EnhancedWeeklyStreak({
           )}
           {[3, 5, 10, 20, 50].includes(streak) && (
             <motion.div
-              className="mt-2 p-2 rounded-lg bg-gradient-to-r from-purple-50 to-pink-50 dark:from-purple-950/30 dark:to-pink-950/30 border border-purple-200 dark:border-purple-800"
+              className="mt-2 p-2 rounded-lg bg-gradient-to-r from-purple-50 to-pink-50 border border-purple-200"
               initial={{
                 opacity: 0,
                 y: 10,
@@ -389,12 +389,12 @@ export default function EnhancedWeeklyStreak({
                   <Award className="w-5 h-5 text-purple-600" />
                 </motion.div>
                 <div className="flex-1">
-                  <p className="text-[10px] font-bold text-purple-900 dark:text-purple-100">
+                  <p className="text-[10px] font-bold text-purple-900">
                     {"🏆 MILESTONE ACHIEVED: "}
                     {streak}
                     {" WEEKS!"}
                   </p>
-                  <p className="text-[9px] text-purple-700 dark:text-purple-300">
+                  <p className="text-[9px] text-purple-700">
                     {streak === 3 && "You're in the top 25% of founders!"}
                     {streak === 5 && "Elite execution - top 10% of all users!"}
                     {streak === 10 && "LEGENDARY status - top 3% globally!"}
@@ -406,7 +406,7 @@ export default function EnhancedWeeklyStreak({
             </motion.div>
           )}
           {hasPartialWeeks && (
-            <p className="text-[10px] text-yellow-600 dark:text-yellow-500 mt-2 pt-2 border-t relative z-10">
+            <p className="text-[10px] text-yellow-600 mt-2 pt-2 border-t relative z-10">
               * Includes weeks with partial progress
             </p>
           )}
@@ -419,7 +419,7 @@ export default function EnhancedWeeklyStreak({
               </TooltipTrigger>
               <TooltipContent
                 side="bottom"
-                className="max-w-xs bg-gray-900 border-gray-700"
+                className="max-w-xs bg-popover text-popover-foreground border border-border"
               >
                 <p className="text-xs text-white">
                   <strong>Build Your Streak:</strong>

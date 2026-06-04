@@ -89,15 +89,15 @@ export default function OrganizationAgenda({
   const getEventTypeColor = (type) => {
     switch (type) {
       case "demo-day":
-        return "bg-purple-500/10 text-purple-700 dark:text-purple-400 border-purple-500/20";
+        return "bg-purple-500/10 text-purple-700 border-purple-500/20";
       case "workshop":
-        return "bg-blue-500/10 text-blue-700 dark:text-blue-400 border-blue-500/20";
+        return "bg-blue-500/10 text-blue-700 border-blue-500/20";
       case "office-hours":
-        return "bg-green-500/10 text-green-700 dark:text-green-400 border-green-500/20";
+        return "bg-green-500/10 text-green-700 border-green-500/20";
       case "networking":
-        return "bg-orange-500/10 text-orange-700 dark:text-orange-400 border-orange-500/20";
+        return "bg-orange-500/10 text-orange-700 border-orange-500/20";
       default:
-        return "bg-gray-500/10 text-gray-700 dark:text-gray-400 border-gray-500/20";
+        return "bg-gray-500/10 text-gray-700 border-gray-500/20";
     }
   };
   const isToday = (dateStr) => {

@@ -11,9 +11,27 @@ import { emitRealtime } from "../services/realtime.service.js";
 import { SOCKET_EVENTS } from "../realtime/events.js";
 import { startupRoom, userRoom, organizationRoom } from "../realtime/rooms.js";
 import { mapMessageDto } from "../utils/messageDto.js";
+import {
+  normalizeAttachments,
+  messageHasContent,
+} from "../utils/messageAttachments.js";
+import {
+  buildForwardedFromSnapshot,
+  canDeleteForEveryone,
+  conversationVisibilityFilter,
+  emitMessageUpdated,
+  getMessageRealtimeRooms,
+  isMessageParticipant,
+  loadMessageById,
+  resolveReplyPreview,
+} from "../utils/messageActions.js";
 
 const messagesRouter = Router();
 const isSelfOrAdmin = (req, userId) => req.user?.isAdmin === true || String(req.user?.id) === String(userId);
+
+function dtoForViewer(message, viewerId, extra = {}) {
+  return mapMessageDto(message, { viewerUserId: viewerId, ...extra });
+}
 
 async function canAccessStartupMessages(req, startupId) {
   if (req.user?.isAdmin) return true;
@@ -31,22 +49,8 @@ async function canAccessStartupMessages(req, startupId) {
 async function createMessage(payload) {
   const message = await Message.create(payload);
 
-  const rooms = [];
-  const isDirectPeer =
-    Boolean(message.toUserId) &&
-    Boolean(message.fromUserId) &&
-    String(message.toUserId) !== String(message.fromUserId);
-  if (message.organizationId) {
-    rooms.push(organizationRoom(message.organizationId));
-  }
-  if (message.startupId && !isDirectPeer) {
-    rooms.push(startupRoom(message.startupId));
-  }
-  rooms.push(userRoom(message.fromUserId));
-  rooms.push(userRoom(message.toUserId));
-
-  const uniqueRooms = [...new Set(rooms.filter(Boolean))];
-  emitRealtime(SOCKET_EVENTS.MESSAGE_CREATED, mapMessageDto(message), uniqueRooms);
+  const rooms = getMessageRealtimeRooms(message);
+  emitRealtime(SOCKET_EVENTS.MESSAGE_CREATED, mapMessageDto(message), rooms);
 
   return message;
 }
@@ -55,25 +59,63 @@ messagesRouter.post(
   "/messages/send",
   requireAuth,
   asyncHandler(async (req, res) => {
-    const { startupId = null, toUserId, body = "", attachments = [], metadata = {} } = req.body || {};
+    const {
+      startupId = null,
+      toUserId,
+      body = "",
+      attachments: rawAttachments = [],
+      metadata = {},
+      replyToMessageId = null,
+      forwardedFrom: rawForwardedFrom = null,
+    } = req.body || {};
+    const attachments = normalizeAttachments(rawAttachments);
 
-    if (!toUserId || !body) {
-      return apiError(res, "toUserId and body are required.", 400);
+    if (!toUserId) {
+      return apiError(res, "toUserId is required.", 400);
+    }
+    if (!messageHasContent(body, attachments) && !rawForwardedFrom) {
+      return apiError(res, "Message body or at least one attachment is required.", 400);
     }
 
     if (startupId && !(await canAccessStartupMessages(req, startupId))) {
       return apiError(res, "Forbidden.", 403);
     }
+
+    let replyPreview = null;
+    let replyToId = null;
+    if (replyToMessageId) {
+      replyPreview = await resolveReplyPreview(replyToMessageId, req.user.id);
+      if (!replyPreview) {
+        return apiError(res, "Invalid reply target.", 400);
+      }
+      replyToId = replyPreview.messageId;
+    }
+
+    let forwardedFrom = null;
+    if (rawForwardedFrom && typeof rawForwardedFrom === "object") {
+      forwardedFrom = {
+        messageId: rawForwardedFrom.messageId || null,
+        fromUserId: rawForwardedFrom.fromUserId || req.user.id,
+        fromUserName: String(rawForwardedFrom.fromUserName || ""),
+        bodySnippet: String(rawForwardedFrom.bodySnippet || ""),
+        attachments: normalizeAttachments(rawForwardedFrom.attachments || []),
+      };
+    }
+
     const message = await createMessage({
       startupId,
       fromUserId: req.user.id,
       toUserId,
-      body,
+      body: String(body || "").trim(),
       attachments,
       metadata,
+      replyToMessageId: replyToId,
+      replyPreview,
+      forwardedFrom,
+      messageType: "dm",
     });
 
-    return apiSuccess(res, mapMessageDto(message), 201);
+    return apiSuccess(res, dtoForViewer(message, req.user.id), 201);
   }),
 );
 
@@ -112,10 +154,99 @@ messagesRouter.post(
       fromUserId: req.user.id,
       toUserId: req.body?.toUserId,
       body: bodyText,
-      attachments: req.body?.attachments || [],
+      attachments: normalizeAttachments(req.body?.attachments || []),
+      messageType: "dm",
     });
 
-    return apiSuccess(res, mapMessageDto(message), 201);
+    return apiSuccess(res, dtoForViewer(message, req.user.id), 201);
+  }),
+);
+
+messagesRouter.delete(
+  "/messages/:messageId",
+  requireAuth,
+  asyncHandler(async (req, res) => {
+    const scope = String(req.query?.scope || "forMe");
+    const message = await loadMessageById(req.params.messageId);
+    if (!message) {
+      return apiError(res, "Message not found.", 404);
+    }
+    if (!isMessageParticipant(message, req.user.id)) {
+      return apiError(res, "Forbidden.", 403);
+    }
+
+    if (scope === "forEveryone") {
+      if (!canDeleteForEveryone(message, req.user.id)) {
+        return apiError(
+          res,
+          "You can only delete your own messages within 48 hours.",
+          403,
+        );
+      }
+      message.body = "";
+      message.attachments = [];
+      message.deletedForEveryoneAt = new Date();
+      message.deletedForEveryoneBy = req.user.id;
+      await message.save();
+      emitMessageUpdated(message);
+      return apiSuccess(res, dtoForViewer(message, req.user.id));
+    }
+
+    const userOid = req.user.id;
+    if (!message.hiddenForUserIds.some((id) => String(id) === String(userOid))) {
+      message.hiddenForUserIds.push(userOid);
+      await message.save();
+    }
+    emitMessageUpdated(message);
+    return apiSuccess(res, { deletedForMe: true, messageId: String(message._id) });
+  }),
+);
+
+messagesRouter.post(
+  "/messages/:messageId/forward",
+  requireAuth,
+  asyncHandler(async (req, res) => {
+    const { toUserId, startupId = null, caption = "" } = req.body || {};
+    if (!toUserId) {
+      return apiError(res, "toUserId is required.", 400);
+    }
+
+    const source = await loadMessageById(req.params.messageId);
+    if (!source) {
+      return apiError(res, "Message not found.", 404);
+    }
+    if (!isMessageParticipant(source, req.user.id)) {
+      return apiError(res, "Forbidden.", 403);
+    }
+    if (source.messageType !== "dm") {
+      return apiError(res, "Only direct messages can be forwarded.", 400);
+    }
+    if (startupId && !(await canAccessStartupMessages(req, startupId))) {
+      return apiError(res, "Forbidden.", 403);
+    }
+
+    let fromUserName = "";
+    try {
+      const sender = await User.findById(source.fromUserId, { name: 1 });
+      fromUserName = sender?.name || "";
+    } catch {
+      /* optional */
+    }
+
+    const forwardedFrom = buildForwardedFromSnapshot(source, fromUserName);
+    const bodyText = String(caption || "").trim();
+
+    const message = await createMessage({
+      startupId,
+      fromUserId: req.user.id,
+      toUserId,
+      body: bodyText,
+      attachments: [],
+      forwardedFrom,
+      messageType: "dm",
+    });
+
+    return apiSuccess(res, dtoForViewer(message, req.user.id), 201);
   }),
 );
 
@@ -132,8 +263,12 @@ messagesRouter.get(
         { fromUserId: userId, toUserId: otherUserId },
         { fromUserId: otherUserId, toUserId: userId },
       ],
+      ...conversationVisibilityFilter(req.user.id),
     }).sort({ createdAt: 1 });
-    return apiSuccess(res, messages.map(mapMessageDto));
+    return apiSuccess(
+      res,
+      messages.map((m) => dtoForViewer(m, req.user.id)).filter(Boolean),
+    );
   }),
 );
 
@@ -146,9 +281,13 @@ messagesRouter.get(
     }
     const messages = await Message.find({
       $or: [{ fromUserId: req.params.userId }, { toUserId: req.params.userId }],
+      ...conversationVisibilityFilter(req.user.id),
     }).sort({ createdAt: -1 });
 
-    return apiSuccess(res, messages.map(mapMessageDto));
+    return apiSuccess(
+      res,
+      messages.map((m) => dtoForViewer(m, req.user.id)).filter(Boolean),
+    );
   }),
 );
 
@@ -169,9 +308,13 @@ messagesRouter.get(
         { fromUserId: userId, toUserId: otherUserId },
         { fromUserId: otherUserId, toUserId: userId },
       ],
+      ...conversationVisibilityFilter(req.user.id),
     }).sort({ createdAt: 1 });
 
-    return apiSuccess(res, messages.map(mapMessageDto));
+    return apiSuccess(
+      res,
+      messages.map((m) => dtoForViewer(m, req.user.id)).filter(Boolean),
+    );
   }),
 );
 
@@ -187,7 +330,11 @@ messagesRouter.get(
       return apiError(res, "Forbidden.", 403);
     }
 
-    const rows = await Message.find({ startupId, $or: [{ fromUserId: userId }, { toUserId: userId }] })
+    const rows = await Message.find({
+      startupId,
+      $or: [{ fromUserId: userId }, { toUserId: userId }],
+      ...conversationVisibilityFilter(req.user.id),
+    })
       .sort({ createdAt: -1 })
       .limit(500);
 
@@ -199,7 +346,12 @@ messagesRouter.get(
       }
     });
 
-    return apiSuccess(res, Array.from(map.values()).map(mapMessageDto));
+    return apiSuccess(
+      res,
+      Array.from(map.values())
+        .map((m) => dtoForViewer(m, req.user.id))
+        .filter(Boolean),
+    );
   }),
 );
 
@@ -243,6 +395,7 @@ messagesRouter.get(
       startupId: req.params.startupId,
       toUserId: req.params.userId,
       readAt: null,
+      ...conversationVisibilityFilter(req.user.id),
     });
 
     return apiSuccess(res, { unreadCount: count, count });

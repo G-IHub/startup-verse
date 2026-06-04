@@ -63,6 +63,14 @@ import {
 } from "lucide-react";
 import { cn } from "./ui/utils";
 import { Checkbox } from "./ui/checkbox";
+import {
+  SettingsPanelCard,
+  SettingsGroup,
+  SettingsField,
+  SettingsFieldGrid,
+  settingsBtnPrimary,
+  settingsBtnOutline,
+} from "./settings/SettingsPrimitives.jsx";
 
 const SP_LABEL =
   "font-body text-[13px] font-medium uppercase tracking-[0.06em] text-text-muted";
@@ -76,7 +84,7 @@ const SP_SELECT_TRIGGER =
   "w-full rounded-input border-[1.5px] border-surface-border bg-surface-card font-body text-sm text-text-heading transition-all duration-200 ease-in-out focus-visible:border-primary focus-visible:outline-none focus-visible:shadow-focus [&_svg]:text-text-body";
 const SP_VALUE = "font-body text-sm font-normal text-text-heading";
 const SP_EMPTY = "font-body text-sm italic text-text-muted";
-const SP_CARD = "border-0 bg-surface-card shadow-soft rounded-card";
+const SP_CARD = "rounded-card border border-surface-border bg-surface-card shadow-soft";
 const SP_CARD_TITLE =
   "flex items-center gap-2 font-heading text-base font-semibold text-text-heading [&_svg]:text-primary";
 const SP_PRIMARY_BTN =
@@ -93,7 +101,12 @@ const SP_CHECK_LABEL_BASE =
   "flex cursor-pointer items-center gap-2 font-body text-sm text-text-heading";
 const SP_CHECK_LABEL_ON = "font-medium text-primary";
 
-export default function ProfilePage({ user, onUpdateUser, initialEditing = false }) {
+export default function ProfilePage({
+  user,
+  onUpdateUser,
+  initialEditing = false,
+  embeddedInSettings = false,
+}) {
   const [isEditing, setIsEditing] = useState(initialEditing);
   const [showPreview, setShowPreview] = useState(false);
 
@@ -178,6 +191,36 @@ export default function ProfilePage({ user, onUpdateUser, initialEditing = false
     return getTalentProfileCompletionPercent(user);
   };
   const profileCompletion = calculateProfileCompletion();
+  const profileShellClass = embeddedInSettings
+    ? "w-full space-y-4"
+    : "min-h-full space-y-3 bg-transparent p-2 font-body md:space-y-4 md:p-3 lg:p-4";
+
+  const renderProfileEditActions = () => {
+    if (!isEditing) {
+      return (
+        <Button className={settingsBtnPrimary} onClick={() => setIsEditing(true)}>
+          <Edit className="mr-2 h-4 w-4" />
+          Edit profile
+        </Button>
+      );
+    }
+    return (
+      <>
+        <Button
+          variant="outline"
+          className={settingsBtnOutline}
+          onClick={() => setIsEditing(false)}
+        >
+          Cancel
+        </Button>
+        <Button className={settingsBtnPrimary} onClick={handleSave}>
+          <Save className="mr-2 h-4 w-4" />
+          Save changes
+        </Button>
+      </>
+    );
+  };
+
   const getCompletionMessage = (percentage) => {
     if (percentage === 100) return "Your profile is complete! 🎉";
     if (percentage >= 80)
@@ -464,49 +507,46 @@ export default function ProfilePage({ user, onUpdateUser, initialEditing = false
   // Render Talent Profile
   if (user.role === "talent") {
     return (
-      <div className="min-h-full space-y-3 bg-transparent p-2 font-body md:space-y-4 md:p-3 lg:p-4">
-        <div className="flex flex-wrap items-center justify-between gap-4">
-          <div>
-            <h1 className="mb-2 font-heading text-3xl font-bold text-text-heading">
-              Professional Profile
-            </h1>
-            <p className="font-body text-text-body">
-              This is what founders see when browsing talent
-            </p>
+      <div className={profileShellClass}>
+        {!embeddedInSettings ? (
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <div>
+              <h1 className="mb-2 font-heading text-3xl font-bold text-text-heading">
+                Professional Profile
+              </h1>
+              <p className="font-body text-text-body">
+                This is what founders see when browsing talent
+              </p>
+            </div>
+            <div className="flex gap-2">
+              {!isEditing && (
+                <Button
+                  variant="outline"
+                  className={SP_PREVIEW_BTN}
+                  onClick={() => setShowPreview(!showPreview)}
+                >
+                  <Eye className="mr-2 h-4 w-4" />
+                  {showPreview ? "Edit View" : "Preview"}
+                </Button>
+              )}
+              {renderProfileEditActions()}
+            </div>
           </div>
-          <div className="flex gap-2">
+        ) : (
+          <div className="flex flex-wrap items-center justify-end gap-2 rounded-card border border-surface-border bg-surface-card px-4 py-3 shadow-soft md:px-5">
             {!isEditing && (
               <Button
                 variant="outline"
-                className={SP_PREVIEW_BTN}
+                className={settingsBtnOutline}
                 onClick={() => setShowPreview(!showPreview)}
               >
                 <Eye className="mr-2 h-4 w-4" />
-                {showPreview ? "Edit View" : "Preview"}
+                {showPreview ? "Edit view" : "Preview"}
               </Button>
             )}
-            {!isEditing ? (
-              <Button className={SP_PRIMARY_BTN} onClick={() => setIsEditing(true)}>
-                <Edit className="mr-2 h-4 w-4" />
-                Edit Profile
-              </Button>
-            ) : (
-              <>
-                <Button
-                  variant="outline"
-                  className={SP_CANCEL_BTN}
-                  onClick={() => setIsEditing(false)}
-                >
-                  Cancel
-                </Button>
-                <Button className={SP_PRIMARY_BTN} onClick={handleSave}>
-                  <Save className="mr-2 h-4 w-4" />
-                  Save Changes
-                </Button>
-              </>
-            )}
+            {renderProfileEditActions()}
           </div>
-        </div>
+        )}
         {!showPreview && profileCompletion < 100 && (
           <Card className={cn(SP_CARD, "ring-1 ring-primary/25")}>
             <CardContent className="pt-6 space-y-4">
@@ -1619,96 +1659,67 @@ export default function ProfilePage({ user, onUpdateUser, initialEditing = false
 
   // Render Founder/Team Member Profile
   return (
-    <div className="min-h-full space-y-3 bg-transparent p-2 font-body md:space-y-4 md:p-3 lg:p-4">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="mb-2 font-heading text-3xl font-bold text-text-heading">
-            Founder Profile
-          </h1>
-          <p className="font-body text-text-body">
-            Manage your personal and startup information
-          </p>
+    <div className={profileShellClass}>
+      {!embeddedInSettings ? (
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div>
+            <h1 className="mb-2 font-heading text-3xl font-bold text-text-heading">
+              Founder Profile
+            </h1>
+            <p className="font-body text-text-body">
+              Manage your personal and startup information
+            </p>
+          </div>
+          {renderProfileEditActions()}
         </div>
-        {!isEditing ? (
-          <Button className={SP_PRIMARY_BTN} onClick={() => setIsEditing(true)}>
-            <Edit className="mr-2 h-4 w-4" />
-            Edit Profile
-          </Button>
-        ) : (
-          <div className="flex gap-2">
-            <Button
-              variant="outline"
-              className={SP_CANCEL_BTN}
-              onClick={() => setIsEditing(false)}
-            >
-              Cancel
-            </Button>
-            <Button className={SP_PRIMARY_BTN} onClick={handleSave}>
-              <Save className="mr-2 h-4 w-4" />
-              Save Changes
-            </Button>
-          </div>
-        )}
-      </div>
-      <Card className={SP_CARD}>
-        <CardHeader>
-          <CardTitle className={SP_CARD_TITLE}>
-            <UserCircle className="w-5 h-5" />
-            Personal Information
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid md:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label className={SP_LABEL} htmlFor="name">Full Name</Label>
-              {isEditing ? (
-                <Input className={cn(SP_INPUT)}
-                  id="name"
-                  value={editedProfile.name}
-                  onChange={(e) =>
-                    setEditedProfile({
-                      ...editedProfile,
-                      name: e.target.value,
-                    })
-                  }
-                />
-              ) : (
-                <p className={SP_VALUE}>{user.name}</p>
-              )}
-            </div>
-            <div className="space-y-2">
-              <Label className={SP_LABEL} htmlFor="email">Email</Label>
-              {isEditing ? (
-                <Input className={cn(SP_INPUT)}
-                  id="email"
-                  type="email"
-                  value={editedProfile.email}
-                  onChange={(e) =>
-                    setEditedProfile({
-                      ...editedProfile,
-                      email: e.target.value,
-                    })
-                  }
-                />
-              ) : (
-                <p className={cn(SP_VALUE, "flex items-center gap-2")}>
-                  <Mail className="h-4 w-4 shrink-0 text-text-muted" />
-                  {user.email}
-                </p>
-              )}
-            </div>
-          </div>
-          <div className="space-y-2">
-            <Label className={SP_LABEL} htmlFor="bio">Bio</Label>
+      ) : null}
+      <SettingsPanelCard
+        icon={UserCircle}
+        title="Personal information"
+        description="Your name, email, and founder bio"
+        actions={embeddedInSettings ? renderProfileEditActions() : null}
+      >
+        <SettingsFieldGrid>
+          <SettingsField label="Full name" htmlFor="name">
             {isEditing ? (
-              <Textarea className={cn(SP_TEXTAREA)}
+              <Input
+                className={cn(SP_INPUT, "mt-0")}
+                id="name"
+                value={editedProfile.name}
+                onChange={(e) =>
+                  setEditedProfile({ ...editedProfile, name: e.target.value })
+                }
+              />
+            ) : (
+              <p className={SP_VALUE}>{user.name}</p>
+            )}
+          </SettingsField>
+          <SettingsField label="Email" htmlFor="email">
+            {isEditing ? (
+              <Input
+                className={cn(SP_INPUT, "mt-0")}
+                id="email"
+                type="email"
+                value={editedProfile.email}
+                onChange={(e) =>
+                  setEditedProfile({ ...editedProfile, email: e.target.value })
+                }
+              />
+            ) : (
+              <p className={cn(SP_VALUE, "flex items-center gap-2")}>
+                <Mail className="h-4 w-4 shrink-0 text-text-muted" />
+                {user.email}
+              </p>
+            )}
+          </SettingsField>
+          <SettingsField label="Bio" htmlFor="bio" fullWidth>
+            {isEditing ? (
+              <Textarea
+                className={cn(SP_TEXTAREA, "mt-0")}
                 id="bio"
                 value={editedProfile.bio}
                 onChange={(e) =>
-                  setEditedProfile({
-                    ...editedProfile,
-                    bio: e.target.value,
-                  })
+                  setEditedProfile({ ...editedProfile, bio: e.target.value })
                 }
                 placeholder="Tell us about yourself as a founder..."
                 rows={4}
@@ -1724,23 +1735,21 @@ export default function ProfilePage({ user, onUpdateUser, initialEditing = false
                 {user.bio || "No bio added yet"}
               </p>
             )}
-          </div>
-        </CardContent>
-      </Card>
+          </SettingsField>
+        </SettingsFieldGrid>
+      </SettingsPanelCard>
       {user.role === "founder" && (
-        <Card className={SP_CARD}>
-          <CardHeader>
-            <CardTitle className={SP_CARD_TITLE}>
-              <Building className="w-5 h-5" />
-              Startup Information
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid md:grid-cols-2 gap-4">
-              <div className="space-y-2 md:col-span-2">
-                <Label className={SP_LABEL} htmlFor="startupName">Startup name</Label>
+        <SettingsPanelCard
+          icon={Building}
+          title="Startup information"
+          description="Company details and execution stage"
+          actions={null}
+        >
+            <SettingsFieldGrid>
+              <SettingsField label="Startup name" htmlFor="startupName" fullWidth>
                 {isEditing ? (
-                  <Input className={cn(SP_INPUT)}
+                  <Input
+                    className={cn(SP_INPUT, "mt-0")}
                     id="startupName"
                     value={editedProfile.startupName}
                     onChange={(e) =>
@@ -1758,11 +1767,11 @@ export default function ProfilePage({ user, onUpdateUser, initialEditing = false
                       "Not specified"}
                   </p>
                 )}
-              </div>
-              <div className="space-y-2 md:col-span-2">
-                <Label className={SP_LABEL} htmlFor="startupDescription">Startup description</Label>
+              </SettingsField>
+              <SettingsField label="Startup description" htmlFor="startupDescription" fullWidth>
                 {isEditing ? (
-                  <Textarea className={cn(SP_TEXTAREA)}
+                  <Textarea
+                    className={cn(SP_TEXTAREA, "mt-0")}
                     id="startupDescription"
                     value={editedProfile.startupDescription || ""}
                     onChange={(e) =>
@@ -1781,9 +1790,8 @@ export default function ProfilePage({ user, onUpdateUser, initialEditing = false
                       "Not specified"}
                   </p>
                 )}
-              </div>
-              <div className="space-y-2 md:col-span-2">
-                <Label className={SP_LABEL}>Startup type (industry)</Label>
+              </SettingsField>
+              <SettingsField label="Startup type (industry)" fullWidth>
                 {isEditing ? (
                   <>
                     <Select
@@ -1828,9 +1836,8 @@ export default function ProfilePage({ user, onUpdateUser, initialEditing = false
                       "Not specified"}
                   </p>
                 )}
-              </div>
-              <div className="space-y-2 md:col-span-2">
-                <Label className={SP_LABEL}>Target audience</Label>
+              </SettingsField>
+              <SettingsField label="Target audience" fullWidth>
                 {isEditing ? (
                   <div className={SP_CHECK_WRAP}>
                     {FOUNDER_TARGET_AUDIENCE_OPTIONS.map((opt) => {
@@ -1871,9 +1878,8 @@ export default function ProfilePage({ user, onUpdateUser, initialEditing = false
                         : "Not specified"}
                   </p>
                 )}
-              </div>
-              <div className="space-y-2 md:col-span-2">
-                <Label className={SP_LABEL}>Roles needed</Label>
+              </SettingsField>
+              <SettingsField label="Roles needed" fullWidth>
                 {isEditing ? (
                   <div className={cn(SP_CHECK_WRAP, "max-h-48 overflow-y-auto")}>
                     {FOUNDER_ROLES_NEEDED_OPTIONS.map((opt) => {
@@ -1927,9 +1933,8 @@ export default function ProfilePage({ user, onUpdateUser, initialEditing = false
                         : "Not specified"}
                   </p>
                 )}
-              </div>
-              <div className="space-y-2">
-                <Label className={SP_LABEL}>Team size</Label>
+              </SettingsField>
+              <SettingsField label="Team size">
                 {isEditing ? (
                   <Select
                     value={editedProfile.teamSize || ""}
@@ -1960,9 +1965,8 @@ export default function ProfilePage({ user, onUpdateUser, initialEditing = false
                     {user.profile?.teamSize || user.teamSize || "Not specified"}
                   </p>
                 )}
-              </div>
-              <div className="space-y-2">
-                <Label className={SP_LABEL}>Execution stage</Label>
+              </SettingsField>
+              <SettingsField label="Execution stage">
                 {isEditing ? (
                   <Select
                     value={editedProfile.startupStage || ""}
@@ -1996,18 +2000,11 @@ export default function ProfilePage({ user, onUpdateUser, initialEditing = false
                       "Not specified"}
                   </p>
                 )}
-              </div>
-            </div>
-            <div
-              className={cn(
-                "grid gap-4 border-t border-surface-border pt-4 md:grid-cols-1",
-              )}
-            >
-              <p className="font-body text-sm font-semibold text-text-heading">
-                Where you are today
-              </p>
-              <div className="space-y-2">
-                <Label className={SP_SUBLABEL}>Validated problem / idea</Label>
+              </SettingsField>
+            </SettingsFieldGrid>
+            <SettingsGroup title="Where you are today" icon={Target}>
+              <SettingsFieldGrid cols={1}>
+              <SettingsField label="Validated problem / idea">
                 {isEditing ? (
                   <Select
                     value={editedProfile.hasValidatedIdea || ""}
@@ -2036,9 +2033,8 @@ export default function ProfilePage({ user, onUpdateUser, initialEditing = false
                       "Not specified"}
                   </p>
                 )}
-              </div>
-              <div className="space-y-2">
-                <Label className={SP_SUBLABEL}>MVP or prototype</Label>
+              </SettingsField>
+              <SettingsField label="MVP or prototype">
                 {isEditing ? (
                   <Select
                     value={editedProfile.hasMVP || ""}
@@ -2062,9 +2058,8 @@ export default function ProfilePage({ user, onUpdateUser, initialEditing = false
                     {user.profile?.hasMVP || user.hasMVP || "Not specified"}
                   </p>
                 )}
-              </div>
-              <div className="space-y-2">
-                <Label className={SP_SUBLABEL}>Customers or users</Label>
+              </SettingsField>
+              <SettingsField label="Customers or users">
                 {isEditing ? (
                   <Select
                     value={editedProfile.hasCustomers || ""}
@@ -2093,77 +2088,73 @@ export default function ProfilePage({ user, onUpdateUser, initialEditing = false
                       "Not specified"}
                   </p>
                 )}
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+              </SettingsField>
+              </SettingsFieldGrid>
+            </SettingsGroup>
+        </SettingsPanelCard>
       )}
-      <Card className={SP_CARD}>
-        <CardHeader>
-          <CardTitle className={SP_CARD_TITLE}>
-            <Globe className="w-5 h-5" />
-            Contact & Links
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid md:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label className={SP_LABEL} htmlFor="website">Website</Label>
-              {isEditing ? (
-                <Input className={cn(SP_INPUT)}
-                  id="website"
-                  value={editedProfile.website}
-                  onChange={(e) =>
-                    setEditedProfile({
-                      ...editedProfile,
-                      website: e.target.value,
-                    })
-                  }
-                  placeholder="https://yourstartup.com"
-                />
-              ) : (
-                <p
-                  className={cn(
-                    SP_VALUE,
-                    "flex items-center gap-2",
-                    !user.website && SP_EMPTY,
-                  )}
-                >
-                  <Globe className="h-4 w-4 shrink-0 text-text-muted" />
-                  {user.website || "Not specified"}
-                </p>
-              )}
-            </div>
-            <div className="space-y-2">
-              <Label className={SP_LABEL} htmlFor="linkedin">LinkedIn</Label>
-              {isEditing ? (
-                <Input className={cn(SP_INPUT)}
-                  id="linkedin"
-                  value={editedProfile.linkedin}
-                  onChange={(e) =>
-                    setEditedProfile({
-                      ...editedProfile,
-                      linkedin: e.target.value,
-                    })
-                  }
-                  placeholder="https://linkedin.com/in/yourname"
-                />
-              ) : (
-                <p
-                  className={cn(
-                    SP_VALUE,
-                    "flex items-center gap-2",
-                    !user.linkedin && SP_EMPTY,
-                  )}
-                >
-                  <Linkedin className="h-4 w-4 shrink-0 text-text-muted" />
-                  {user.linkedin || "Not specified"}
-                </p>
-              )}
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+      <SettingsPanelCard
+        icon={Globe}
+        title="Contact & links"
+        description="Public URLs for your startup and profile"
+      >
+        <SettingsFieldGrid>
+          <SettingsField label="Website" htmlFor="website">
+            {isEditing ? (
+              <Input
+                className={cn(SP_INPUT, "mt-0")}
+                id="website"
+                value={editedProfile.website}
+                onChange={(e) =>
+                  setEditedProfile({
+                    ...editedProfile,
+                    website: e.target.value,
+                  })
+                }
+                placeholder="https://yourstartup.com"
+              />
+            ) : (
+              <p
+                className={cn(
+                  SP_VALUE,
+                  "flex items-center gap-2",
+                  !user.website && SP_EMPTY,
+                )}
+              >
+                <Globe className="h-4 w-4 shrink-0 text-text-muted" />
+                {user.website || "Not specified"}
+              </p>
+            )}
+          </SettingsField>
+          <SettingsField label="LinkedIn" htmlFor="linkedin">
+            {isEditing ? (
+              <Input
+                className={cn(SP_INPUT, "mt-0")}
+                id="linkedin"
+                value={editedProfile.linkedin}
+                onChange={(e) =>
+                  setEditedProfile({
+                    ...editedProfile,
+                    linkedin: e.target.value,
+                  })
+                }
+                placeholder="https://linkedin.com/in/yourname"
+              />
+            ) : (
+              <p
+                className={cn(
+                  SP_VALUE,
+                  "flex items-center gap-2",
+                  !user.linkedin && SP_EMPTY,
+                )}
+              >
+                <Linkedin className="h-4 w-4 shrink-0 text-text-muted" />
+                {user.linkedin || "Not specified"}
+              </p>
+            )}
+          </SettingsField>
+        </SettingsFieldGrid>
+      </SettingsPanelCard>
     </div>
   );
 }

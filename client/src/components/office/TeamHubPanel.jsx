@@ -1201,7 +1201,7 @@ export function TeamHubPanel({
                     key={emoji}
                     type="button"
                     onClick={() => setNewAnnouncement({ ...newAnnouncement, emoji })}
-                    className={`text-base w-8 h-8 rounded-lg border-2 transition-all hover:scale-110 ${newAnnouncement.emoji === emoji ? "border-indigo-500 bg-indigo-50 dark:bg-indigo-950 shadow-sm" : "border-border hover:border-indigo-300"}`}
+                    className={`text-base w-8 h-8 rounded-lg border-2 transition-all hover:scale-110 ${newAnnouncement.emoji === emoji ? "border-indigo-500 bg-indigo-50 shadow-sm" : "border-border hover:border-indigo-300"}`}
                   >
                     {emoji}
                   </button>
@@ -1232,7 +1232,7 @@ export function TeamHubPanel({
                       key={value}
                       type="button"
                       onClick={() => setNewAnnouncement({ ...newAnnouncement, priority: value })}
-                      className={`text-left text-xs px-2.5 py-1.5 rounded-lg border transition-all ${newAnnouncement.priority === value ? "border-indigo-500 bg-indigo-50 dark:bg-indigo-950 font-medium" : "border-border hover:border-indigo-300"}`}
+                      className={`text-left text-xs px-2.5 py-1.5 rounded-lg border transition-all ${newAnnouncement.priority === value ? "border-indigo-500 bg-indigo-50 font-medium" : "border-border hover:border-indigo-300"}`}
                     >
                       {label}
                     </button>
@@ -1251,7 +1251,7 @@ export function TeamHubPanel({
                       key={value}
                       type="button"
                       onClick={() => setNewAnnouncement({ ...newAnnouncement, category: value })}
-                      className={`text-left text-xs px-2.5 py-1.5 rounded-lg border transition-all ${newAnnouncement.category === value ? "border-indigo-500 bg-indigo-50 dark:bg-indigo-950 font-medium" : "border-border hover:border-indigo-300"}`}
+                      className={`text-left text-xs px-2.5 py-1.5 rounded-lg border transition-all ${newAnnouncement.category === value ? "border-indigo-500 bg-indigo-50 font-medium" : "border-border hover:border-indigo-300"}`}
                     >
                       {label}
                     </button>

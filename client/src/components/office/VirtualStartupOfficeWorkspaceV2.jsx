@@ -33,6 +33,7 @@ import MeetingScheduler from "../calendar/MeetingScheduler";
 import { useOfficePanels } from "../../domains/office/hooks/useOfficePanels";
 import { useOfficeWorkspaceData } from "../../domains/office/hooks/useOfficeWorkspaceData";
 import { useOfficeStore } from "../../state/useOfficeStore";
+import PresenceIndicator from "../presence/PresenceIndicator";
 
 function formatRelativeTime(dateValue) {
   const date = dateValue instanceof Date ? dateValue : new Date(dateValue || Date.now());
@@ -466,7 +467,7 @@ export default function VirtualStartupOfficeWorkspaceV2({
       {office.error ? (
         <Card className="border-amber-300 bg-amber-50 shadow-none">
           <CardContent className="pt-4">
-            <p className="text-[13px] text-amber-900 dark:text-amber-200">{office.error}</p>
+            <p className="text-[13px] text-amber-900">{office.error}</p>
           </CardContent>
         </Card>
       ) : null}
@@ -560,9 +561,6 @@ export default function VirtualStartupOfficeWorkspaceV2({
             <div className="grid grid-cols-1 gap-3">
               {roster.map((member) => {
                 const isOnline = Boolean(member.isOnline);
-                const statusLabel = isOnline
-                  ? member.statusText || "In workspace"
-                  : "Offline";
                 return (
                   <div
                     key={member.id}
@@ -582,20 +580,14 @@ export default function VirtualStartupOfficeWorkspaceV2({
                         </p>
                       </div>
                     </div>
-                    <div className="flex items-center gap-1.5">
-                      <span
-                        className={`inline-block h-1.5 w-1.5 rounded-full ${
-                          isOnline ? "bg-status-success" : "bg-text-muted/60"
-                        }`}
-                      />
-                      <p
-                        className={`truncate font-body text-[11px] font-medium ${
-                          isOnline ? "text-text-body" : "text-text-muted"
-                        }`}
-                      >
-                        {statusLabel}
-                      </p>
-                    </div>
+                    <PresenceIndicator
+                      connection={member.connection}
+                      isOnline={member.isOnline}
+                      showLabel
+                      size="sm"
+                      statusText={isOnline ? member.statusText || "Online" : "Offline"}
+                      lastSeenAt={member.lastSeenAt}
+                    />
                   </div>
                 );
               })}

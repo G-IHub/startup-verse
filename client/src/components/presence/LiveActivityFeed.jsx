@@ -130,7 +130,7 @@ export function LiveActivityFeed({ activities, showPopups = true }) {
                 stiffness: 300,
                 damping: 30,
               }}
-              className="bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 p-3 flex items-center gap-3 backdrop-blur-sm pointer-events-auto"
+              className="bg-white rounded-lg shadow-xl border border-gray-200 p-3 flex items-center gap-3 backdrop-blur-sm pointer-events-auto"
             >
               <div
                 className="w-10 h-10 rounded-full flex items-center justify-center text-white flex-shrink-0"
@@ -143,13 +143,13 @@ export function LiveActivityFeed({ activities, showPopups = true }) {
                   : "📋"}
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-sm text-gray-900 dark:text-white truncate">
+                <p className="text-sm text-gray-900 truncate">
                   <span className="font-medium">{notification.userName}</span>{" "}
-                  <span className="text-gray-600 dark:text-gray-300">
+                  <span className="text-gray-600">
                     {notification.message}
                   </span>
                 </p>
-                <p className="text-xs text-gray-500 dark:text-gray-400">
+                <p className="text-xs text-gray-500">
                   {getTimeAgo(notification.timestamp)}
                 </p>
               </div>

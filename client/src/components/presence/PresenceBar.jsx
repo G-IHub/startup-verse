@@ -99,17 +99,17 @@ export function PresenceBar({ users, onUserClick }) {
               )}
             </div>
             <div
-              className="absolute bottom-0 right-0 w-4 h-4 rounded-full border-2 border-white dark:border-gray-900"
+              className="absolute bottom-0 right-0 w-4 h-4 rounded-full border-2 border-white"
               style={{
                 backgroundColor: statusColor,
               }}
             />
             {user.activity && user.activity !== "idle" && (
-              <div className="absolute top-0 right-0 w-5 h-5 rounded-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 flex items-center justify-center text-gray-600 dark:text-gray-300">
+              <div className="absolute top-0 right-0 w-5 h-5 rounded-full bg-white border border-gray-200 flex items-center justify-center text-gray-600">
                 {getActivityIcon(user.activity)}
               </div>
             )}
-            <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 bg-gray-900 dark:bg-gray-800 text-white px-3 py-2 rounded-lg text-xs whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none shadow-lg">
+            <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 bg-popover text-popover-foreground border border-border px-3 py-2 rounded-lg text-xs whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none shadow-lg">
               <div>{user.name}</div>
               <div className="text-gray-300 capitalize">{user.status}</div>
               <div className="text-gray-400">{user.role || "team-member"}</div>

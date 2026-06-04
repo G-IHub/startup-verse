@@ -58,8 +58,12 @@ export async function getOrganizationInvitations(founderId) {
     if (out._id != null && out.id == null) {
       out.id = String(out._id);
     }
+    const isOrgInvite =
+      (Boolean(out.cohortId) && Boolean(out.organizationId)) ||
+      String(out.kind || "") === "org-founder";
+    out.itemType = isOrgInvite ? "organization-invitation" : "other";
     return out;
-  });
+  }).filter((inv) => inv?.itemType === "organization-invitation");
 
   console.log(
     "📊 [InboxAPI] Parsed invitations count:",
@@ -133,22 +137,46 @@ export async function getSentInterests(talentId, params = {}) {
   }
 }
 
+// Permanently remove an interest (both parties; not allowed after accepted)
+export async function deleteInterest(interestId) {
+  return apiRequest(`/interests/${interestId}`, { method: "DELETE" });
+}
+
+// Permanently remove a founder-talent invitation
+export async function deleteInvitation(invitationId) {
+  return apiRequest(`/invitations/${invitationId}`, { method: "DELETE" });
+}
+
 // Update interest status (accept/reject)
 export async function updateInterestStatus(interestId, status, response) {
   const data = await apiRequest(`/interests/${interestId}/status`, {
     method: "PUT",
     body: JSON.stringify({ status, response }),
   });
-  return data.interest;
+  return data;
+}
+
+function buildInboxMessagePayload(payload) {
+  if (typeof payload === "string") {
+    return { message: payload, attachments: [] };
+  }
+  const text =
+    typeof payload?.text === "string"
+      ? payload.text
+      : typeof payload?.message === "string"
+        ? payload.message
+        : "";
+  const attachments = Array.isArray(payload?.attachments) ? payload.attachments : [];
+  return { message: text, attachments };
 }
 
 // Add message to interest conversation
 export async function addInterestMessage(interestId, message) {
   const data = await apiRequest(`/interests/${interestId}/messages`, {
     method: "POST",
-    body: JSON.stringify({ message }),
+    body: JSON.stringify(buildInboxMessagePayload(message)),
   });
-  return data.interest;
+  return data;
 }
 
 // Mark interest as onboarded (after compensation setup)
@@ -237,14 +265,14 @@ export async function updateInvitationStatus(invitationId, status, response) {
     method: "PUT",
     body: JSON.stringify({ status, response }),
   });
-  return data.invitation;
+  return data;
 }
 
 // Add message to invitation conversation
 export async function addInvitationMessage(invitationId, message) {
   const data = await apiRequest(`/invitations/${invitationId}/messages`, {
     method: "POST",
-    body: JSON.stringify({ message }),
+    body: JSON.stringify(buildInboxMessagePayload(message)),
   });
-  return data.invitation;
+  return data;
 }

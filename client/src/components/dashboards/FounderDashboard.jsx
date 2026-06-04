@@ -923,7 +923,7 @@ export default function FounderDashboard({
 
   const unreadNotifications = unreadNotificationsCount;
   const onlineMembers =
-    teamMembers.filter((m) => m.status === "online" || m.isOnline).length + 1;
+    teamMembers.filter((m) => m.isOnline).length + 1;
 
   // 🎯 Generate Inspirational Startup Insight - Company stories + motivational coaching
   const getSmartInsight = () => {
@@ -1574,13 +1574,13 @@ export default function FounderDashboard({
     const currentText = savedResponse?.text || "";
     if (isCompleted) {
       return (
-        <div className="flex items-center gap-3 p-4 bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-800 rounded-lg">
+        <div className="flex items-center gap-3 p-4 bg-green-50 border border-green-200 rounded-lg">
           <CheckCircle2 className="w-5 h-5 text-green-600 flex-shrink-0" />
           <div className="flex-1">
-            <p className="font-medium text-green-900 dark:text-green-100">
+            <p className="font-medium text-green-900">
               {task.title}
             </p>
-            <p className="text-sm text-green-700 dark:text-green-300">
+            <p className="text-sm text-green-700">
               Completed ✓
             </p>
           </div>
@@ -1819,15 +1819,15 @@ export default function FounderDashboard({
         </div>
       </div>
       {!user.onboardingComplete && (
-        <Card className="border-2 border-orange-200 bg-orange-50/50 dark:bg-orange-950/20 mt-1.5 flex-shrink-0">
+        <Card className="border-2 border-orange-200 bg-orange-50/50 mt-1.5 flex-shrink-0">
           <CardContent className="p-1.5">
             <div className="flex items-start gap-1.5">
               <AlertCircle className="w-3.5 h-3.5 text-orange-600 flex-shrink-0 mt-0.5" />
               <div className="flex-1">
-                <p className="font-medium text-[11px] text-orange-900 dark:text-orange-100">
+                <p className="font-medium text-[11px] text-orange-900">
                   Complete your profile to unlock your journey
                 </p>
-                <p className="text-[9px] text-orange-700 dark:text-orange-300 mt-0.5">
+                <p className="text-[9px] text-orange-700 mt-0.5">
                   Tell us about your startup to get personalized guidance and
                   team recommendations.
                 </p>
@@ -1880,7 +1880,7 @@ export default function FounderDashboard({
                     <ChevronRight className="h-3 w-3 text-primary" />
                   </Button>
                 </CardHeader>
-                <CardContent className="py-3 px-4 flex-1 flex flex-col overflow-y-auto min-h-0 scrollbar-thin scrollbar-thumb-gray-300 dark:scrollbar-thumb-gray-700 scrollbar-track-transparent">
+                <CardContent className="py-3 px-4 flex-1 flex flex-col overflow-y-auto min-h-0 scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-transparent">
                   <TooltipProvider>
                     <div className="flex items-start justify-between gap-1.5 mb-2">
                       <div className="flex items-center gap-1.5 flex-1 min-w-0">
@@ -1900,7 +1900,7 @@ export default function FounderDashboard({
                               </TooltipTrigger>
                               <TooltipContent
                                 side="right"
-                                className="max-w-xs bg-gray-900 border-gray-700"
+                                className="max-w-xs bg-popover text-popover-foreground border border-border"
                               >
                                 <p className="text-xs text-white">
                                   {currentStage.description}
@@ -2056,7 +2056,7 @@ export default function FounderDashboard({
                           <TooltipTrigger asChild={true}>
                             <Badge
                               variant="outline"
-                              className="text-[7px] md:text-[8px] bg-blue-50 dark:bg-blue-950/30 text-blue-700 dark:text-blue-400 border-blue-300 dark:border-blue-700"
+                              className="text-[7px] md:text-[8px] bg-blue-50 text-blue-700 border-blue-300"
                             >
                               <Building className="w-2.5 h-2.5 mr-0.5" />
                               {executionData.currentOutcome.cohortName ||
@@ -2084,7 +2084,7 @@ export default function FounderDashboard({
                     </p>
                   )}
                 </CardHeader>
-                <CardContent className="flex-1 pt-3 px-4 pb-3 overflow-y-auto min-h-0 scrollbar-thin scrollbar-thumb-gray-300 dark:scrollbar-thumb-gray-700 scrollbar-track-transparent">
+                <CardContent className="flex-1 pt-3 px-4 pb-3 overflow-y-auto min-h-0 scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-transparent">
                   {weeklyOutcomeSubmitting ? (
                     <div
                       className="flex min-h-[120px] flex-col items-center justify-center gap-2 px-4 text-center"
@@ -2106,8 +2106,8 @@ export default function FounderDashboard({
                   ) : isLoadingExecutionData ? (
                     <div className="space-y-2 py-3 px-2">
                       <div className="flex items-center justify-between mb-3">
-                        <div className="w-16 h-3 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
-                        <div className="w-20 h-3 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
+                        <div className="w-16 h-3 bg-gray-200 rounded animate-pulse" />
+                        <div className="w-20 h-3 bg-gray-200 rounded animate-pulse" />
                       </div>
                       {[1, 2, 3, 4].map((i) => (
                         <div
@@ -2115,15 +2115,15 @@ export default function FounderDashboard({
                           className="space-y-1 p-1.5 rounded-lg bg-muted/30 border"
                         >
                           <div className="flex items-center justify-between">
-                            <div className="w-3/4 h-3 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
-                            <div className="w-8 h-4 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
+                            <div className="w-3/4 h-3 bg-gray-200 rounded animate-pulse" />
+                            <div className="w-8 h-4 bg-gray-200 rounded animate-pulse" />
                           </div>
-                          <div className="w-full h-0.5 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
+                          <div className="w-full h-0.5 bg-gray-200 rounded animate-pulse" />
                         </div>
                       ))}
                       <div className="flex gap-1.5 pt-2 border-t">
-                        <div className="flex-1 h-6 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
-                        <div className="w-24 h-6 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
+                        <div className="flex-1 h-6 bg-gray-200 rounded animate-pulse" />
+                        <div className="w-24 h-6 bg-gray-200 rounded animate-pulse" />
                       </div>
                     </div>
                   ) : (
@@ -2186,7 +2186,7 @@ export default function FounderDashboard({
                                           </TooltipTrigger>
                                           <TooltipContent
                                             side="bottom"
-                                            className="max-w-xs bg-gray-900 border-gray-700"
+                                            className="max-w-xs bg-popover text-popover-foreground border border-border"
                                           >
                                             <p className="text-xs text-white">
                                               {milestone.description}
@@ -2238,7 +2238,7 @@ export default function FounderDashboard({
                                 return (
                                   <div
                                     key={deliverable.id}
-                                    className="space-y-0.5 md:space-y-1 p-1.5 rounded-lg bg-blue-50/50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800"
+                                    className="space-y-0.5 md:space-y-1 p-1.5 rounded-lg bg-blue-50/50 border border-blue-200"
                                   >
                                     <div className="flex items-start justify-between gap-1.5">
                                       <div className="flex-1 min-w-0">
@@ -2256,21 +2256,21 @@ export default function FounderDashboard({
                                       {isSubmitted ? (
                                         <Badge
                                           variant="outline"
-                                          className={`text-[7px] ${deliverable.mySubmission.status === "approved" ? "bg-green-500/10 text-green-700 dark:text-green-400 border-green-500/20" : deliverable.mySubmission.status === "revision_requested" || deliverable.mySubmission.status === "needs-revision" ? "bg-yellow-500/10 text-yellow-700 dark:text-yellow-400 border-yellow-500/20" : deliverable.mySubmission.status === "rejected" ? "bg-red-500/10 text-red-700 dark:text-red-400 border-red-500/20" : "bg-purple-500/10 text-purple-700 dark:text-purple-400 border-purple-500/20"}`}
+                                          className={`text-[7px] ${deliverable.mySubmission.status === "approved" ? "bg-green-500/10 text-green-700 border-green-500/20" : deliverable.mySubmission.status === "revision_requested" || deliverable.mySubmission.status === "needs-revision" ? "bg-yellow-500/10 text-yellow-700 border-yellow-500/20" : deliverable.mySubmission.status === "rejected" ? "bg-red-500/10 text-red-700 border-red-500/20" : "bg-purple-500/10 text-purple-700 border-purple-500/20"}`}
                                         >
                                           {deliverable.mySubmission.status}
                                         </Badge>
                                       ) : isPastDue ? (
                                         <Badge
                                           variant="outline"
-                                          className="text-[7px] bg-red-500/10 text-red-700 dark:text-red-400 border-red-500/20"
+                                          className="text-[7px] bg-red-500/10 text-red-700 border-red-500/20"
                                         >
                                           Past Due
                                         </Badge>
                                       ) : daysUntil <= 3 ? (
                                         <Badge
                                           variant="outline"
-                                          className="text-[7px] bg-yellow-500/10 text-yellow-700 dark:text-yellow-400 border-yellow-500/20"
+                                          className="text-[7px] bg-yellow-500/10 text-yellow-700 border-yellow-500/20"
                                         >
                                           {daysUntil}d left
                                         </Badge>

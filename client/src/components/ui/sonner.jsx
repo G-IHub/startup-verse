@@ -1,39 +1,27 @@
-import { useEffect, useState } from "react";
 import { Toaster as Sonner } from "sonner";
 
 export function Toaster(props) {
-  const [theme, setTheme] = useState("system");
-
-  useEffect(() => {
-    const updateTheme = () => {
-      const isDark = document.documentElement.classList.contains("dark");
-      setTheme(isDark ? "dark" : "light");
-    };
-
-    updateTheme();
-
-    const observer = new MutationObserver((mutations) => {
-      if (mutations.some((mutation) => mutation.attributeName === "class")) {
-        updateTheme();
-      }
-    });
-
-    observer.observe(document.documentElement, {
-      attributes: true,
-      attributeFilter: ["class"],
-    });
-
-    return () => observer.disconnect();
-  }, []);
-
   return (
     <Sonner
-      theme={theme}
       className="toaster group"
       style={{
         "--normal-bg": "var(--popover)",
         "--normal-text": "var(--popover-foreground)",
         "--normal-border": "var(--border)",
+      }}
+      toastOptions={{
+        classNames: {
+          toast:
+            "group toast-modern rounded-input border border-surface-border bg-surface-card px-3 py-2 shadow-[var(--shadow-soft)]",
+          title: "font-body text-[13px] font-semibold text-text-heading",
+          description: "font-body text-[12px] text-text-muted",
+          actionButton:
+            "h-7 rounded-input bg-primary px-2.5 font-body text-[12px] font-semibold text-white",
+          cancelButton:
+            "h-7 rounded-input border border-surface-border bg-surface-card px-2.5 font-body text-[12px] font-medium text-text-body",
+          closeButton:
+            "h-6 w-6 rounded-md border border-surface-border bg-surface-card text-text-muted transition-colors hover:bg-surface-page hover:text-text-heading",
+        },
       }}
       {...props}
     />

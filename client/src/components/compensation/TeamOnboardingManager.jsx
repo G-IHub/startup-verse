@@ -227,8 +227,8 @@ export default function TeamOnboardingManager({ user }) {
         <Card>
           <CardContent className="pt-6">
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-orange-100 dark:bg-orange-900/20 rounded-lg">
-                <Clock className="w-5 h-5 text-orange-600 dark:text-orange-400" />
+              <div className="p-2 bg-orange-100 rounded-lg">
+                <Clock className="w-5 h-5 text-orange-600" />
               </div>
               <div>
                 <p className="text-2xl font-bold">{pendingOnboarding.length}</p>
@@ -242,8 +242,8 @@ export default function TeamOnboardingManager({ user }) {
         <Card>
           <CardContent className="pt-6">
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-green-100 dark:bg-green-900/20 rounded-lg">
-                <CheckCircle2 className="w-5 h-5 text-green-600 dark:text-green-400" />
+              <div className="p-2 bg-green-100 rounded-lg">
+                <CheckCircle2 className="w-5 h-5 text-green-600" />
               </div>
               <div>
                 <p className="text-2xl font-bold">{onboardedTalent.length}</p>
@@ -255,8 +255,8 @@ export default function TeamOnboardingManager({ user }) {
         <Card>
           <CardContent className="pt-6">
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-blue-100 dark:bg-blue-900/20 rounded-lg">
-                <Users className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+              <div className="p-2 bg-blue-100 rounded-lg">
+                <Users className="w-5 h-5 text-blue-600" />
               </div>
               <div>
                 <p className="text-2xl font-bold">{acceptedTalent.length}</p>
@@ -357,10 +357,10 @@ export default function TeamOnboardingManager({ user }) {
               {onboardedTalent.map((talent) => (
                 <div
                   key={talent.id}
-                  className="flex items-center gap-4 p-4 border rounded-lg bg-green-50 dark:bg-green-950/10"
+                  className="flex items-center gap-4 p-4 border rounded-lg bg-green-50"
                 >
                   <Avatar className="h-12 w-12">
-                    <AvatarFallback className="bg-green-100 dark:bg-green-900/20 text-green-700 dark:text-green-400 font-semibold">
+                    <AvatarFallback className="bg-green-100 text-green-700 font-semibold">
                       {getInitials(talent.talentName)}
                     </AvatarFallback>
                   </Avatar>
@@ -378,7 +378,7 @@ export default function TeamOnboardingManager({ user }) {
                   <div className="text-right">
                     <Badge
                       variant="outline"
-                      className="text-green-700 dark:text-green-400 border-green-600"
+                      className="text-green-700 border-green-600"
                     >
                       Onboarded
                     </Badge>

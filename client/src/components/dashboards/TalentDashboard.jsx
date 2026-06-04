@@ -402,7 +402,7 @@ export default function TalentDashboard({
   if (entryMode !== "opportunities") {
     return (
       <div className="min-h-full bg-background">
-        <div className="max-w-7xl mx-auto py-4 space-y-4 ">
+        <div className="max-w-7xl mx-auto py-4 space-y-4">
           {/* Welcome Header */}
           <div className="flex items-start justify-between">
             <div>
@@ -518,7 +518,7 @@ export default function TalentDashboard({
                   Complete your profile to unlock personalized startup matches.
                 </p>
                 {!visibleToFoundersInBrowse && (
-                  <div className="mt-6 mx-auto max-w-md rounded-xl border border-primary/15 bg-gradient-to-br from-[#3a5afe]/[0.07] via-background to-[#7c4dff]/[0.06] px-4 py-3.5 text-left shadow-[0_1px_0_0_rgba(255,255,255,0.65)_inset] dark:shadow-none dark:from-[#3a5afe]/10 dark:to-background">
+                  <div className="mt-6 mx-auto max-w-md rounded-xl border border-primary/15 bg-gradient-to-br from-[#3a5afe]/[0.07] via-background to-[#7c4dff]/[0.06] px-4 py-3.5 text-left shadow-[0_1px_0_0_rgba(255,255,255,0.65)_inset]">
                     <div className="flex gap-3">
                       <div
                         className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-white shadow-md"
@@ -757,7 +757,7 @@ export default function TalentDashboard({
                 </div>
               </div>
             ) : (
-              <p className="flex items-center gap-1.5 px-0.5 font-body text-[10px] font-medium text-emerald-700 dark:text-emerald-400/90">
+              <p className="flex items-center gap-1.5 px-0.5 font-body text-[10px] font-medium text-emerald-700">
                 <CheckCircle2 className="h-3.5 w-3.5 shrink-0" />
                 You appear in founder Browse Talent
               </p>
@@ -798,7 +798,7 @@ export default function TalentDashboard({
                         {selectedStartup.posted}
                       </DialogDescription>
                       <div className="flex flex-wrap items-center gap-2 mt-3">
-                        <div className="flex items-center gap-1 bg-yellow-50 dark:bg-yellow-950/20 px-3 py-1.5 rounded-full">
+                        <div className="flex items-center gap-1 bg-yellow-50 px-3 py-1.5 rounded-full">
                           <Star className="w-4 h-4 text-yellow-500 fill-yellow-500" />
                           <span className="text-lg font-semibold text-primary">
                             {selectedStartup.match}%
@@ -966,7 +966,7 @@ export default function TalentDashboard({
                       in Browse Talent—bring yours up to get discovered.
                     </p>
                   ) : (
-                    <p className="mt-2 text-[11px] leading-snug text-emerald-800 dark:text-emerald-600 flex items-center gap-1">
+                    <p className="mt-2 text-[11px] leading-snug text-emerald-800 flex items-center gap-1">
                       <CheckCircle2 className="h-3.5 w-3.5 shrink-0" />
                       Your profile is listed for founders in Browse Talent.
                     </p>
@@ -1363,7 +1363,7 @@ export default function TalentDashboard({
                       {selectedStartup.posted}
                     </DialogDescription>
                     <div className="flex flex-wrap items-center gap-2 mt-3">
-                      <div className="flex items-center gap-1 bg-yellow-50 dark:bg-yellow-950/20 px-3 py-1.5 rounded-full">
+                      <div className="flex items-center gap-1 bg-yellow-50 px-3 py-1.5 rounded-full">
                         <Star className="w-4 h-4 text-yellow-500 fill-yellow-500" />
                         <span className="text-lg font-semibold text-primary">
                           {selectedStartup.match}%

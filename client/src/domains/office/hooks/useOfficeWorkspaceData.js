@@ -1,14 +1,13 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import * as presenceApi from "../../../utils/presenceApi";
 import { getStartupId } from "../../../utils/startupId";
 import {
   subscribeToActivities,
   subscribeToAnnouncements,
-  subscribeToPresence,
   subscribeToTasks,
   subscribeToWins,
   isRealtimeConnected,
 } from "../../../utils/realtimeSubscriptions";
+import { refreshPresenceSnapshot } from "../../presence/presenceSync";
 import {
   mapOfficeWorkspaceModel,
 } from "../mappers/officeViewModel";
@@ -28,7 +27,6 @@ export function useOfficeWorkspaceData({ user }) {
   const announcementRows = useOfficeStore((s) => s.announcements);
   const taskRows = useOfficeStore((s) => s.tasks);
   const agendaRows = useOfficeStore((s) => s.agenda);
-  const patchPresence = useOfficeStore((s) => s.patchPresence);
   const patchTask = useOfficeStore((s) => s.patchTask);
   const patchActivity = useOfficeStore((s) => s.patchActivity);
   const patchAnnouncement = useOfficeStore((s) => s.patchAnnouncement);
@@ -53,95 +51,22 @@ export function useOfficeWorkspaceData({ user }) {
   }, [loadInitial]);
 
   useEffect(() => {
-    if (!startupId || !resolvedUserId) return undefined;
-    const stopHeartbeat = presenceApi.startPresenceHeartbeat(
-      resolvedUserId,
-      startupId,
-      () => ({
-        userName: user.name || "Team member",
-        role: user.role || "team-member",
-        status: "available",
-        statusText: "In workspace",
-        activity: "working",
-        isOnline: true,
-      }),
-    );
-
-    return () => {
-      stopHeartbeat?.();
-    };
-  }, [startupId, resolvedUserId, user?.name, user?.role]);
-
-  useEffect(() => {
-    if (!startupId || !resolvedUserId) return undefined;
+    if (!startupId) return undefined;
     let stopped = false;
-    let fallbackInterval = null;
-    let fallbackGraceTimeout = null;
-
-    const stopFallbackPolling = () => {
-      if (fallbackInterval != null) {
-        clearInterval(fallbackInterval);
-        fallbackInterval = null;
-      }
-      if (fallbackGraceTimeout != null) {
-        clearTimeout(fallbackGraceTimeout);
-        fallbackGraceTimeout = null;
-      }
-    };
-
-    const fetchPresence = async () => {
-      const result = await presenceApi.getActiveUsers(startupId);
-      if (!stopped && result?.success) {
-        patchPresence(result.presence || []);
-      }
-    };
-
-    const ensureFallbackPolling = () => {
-      if (stopped || isRealtimeConnected() || fallbackInterval != null || fallbackGraceTimeout != null) {
-        return;
-      }
-      fallbackGraceTimeout = setTimeout(() => {
-        fallbackGraceTimeout = null;
-        if (stopped || isRealtimeConnected()) return;
-        void fetchPresence();
-        fallbackInterval = setInterval(() => {
-          void fetchPresence();
-        }, 30000);
-      }, 3000);
-    };
-
-    const onPresenceRows = (rows) => {
-      if (stopped) return;
-      patchPresence(rows || []);
-    };
-
-    const unsubscribePresence = subscribeToPresence(
-      startupId,
-      resolvedUserId,
-      user.name || "",
-      onPresenceRows,
-    );
-
-    void fetchPresence();
-    ensureFallbackPolling();
 
     const probe = setInterval(() => {
       const connected = isRealtimeConnected();
       setRealtimeOnline(connected);
-      if (connected) {
-        stopFallbackPolling();
-        return;
+      if (!stopped && !connected) {
+        void refreshPresenceSnapshot(startupId);
       }
-      ensureFallbackPolling();
     }, 8000);
 
     return () => {
       stopped = true;
       clearInterval(probe);
-      stopFallbackPolling();
-      unsubscribePresence?.();
     };
-  }, [startupId, resolvedUserId, user?.name]);
+  }, [startupId]);
 
   useEffect(() => {
     if (!startupId) return undefined;
