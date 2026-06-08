@@ -198,7 +198,7 @@ export default function DocumentsPage({ user, onNavigate }) {
             return (
               <Card
                 key={doc.id}
-                className={`border-2 ${doc.borderColor} bg-gradient-to-br ${doc.bgColor}"-")[1]}-950/20 relative overflow-hidden ${!doc.available && "opacity-60"}`}
+                className={"border-2 " + doc.borderColor + " bg-gradient-to-br " + doc.bgColor + " relative overflow-hidden " + (!doc.available ? "opacity-60" : "")}
               >
                 <CardHeader>
                   <div className="flex items-start gap-3 mb-2">
