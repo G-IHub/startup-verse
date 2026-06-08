@@ -31,7 +31,8 @@ import {
 
 function isSelectableMessage(message) {
   return (
-    isServerMessageId(message?.id) &&
+    message &&
+    isServerMessageId(message.id) &&
     !message._uploading &&
     !message.deletedForEveryone
   );
