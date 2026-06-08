@@ -4,9 +4,9 @@ import { Input } from "../ui/input";
 import { PasswordInput } from "../ui/password-input";
 import { toast } from "sonner";
 import { authApi } from "../../api/authApi";
+import GoogleAuthButton from "./GoogleAuthButton";
 import {
   AuthFormCard,
-  AuthGoogleButton,
   AuthDivider,
   AuthField,
   authBtnPrimary,
@@ -27,8 +27,15 @@ export default function AuthSignupForm({
   const roleContent = getAuthRoleContent(role);
   const RoleIcon = roleContent.icon;
 
-  const handleGoogleSignup = () => {
-    toast.info("Google signup is temporarily unavailable. Please use email signup.");
+  const handleGoogleAuthenticated = (authResult) => {
+    const user = authResult.user;
+    onSignup(role, {
+      method: "google",
+      fullName: user.name,
+      email: user.email,
+      userId: user.id || user._id,
+      backendUser: user,
+    });
   };
 
   const handleEmailSignup = async (e) => {
@@ -65,7 +72,12 @@ export default function AuthSignupForm({
       description={roleContent.description}
       compact={compact}
     >
-      <AuthGoogleButton onClick={handleGoogleSignup} disabled={loading} compact={compact} />
+      <GoogleAuthButton
+        role={role}
+        disabled={loading}
+        compact={compact}
+        onAuthenticated={handleGoogleAuthenticated}
+      />
       <AuthDivider compact={compact} />
       <form onSubmit={handleEmailSignup} className="space-y-3">
         <AuthField id="fullName" label="Full Name">

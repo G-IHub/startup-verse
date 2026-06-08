@@ -5,10 +5,10 @@ import { PasswordInput } from "./ui/password-input";
 import { LogIn } from "lucide-react";
 import { toast } from "sonner";
 import { authApi } from "../api/authApi";
+import GoogleAuthButton from "./auth/GoogleAuthButton";
 import {
   AuthSplitLayout,
   AuthFormCard,
-  AuthGoogleButton,
   AuthDivider,
   AuthField,
   authBtnPrimary,
@@ -20,8 +20,15 @@ export default function LoginPage({ onRoleSelect, onNavigateToSignup }) {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
 
-  const handleGoogleLogin = () => {
-    toast.info("Google sign-in is temporarily unavailable. Please use email sign-in.");
+  const handleGoogleAuthenticated = (authResult) => {
+    const user = authResult.user;
+    onRoleSelect(user.role, {
+      method: "google",
+      fullName: user.name,
+      email: user.email,
+      userId: user.id || user._id,
+      backendUser: user,
+    });
   };
 
   const handleEmailLogin = async (e) => {
@@ -54,7 +61,10 @@ export default function LoginPage({ onRoleSelect, onNavigateToSignup }) {
           title="Sign In"
           description="Access your StartupVerse account"
         >
-          <AuthGoogleButton onClick={handleGoogleLogin} disabled={loading} />
+          <GoogleAuthButton
+            disabled={loading}
+            onAuthenticated={handleGoogleAuthenticated}
+          />
           <AuthDivider />
           <form onSubmit={handleEmailLogin} className="space-y-4">
             <AuthField id="email" label="Email">

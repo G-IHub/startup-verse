@@ -5,10 +5,10 @@ import { PasswordInput } from "./ui/password-input";
 import { ArrowRight, Rocket } from "lucide-react";
 import { toast } from "sonner";
 import { setAdminFlag } from "../utils/adminHelpers";
+import GoogleAuthButton from "./auth/GoogleAuthButton";
 import {
   AuthPageShell,
   AuthFormCard,
-  AuthGoogleButton,
   AuthDivider,
   AuthField,
   AUTH_CALLOUT,
@@ -61,18 +61,17 @@ export default function SimpleAuth({ role, onComplete }) {
     }, 1000);
   };
 
-  const handleGoogleAuth = () => {
-    setIsLoading(true);
-    setTimeout(() => {
-      finishAuth({
-        id: Math.random().toString(36).substr(2, 9),
-        email: "user@gmail.com",
-        name: "Google User",
-        role,
-        onboardingComplete: true,
-        profile: { role: getRoleDisplayName(role) },
-      });
-    }, 1000);
+  const handleGoogleAuthenticated = (authResult) => {
+    const user = authResult.user;
+    finishAuth({
+      ...user,
+      id: user.id || user._id,
+      role: user.role || role,
+      profile: {
+        ...(user.profile || {}),
+        role: getRoleDisplayName(user.role || role),
+      },
+    });
   };
 
   return (
@@ -120,7 +119,11 @@ export default function SimpleAuth({ role, onComplete }) {
             </>
           }
         >
-          <AuthGoogleButton onClick={handleGoogleAuth} disabled={isLoading} />
+          <GoogleAuthButton
+            role={isSignup ? role : undefined}
+            disabled={isLoading}
+            onAuthenticated={handleGoogleAuthenticated}
+          />
           <AuthDivider />
           <form onSubmit={handleEmailAuth} className="space-y-3">
             {isSignup && (

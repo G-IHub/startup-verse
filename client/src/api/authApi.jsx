@@ -68,6 +68,29 @@ export const authApi = {
   },
 
   /**
+   * Sign in or role-selected sign up with a Google Identity Services ID token.
+   */
+  google: async ({ credential, role } = {}) => {
+    const response = await fetch(`${API_BASE_URL}/auth/google`, {
+      ...defaultOptions,
+      method: "POST",
+      body: JSON.stringify({
+        credential,
+        ...(role ? { role } : {}),
+      }),
+    });
+
+    const payload = await response.json();
+    const result = payload?.data || {};
+
+    if (!response.ok) {
+      throw new Error(payload?.message || "Google sign-in failed");
+    }
+
+    return { user: result.user };
+  },
+
+  /**
    * Update user profile
    */
   updateProfile: async (userId, updates) => {
