@@ -2,7 +2,9 @@
 
 import { API_BASE_URL } from "../config/apiBase.js";
 import { request } from "./backendClient";
-import { uploadFile } from "./api/uploadApi.js";
+import { uploadFileWithProgress } from "./api/uploadApi.js";
+import { resolveMediaUrl } from "./resolveMediaUrl.js";
+import { formatConversationPreview } from "./messageAttachmentUtils.js";
 
 // Default fetch options for cookie-based auth
 const defaultOptions = {
@@ -14,14 +16,33 @@ const defaultOptions = {
 
 const API_BASE = API_BASE_URL;
 
-function mapMessageDto(row) {
+export function mapMessageDto(row) {
   if (!row) return null;
-  const attachments = Array.isArray(row.attachments) ? row.attachments : [];
-  const firstAtt = attachments[0] && typeof attachments[0] === "object" ? attachments[0] : null;
-  const fileUrl = row.fileUrl || firstAtt?.url || "";
-  const fileName = row.fileName || firstAtt?.fileName || "";
-  const fileSize = row.fileSize ?? firstAtt?.fileSize ?? 0;
-  const fileType = row.fileType || firstAtt?.fileType || "";
+  const rawAttachments = Array.isArray(row.attachments) ? row.attachments : [];
+  const attachments = rawAttachments
+    .filter((a) => a && typeof a === "object" && (a.url || a.fileUrl))
+    .map((a) => ({
+      url: resolveMediaUrl(String(a.url || a.fileUrl || "")),
+      fileName: String(a.fileName || a.name || "file"),
+      fileSize: Number(a.fileSize ?? a.size ?? 0) || 0,
+      fileType: String(a.fileType || a.mimeType || a.type || ""),
+    }));
+
+  if (attachments.length === 0 && row.fileUrl) {
+    attachments.push({
+      url: resolveMediaUrl(String(row.fileUrl)),
+      fileName: String(row.fileName || "file"),
+      fileSize: Number(row.fileSize ?? 0) || 0,
+      fileType: String(row.fileType || ""),
+    });
+  }
+
+  const firstAtt = attachments[0] || null;
+  const deletedForEveryone = Boolean(row.deletedForEveryone || row.deletedForEveryoneAt);
+  const content = deletedForEveryone
+    ? ""
+    : String(row.content || row.body || "");
+
   return {
     id: String(row.id || row._id || ""),
     senderId: String(row.senderId || row.fromUserId || ""),
@@ -29,16 +50,59 @@ function mapMessageDto(row) {
     senderRole: String(row.senderRole || ""),
     recipientId: String(row.recipientId || row.toUserId || ""),
     recipientName: String(row.recipientName || ""),
-    content: String(row.content || row.body || ""),
+    content,
     timestamp: row.timestamp ? Number(row.timestamp) : new Date(row.createdAt || Date.now()).getTime(),
     startupId: String(row.startupId || ""),
+    messageType: String(row.messageType || "dm"),
     read: Boolean(row.read || row.readAt),
-    fileUrl,
-    fileName,
-    fileSize,
-    fileType,
+    attachments: deletedForEveryone ? [] : attachments,
+    fileUrl: deletedForEveryone ? "" : firstAtt?.url || "",
+    fileName: deletedForEveryone ? "" : firstAtt?.fileName || "",
+    fileSize: deletedForEveryone ? 0 : firstAtt?.fileSize ?? 0,
+    fileType: deletedForEveryone ? "" : firstAtt?.fileType || "",
     createdAt: row.createdAt || null,
+    replyToMessageId: row.replyToMessageId ? String(row.replyToMessageId) : "",
+    replyTo: row.replyTo && typeof row.replyTo === "object" ? row.replyTo : null,
+    forwardedFrom:
+      row.forwardedFrom && typeof row.forwardedFrom === "object" ? row.forwardedFrom : null,
+    metadata: row.metadata && typeof row.metadata === "object" ? row.metadata : {},
+    deletedForEveryone,
+    deletedForEveryoneAt: row.deletedForEveryoneAt || null,
+    hiddenForUserIds: Array.isArray(row.hiddenForUserIds)
+      ? row.hiddenForUserIds.map(String)
+      : [],
   };
+}
+
+/** Apply socket/API message update to a thread message list. */
+export function mergeMessageIntoThread(prev, update, currentUserId) {
+  const m = update?.message;
+  if (!m?.id) return prev;
+
+  const hidden = Array.isArray(m.hiddenForUserIds)
+    ? m.hiddenForUserIds.some((id) => String(id) === String(currentUserId))
+    : false;
+  if (hidden) {
+    return prev.filter((row) => String(row.id) !== String(m.id));
+  }
+
+  const byId = new Map(prev.map((row) => [String(row.id), row]));
+  byId.set(String(m.id), m);
+  return Array.from(byId.values()).sort((a, b) => a.timestamp - b.timestamp);
+}
+
+export const DELETE_FOR_EVERYONE_WINDOW_MS = 48 * 60 * 60 * 1000;
+
+export function canDeleteMessageForEveryone(message, currentUserId) {
+  if (!message || message.deletedForEveryone) return false;
+  if (String(message.messageType || "dm") !== "dm") return false;
+  if (String(message.senderId) !== String(currentUserId)) return false;
+  const ts = message.timestamp || (message.createdAt ? new Date(message.createdAt).getTime() : 0);
+  return Date.now() - ts <= DELETE_FOR_EVERYONE_WINDOW_MS;
+}
+
+export function isServerMessageId(id) {
+  return id && !String(id).startsWith("opt-");
 }
 
 // Send a new message
@@ -79,15 +143,26 @@ export async function sendMessage(
 
   // Then send to backend
   try {
+    const attachmentList = Array.isArray(options?.attachments)
+      ? options.attachments
+      : fileUrl
+        ? [{ url: fileUrl, fileName, fileSize, fileType }]
+        : [];
+
     const payload = await request("/messages/send", {
       method: "POST",
       body: JSON.stringify({
         startupId,
         toUserId: recipientId,
-        body: content,
-        attachments: fileUrl
-          ? [{ url: fileUrl, fileName, fileSize, fileType }]
-          : [],
+        body: content || "",
+        attachments: attachmentList,
+        ...(options.replyToMessageId
+          ? { replyToMessageId: options.replyToMessageId }
+          : {}),
+        ...(options.forwardedFrom ? { forwardedFrom: options.forwardedFrom } : {}),
+        ...(options.metadata && typeof options.metadata === "object"
+          ? { metadata: options.metadata }
+          : {}),
       }),
     });
     const serverMessage = mapMessageDto(payload?.data || payload?.message);
@@ -203,7 +278,7 @@ export async function getUserConversations(userId, startupId, teamMembers, optio
         userId: String(otherId),
         userName: teammate?.name || "Team Member",
         userRole: teammate?.role || "team-member",
-        lastMessage: row.content || "",
+        lastMessage: formatConversationPreview(row) || row.content || "",
         lastMessageTime: row.timestamp || Date.now(),
         unreadCount: 0,
       };
@@ -325,9 +400,14 @@ export function formatMessageTimestamp(timestamp) {
 // now land in the configured storage driver (Cloudinary or disk).
 export async function uploadMessageFile(file, _startupId, _senderId, options = {}) {
   try {
-    const result = await uploadFile(file, "messages");
+    const result = await uploadFileWithProgress(
+      file,
+      "messages",
+      options?.onProgress,
+    );
+    const rawUrl = result?.url || "";
     return {
-      url: result?.url || "",
+      url: rawUrl,
       key: result?.key || "",
       fileName: file.name,
       fileSize: typeof result?.size === "number" ? result.size : file.size,

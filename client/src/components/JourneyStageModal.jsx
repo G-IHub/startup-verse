@@ -272,7 +272,7 @@ export function JourneyStageModal({
             </div>
             <div className="flex-1">
               <div className="flex items-center gap-2 mb-2">
-                {isCurrent && <Badge className="bg-primary">Current</Badge>}
+                {isCurrent && <Badge className="bg-primary text-white">Current</Badge>}
                 {isCompleted && (
                   <Badge className="bg-green-500">
                     <CheckCircle2 className="w-3 h-3 mr-1" />
@@ -335,7 +335,7 @@ export function JourneyStageModal({
             )}
           </div>
           {stage.id === 3 && isCurrent && !isCompleted && (
-            <div className="p-6 bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-950/20 dark:to-indigo-950/20 rounded-lg border-2 border-blue-200 dark:border-blue-800">
+            <div className="p-6 bg-gradient-to-br from-blue-50 to-indigo-50 rounded-lg border-2 border-blue-200">
               <div className="flex items-start gap-3 mb-4">
                 <Users className="w-6 h-6 text-primary flex-shrink-0" />
                 <div>
@@ -354,7 +354,7 @@ export function JourneyStageModal({
                       onClick={() => setHasTeam("yes")}
                       variant="outline"
                       size="lg"
-                      className="h-auto py-6 flex-col gap-2 bg-white dark:bg-gray-800 hover:bg-primary/5 hover:border-primary"
+                      className="h-auto py-6 flex-col gap-2 bg-white hover:bg-primary/5 hover:border-primary"
                     >
                       <UserPlus className="w-6 h-6 text-primary" />
                       <div className="text-center">
@@ -368,7 +368,7 @@ export function JourneyStageModal({
                       onClick={() => setHasTeam("no")}
                       variant="outline"
                       size="lg"
-                      className="h-auto py-6 flex-col gap-2 bg-white dark:bg-gray-800 hover:bg-primary/5 hover:border-primary"
+                      className="h-auto py-6 flex-col gap-2 bg-white hover:bg-primary/5 hover:border-primary"
                     >
                       <Search className="w-6 h-6 text-primary" />
                       <div className="text-center">
@@ -398,7 +398,7 @@ export function JourneyStageModal({
                   {teamInvites.map((invite, index) => (
                     <div
                       key={index}
-                      className="p-4 bg-white dark:bg-gray-800 rounded-lg border space-y-3"
+                      className="p-4 bg-white rounded-lg border space-y-3"
                     >
                       <div className="flex items-center justify-between mb-2">
                         <p className="text-sm font-medium">
@@ -498,7 +498,7 @@ export function JourneyStageModal({
                       ← Back
                     </Button>
                   </div>
-                  <div className="p-6 bg-white dark:bg-gray-800 rounded-lg border-2 border-dashed border-primary/30 text-center space-y-4">
+                  <div className="p-6 bg-white rounded-lg border-2 border-dashed border-primary/30 text-center space-y-4">
                     <div className="flex justify-center">
                       <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center">
                         <Sparkles className="w-8 h-8 text-primary" />
@@ -556,7 +556,7 @@ export function JourneyStageModal({
                         handleToggleCompletionCriteria(criteria, index)
                       }
                       disabled={!isCurrent}
-                      className={`w-full flex items-start gap-3 p-3 rounded-lg border-2 text-left transition-all ${isChecked ? "border-green-200 bg-green-50 dark:bg-green-950/20" : "border-muted bg-background hover:border-primary/50"} ${!isCurrent ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}`}
+                      className={`w-full flex items-start gap-3 p-3 rounded-lg border-2 text-left transition-all ${isChecked ? "border-green-200 bg-green-50" : "border-muted bg-background hover:border-primary/50"} ${!isCurrent ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}`}
                     >
                       <div className="mt-0.5 flex-shrink-0">
                         {isChecked ? (
@@ -566,7 +566,7 @@ export function JourneyStageModal({
                         )}
                       </div>
                       <span
-                        className={`text-sm ${isChecked ? "text-green-900 dark:text-green-100" : "text-foreground"}`}
+                        className={`text-sm ${isChecked ? "text-green-900" : "text-foreground"}`}
                       >
                         {criteria}
                       </span>
@@ -642,8 +642,8 @@ export function JourneyStageModal({
               </Button>
             )}
             {isCurrent && !canComplete && (
-              <div className="flex-1 p-4 bg-blue-50 dark:bg-blue-950/20 rounded-lg border border-blue-200">
-                <p className="text-sm text-blue-900 dark:text-blue-100">
+              <div className="flex-1 p-4 bg-blue-50 rounded-lg border border-blue-200">
+                <p className="text-sm text-blue-900">
                   Complete at least 60% of the criteria and milestones to finish
                   this stage.
                 </p>
@@ -661,10 +661,10 @@ export function JourneyStageModal({
               </Button>
             )}
             {isCompleted && (
-              <div className="flex-1 p-4 bg-green-50 dark:bg-green-950/20 rounded-lg border border-green-200">
+              <div className="flex-1 p-4 bg-green-50 rounded-lg border border-green-200">
                 <div className="flex items-center gap-2">
                   <CheckCircle2 className="w-5 h-5 text-green-600" />
-                  <p className="text-sm font-medium text-green-900 dark:text-green-100">
+                  <p className="text-sm font-medium text-green-900">
                     Stage completed! Great progress on your startup journey. 🎉
                   </p>
                 </div>

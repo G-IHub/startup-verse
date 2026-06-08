@@ -26,6 +26,18 @@ import {
 import { toast } from "sonner";
 import { API_BASE_URL } from "../utils/backendClient";
 import { clearAuthSession } from "../app/session";
+import {
+  AUTH_CARD,
+  AUTH_CALLOUT,
+  authBtnPrimary,
+  authBtnOutline,
+  authFieldClass,
+  AuthPageShell,
+} from "./auth/AuthPrimitives";
+
+const ONBOARD_SHELL =
+  "flex min-h-screen items-center justify-center p-4";
+
 export function TeamMemberOnboarding({ invitationToken, onComplete }) {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -175,71 +187,69 @@ export function TeamMemberOnboarding({ invitationToken, onComplete }) {
   // Loading state
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-green-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 flex items-center justify-center p-4">
-        <Card className="w-full max-w-md">
+      <AuthPageShell className={ONBOARD_SHELL}>
+        <Card className={`w-full max-w-md ${AUTH_CARD}`}>
           <CardContent className="flex flex-col items-center justify-center py-12">
-            <Loader2 className="w-12 h-12 text-blue-600 animate-spin mb-4" />
-            <p className="text-gray-600 dark:text-gray-300">
-              Loading invitation...
-            </p>
+            <Loader2 className="mb-4 h-12 w-12 animate-spin text-primary" />
+            <p className="font-body text-text-muted">Loading invitation...</p>
           </CardContent>
         </Card>
-      </div>
+      </AuthPageShell>
     );
   }
 
   // Error state
   if (error || !invitation) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-green-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 flex items-center justify-center p-4">
-        <Card className="w-full max-w-md border-red-200 dark:border-red-800">
+      <AuthPageShell className={ONBOARD_SHELL}>
+        <Card className={`w-full max-w-md border-status-error/30 ${AUTH_CARD}`}>
           <CardHeader>
-            <div className="flex items-center gap-3 mb-2">
-              <div className="p-3 bg-red-100 dark:bg-red-900/20 rounded-full">
-                <AlertCircle className="w-6 h-6 text-red-600 dark:text-red-400" />
+            <div className="mb-2 flex items-center gap-3">
+              <div className="rounded-full bg-status-error/10 p-3">
+                <AlertCircle className="h-6 w-6 text-status-error" />
               </div>
-              <CardTitle className="text-red-600 dark:text-red-400">
+              <CardTitle className="font-heading text-status-error">
                 Invalid Invitation
               </CardTitle>
             </div>
-            <CardDescription className="text-red-600/80 dark:text-red-400/80">
+            <CardDescription className="font-body text-status-error/80">
               {error || "This invitation link is not valid"}
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+            <p className="mb-4 font-body text-sm text-text-body">
               This could happen if:
             </p>
-            <ul className="list-disc list-inside space-y-1 text-sm text-gray-600 dark:text-gray-400 mb-6">
+            <ul className="mb-6 list-inside list-disc space-y-1 font-body text-sm text-text-muted">
               <li>The invitation has expired (14 days)</li>
               <li>The invitation has already been used</li>
               <li>The invitation link is incorrect</li>
             </ul>
             <Button
               onClick={() => (window.location.href = "/")}
-              className="w-full bg-blue-600 hover:bg-blue-700"
+              className={`w-full ${authBtnPrimary}`}
             >
               Go to Homepage
             </Button>
           </CardContent>
         </Card>
-      </div>
+      </AuthPageShell>
     );
   }
 
   // Main onboarding form
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-green-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 flex items-center justify-center p-4">
-      <Card className="w-full max-w-2xl shadow-xl">
-        <CardHeader className="text-center pb-6">
-          <div className="mb-6 p-6 bg-gradient-to-r from-blue-600 to-blue-700 rounded-lg text-white">
-            <div className="flex items-center justify-center gap-3 mb-3">
-              <div className="p-3 bg-white/20 rounded-full">
-                <Rocket className="w-8 h-8" />
+    <AuthPageShell className={ONBOARD_SHELL}>
+      <Card className={`w-full max-w-2xl ${AUTH_CARD}`}>
+        <CardHeader className="border-b border-surface-border pb-6 text-center">
+          <div className={`mb-6 ${AUTH_CALLOUT} bg-primary text-white border-primary`}>
+            <div className="mb-3 flex items-center justify-center gap-3">
+              <div className="rounded-lg bg-white/20 p-3">
+                <Rocket className="h-8 w-8 text-white" />
               </div>
               <div className="text-left">
-                <h2 className="text-2xl font-bold">{invitation.startupName}</h2>
-                <p className="text-blue-100 text-sm">
+                <h2 className="font-heading text-2xl font-bold text-white">{invitation.startupName}</h2>
+                <p className="font-body text-sm text-white/90">
                   invites you to join their team
                 </p>
               </div>
@@ -270,8 +280,10 @@ export function TeamMemberOnboarding({ invitationToken, onComplete }) {
               </div>
             )}
           </div>
-          <CardTitle className="text-2xl">Complete Your Profile</CardTitle>
-          <CardDescription>
+          <CardTitle className="font-heading text-2xl font-extrabold text-text-heading">
+            Complete Your Profile
+          </CardTitle>
+          <CardDescription className="font-body text-text-muted">
             Set up your account to start collaborating with the team
           </CardDescription>
         </CardHeader>
@@ -294,7 +306,7 @@ export function TeamMemberOnboarding({ invitationToken, onComplete }) {
                   })
                 }
                 required={true}
-                className="w-full"
+                className={authFieldClass}
               />
             </div>
             <div className="space-y-2">
@@ -308,7 +320,7 @@ export function TeamMemberOnboarding({ invitationToken, onComplete }) {
                 value={formData.email}
                 readOnly={true}
                 disabled={true}
-                className="w-full bg-gray-50 dark:bg-gray-800"
+                className={`w-full ${authFieldClass} opacity-80`}
               />
             </div>
             <div className="space-y-2">
@@ -329,7 +341,7 @@ export function TeamMemberOnboarding({ invitationToken, onComplete }) {
                 }
                 required={true}
                 minLength={6}
-                className="w-full"
+                className={authFieldClass}
               />
             </div>
             <div className="space-y-2">
@@ -353,7 +365,7 @@ export function TeamMemberOnboarding({ invitationToken, onComplete }) {
                 }
                 required={true}
                 minLength={6}
-                className="w-full"
+                className={authFieldClass}
               />
             </div>
             <div className="space-y-2">
@@ -369,7 +381,7 @@ export function TeamMemberOnboarding({ invitationToken, onComplete }) {
                   })
                 }
                 rows={3}
-                className="w-full resize-none"
+                className={`${authFieldClass} resize-none`}
               />
             </div>
             <div className="space-y-2">
@@ -385,7 +397,7 @@ export function TeamMemberOnboarding({ invitationToken, onComplete }) {
                     linkedin: e.target.value,
                   })
                 }
-                className="w-full"
+                className={authFieldClass}
               />
             </div>
             <div className="space-y-2">
@@ -401,13 +413,13 @@ export function TeamMemberOnboarding({ invitationToken, onComplete }) {
                     github: e.target.value,
                   })
                 }
-                className="w-full"
+                className={authFieldClass}
               />
             </div>
             <Button
               type="submit"
               disabled={submitting}
-              className="w-full bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white py-6 text-lg font-semibold mt-6"
+              className={`mt-6 w-full py-6 text-lg ${authBtnPrimary}`}
             >
               {submitting ? (
                 <>
@@ -421,7 +433,7 @@ export function TeamMemberOnboarding({ invitationToken, onComplete }) {
                 </>
               )}
             </Button>
-            <p className="text-xs text-center text-gray-500 dark:text-gray-400 mt-4">
+            <p className="mt-4 text-center font-body text-xs text-text-muted">
               {"By joining, you agree to collaborate with "}
               {invitation.startupName}
               {" on StartupVerse"}
@@ -429,6 +441,6 @@ export function TeamMemberOnboarding({ invitationToken, onComplete }) {
           </form>
         </CardContent>
       </Card>
-    </div>
+    </AuthPageShell>
   );
 }

@@ -9,7 +9,6 @@ export default function TalentChatPage({
   user,
   onNavigate,
   initialSelectedUserId = null,
-  onInitialSelectionApplied,
 }) {
   const talentId = String(user._id ?? user.id ?? "");
 
@@ -40,12 +39,6 @@ export default function TalentChatPage({
 
     loadData();
   }, [talentId]);
-
-  useEffect(() => {
-    if (initialSelectedUserId && onInitialSelectionApplied) {
-      onInitialSelectionApplied();
-    }
-  }, [initialSelectedUserId, onInitialSelectionApplied]);
 
   // Build unified roster combining interests and invitations
   const roster = useMemo(() => {
@@ -104,6 +97,12 @@ export default function TalentChatPage({
           startupId={null}
           teamMembers={roster}
         initialSelectedUserId={initialSelectedUserId}
+          onSelectedPeerChange={(peerUserId) => {
+            onNavigate?.(
+              "talent-chat",
+              peerUserId ? { messageUserId: peerUserId } : {},
+            );
+          }}
           strictMode={false}
         />
       </div>

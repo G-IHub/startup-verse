@@ -6,6 +6,7 @@ import OrganizationAdmin from "../models/OrganizationAdmin.js";
 import User from "../models/User.js";
 import { error as apiError, success as apiSuccess } from "../utils/apiResponse.js";
 import { createNotification, broadcastNotification } from "../services/notificationService.js";
+import { officeDeepLink } from "../utils/deepLinks.js";
 import {
   DELIVERABLE_TYPES,
   DELIVERABLE_SUBMISSION_STATUSES,
@@ -364,7 +365,7 @@ export const reviewSubmission = async (req, res) => {
         message: deliverable
           ? `Feedback received on "${deliverable.title}".`
           : "Feedback received on your submission.",
-        actionUrl: `/?view=virtual-office&tab=deliverables&deliverableId=${submission.deliverableId}`,
+        actionUrl: officeDeepLink({ tab: "deliverables", deliverableId: submission.deliverableId }),
         metadata: {
           deliverableId: String(submission.deliverableId),
           submissionId: String(submission._id),

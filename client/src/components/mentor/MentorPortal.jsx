@@ -327,14 +327,14 @@ export default function MentorPortal({ mentor, onLogout }) {
       >
         <DialogContent className="sm:max-w-[500px] p-8">
           <div className="flex flex-col items-center text-center space-y-6">
-            <div className="w-20 h-20 rounded-full bg-[#3A5AFE]/10 dark:bg-[#3A5AFE]/20 flex items-center justify-center">
+            <div className="w-20 h-20 rounded-full bg-[#3A5AFE]/10 flex items-center justify-center">
               <Video className="w-10 h-10 text-[#3A5AFE]" />
             </div>
             <div>
-              <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
+              <h2 className="text-2xl font-bold text-gray-900 mb-2">
                 Mentorship Session
               </h2>
-              <p className="text-gray-600 dark:text-gray-400">
+              <p className="text-gray-600">
                 You're about to join this meeting
               </p>
             </div>
@@ -343,7 +343,7 @@ export default function MentorPortal({ mentor, onLogout }) {
                 <div className="w-5 h-5 rounded-full bg-[#2ECC71] flex items-center justify-center flex-shrink-0">
                   <Check className="w-3 h-3 text-white" />
                 </div>
-                <span className="text-gray-900 dark:text-white">
+                <span className="text-gray-900">
                   Camera and microphone ready
                 </span>
               </div>
@@ -351,7 +351,7 @@ export default function MentorPortal({ mentor, onLogout }) {
                 <div className="w-5 h-5 rounded-full bg-[#2ECC71] flex items-center justify-center flex-shrink-0">
                   <Check className="w-3 h-3 text-white" />
                 </div>
-                <span className="text-gray-900 dark:text-white">
+                <span className="text-gray-900">
                   {"Joining as: "}
                   <strong>{mentor.name}</strong>
                 </span>
@@ -360,7 +360,7 @@ export default function MentorPortal({ mentor, onLogout }) {
                 <div className="w-5 h-5 rounded-full bg-[#2ECC71] flex items-center justify-center flex-shrink-0">
                   <Check className="w-3 h-3 text-white" />
                 </div>
-                <span className="text-gray-900 dark:text-white">
+                <span className="text-gray-900">
                   High-quality video enabled
                 </span>
               </div>
@@ -375,7 +375,7 @@ export default function MentorPortal({ mentor, onLogout }) {
               <Video className="w-5 h-5" />
               Join Meeting Now
             </Button>
-            <p className="text-xs text-gray-500 dark:text-gray-400">
+            <p className="text-xs text-gray-500">
               By joining, you agree to allow StartupVerse to use your camera and
               microphone
             </p>
@@ -385,20 +385,20 @@ export default function MentorPortal({ mentor, onLogout }) {
       <Dialog open={!googleConnected} onOpenChange={setGoogleConnected}>
         <DialogContent className="sm:max-w-[500px] p-8">
           <div className="flex flex-col items-center text-center space-y-6">
-            <div className="w-20 h-20 rounded-full bg-[#3A5AFE]/10 dark:bg-[#3A5AFE]/20 flex items-center justify-center">
+            <div className="w-20 h-20 rounded-full bg-[#3A5AFE]/10 flex items-center justify-center">
               <SettingsIcon className="w-10 h-10 text-[#3A5AFE]" />
             </div>
             <div>
-              <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
+              <h2 className="text-2xl font-bold text-gray-900 mb-2">
                 Connect Google Account
               </h2>
-              <p className="text-gray-600 dark:text-gray-400">
+              <p className="text-gray-600">
                 Connect your Google account to create instant Google Meet
                 meetings
               </p>
             </div>
             <GoogleAccountConnect userId={mentor.id} userType="mentor" />
-            <p className="text-xs text-gray-500 dark:text-gray-400">
+            <p className="text-xs text-gray-500">
               By connecting your Google account, you agree to allow StartupVerse
               to create and manage Google Meet meetings on your behalf
             </p>

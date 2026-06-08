@@ -230,7 +230,7 @@ export default function OrganizationMessaging({
                 return (
                   <div
                     key={message.id}
-                    className={`p-3 rounded-lg border ${isSent ? "bg-gray-50 dark:bg-gray-900 border-gray-200 dark:border-gray-800" : "bg-blue-50/50 dark:bg-blue-950/20 border-blue-200 dark:border-blue-800"}`}
+                    className={`p-3 rounded-lg border ${isSent ? "bg-gray-50 border-gray-200" : "bg-blue-50/50 border-blue-200"}`}
                   >
                     <div className="flex items-start justify-between gap-2 mb-1">
                       <div className="flex items-center gap-1.5">

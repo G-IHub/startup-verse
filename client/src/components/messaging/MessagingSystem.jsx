@@ -4,25 +4,34 @@ import { Input } from "../ui/input";
 import { Avatar, AvatarFallback } from "../ui/avatar";
 import { Badge } from "../ui/badge";
 import { ScrollArea } from "../ui/scroll-area";
+import { cn } from "../ui/utils";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../ui/tabs";
 import {
-  Send,
   Search,
   Phone,
   Video,
   MoreHorizontal,
   Users,
   Star,
-  CheckCheck,
   MessageSquare,
 } from "lucide-react";
+import { toast } from "sonner";
 import {
   sendMessage,
   getConversation,
   getUserConversations,
   markMessagesAsRead,
   formatMessageTime,
+  uploadMessageFile,
+  mergeMessageIntoThread,
 } from "../../utils/messaging";
+import { subscribeToMessages } from "../../utils/realtimeSubscriptions";
+import { ChatComposer } from "./ChatComposer";
+import { ChatMessageList } from "./ChatMessageList";
+import { ChatSelectionToolbar } from "./ChatSelectionToolbar";
+import { ForwardMessageModal } from "./ForwardMessageModal";
+import { useChatMessageHandlers, useReplyState } from "./useChatMessageHandlers";
+import { chatShell } from "./chatStyles";
 import { getStartupId } from "../../utils/startupId";
 import {
   fetchClientPreferences,
@@ -38,14 +47,64 @@ export default function MessagingSystem({
   const [conversations, setConversations] = useState([]);
   const [selectedConversation, setSelectedConversation] = useState(null);
   const [messages, setMessages] = useState([]);
+  const [messagesLoading, setMessagesLoading] = useState(false);
   const [newMessage, setNewMessage] = useState("");
+  const [pendingFile, setPendingFile] = useState(null);
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
   const [searchQuery, setSearchQuery] = useState("");
-  const [refreshKey, setRefreshKey] = useState(0);
   const [starredConversations, setStarredConversations] = useState(new Set());
   const messagesEndRef = useRef(null);
+  const [forwardMessages, setForwardMessages] = useState([]);
+  const [forwardOpen, setForwardOpen] = useState(false);
+  const [selectionMode, setSelectionMode] = useState(false);
+  const [selectionToolbar, setSelectionToolbar] = useState(null);
+  const { replyingTo, setReplyingTo, clearReply } = useReplyState();
+  const userId = user?.id ?? user?._id;
 
   // Get user's startup ID using centralized utility
   const startupId = getStartupId(user);
+
+  const nameForMessage = (message) =>
+    message.senderName ||
+    teamMembers.find((m) => String(m.id) === String(message.senderId))?.name ||
+    "?";
+
+  const {
+    handleCopy,
+    handleSaveMedia,
+    handleDeleteForMe,
+    bulkDeleteForMe,
+    handleDeleteForEveryone,
+    handleRealtimeUpdate,
+  } = useChatMessageHandlers({
+    currentUserId: userId,
+    setMessages,
+    onReply: (message) => setReplyingTo({ ...message, senderName: nameForMessage(message) }),
+    onForward: (message) => {
+      setForwardMessages(message ? [message] : []);
+      setForwardOpen(true);
+    },
+  });
+
+  const messageActionProps = {
+    onReply: (message) => setReplyingTo({ ...message, senderName: nameForMessage(message) }),
+    onCopy: handleCopy,
+    onSaveMedia: handleSaveMedia,
+    onForward: (message) => {
+      setForwardMessages(message ? [message] : []);
+      setForwardOpen(true);
+    },
+    onDeleteForMe: handleDeleteForMe,
+    onDeleteForEveryone: handleDeleteForEveryone,
+    onSelectionModeChange: setSelectionMode,
+    onSelectionToolbarChange: setSelectionToolbar,
+    onBulkDeleteForMe: bulkDeleteForMe,
+    onBulkForward: (msgs) => {
+      setForwardMessages(msgs);
+      setForwardOpen(true);
+    },
+  };
 
   useEffect(() => {
     const uid = user?._id ?? user?.id;
@@ -87,17 +146,47 @@ export default function MessagingSystem({
 
   // Load conversations
   useEffect(() => {
-    loadConversations();
-  }, [user.id, startupId, teamMembers, refreshKey]);
+    void loadConversations();
+  }, [userId, startupId, teamMembers]);
 
-  // Load messages when conversation is selected
   useEffect(() => {
     if (selectedConversation) {
-      loadMessages(selectedConversation);
-      markMessagesAsRead(user.id, selectedConversation, startupId);
-      setRefreshKey((prev) => prev + 1);
+      void loadMessages(selectedConversation);
+      void markMessagesAsRead(userId, selectedConversation, startupId);
     }
   }, [selectedConversation]);
+
+  useEffect(() => {
+    if (!selectedConversation) return;
+    const unsub = subscribeToMessages(
+      startupId,
+      (update) => {
+        const m = update?.message;
+        if (!m && update?.action !== "message_updated") return;
+
+        if (update.action === "message_updated") {
+          const touches =
+            String(m?.senderId) === String(selectedConversation) ||
+            String(m?.recipientId) === String(selectedConversation);
+          if (touches) handleRealtimeUpdate(update);
+          void loadConversations();
+          return;
+        }
+
+        const touches =
+          String(m.senderId) === String(selectedConversation) ||
+          String(m.recipientId) === String(selectedConversation);
+        if (!touches) {
+          void loadConversations();
+          return;
+        }
+        setMessages((prev) => mergeMessageIntoThread(prev, update, userId));
+        void loadConversations();
+      },
+      { userId, peerUserId: selectedConversation },
+    );
+    return () => unsub?.();
+  }, [startupId, selectedConversation, userId]);
 
   // Auto-scroll to bottom when new messages arrive
   useEffect(() => {
@@ -108,39 +197,76 @@ export default function MessagingSystem({
 
   // ✅ REALTIME: Removed message polling (was every 3s) - messages now update via real-time subscription
 
-  const loadConversations = () => {
-    const convs = getUserConversations(user.id, startupId, teamMembers);
+  const loadConversations = async () => {
+    const convs = await getUserConversations(userId, startupId, teamMembers);
     setConversations(convs);
   };
-  const loadMessages = (otherUserId) => {
-    const msgs = getConversation(user.id, otherUserId, startupId);
-    setMessages(msgs);
+  const loadMessages = async (otherUserId) => {
+    setMessagesLoading(true);
+    try {
+      const msgs = await getConversation(userId, otherUserId, startupId);
+      setMessages(msgs);
+    } catch (err) {
+      toast.error(err?.message || "Failed to load messages");
+      setMessages([]);
+    } finally {
+      setMessagesLoading(false);
+    }
   };
-  const handleSendMessage = () => {
-    if (!newMessage.trim() || !selectedConversation) return;
+  const handleSendMessage = async () => {
+    if (!selectedConversation) return;
+    const text = newMessage.trim();
+    if (!text && !pendingFile) return;
+
     const isTeamMessage = selectedConversation.startsWith("team-");
-    const recipient = conversations.find(
-      (c) => c.userId === selectedConversation,
-    );
-    sendMessage(
-      user.id,
+    const recipient = conversations.find((c) => c.userId === selectedConversation);
+    let attachmentPayload = null;
+
+    if (pendingFile) {
+      setIsUploading(true);
+      setUploadProgress(0);
+      try {
+        const uploadResult = await uploadMessageFile(
+          pendingFile,
+          startupId,
+          userId,
+          { onProgress: setUploadProgress },
+        );
+        if (!uploadResult?.url) throw new Error("Upload failed");
+        attachmentPayload = uploadResult;
+      } catch (err) {
+        toast.error(err?.message || "Failed to upload file");
+        setIsUploading(false);
+        return;
+      } finally {
+        setPendingFile(null);
+        setIsUploading(false);
+        setUploadProgress(0);
+      }
+    }
+
+    setNewMessage("");
+    await sendMessage(
+      userId,
       user.name,
       user.role,
       selectedConversation,
       recipient?.userName || "Team",
-      newMessage,
+      text,
       startupId,
       isTeamMessage,
+      attachmentPayload?.url,
+      attachmentPayload?.fileName,
+      attachmentPayload?.fileSize,
+      attachmentPayload?.fileType,
+      {
+        attachments: attachmentPayload ? [attachmentPayload] : [],
+        ...(replyingTo?.id ? { replyToMessageId: replyingTo.id } : {}),
+      },
     );
-    setNewMessage("");
-    loadMessages(selectedConversation);
-    loadConversations();
-  };
-  const handleKeyPress = (e) => {
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault();
-      handleSendMessage();
-    }
+    clearReply();
+    await loadMessages(selectedConversation);
+    await loadConversations();
   };
   const handleVideoCall = () => {
     if (
@@ -421,12 +547,20 @@ export default function MessagingSystem({
         </Tabs>
       </div>
       <div
-        className={`flex-1 flex flex-col ${selectedConversation ? "flex" : "hidden lg:flex"}`}
+        className={`flex-1 flex flex-col bg-surface-page ${selectedConversation ? "flex" : "hidden lg:flex"}`}
       >
         {selectedConv ? (
           <>
-            <div className="p-3 border-b border-border">
-              <div className="flex items-center justify-between gap-2">
+            {selectionMode && selectionToolbar ? (
+              <ChatSelectionToolbar
+                selectedCount={selectionToolbar.selectedCount}
+                onCancel={selectionToolbar.onCancel}
+                onDelete={selectionToolbar.onDelete}
+                onForward={selectionToolbar.onForward}
+              />
+            ) : (
+            <div className={chatShell.threadHeader}>
+              <div className="flex items-center justify-between gap-2 w-full">
                 <div className="flex items-center gap-2 flex-1 min-w-0">
                   <Button
                     variant="ghost"
@@ -451,10 +585,10 @@ export default function MessagingSystem({
                     </Avatar>
                   )}
                   <div className="flex-1 min-w-0">
-                    <h3 className="text-base font-semibold truncate">
+                    <h3 className="text-base font-semibold truncate text-text-heading">
                       {selectedConv.userName}
                     </h3>
-                    <p className="text-xs text-muted-foreground truncate">
+                    <p className="text-xs text-text-muted truncate">
                       {selectedConv.isTeamChat
                         ? `${teamMembers.length + 1} members`
                         : selectedConv.userRole || "Team Member"}
@@ -479,136 +613,61 @@ export default function MessagingSystem({
                 </div>
               </div>
             </div>
-            <ScrollArea className="flex-1 p-4">
-              {messages.length === 0 ? (
-                <div className="flex flex-col items-center justify-center h-full text-center py-12">
-                  <MessageSquare className="w-16 h-16 text-muted-foreground opacity-50 mb-4" />
-                  <p className="text-sm text-muted-foreground">
-                    No messages yet
-                  </p>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Start the conversation!
-                  </p>
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  {messages.map((message, index) => {
-                    const isOwnMessage = message.senderId === user.id;
-                    const showDate =
-                      index === 0 ||
-                      new Date(message.timestamp).toDateString() !==
-                        new Date(messages[index - 1].timestamp).toDateString();
-                    return (
-                      <div key={message.id}>
-                        {showDate && (
-                          <div className="flex items-center justify-center my-4">
-                            <div className="bg-muted px-3 py-1 rounded-full">
-                              <p className="text-[10px] text-muted-foreground">
-                                {new Date(message.timestamp).toLocaleDateString(
-                                  "en-US",
-                                  {
-                                    month: "short",
-                                    day: "numeric",
-                                    year: "numeric",
-                                  },
-                                )}
-                              </p>
-                            </div>
-                          </div>
-                        )}
-                        <div
-                          className={`flex gap-3 ${isOwnMessage ? "flex-row-reverse" : ""}`}
-                        >
-                          {!isOwnMessage && (
-                            <Avatar className="w-8 h-8 flex-shrink-0">
-                              <AvatarFallback className="bg-primary/10 text-primary text-[10px]">
-                                {message.senderName
-                                  .split(" ")
-                                  .map((n) => n[0])
-                                  .join("")}
-                              </AvatarFallback>
-                            </Avatar>
-                          )}
-                          <div
-                            className={`flex flex-col ${isOwnMessage ? "items-end" : "items-start"} max-w-[70%]`}
-                          >
-                            {!isOwnMessage && (
-                              <div className="flex items-center gap-2 mb-1">
-                                <p className="text-xs font-medium">
-                                  {message.senderName}
-                                </p>
-                                <Badge
-                                  variant="outline"
-                                  className="text-[9px] px-1.5 py-0"
-                                >
-                                  {message.senderRole}
-                                </Badge>
-                              </div>
-                            )}
-                            <div
-                              className={`px-3 py-2 rounded-lg ${isOwnMessage ? "bg-primary text-primary-foreground" : "bg-muted"}`}
-                            >
-                              <p className="text-sm whitespace-pre-wrap break-words">
-                                {message.content}
-                              </p>
-                            </div>
-                            <div className="flex items-center gap-1 mt-1">
-                              <p className="text-[10px] text-muted-foreground">
-                                {new Date(message.timestamp).toLocaleTimeString(
-                                  "en-US",
-                                  {
-                                    hour: "numeric",
-                                    minute: "2-digit",
-                                    hour12: true,
-                                  },
-                                )}
-                              </p>
-                              {isOwnMessage && (
-                                <CheckCheck className="w-3 h-3 text-muted-foreground" />
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
-                  <div ref={messagesEndRef} />
-                </div>
-              )}
-            </ScrollArea>
-            <div className="border-t p-4">
-              <div className="flex gap-2">
-                <Input
-                  placeholder="Type a message..."
-                  value={newMessage}
-                  onChange={(e) => setNewMessage(e.target.value)}
-                  onKeyPress={handleKeyPress}
-                  className="flex-1"
+            )}
+            <ScrollArea className={cn("flex-1", chatShell.threadScroll)}>
+              <div className={chatShell.threadColumn}>
+                <ChatMessageList
+                  messages={messages}
+                  loading={messagesLoading}
+                  currentUserId={userId}
+                  resolveSenderName={(m) => m.senderName || nameForMessage(m)}
+                  messagesEndRef={messagesEndRef}
+                  {...messageActionProps}
                 />
-                <Button
-                  onClick={handleSendMessage}
-                  disabled={!newMessage.trim()}
-                  size="sm"
-                >
-                  <Send className="w-4 h-4" />
-                </Button>
               </div>
-            </div>
+            </ScrollArea>
+            {!selectionMode && (
+              <div className={chatShell.composerFooter}>
+                <div className={chatShell.composerColumn}>
+                  <ChatComposer
+                    value={newMessage}
+                    onChange={setNewMessage}
+                    onSend={handleSendMessage}
+                    onFileSelect={setPendingFile}
+                    pendingFile={pendingFile}
+                    onClearPendingFile={() => setPendingFile(null)}
+                    uploading={isUploading}
+                    uploadProgress={uploadProgress}
+                    replyingTo={replyingTo}
+                    onCancelReply={clearReply}
+                  />
+                </div>
+              </div>
+            )}
           </>
         ) : (
           <div className="flex-1 flex items-center justify-center">
             <div className="text-center">
-              <MessageSquare className="w-20 h-20 text-muted-foreground opacity-30 mx-auto mb-4" />
-              <h3 className="text-lg font-semibold mb-1">
+              <MessageSquare className="w-20 h-20 text-text-muted opacity-30 mx-auto mb-4" />
+              <h3 className="text-lg font-semibold mb-1 text-text-heading">
                 Select a conversation
               </h3>
-              <p className="text-sm text-muted-foreground">
+              <p className="text-sm text-text-muted">
                 Choose a conversation from the list to start messaging
               </p>
             </div>
           </div>
         )}
       </div>
+      <ForwardMessageModal
+        open={forwardOpen}
+        onOpenChange={setForwardOpen}
+        messages={forwardMessages}
+        conversations={conversations}
+        currentUserId={userId}
+        startupId={startupId}
+        onForwarded={() => loadConversations()}
+      />
     </div>
   );
 }

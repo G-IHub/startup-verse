@@ -42,39 +42,39 @@ export function TeamEnergyPulse({ users }) {
       value: activeUsers,
       icon: <Users className="w-3 h-3" />,
       color: "#64748b",
-      bgColor: "bg-slate-100 dark:bg-slate-800/50",
-      textColor: "text-slate-700 dark:text-slate-300",
+      bgColor: "bg-slate-100",
+      textColor: "text-slate-700",
     },
     {
       label: "Working",
       value: workingUsers,
       icon: <Zap className="w-3 h-3" />,
       color: "#64748b",
-      bgColor: "bg-slate-100 dark:bg-slate-800/50",
-      textColor: "text-slate-700 dark:text-slate-300",
+      bgColor: "bg-slate-100",
+      textColor: "text-slate-700",
     },
     {
       label: "In Calls",
       value: inCallUsers,
       icon: <Phone className="w-3 h-3" />,
       color: "#64748b",
-      bgColor: "bg-slate-100 dark:bg-slate-800/50",
-      textColor: "text-slate-700 dark:text-slate-300",
+      bgColor: "bg-slate-100",
+      textColor: "text-slate-700",
     },
     {
       label: "Video On",
       value: cameraOnUsers,
       icon: <Video className="w-3 h-3" />,
       color: "#64748b",
-      bgColor: "bg-slate-100 dark:bg-slate-800/50",
-      textColor: "text-slate-700 dark:text-slate-300",
+      bgColor: "bg-slate-100",
+      textColor: "text-slate-700",
     },
   ];
   return (
     <Card className="h-[300px] flex flex-col">
       <CardHeader className="pb-1.5 pt-1.5 flex-shrink-0">
         <CardTitle className="text-xs flex items-center gap-1.5">
-          <Activity className="w-3 h-3 text-slate-600 dark:text-slate-400" />
+          <Activity className="w-3 h-3 text-slate-600" />
           Team Energy & Pulse
         </CardTitle>
       </CardHeader>
@@ -98,7 +98,7 @@ export function TeamEnergyPulse({ users }) {
         <Separator />
         <div className="space-y-1">
           <div className="flex items-center gap-1">
-            <TrendingUp className="w-3 h-3 text-slate-600 dark:text-slate-400" />
+            <TrendingUp className="w-3 h-3 text-slate-600" />
             <span className="text-[10px] text-muted-foreground">
               Live Stats
             </span>
@@ -141,7 +141,7 @@ export function TeamEnergyPulse({ users }) {
         <div className="space-y-0.5">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-1">
-              <Activity className="w-3 h-3 text-gray-600 dark:text-gray-400" />
+              <Activity className="w-3 h-3 text-gray-600" />
               <span className="text-[10px] text-muted-foreground">
                 Energy Level
               </span>
@@ -150,7 +150,7 @@ export function TeamEnergyPulse({ users }) {
               {energyPercentage}%
             </span>
           </div>
-          <div className="w-full h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+          <div className="w-full h-2 bg-gray-200 rounded-full overflow-hidden">
             <motion.div
               className="h-full rounded-full"
               style={{

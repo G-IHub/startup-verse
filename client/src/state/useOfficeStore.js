@@ -7,6 +7,8 @@ import * as taskApi from "../utils/api/taskApi";
 import { getStartupAnnouncements, postStartupAnnouncement } from "../utils/announcementApi";
 import { postWin } from "../utils/activityApi";
 import { getReceivedInterests } from "../utils/api/inboxApi";
+import { normalizePresenceRow } from "../domains/presence/presenceModel.js";
+import { getStartupId } from "../utils/startupId.js";
 
 function initialState() {
   return {
@@ -55,8 +57,9 @@ export const useOfficeStore = create((set, get) => ({
 
   async loadWorkspace(user, options = {}) {
     const rawId = String(user?._id ?? user?.id ?? "");
-    const startupId = String(user?.startupId || rawId);
-    const founderId = resolveFounderId(user);
+    const startupId = getStartupId(user);
+    const founderId =
+      user?.role === "founder" ? rawId : String(user?.founderId || startupId || "");
     const userId = rawId;
     const userRole = String(user?.role || "");
 
@@ -155,6 +158,8 @@ export const useOfficeStore = create((set, get) => ({
       presenceRows:
         presenceRes.status === "fulfilled" && presenceRes.value?.success
           ? safeArray(presenceRes.value.presence)
+              .map((row) => normalizePresenceRow(row))
+              .filter(Boolean)
           : previous.presenceRows,
       tasks:
         tasksRes.status === "fulfilled"
@@ -170,10 +175,17 @@ export const useOfficeStore = create((set, get) => ({
     return get().loadWorkspace(user, { silent: true });
   },
 
+  /** Authoritative snapshot from GET /presence/:startupId — replaces roster presence. */
+  setPresenceFromServer(rows) {
+    const normalized = safeArray(rows)
+      .map((row) => normalizePresenceRow(row))
+      .filter(Boolean);
+    set({ presenceRows: normalized });
+  },
+
+  /** @deprecated Prefer setPresenceFromServer. */
   patchPresence(rows) {
-    set((previous) => ({
-      presenceRows: mergeById(previous.presenceRows, safeArray(rows)),
-    }));
+    get().setPresenceFromServer(rows);
   },
 
   patchTask(task) {

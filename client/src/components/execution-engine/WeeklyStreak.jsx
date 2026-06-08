@@ -51,7 +51,7 @@ export default function WeeklyStreak({
                   </TooltipTrigger>
                   <TooltipContent
                     side="bottom"
-                    className="max-w-xs bg-gray-900 border-gray-700"
+                    className="max-w-xs bg-popover text-popover-foreground border border-border"
                   >
                     <p className="text-xs text-white">
                       Complete weekly outcomes to build your streak. Each week
@@ -83,7 +83,7 @@ export default function WeeklyStreak({
             {getStreakMessage()}
           </p>
           {hasPartialWeeks && (
-            <p className="text-[10px] text-yellow-600 dark:text-yellow-500 mt-2 pt-2 border-t">
+            <p className="text-[10px] text-yellow-600 mt-2 pt-2 border-t">
               * Includes weeks with partial progress
             </p>
           )}

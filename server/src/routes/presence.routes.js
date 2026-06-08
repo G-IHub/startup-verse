@@ -2,36 +2,19 @@ import { Router } from "express";
 import asyncHandler from "../utils/asyncHandler.js";
 import requireAuth from "../middleware/requireAuth.js";
 import { error as apiError, success as apiSuccess } from "../utils/apiResponse.js";
-import Presence from "../models/Presence.js";
-import Activity from "../models/Activity.js";
 import User from "../models/User.js";
 import Startup from "../models/Startup.js";
+import Presence from "../models/Presence.js";
 import { emitRealtime } from "../services/realtime.service.js";
 import { SOCKET_EVENTS } from "../realtime/events.js";
 import { startupRoom } from "../realtime/rooms.js";
-import { mapActivityToDto } from "../utils/activityDto.js";
-
+import {
+  listStartupPresence,
+  upsertPresence,
+} from "../services/presence.service.js";
 const presenceRouter = Router();
-const isSelfOrAdmin = (req, userId) => req.user?.isAdmin === true || req.user?.id === String(userId);
-const NORMALIZED_ONLINE_STATUSES = new Set(["available", "in-meeting", "focus-mode", "on-break"]);
-
-function normalizePresenceRow(doc) {
-  if (!doc) return null;
-  return {
-    id: String(doc._id),
-    startupId: String(doc.startupId || ""),
-    userId: String(doc.userId || ""),
-    userName: String(doc.userName || ""),
-    role: String(doc.role || ""),
-    isOnline: Boolean(doc.isOnline),
-    statusText: String(doc.statusText || ""),
-    mood: String(doc.mood || ""),
-    lastSeenAt: doc.lastSeenAt || doc.updatedAt || new Date(),
-    metadata: doc.metadata || {},
-    createdAt: doc.createdAt || null,
-    updatedAt: doc.updatedAt || null,
-  };
-}
+const isSelfOrAdmin = (req, userId) =>
+  req.user?.isAdmin === true || req.user?.id === String(userId);
 
 async function canAccessStartupPresence(req, startupId) {
   if (req.user?.isAdmin) return true;
@@ -71,55 +54,18 @@ presenceRouter.post(
       return apiError(res, "Forbidden.", 403);
     }
 
-    const mergedMetadata =
-      activity && typeof activity === "object"
-        ? { ...metadata, lastFeedActivity: activity }
-        : metadata;
-    const normalizedOnline =
-      typeof isOnline === "boolean"
-        ? isOnline
-        : NORMALIZED_ONLINE_STATUSES.has(String(status || "").toLowerCase());
-
-    const presence = await Presence.findOneAndUpdate(
-      { startupId: String(startupId), userId: String(userId) },
-      {
-        startupId: String(startupId),
-        userId: String(userId),
-        userName,
-        role,
-        isOnline: normalizedOnline,
-        statusText: String(statusText || ""),
-        mood: String(mood || ""),
-        lastSeenAt: new Date(),
-        expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
-        metadata: mergedMetadata,
-      },
-      { upsert: true, new: true, runValidators: true },
-    );
-    const normalizedPresence = normalizePresenceRow(presence);
-
-    emitRealtime(SOCKET_EVENTS.PRESENCE_UPDATED, normalizedPresence, [startupRoom(startupId)]);
-
-    if (activity && typeof activity === "object" && startupId) {
-      const { lastFeedActivity: _ignoredActivity, ...activityMetadata } =
-        mergedMetadata && typeof mergedMetadata === "object" ? mergedMetadata : {};
-      const activityDoc = await Activity.create({
-        startupId: String(startupId),
-        userId: String(userId),
-        type: String(activity.type || "update"),
-        text: String(activity.message || ""),
-        metadata: {
-          ...activityMetadata,
-          userName: String(activity.userName || userName || ""),
-          icon: String(activity.icon || "📋"),
-        },
-      });
-      emitRealtime(
-        SOCKET_EVENTS.ACTIVITY_CREATED,
-        mapActivityToDto(activityDoc),
-        [startupRoom(startupId)],
-      );
-    }
+    const normalizedPresence = await upsertPresence({
+      startupId,
+      userId,
+      userName,
+      role,
+      isOnline,
+      status,
+      statusText,
+      mood,
+      metadata,
+      activity,
+    });
 
     return apiSuccess(res, normalizedPresence, 201);
   }),
@@ -132,8 +78,8 @@ presenceRouter.get(
     if (!(await canAccessStartupPresence(req, req.params.startupId))) {
       return apiError(res, "Forbidden.", 403);
     }
-    const rows = await Presence.find({ startupId: req.params.startupId }).sort({ updatedAt: -1 });
-    return apiSuccess(res, rows.map((row) => normalizePresenceRow(row)));
+    const rows = await listStartupPresence(req.params.startupId);
+    return apiSuccess(res, rows);
   }),
 );
 

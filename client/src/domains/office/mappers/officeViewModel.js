@@ -1,3 +1,8 @@
+import {
+  normalizePresenceRow,
+  sortRosterByPresence,
+} from "../../presence/presenceModel.js";
+
 function toId(row) {
   if (!row || typeof row !== "object") return "";
   return String(row.id || row._id || row.userId || "");
@@ -32,23 +37,12 @@ function normalizeActivity(row) {
 }
 
 function normalizePresence(row) {
-  if (!row) return null;
-  const id = String(row.userId || row.id || "");
-  const isOnline =
-    typeof row.isOnline === "boolean" ? row.isOnline : String(row.status || "") !== "away";
+  const normalized = normalizePresenceRow(row);
+  if (!normalized) return null;
   return {
-    id,
-    userId: id,
-    userName: String(row.userName || row.name || "Team member"),
-    role: String(row.role || "team-member"),
-    status: String(row.status || (isOnline ? "available" : "away")),
-    statusText: String(row.statusText || ""),
-    mood: String(row.mood || ""),
-    activity: String(row.activity?.type || row.activity || "working"),
-    cameraEnabled: Boolean(row.cameraEnabled),
-    isOnline,
-    lastSeenAt: toDate(row.lastSeenAt || row.updatedAt),
-    avatar: row.avatar || "",
+    ...normalized,
+    activity: String(normalized.activity?.type || normalized.activity || "working"),
+    avatar: row?.avatar || "",
   };
 }
 
@@ -155,6 +149,8 @@ export function mapOfficeWorkspaceModel({
       role: String(row.role || "team-member"),
       title: String(row.title || row.professionalTitle || ""),
       avatar: row.avatar || "",
+      isOnline: Boolean(row.isOnline),
+      connection: row.connection || (row.isOnline ? "online" : "offline"),
     }))
     .filter((row) => Boolean(row.id));
 
@@ -177,32 +173,38 @@ export function mapOfficeWorkspaceModel({
       }
     : null;
 
-  const teamRoster = mergeByIdInternal(
-    [
-      ...normalizedTeamMembers,
-      ...(ensureCurrentUser ? [ensureCurrentUser] : []),
-      ...presence.map((row) => ({
-        id: row.id,
-        name: row.userName,
-        role: row.role,
-        title: memberById.get(row.id)?.title || "",
-        avatar: memberById.get(row.id)?.avatar || row.avatar || "",
-      })),
-    ],
-    (row) => row.id,
-  ).map((member) => {
-    const presenceRow = presenceById.get(member.id);
-    return {
-      ...member,
-      status: presenceRow?.status || "away",
-      isOnline: Boolean(presenceRow?.isOnline),
-      activity: presenceRow?.activity || "working",
-      statusText: presenceRow?.statusText || "",
-      mood: presenceRow?.mood || "",
-      lastSeenAt: presenceRow?.lastSeenAt || new Date(0),
-      cameraEnabled: Boolean(presenceRow?.cameraEnabled),
-    };
-  });
+  const teamRoster = sortRosterByPresence(
+    mergeByIdInternal(
+      [
+        ...normalizedTeamMembers,
+        ...(ensureCurrentUser ? [ensureCurrentUser] : []),
+        ...presence.map((row) => ({
+          id: row.id,
+          name: row.userName,
+          role: row.role,
+          title: memberById.get(row.id)?.title || "",
+          avatar: memberById.get(row.id)?.avatar || row.avatar || "",
+        })),
+      ],
+      (row) => row.id,
+    ).map((member) => {
+      const presenceRow = presenceById.get(member.id);
+      const teamRow = memberById.get(member.id);
+      const isOnline = presenceRow
+        ? Boolean(presenceRow.isOnline)
+        : Boolean(teamRow?.isOnline);
+      return {
+        ...member,
+        connection: presenceRow?.connection || teamRow?.connection || (isOnline ? "online" : "offline"),
+        isOnline,
+        activity: presenceRow?.activity || "working",
+        statusText: presenceRow?.statusText || "",
+        mood: presenceRow?.mood || "",
+        lastSeenAt: presenceRow?.lastSeenAt || new Date(0),
+        cameraEnabled: Boolean(presenceRow?.cameraEnabled),
+      };
+    }),
+  );
 
   const activities = mergeByIdInternal(
     [...(activityRows || []), ...(winRows || [])].map(normalizeActivity).filter(Boolean),

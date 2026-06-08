@@ -311,7 +311,7 @@ export default function VideoCallSystem({ user, callType = "mentor-session" }) {
   };
   if (isInCall && currentCall) {
     return (
-      <div className="h-full bg-gray-900 flex flex-col">
+      <div className="h-full bg-card flex flex-col">
         <div className="bg-black/20 p-3 flex items-center justify-between text-white">
           <div className="flex items-center space-x-3">
             <h2>{currentCall.title}</h2>

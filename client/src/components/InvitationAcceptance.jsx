@@ -27,6 +27,17 @@ import {
 import { toast } from "sonner";
 import { useAuth } from "../contexts/AuthContext";
 import { clearAuthSession } from "../app/session";
+import {
+  AUTH_CARD,
+  AUTH_CALLOUT,
+  authBtnPrimary,
+  authBtnOutline,
+  authFieldClass,
+  authLabelClass,
+} from "./auth/AuthPrimitives";
+
+const INVITE_PAGE =
+  "min-h-screen flex items-center justify-center p-4 bg-surface-page font-body";
 
 // Default fetch options for cookie-based auth
 
@@ -84,14 +95,14 @@ function CohortInvitationPanel({ invitation, onCancel, onCohortResolved }) {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-primary/5 via-background to-accent/5">
-      <Card className="w-full max-w-lg border-primary/20">
+    <div className={INVITE_PAGE}>
+      <Card className={`w-full max-w-lg ${AUTH_CARD}`}>
         <CardHeader className="text-center">
-          <div className="w-16 h-16 bg-primary rounded-full flex items-center justify-center mx-auto mb-4">
-            <Building className="w-8 h-8 text-primary-foreground" />
+          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-lg bg-primary-tint">
+            <Building className="h-7 w-7 text-primary" />
           </div>
-          <CardTitle>Cohort invitation</CardTitle>
-          <CardDescription>
+          <CardTitle className="font-heading text-text-heading">Cohort invitation</CardTitle>
+          <CardDescription className="font-body text-text-body">
             {orgName}
             {" invites your startup to join "}
             <span className="font-medium text-foreground">{cohortName}</span>
@@ -99,8 +110,8 @@ function CohortInvitationPanel({ invitation, onCancel, onCohortResolved }) {
         </CardHeader>
         <CardContent className="space-y-4">
           {invitation.message ? (
-            <div className="p-4 bg-muted/50 rounded-lg border text-sm">
-              <p className="text-xs text-muted-foreground mb-1">Message</p>
+            <div className={`text-sm ${AUTH_CALLOUT}`}>
+              <p className="mb-1 font-body text-xs text-text-muted">Message</p>
               <p className="italic">"{invitation.message}"</p>
             </div>
           ) : null}
@@ -120,7 +131,7 @@ function CohortInvitationPanel({ invitation, onCancel, onCohortResolved }) {
             </p>
           ) : null}
           {user && !founderMatch ? (
-            <p className="text-sm text-center text-amber-600 dark:text-amber-400">
+            <p className="text-sm text-center text-amber-600">
               You’re signed in as a different user. Switch to the invited founder
               account to respond.
             </p>
@@ -129,7 +140,7 @@ function CohortInvitationPanel({ invitation, onCancel, onCohortResolved }) {
             <Button
               type="button"
               variant="outline"
-              className="flex-1"
+              className={`flex-1 ${authBtnOutline}`}
               disabled={busy}
               onClick={() => onCancel?.()}
             >
@@ -137,8 +148,8 @@ function CohortInvitationPanel({ invitation, onCancel, onCohortResolved }) {
             </Button>
             <Button
               type="button"
-              variant="secondary"
-              className="flex-1"
+              variant="outline"
+              className={`flex-1 ${authBtnOutline}`}
               disabled={busy || !founderMatch}
               onClick={() => respond(false)}
             >
@@ -146,7 +157,7 @@ function CohortInvitationPanel({ invitation, onCancel, onCohortResolved }) {
             </Button>
             <Button
               type="button"
-              className="flex-1"
+              className={`flex-1 ${authBtnPrimary}`}
               disabled={busy || !founderMatch}
               onClick={() => respond(true)}
             >
@@ -323,11 +334,11 @@ export default function InvitationAcceptance({
   };
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center p-4">
-        <Card className="w-full max-w-md">
+      <div className={INVITE_PAGE}>
+        <Card className={`w-full max-w-md ${AUTH_CARD}`}>
           <CardContent className="p-8 text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4" />
-            <p className="text-muted-foreground">Loading invitation...</p>
+            <div className="mx-auto mb-4 h-12 w-12 animate-spin rounded-full border-b-2 border-primary" />
+            <p className="font-body text-text-muted">Loading invitation...</p>
           </CardContent>
         </Card>
       </div>
@@ -335,15 +346,15 @@ export default function InvitationAcceptance({
   }
   if (error || !invitation) {
     return (
-      <div className="min-h-screen flex items-center justify-center p-4">
-        <Card className="w-full max-w-md">
+      <div className={INVITE_PAGE}>
+        <Card className={`w-full max-w-md ${AUTH_CARD}`}>
           <CardContent className="p-8 text-center">
-            <div className="w-16 h-16 bg-destructive/10 rounded-full flex items-center justify-center mx-auto mb-4">
-              <AlertCircle className="w-8 h-8 text-destructive" />
+            <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-status-error/10">
+              <AlertCircle className="h-8 w-8 text-status-error" />
             </div>
-            <h2>Invalid Invitation</h2>
-            <p className="text-muted-foreground mb-6">{error}</p>
-            <Button onClick={onCancel} variant="outline">
+            <h2 className="font-heading text-lg font-semibold text-text-heading">Invalid Invitation</h2>
+            <p className="mb-6 font-body text-text-muted">{error}</p>
+            <Button onClick={onCancel} variant="outline" className={authBtnOutline}>
               Go to Home
             </Button>
           </CardContent>
@@ -363,15 +374,15 @@ export default function InvitationAcceptance({
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-primary/5 via-background to-accent/5">
+    <div className={INVITE_PAGE}>
       <div className="w-full max-w-2xl space-y-6">
-        <Card className="border-primary/20">
+        <Card className={AUTH_CARD}>
           <CardHeader className="text-center">
-            <div className="w-16 h-16 bg-primary rounded-full flex items-center justify-center mx-auto mb-4">
-              <UserPlus className="w-8 h-8 text-primary-foreground" />
+            <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-lg bg-primary-tint">
+              <UserPlus className="h-7 w-7 text-primary" />
             </div>
-            <CardTitle>You're Invited!</CardTitle>
-            <CardDescription>
+            <CardTitle className="font-heading text-text-heading">You&apos;re Invited!</CardTitle>
+            <CardDescription className="font-body text-text-body">
               {invitation.founderName || "A founder"}
               {" has invited you to join their startup team"}
             </CardDescription>
@@ -399,18 +410,18 @@ export default function InvitationAcceptance({
                     <p className="text-sm">{invitation.role || "—"}</p>
                   </div>
                 </div>
-                <div className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg">
-                  <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
-                    <User className="w-5 h-5 text-blue-600" />
+                <div className="flex items-center gap-3 rounded-input border border-surface-border bg-surface-page p-3">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary-tint">
+                    <User className="h-5 w-5 text-primary" />
                   </div>
                   <div>
                     <p className="text-xs text-muted-foreground">Department</p>
                     <p className="text-sm">{invitation.department || "—"}</p>
                   </div>
                 </div>
-                <div className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg">
-                  <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center">
-                    <Mail className="w-5 h-5 text-green-600" />
+                <div className="flex items-center gap-3 rounded-input border border-surface-border bg-surface-page p-3">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-status-success/15">
+                    <Mail className="h-5 w-5 text-status-success" />
                   </div>
                   <div>
                     <p className="text-xs text-muted-foreground">Email</p>
@@ -456,7 +467,7 @@ export default function InvitationAcceptance({
                         </div>
                       )}
                       {invitation.salary && (
-                        <div className="p-3 bg-green-50 dark:bg-green-950/20 rounded-lg border border-green-200 dark:border-green-900">
+                        <div className="rounded-input border border-status-success/30 bg-status-success/10 p-3">
                           <p className="text-xs text-muted-foreground">
                             Salary
                           </p>
@@ -464,7 +475,7 @@ export default function InvitationAcceptance({
                         </div>
                       )}
                       {invitation.benefits && (
-                        <div className="p-3 bg-blue-50 dark:bg-blue-950/20 rounded-lg border border-blue-200 dark:border-blue-900 md:col-span-2">
+                        <div className="rounded-input border border-primary/20 bg-primary-tint p-3 md:col-span-2">
                           <p className="text-xs text-muted-foreground">
                             Benefits
                           </p>
@@ -472,7 +483,7 @@ export default function InvitationAcceptance({
                         </div>
                       )}
                       {invitation.startDate && (
-                        <div className="p-3 bg-purple-50 dark:bg-purple-950/20 rounded-lg border border-purple-200 dark:border-purple-900 md:col-span-2">
+                        <div className="rounded-input border border-accent/20 bg-accent-tint p-3 md:col-span-2">
                           <p className="text-xs text-muted-foreground">
                             Start Date
                           </p>
@@ -497,23 +508,23 @@ export default function InvitationAcceptance({
             </div>
           </CardContent>
         </Card>
-        <Card>
+        <Card className={AUTH_CARD}>
           <CardHeader>
-            <CardTitle>Complete Your Account</CardTitle>
-            <CardDescription>
+            <CardTitle className="font-heading text-text-heading">Complete Your Account</CardTitle>
+            <CardDescription className="font-body text-text-body">
               Create your account to join the team
             </CardDescription>
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="email">Email Address</Label>
+                <Label htmlFor="email" className={authLabelClass}>Email Address</Label>
                 <Input
                   id="email"
                   type="email"
                   value={invitation.email}
                   disabled={true}
-                  className="bg-muted"
+                  className={authFieldClass}
                 />
                 <p className="text-xs text-muted-foreground">
                   This email is pre-assigned by your invitation
@@ -573,11 +584,11 @@ export default function InvitationAcceptance({
                   type="button"
                   variant="outline"
                   onClick={onCancel}
-                  className="flex-1"
+                  className={`flex-1 ${authBtnOutline}`}
                 >
                   Decline
                 </Button>
-                <Button type="submit" className="flex-1" disabled={submitting}>
+                <Button type="submit" className={`flex-1 ${authBtnPrimary}`} disabled={submitting}>
                   {submitting ? "Submitting…" : "Accept & Join Team"}
                   {!submitting ? (
                     <ArrowRight className="w-4 h-4 ml-2" />

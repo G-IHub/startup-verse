@@ -301,11 +301,11 @@ export default function CalendarView({
                     !isCurrentDay &&
                       !isSelected &&
                       hasAgendaItems &&
-                      "bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300",
+                      "bg-purple-100 text-purple-700",
                     !isCurrentDay &&
                       !isSelected &&
                       !hasAgendaItems &&
-                      "text-gray-700 dark:text-gray-300",
+                      "text-gray-700",
                   )}
                 >
                   <div className="flex flex-col items-center justify-center h-full">
@@ -340,7 +340,7 @@ export default function CalendarView({
                         "w-6 h-6 rounded-lg flex items-center justify-center flex-shrink-0",
                         event.color
                           ? `${event.color}/10`
-                          : "bg-blue-100 dark:bg-blue-900/30",
+                          : "bg-blue-100",
                       )}
                     >
                       <IconComponent
@@ -388,7 +388,7 @@ export default function CalendarView({
               {agendaItems.length > 0 && (
                 <Badge
                   variant="secondary"
-                  className="text-[8px] px-1.5 py-0 h-4 bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300"
+                  className="text-[8px] px-1.5 py-0 h-4 bg-green-100 text-green-700"
                 >
                   {agendaItems.length}
                 </Badge>

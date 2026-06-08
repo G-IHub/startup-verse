@@ -124,7 +124,7 @@ export function getStreakTier(streak) {
     return {
       name: "LEGENDARY",
       color: "text-purple-600",
-      bgColor: "bg-purple-100 dark:bg-purple-900/30",
+      bgColor: "bg-purple-100",
       minWeeks: 12,
       description: "Top 3% globally - Iconic execution",
     };
@@ -133,7 +133,7 @@ export function getStreakTier(streak) {
     return {
       name: "ELITE",
       color: "text-red-600",
-      bgColor: "bg-red-100 dark:bg-red-900/30",
+      bgColor: "bg-red-100",
       minWeeks: 8,
       description: "Top 10% worldwide - Strong momentum",
     };
@@ -142,7 +142,7 @@ export function getStreakTier(streak) {
     return {
       name: "STRONG",
       color: "text-orange-600",
-      bgColor: "bg-orange-100 dark:bg-orange-900/30",
+      bgColor: "bg-orange-100",
       minWeeks: 4,
       description: "Consistent execution - Building momentum",
     };
@@ -151,7 +151,7 @@ export function getStreakTier(streak) {
     return {
       name: "BUILDING",
       color: "text-blue-600",
-      bgColor: "bg-blue-100 dark:bg-blue-900/30",
+      bgColor: "bg-blue-100",
       minWeeks: 2,
       description: "Early momentum - Keep going!",
     };
@@ -159,7 +159,7 @@ export function getStreakTier(streak) {
   return {
     name: "STARTER",
     color: "text-green-600",
-    bgColor: "bg-green-100 dark:bg-green-900/30",
+    bgColor: "bg-green-100",
     minWeeks: 1,
     description: "First week complete - Great start!",
   };

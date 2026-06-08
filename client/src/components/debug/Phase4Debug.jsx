@@ -19,9 +19,9 @@ export default function Phase4Debug({ user }) {
   const tasks = founderScopeId ? getTasks(founderScopeId) : [];
   const myTasks = tasks.filter((t) => t.assignedTo === user.id);
   return (
-    <Card className="border-4 border-yellow-400 bg-yellow-50 dark:bg-yellow-950/20">
+    <Card className="border-4 border-yellow-400 bg-yellow-50">
       <CardHeader>
-        <CardTitle className="text-yellow-900 dark:text-yellow-100">
+        <CardTitle className="text-yellow-900">
           🐛 Phase 4 Debug Panel
         </CardTitle>
       </CardHeader>
@@ -97,8 +97,8 @@ export default function Phase4Debug({ user }) {
               </Badge>
             </p>
             {myTasks.length > 0 && (
-              <div className="mt-2 p-2 bg-green-100 dark:bg-green-950/30 rounded border border-green-300">
-                <p className="font-semibold text-green-800 dark:text-green-200">
+              <div className="mt-2 p-2 bg-green-100 rounded border border-green-300">
+                <p className="font-semibold text-green-800">
                   Your Tasks:
                 </p>
                 {myTasks.map((task, idx) => (
@@ -127,57 +127,57 @@ export default function Phase4Debug({ user }) {
           </div>
         </div>
         {!founder && (
-          <div className="p-3 bg-red-100 dark:bg-red-950/30 border border-red-300 rounded">
-            <p className="font-semibold text-red-800 dark:text-red-200">
+          <div className="p-3 bg-red-100 border border-red-300 rounded">
+            <p className="font-semibold text-red-800">
               ❌ Action Required:
             </p>
-            <p className="text-red-700 dark:text-red-300 mt-1">
+            <p className="text-red-700 mt-1">
               {"No founder found for startup ID: "}
               {user.startupId}
             </p>
-            <p className="text-xs text-red-600 dark:text-red-400 mt-2">
+            <p className="text-xs text-red-600 mt-2">
               This means your startupId doesn't match any founder's ID in the
               system.
             </p>
           </div>
         )}
         {founder && tasks.length === 0 && (
-          <div className="p-3 bg-orange-100 dark:bg-orange-950/30 border border-orange-300 rounded">
-            <p className="font-semibold text-orange-800 dark:text-orange-200">
+          <div className="p-3 bg-orange-100 border border-orange-300 rounded">
+            <p className="font-semibold text-orange-800">
               ⚠️ Action Required:
             </p>
-            <p className="text-orange-700 dark:text-orange-300 mt-1">
+            <p className="text-orange-700 mt-1">
               Founder hasn't created any tasks yet.
             </p>
-            <p className="text-xs text-orange-600 dark:text-orange-400 mt-2">
+            <p className="text-xs text-orange-600 mt-2">
               Login as founder ({founder.name}) and set a weekly outcome first.
             </p>
           </div>
         )}
         {founder && tasks.length > 0 && myTasks.length === 0 && (
-          <div className="p-3 bg-blue-100 dark:bg-blue-950/30 border border-blue-300 rounded">
-            <p className="font-semibold text-blue-800 dark:text-blue-200">
+          <div className="p-3 bg-blue-100 border border-blue-300 rounded">
+            <p className="font-semibold text-blue-800">
               ℹ️ Info:
             </p>
-            <p className="text-blue-700 dark:text-blue-300 mt-1">
+            <p className="text-blue-700 mt-1">
               {"Founder has "}
               {tasks.length}
               {" tasks, but none assigned to you yet."}
             </p>
-            <p className="text-xs text-blue-600 dark:text-blue-400 mt-2">
+            <p className="text-xs text-blue-600 mt-2">
               Login as founder and assign some tasks to "{user.name}".
             </p>
           </div>
         )}
         {myTasks.length > 0 && (
-          <div className="p-3 bg-green-100 dark:bg-green-950/30 border border-green-300 rounded">
-            <p className="font-semibold text-green-800 dark:text-green-200">
+          <div className="p-3 bg-green-100 border border-green-300 rounded">
+            <p className="font-semibold text-green-800">
               ✅ Success!
             </p>
-            <p className="text-green-700 dark:text-green-300 mt-1">
+            <p className="text-green-700 mt-1">
               Phase 4 should be visible below this debug panel.
             </p>
-            <p className="text-xs text-green-600 dark:text-green-400 mt-2">
+            <p className="text-xs text-green-600 mt-2">
               {"Scroll down to see your "}
               {myTasks.length}
               {" assigned task(s)!"}

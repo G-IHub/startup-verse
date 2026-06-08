@@ -23,7 +23,7 @@ export function TaskWeekBadge({
     return (
       <span
         className={cn(
-          "text-xs text-gray-500 dark:text-gray-400 font-mono",
+          "text-xs text-gray-500 font-mono",
           className,
         )}
       >
@@ -36,7 +36,7 @@ export function TaskWeekBadge({
       <Badge
         variant="outline"
         className={cn(
-          "text-xs px-1.5 py-0 h-5 bg-blue-50 dark:bg-blue-950/30 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-800",
+          "text-xs px-1.5 py-0 h-5 bg-blue-50 text-blue-700 border-blue-200",
           className,
         )}
       >
@@ -48,7 +48,7 @@ export function TaskWeekBadge({
     <Badge
       variant="outline"
       className={cn(
-        "bg-blue-50 dark:bg-blue-950/30 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-800",
+        "bg-blue-50 text-blue-700 border-blue-200",
         className,
       )}
     >

@@ -86,11 +86,11 @@ export default function StageRoadmapModal({
                 className={cn(
                   "relative overflow-hidden rounded-xl transition-all duration-200 ease-in-out",
                   isLocked &&
-                    "border border-surface-border bg-surface-page opacity-70 dark:bg-surface-page",
+                    "border border-surface-border bg-surface-page opacity-70",
                   isCurrent && "border-[1.5px] border-primary bg-primary-tint",
                   !isLocked &&
                     !isCurrent &&
-                    "border border-surface-border bg-white dark:bg-card",
+                    "border border-surface-border bg-white",
                 )}
               >
                 <div className="flex items-start gap-2.5 p-3">
@@ -126,7 +126,7 @@ export default function StageRoadmapModal({
                           isCurrent && "font-bold text-primary",
                           !isLocked &&
                             !isCurrent &&
-                            "text-text-heading dark:text-foreground",
+                            "text-text-heading",
                         )}
                       >
                         {"Stage "}
@@ -191,11 +191,11 @@ export default function StageRoadmapModal({
                               <span className="text-[9px] text-muted-foreground">{dateStr}</span>
                             )}
                             {wasSkipped ? (
-                              <Badge variant="outline" className="text-[8px] px-1 py-0 h-3.5 border-amber-400 text-amber-600 dark:text-amber-400">
+                              <Badge variant="outline" className="text-[8px] px-1 py-0 h-3.5 border-amber-400 text-amber-600">
                                 skipped
                               </Badge>
                             ) : (
-                              <Badge variant="outline" className="text-[8px] px-1 py-0 h-3.5 border-green-500 text-green-600 dark:text-green-400">
+                              <Badge variant="outline" className="text-[8px] px-1 py-0 h-3.5 border-green-500 text-green-600">
                                 completed
                               </Badge>
                             )}
@@ -236,7 +236,7 @@ export default function StageRoadmapModal({
                           <Badge
                             key={idx}
                             variant="outline"
-                            className={`text-[9px] px-1.5 py-0 ${isCompleted ? "bg-green-100 dark:bg-green-950 text-green-700 dark:text-green-400 border-green-300 dark:border-green-700" : ""}`}
+                            className={`text-[9px] px-1.5 py-0 ${isCompleted ? "bg-green-100 text-green-700 border-green-300" : ""}`}
                           >
                             {milestone}
                           </Badge>

@@ -156,11 +156,11 @@ export function StreakLeaderboard({ currentUser, onClose }) {
   };
   const getRankColor = (rank) => {
     if (rank === 1)
-      return "bg-gradient-to-r from-yellow-50 to-yellow-100 dark:from-yellow-950/30 dark:to-yellow-900/30 border-yellow-300 dark:border-yellow-700";
+      return "bg-gradient-to-r from-yellow-50 to-yellow-100 border-yellow-300";
     if (rank === 2)
-      return "bg-gradient-to-r from-gray-50 to-gray-100 dark:from-gray-900/30 dark:to-gray-800/30 border-gray-300 dark:border-gray-700";
+      return "bg-gradient-to-r from-gray-50 to-gray-100 border-gray-300";
     if (rank === 3)
-      return "bg-gradient-to-r from-orange-50 to-orange-100 dark:from-orange-950/30 dark:to-orange-900/30 border-orange-300 dark:border-orange-700";
+      return "bg-gradient-to-r from-orange-50 to-orange-100 border-orange-300";
     return "";
   };
   const getStreakTier = (streak) => {
@@ -168,30 +168,30 @@ export function StreakLeaderboard({ currentUser, onClose }) {
       return {
         name: "LEGENDARY",
         color: "text-purple-600",
-        bgColor: "bg-purple-100 dark:bg-purple-900/30",
+        bgColor: "bg-purple-100",
       };
     if (streak >= 8)
       return {
         name: "ELITE",
         color: "text-red-600",
-        bgColor: "bg-red-100 dark:bg-red-900/30",
+        bgColor: "bg-red-100",
       };
     if (streak >= 4)
       return {
         name: "STRONG",
         color: "text-orange-600",
-        bgColor: "bg-orange-100 dark:bg-orange-900/30",
+        bgColor: "bg-orange-100",
       };
     if (streak >= 2)
       return {
         name: "BUILDING",
         color: "text-blue-600",
-        bgColor: "bg-blue-100 dark:bg-blue-900/30",
+        bgColor: "bg-blue-100",
       };
     return {
       name: "STARTER",
       color: "text-green-600",
-      bgColor: "bg-green-100 dark:bg-green-900/30",
+      bgColor: "bg-green-100",
     };
   };
   const renderLeaderboardEntry = (entry, rank, isCurrentUser) => {

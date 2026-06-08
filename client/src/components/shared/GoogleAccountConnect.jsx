@@ -197,15 +197,15 @@ export default function GoogleAccountConnect({ userId, userType }) {
           </p>
         ) : connected ? (
           <div className="space-y-4">
-            <div className="flex items-center gap-3 p-3 bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-800 rounded-lg">
+            <div className="flex items-center gap-3 p-3 bg-green-50 border border-green-200 rounded-lg">
               <div className="w-8 h-8 rounded-full bg-green-500 flex items-center justify-center flex-shrink-0">
                 <Check className="w-5 h-5 text-white" />
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-xs font-semibold text-green-900 dark:text-green-100">
+                <p className="text-xs font-semibold text-green-900">
                   Connected
                 </p>
-                <p className="text-[10px] text-green-700 dark:text-green-300 truncate">
+                <p className="text-[10px] text-green-700 truncate">
                   {email}
                 </p>
               </div>

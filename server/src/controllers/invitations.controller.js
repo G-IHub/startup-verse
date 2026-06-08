@@ -19,6 +19,7 @@ import { error as apiError, success as apiSuccess } from "../utils/apiResponse.j
 import { sendTokenResponse } from "../utils/sendToken.js";
 import { emitRealtime } from "../services/realtime.service.js";
 import { createNotification, broadcastNotification } from "../services/notificationService.js";
+import { chatDeepLink, officeDeepLink } from "../utils/deepLinks.js";
 import { SOCKET_EVENTS } from "../realtime/events.js";
 import { startupRoom, userRoom } from "../realtime/rooms.js";
 import { mapActivityToDto } from "../utils/activityDto.js";
@@ -27,6 +28,10 @@ import {
   sendCohortInvitationEmail,
 } from "../services/emailService.js";
 import { logger } from "../config/logger.js";
+import {
+  normalizeAttachments,
+  messageHasContent,
+} from "../utils/messageAttachments.js";
 
 const isAdmin = (req) => req.user?.isAdmin === true;
 const isSelfOrAdmin = (req, userId) => isAdmin(req) || req.user?.id === String(userId);
@@ -38,6 +43,8 @@ const canAccessInterest = (req, interest) =>
   isAdmin(req) ||
   req.user?.id === String(interest?.founderId || "") ||
   req.user?.id === String(interest?.talentId || "");
+const isFounderTalentKind = (invitation) =>
+  String(invitation?.kind || "founder-talent") === "founder-talent";
 
 const toIdString = (value) => {
   if (!value) return "";
@@ -99,10 +106,12 @@ function mapConversationMessages(rawMessages, usersById) {
   return messages.map((message) => {
     const senderId = toIdString(message.senderId);
     const sender = usersById.get(senderId);
+    const attachments = Array.isArray(message.attachments) ? message.attachments : [];
     return {
       senderId,
       sender: message.sender || sender?.name || "Unknown",
       text: message.text || message.body || "",
+      attachments,
       timestamp: message.timestamp || message.sentAt || null,
       companyName: message.companyName || "",
     };
@@ -239,6 +248,38 @@ export const createInvitation = async (req, res) => {
   }
 
   const founderId = req.body?.founderId || null;
+  if (founderId && !mongoose.Types.ObjectId.isValid(String(founderId))) {
+    return apiError(res, "founderId must be a valid id when provided.", 400);
+  }
+  if (founderId) {
+    const founderUser = await User.findById(founderId, { role: 1, email: 1 }).lean();
+    if (!founderUser) {
+      return apiError(res, "Founder user not found.", 404);
+    }
+    if (!["founder", "mentor"].includes(String(founderUser.role || ""))) {
+      return apiError(
+        res,
+        "Cohort invitations can only target founders or mentors.",
+        422,
+      );
+    }
+  }
+  if (!founderId) {
+    const byEmailUser = await User.findOne(
+      { email: normalizedEmail },
+      { role: 1, email: 1 },
+    ).lean();
+    if (
+      byEmailUser &&
+      !["founder", "mentor"].includes(String(byEmailUser.role || ""))
+    ) {
+      return apiError(
+        res,
+        "Cohort invitations can only target founders or mentors.",
+        422,
+      );
+    }
+  }
   if (founderId && mongoose.Types.ObjectId.isValid(String(founderId))) {
     const existingByFounder = await CohortInvitation.findOne({
       cohortId,
@@ -444,6 +485,14 @@ export const acceptInvitationByToken = async (req, res) => {
   }
 
   const invitation = await FounderTalentInvitation.findOne({ token });
+  if (!isFounderTalentKind(invitation)) {
+    return apiError(
+      res,
+      "This token is not valid for team-member onboarding.",
+      409,
+    );
+  }
+
   if (!invitation) {
     return apiError(res, "Invitation not found.", 404);
   }
@@ -731,7 +780,7 @@ export const sendFounderTalentInvitation = async (req, res) => {
       message: body.message
         ? String(body.message).slice(0, 200)
         : "You have a new invitation from a founder.",
-      actionUrl: `/?view=virtual-office&tab=invitations&invitationId=${invitation._id}`,
+      actionUrl: chatDeepLink(founderId),
       metadata: {
         invitationId: String(invitation._id),
         founderId: String(founderId),
@@ -812,6 +861,9 @@ export const getReceivedFounderTalentInvitations = async (req, res) => {
 export const updateFounderTalentInvitationStatus = async (req, res) => {
   const invitation = await FounderTalentInvitation.findById(req.params.invitationId);
   if (!invitation) return apiError(res, "Invitation not found.", 404);
+  if (!isFounderTalentKind(invitation)) {
+    return apiError(res, "Only founder-talent invitations are supported here.", 422);
+  }
   if (!canAccessInvitation(req, invitation)) {
     return apiError(res, "Forbidden.", 403);
   }
@@ -908,8 +960,25 @@ export const updateFounderTalentInvitationStatus = async (req, res) => {
 export const addMessageToFounderTalentInvitation = async (req, res) => {
   const invitation = await FounderTalentInvitation.findById(req.params.invitationId);
   if (!invitation) return apiError(res, "Invitation not found.", 404);
+  if (!isFounderTalentKind(invitation)) {
+    return apiError(res, "Only founder-talent invitations are supported here.", 422);
+  }
   if (!canAccessInvitation(req, invitation)) {
     return apiError(res, "Forbidden.", 403);
+  }
+
+  const rawMessage = req.body?.message;
+  const text =
+    typeof rawMessage === "string"
+      ? rawMessage
+      : typeof rawMessage?.text === "string"
+        ? rawMessage.text
+        : String(req.body?.body || "").trim();
+  const attachments = normalizeAttachments(
+    req.body?.attachments || (typeof rawMessage === "object" ? rawMessage?.attachments : []) || [],
+  );
+  if (!messageHasContent(text, attachments)) {
+    return apiError(res, "Message body or at least one attachment is required.", 400);
   }
 
   const existing = Array.isArray(invitation.metadata?.messages) ? invitation.metadata.messages : [];
@@ -917,7 +986,13 @@ export const addMessageToFounderTalentInvitation = async (req, res) => {
     ...(invitation.metadata || {}),
     messages: [
       ...existing,
-      { senderId: req.user.id, body: req.body?.message || "", sentAt: new Date().toISOString() },
+      {
+        senderId: req.user.id,
+        body: text,
+        text,
+        attachments,
+        sentAt: new Date().toISOString(),
+      },
     ],
   };
 
@@ -967,10 +1042,11 @@ export const createInterest = async (req, res) => {
     messages: [],
   });
 
+  const talentUser = await User.findById(talentId, { name: 1 }).lean();
+  const talentName = talentUser?.name || "A talent";
+
   // Auto-send DM to founder so the interest appears in the Virtual Office chat
   try {
-    const talent = await User.findById(talentId, { name: 1 }).lean();
-    const talentName = talent?.name || "A talent";
     const startupLabel = body.startupTitle ? ` in "${body.startupTitle}"` : "";
     const dmBody = body.message
       ? `${talentName} is interested${startupLabel}: ${body.message}`
@@ -999,22 +1075,6 @@ export const createInterest = async (req, res) => {
     console.error("[createInterest] Failed to send interest DM:", dmErr.message);
   }
 
-  // Notify founder of the new interest.
-  await createNotification({
-    userId: body.founderId,
-    type: "interest-received",
-    title: "New interest in your startup",
-    message: body.message
-      ? `New interest: ${String(body.message).slice(0, 200)}`
-      : "A talent expressed interest in your startup.",
-    actionUrl: `/?view=virtual-office&tab=inbox&interestId=${interest._id}`,
-    metadata: {
-      interestId: String(interest._id),
-      talentId: String(talentId),
-      startupId: String(body.startupId || ""),
-    },
-  }).catch(() => null);
-
   // Emit real-time event to founder's room for instant inbox update
   emitRealtime(SOCKET_EVENTS.INTEREST_CREATED, {
     interest: {
@@ -1027,6 +1087,19 @@ export const createInterest = async (req, res) => {
       createdAt: interest.createdAt,
     },
   }, [userRoom(body.founderId)]);
+
+  await createNotification({
+    userId: body.founderId,
+    type: "interest-received",
+    title: "New talent interest",
+    message: `${talentName} expressed interest in your startup.`,
+    actionUrl: chatDeepLink(talentId),
+    metadata: {
+      talentId: String(talentId),
+      interestId: String(interest._id),
+      founderId: String(body.founderId),
+    },
+  }).catch(() => null);
 
   return apiSuccess(res, interest, 201);
 };
@@ -1186,9 +1259,29 @@ export const addMessageToInterest = async (req, res) => {
     return apiError(res, "Forbidden.", 403);
   }
 
+  const rawMessage = req.body?.message;
+  const text =
+    typeof rawMessage === "string"
+      ? rawMessage
+      : typeof rawMessage?.text === "string"
+        ? rawMessage.text
+        : String(req.body?.body || "").trim();
+  const attachments = normalizeAttachments(
+    req.body?.attachments || (typeof rawMessage === "object" ? rawMessage?.attachments : []) || [],
+  );
+  if (!messageHasContent(text, attachments)) {
+    return apiError(res, "Message body or at least one attachment is required.", 400);
+  }
+
   interest.messages = [
     ...(interest.messages || []),
-    { senderId: req.user.id, body: req.body?.message || "", sentAt: new Date().toISOString() },
+    {
+      senderId: req.user.id,
+      body: text,
+      text,
+      attachments,
+      sentAt: new Date().toISOString(),
+    },
   ];
 
   await interest.save();
@@ -1201,6 +1294,75 @@ export const addMessageToInterest = async (req, res) => {
     res,
     serializeInterest(interest.toObject(), { usersById, startupsById, talentProfilesById }),
   );
+};
+
+export const deleteInterest = async (req, res) => {
+  const interest = await Interest.findById(req.params.interestId);
+  if (!interest) return apiError(res, "Interest not found.", 404);
+  if (!canAccessInterest(req, interest)) {
+    return apiError(res, "Forbidden.", 403);
+  }
+  if (interest.status === "accepted") {
+    return apiError(
+      res,
+      "Cannot remove an accepted interest. Manage the team member from your roster instead.",
+      409,
+    );
+  }
+
+  const payload = {
+    interest: {
+      id: String(interest._id),
+      talentId: String(interest.talentId),
+      founderId: String(interest.founderId),
+      deleted: true,
+    },
+  };
+
+  await Interest.findByIdAndDelete(req.params.interestId);
+
+  emitRealtime(SOCKET_EVENTS.INTEREST_UPDATED, payload, [
+    userRoom(interest.founderId),
+    userRoom(interest.talentId),
+  ]);
+
+  return apiSuccess(res, { deleted: true, id: String(interest._id) });
+};
+
+export const deleteFounderTalentInvitation = async (req, res) => {
+  const invitation = await FounderTalentInvitation.findById(req.params.invitationId);
+  if (!invitation) return apiError(res, "Invitation not found.", 404);
+  if (!isFounderTalentKind(invitation)) {
+    return apiError(res, "Only founder-talent invitations are supported here.", 422);
+  }
+  if (!canAccessInvitation(req, invitation)) {
+    return apiError(res, "Forbidden.", 403);
+  }
+  if (invitation.status === "accepted") {
+    return apiError(
+      res,
+      "Cannot remove an accepted invitation. Manage the team member from your roster instead.",
+      409,
+    );
+  }
+
+  const eventPayload = {
+    invitation: {
+      id: String(invitation._id),
+      founderId: String(invitation.founderId),
+      talentId: String(invitation.talentId || ""),
+      deleted: true,
+    },
+  };
+
+  await FounderTalentInvitation.findByIdAndDelete(req.params.invitationId);
+
+  emitRealtime(SOCKET_EVENTS.INVITATION_UPDATED, eventPayload, [
+    userRoom(invitation.founderId),
+    ...(invitation.talentId ? [userRoom(invitation.talentId)] : []),
+  ]);
+
+  return apiSuccess(res, { deleted: true, id: String(invitation._id) });
 };
 
 export const onboardFounderTalentInvitation = async (req, res) => {
@@ -1216,6 +1378,11 @@ export const onboardFounderTalentInvitation = async (req, res) => {
       ).session(session);
       if (!invitation) {
         throw new Error("Invitation not found.");
+      }
+      if (!isFounderTalentKind(invitation)) {
+        const unprocessable = new Error("Only founder-talent invitations can onboard team members.");
+        unprocessable.statusCode = 422;
+        throw unprocessable;
       }
       if (!canAccessInvitation(req, invitation)) {
         const forbidden = new Error("Forbidden.");
@@ -1310,7 +1477,7 @@ export const onboardFounderTalentInvitation = async (req, res) => {
             type: "team-member-joined",
             title: "Team member joined",
             message: "A new team member has been onboarded to your startup.",
-            actionUrl: `/?view=virtual-office&tab=team`,
+            actionUrl: chatDeepLink(onboardedInvitation.talentId),
             metadata: {
               invitationId: String(onboardedInvitation._id),
               talentId: String(onboardedInvitation.talentId || ""),
@@ -1321,7 +1488,7 @@ export const onboardFounderTalentInvitation = async (req, res) => {
             type: "team-member-onboarded",
             title: "Welcome to the team",
             message: "You've been onboarded. Open the Virtual Office to begin.",
-            actionUrl: `/?view=virtual-office`,
+            actionUrl: officeDeepLink({ tab: "team" }),
             metadata: { invitationId: String(onboardedInvitation._id) },
           }).catch(() => null),
         ]);
@@ -1441,7 +1608,7 @@ export const onboardInterest = async (req, res) => {
             type: "team-member-joined",
             title: "Team member joined",
             message: "A new team member has joined your startup.",
-            actionUrl: `/?view=virtual-office&tab=team`,
+            actionUrl: chatDeepLink(onboardedInterest.talentId),
             metadata: {
               interestId: String(onboardedInterest._id),
               talentId: String(onboardedInterest.talentId || ""),
@@ -1452,7 +1619,7 @@ export const onboardInterest = async (req, res) => {
             type: "team-member-onboarded",
             title: "Welcome to the team",
             message: "You've been onboarded. Open the Virtual Office to begin.",
-            actionUrl: `/?view=virtual-office`,
+            actionUrl: officeDeepLink({ tab: "team" }),
             metadata: { interestId: String(onboardedInterest._id) },
           }).catch(() => null),
         ]);

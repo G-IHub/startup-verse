@@ -56,7 +56,7 @@ export default function Dashboard({ user, onLogout, onUpdateUser }) {
         //   return <PaginationTestPage userId={user.id} userRole={user.role as 'founder' | 'talent' | 'team-member'} />;
         // } else {
         //   return (
-        //     <div className="min-h-screen bg-gray-950 p-6 flex items-center justify-center">
+        //     <div className="min-h-screen bg-background p-6 flex items-center justify-center">
         //       <div className="text-center">
         //         <h1 className="text-xl font-bold text-white mb-2">Test Page Not Available</h1>
         //         <p className="text-gray-400 text-sm">Pagination test page is not loaded in this build.</p>
@@ -65,7 +65,7 @@ export default function Dashboard({ user, onLogout, onUpdateUser }) {
         //   );
         // }
         return (
-          <div className="min-h-screen bg-gray-950 p-6 flex items-center justify-center">
+          <div className="min-h-screen bg-background p-6 flex items-center justify-center">
             <div className="text-center">
               <h1 className="text-xl font-bold text-white mb-2">
                 Test Page Not Available

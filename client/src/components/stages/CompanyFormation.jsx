@@ -208,11 +208,11 @@ export default function CompanyFormation({ user, onBack }) {
               Set up your legal entity and foundational documents
             </p>
           </div>
-          <Card className="border-orange-200 dark:border-orange-800 bg-orange-50/50 dark:bg-orange-950/20">
+          <Card className="border-orange-200 bg-orange-50/50">
             <CardContent className="py-4">
               <div className="flex items-center justify-between gap-4">
                 <div className="flex items-center gap-3">
-                  <FastForward className="w-5 h-5 text-orange-600 dark:text-orange-400" />
+                  <FastForward className="w-5 h-5 text-orange-600" />
                   <div>
                     <p className="font-semibold text-sm">Already Completed?</p>
                     <p className="text-xs text-muted-foreground">
@@ -260,7 +260,7 @@ export default function CompanyFormation({ user, onBack }) {
                 </p>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                   <div className="flex items-start gap-2">
-                    <CheckCircle2 className="w-4 h-4 text-green-600 dark:text-green-400 flex-shrink-0 mt-0.5" />
+                    <CheckCircle2 className="w-4 h-4 text-green-600 flex-shrink-0 mt-0.5" />
                     <div>
                       <p className="text-xs font-semibold">
                         Business Name from ₦25,000
@@ -271,7 +271,7 @@ export default function CompanyFormation({ user, onBack }) {
                     </div>
                   </div>
                   <div className="flex items-start gap-2">
-                    <CheckCircle2 className="w-4 h-4 text-green-600 dark:text-green-400 flex-shrink-0 mt-0.5" />
+                    <CheckCircle2 className="w-4 h-4 text-green-600 flex-shrink-0 mt-0.5" />
                     <div>
                       <p className="text-xs font-semibold">
                         Limited Company from ₦95,000
@@ -282,7 +282,7 @@ export default function CompanyFormation({ user, onBack }) {
                     </div>
                   </div>
                   <div className="flex items-start gap-2">
-                    <CheckCircle2 className="w-4 h-4 text-green-600 dark:text-green-400 flex-shrink-0 mt-0.5" />
+                    <CheckCircle2 className="w-4 h-4 text-green-600 flex-shrink-0 mt-0.5" />
                     <div>
                       <p className="text-xs font-semibold">
                         Full Document Support

@@ -2,7 +2,6 @@ import React, { useState } from "react";
 import { Button } from "./ui/button";
 import { Card, CardContent } from "./ui/card";
 import { Separator } from "./ui/separator";
-import ThemeToggle from "./ThemeToggle";
 import { Rocket, Star, CheckCircle } from "lucide-react";
 import SignupModal from "./SignupModal";
 export default function SeamlessLandingPage({ onRoleSelect }) {
@@ -118,8 +117,8 @@ export default function SeamlessLandingPage({ onRoleSelect }) {
               <Card className="border-2 hover:shadow-lg transition-all mt-3">
                 <CardContent className="p-4">
                   <div className="flex items-center space-x-2.5 mb-3">
-                    <div className="w-9 h-9 rounded-full bg-purple-100 dark:bg-purple-950 flex items-center justify-center shrink-0">
-                      <Building className="w-4.5 h-4.5 text-purple-600 dark:text-purple-400" />
+                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-accent-tint">
+                      <Building className="h-4 w-4 text-accent" />
                     </div>
                     <div className="text-left">
                       <h4 className="text-base font-semibold">
@@ -150,7 +149,7 @@ export default function SeamlessLandingPage({ onRoleSelect }) {
                     </div>
                   </div>
                   <Button
-                    className="w-full mt-4 h-8 text-xs bg-purple-600 hover:bg-purple-700"
+                    className="mt-4 h-8 w-full text-xs bg-accent hover:bg-accent-dark"
                     onClick={() => handleRoleClick("organization-admin")}
                   >
                     Create Organization Account
@@ -180,9 +179,6 @@ export default function SeamlessLandingPage({ onRoleSelect }) {
           <div className="flex items-center gap-2">
             <Building className="w-5 h-5 text-muted-foreground" />
             <span className="text-base font-semibold">StartupVerse</span>
-          </div>
-          <div className="flex items-center gap-3">
-            <ThemeToggle />
           </div>
         </div>
       </div>

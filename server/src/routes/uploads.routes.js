@@ -4,24 +4,29 @@ import asyncHandler from "../utils/asyncHandler.js";
 import requireAuth from "../middleware/requireAuth.js";
 import { error as apiError, success as apiSuccess } from "../utils/apiResponse.js";
 import { uploadBuffer } from "../services/uploadService.js";
+import {
+  getMaxUploadBytesForScope,
+  isAllowedMessagesMime,
+} from "../utils/messageAttachments.js";
 
-const MAX_UPLOAD_BYTES = 10 * 1024 * 1024;
+const MESSAGES_MAX_UPLOAD_BYTES = 40 * 1024 * 1024;
 
 const upload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: MAX_UPLOAD_BYTES },
+  limits: { fileSize: MESSAGES_MAX_UPLOAD_BYTES },
 });
 
 const uploadsRouter = Router();
 
-// Map multer's typed errors onto our standard `apiError` envelope so the
-// client sees a consistent shape (status + message) regardless of whether
-// the file was too big or the request body was malformed.
 function handleMulter(req, res, next) {
   upload.single("file")(req, res, (err) => {
     if (err) {
       if (err.code === "LIMIT_FILE_SIZE") {
-        return apiError(res, "File is too large. Maximum is 10MB.", 413);
+        return apiError(
+          res,
+          "File is too large. Maximum is 40MB for chat attachments or 10MB for other uploads.",
+          413,
+        );
       }
       return apiError(res, err.message || "Upload failed.", 400);
     }
@@ -36,6 +41,23 @@ uploadsRouter.post(
   asyncHandler(async (req, res) => {
     if (!req.file) {
       return apiError(res, "file is required.", 400);
+    }
+    const scope = typeof req.body?.scope === "string" ? req.body.scope.trim() : "";
+    const maxBytes = getMaxUploadBytesForScope(scope);
+    if (req.file.size > maxBytes) {
+      const limitMb = Math.round(maxBytes / (1024 * 1024));
+      const msg =
+        scope === "messages"
+          ? `File is too large. Maximum is ${limitMb}MB for chat attachments.`
+          : `File is too large. Maximum is ${limitMb}MB.`;
+      return apiError(res, msg, 413);
+    }
+    if (scope === "messages" && !isAllowedMessagesMime(req.file.mimetype)) {
+      return apiError(
+        res,
+        "File type not allowed for chat. Use images, videos, PDF, or documents.",
+        400,
+      );
     }
     const result = await uploadBuffer({
       buffer: req.file.buffer,

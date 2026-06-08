@@ -5,15 +5,24 @@ export default {
       colors: {
         primary: {
           DEFAULT: "#3a5afe",
+          foreground: "#ffffff",
           hover: "#304ffe",
           dark: "#1a237e",
           tint: "#e8ebff",
         },
         accent: {
           DEFAULT: "#7c4dff",
+          foreground: "#ffffff",
           tint: "#ede7f6",
           dark: "#4527a0",
         },
+        /* Flat keys so utilities like text-primary-foreground resolve (not only CSS vars) */
+        "primary-foreground": "#ffffff",
+        "accent-foreground": "#ffffff",
+        "destructive-foreground": "#ffffff",
+        "secondary-foreground": "#0d0d0d",
+        "card-foreground": "#0d0d0d",
+        "popover-foreground": "#0d0d0d",
         text: {
           heading: "#0d0d0d",
           body: "#4a4a5a",

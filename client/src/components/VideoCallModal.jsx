@@ -70,7 +70,7 @@ export function VideoCallModal({
           </DialogTitle>
           <DialogDescription>Video call in progress</DialogDescription>
         </DialogHeader>
-        <div className="flex flex-col h-full bg-zinc-900 text-white">
+        <div className="flex flex-col h-full bg-card text-foreground">
           <div className="flex items-center justify-between px-6 py-4 border-b border-zinc-800">
             <div className="flex items-center space-x-3">
               <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse" />
@@ -174,7 +174,7 @@ export function VideoCallModal({
               </div>
             )}
           </div>
-          <div className="px-6 py-4 bg-zinc-900 border-t border-zinc-800">
+          <div className="px-6 py-4 bg-card border-t border-border">
             <div className="flex items-center justify-between">
               <div className="flex items-center space-x-2">
                 <Button

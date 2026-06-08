@@ -48,24 +48,24 @@ export function WeekCompletionCelebration({
     if (rate >= 90)
       return {
         level: "Outstanding",
-        color: "text-green-600 dark:text-green-400",
+        color: "text-green-600",
         icon: Trophy,
       };
     if (rate >= 70)
       return {
         level: "Great",
-        color: "text-blue-600 dark:text-blue-400",
+        color: "text-blue-600",
         icon: Award,
       };
     if (rate >= 50)
       return {
         level: "Good",
-        color: "text-yellow-600 dark:text-yellow-400",
+        color: "text-yellow-600",
         icon: CheckCircle2,
       };
     return {
       level: "Progress Made",
-      color: "text-orange-600 dark:text-orange-400",
+      color: "text-orange-600",
       icon: TrendingUp,
     };
   };
@@ -112,7 +112,7 @@ export function WeekCompletionCelebration({
         </div>
         <div className="p-6 space-y-6">
           <div className="flex justify-center">
-            <Card className="bg-gradient-to-br from-blue-50 to-purple-50 dark:from-blue-950/30 dark:to-purple-950/30 border-blue-200 dark:border-blue-800">
+            <Card className="bg-gradient-to-br from-blue-50 to-purple-50 border-blue-200">
               <CardContent className="p-6 text-center">
                 <PerformanceIcon
                   className={cn("size-12 mx-auto mb-3", performance.color)}
@@ -122,13 +122,13 @@ export function WeekCompletionCelebration({
                 >
                   {Math.round(completionData.completionRate)}%
                 </div>
-                <div className="text-sm text-gray-600 dark:text-gray-400 mb-2">
+                <div className="text-sm text-gray-600 mb-2">
                   {performance.level}
                   {" Performance"}
                 </div>
                 <Progress
                   value={completionData.completionRate}
-                  className="h-2 bg-white dark:bg-gray-800"
+                  className="h-2 bg-white"
                 />
               </CardContent>
             </Card>
@@ -137,15 +137,15 @@ export function WeekCompletionCelebration({
             <Card>
               <CardContent className="p-4">
                 <div className="flex items-center gap-3">
-                  <div className="p-2 bg-green-100 dark:bg-green-900/30 rounded-lg">
-                    <CheckCircle2 className="size-5 text-green-600 dark:text-green-400" />
+                  <div className="p-2 bg-green-100 rounded-lg">
+                    <CheckCircle2 className="size-5 text-green-600" />
                   </div>
                   <div>
-                    <div className="text-2xl font-bold text-gray-900 dark:text-gray-100">
+                    <div className="text-2xl font-bold text-gray-900">
                       {completionData.completedTasks}/
                       {completionData.totalTasks}
                     </div>
-                    <div className="text-sm text-gray-600 dark:text-gray-400">
+                    <div className="text-sm text-gray-600">
                       Tasks Completed
                     </div>
                   </div>
@@ -155,15 +155,15 @@ export function WeekCompletionCelebration({
             <Card>
               <CardContent className="p-4">
                 <div className="flex items-center gap-3">
-                  <div className="p-2 bg-blue-100 dark:bg-blue-900/30 rounded-lg">
-                    <Target className="size-5 text-blue-600 dark:text-blue-400" />
+                  <div className="p-2 bg-blue-100 rounded-lg">
+                    <Target className="size-5 text-blue-600" />
                   </div>
                   <div>
-                    <div className="text-2xl font-bold text-gray-900 dark:text-gray-100">
+                    <div className="text-2xl font-bold text-gray-900">
                       {completionData.completedMilestones}/
                       {completionData.totalMilestones}
                     </div>
-                    <div className="text-sm text-gray-600 dark:text-gray-400">
+                    <div className="text-sm text-gray-600">
                       Milestones Hit
                     </div>
                   </div>
@@ -171,7 +171,7 @@ export function WeekCompletionCelebration({
               </CardContent>
             </Card>
           </div>
-          <div className="flex items-center justify-center gap-2 text-sm text-gray-600 dark:text-gray-400">
+          <div className="flex items-center justify-center gap-2 text-sm text-gray-600">
             <Calendar className="size-4" />
             <span>
               {formatDate(completionData.startDate)}
@@ -181,24 +181,24 @@ export function WeekCompletionCelebration({
           </div>
           {completionData.streakDays !== undefined &&
             completionData.streakDays > 0 && (
-              <Card className="bg-gradient-to-r from-orange-50 to-red-50 dark:from-orange-950/30 dark:to-red-950/30 border-orange-200 dark:border-orange-800">
+              <Card className="bg-gradient-to-r from-orange-50 to-red-50 border-orange-200">
                 <CardContent className="p-4">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
-                      <Sparkles className="size-5 text-orange-600 dark:text-orange-400" />
+                      <Sparkles className="size-5 text-orange-600" />
                       <div>
-                        <div className="text-sm font-semibold text-gray-900 dark:text-gray-100">
+                        <div className="text-sm font-semibold text-gray-900">
                           {completionData.streakDays}
                           {" Day Streak"}
                         </div>
-                        <div className="text-xs text-gray-600 dark:text-gray-400">
+                        <div className="text-xs text-gray-600">
                           Keep the momentum going!
                         </div>
                       </div>
                     </div>
                     <Badge
                       variant="outline"
-                      className="bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300 border-orange-300 dark:border-orange-700"
+                      className="bg-orange-100 text-orange-700 border-orange-300"
                     >
                       +{completionData.streakDays}
                       {" bonus"}
@@ -207,8 +207,8 @@ export function WeekCompletionCelebration({
                 </CardContent>
               </Card>
             )}
-          <div className="text-center p-4 bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-950/20 dark:to-purple-950/20 rounded-lg border border-blue-100 dark:border-blue-900">
-            <p className="text-sm text-gray-700 dark:text-gray-300">
+          <div className="text-center p-4 bg-gradient-to-r from-blue-50 to-purple-50 rounded-lg border border-blue-100">
+            <p className="text-sm text-gray-700">
               {getMotivationalMessage(completionData.completionRate)}
             </p>
           </div>

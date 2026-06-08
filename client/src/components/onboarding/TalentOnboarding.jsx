@@ -282,8 +282,8 @@ export default function TalentOnboarding({
       case 3:
         return (
           <div className="text-center space-y-3">
-            <div className="w-10 h-10 bg-green-100 dark:bg-green-900/20 rounded-full flex items-center justify-center mx-auto">
-              <Star className="w-5 h-5 text-green-600 dark:text-green-400" />
+            <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center mx-auto">
+              <Star className="w-5 h-5 text-green-600" />
             </div>
             <h2 className="text-lg">You're All Set! 🎉</h2>
             <p className="text-muted-foreground max-w-2xl mx-auto text-sm">
@@ -294,7 +294,7 @@ export default function TalentOnboarding({
               <CardContent className="p-3">
                 <div className="space-y-2.5 text-left">
                   <div className="flex items-center space-x-2">
-                    <div className="w-7 h-7 bg-blue-100 dark:bg-blue-900/20 rounded-full flex items-center justify-center">
+                    <div className="w-7 h-7 bg-blue-100 rounded-full flex items-center justify-center">
                       <Rocket className="w-3.5 h-3.5 text-blue-600" />
                     </div>
                     <div>
@@ -305,7 +305,7 @@ export default function TalentOnboarding({
                     </div>
                   </div>
                   <div className="flex items-center space-x-2">
-                    <div className="w-7 h-7 bg-purple-100 dark:bg-purple-900/20 rounded-full flex items-center justify-center">
+                    <div className="w-7 h-7 bg-purple-100 rounded-full flex items-center justify-center">
                       <Heart className="w-3.5 h-3.5 text-purple-600" />
                     </div>
                     <div>
@@ -316,7 +316,7 @@ export default function TalentOnboarding({
                     </div>
                   </div>
                   <div className="flex items-center space-x-2">
-                    <div className="w-7 h-7 bg-green-100 dark:bg-green-900/20 rounded-full flex items-center justify-center">
+                    <div className="w-7 h-7 bg-green-100 rounded-full flex items-center justify-center">
                       <Target className="w-3.5 h-3.5 text-green-600" />
                     </div>
                     <div>

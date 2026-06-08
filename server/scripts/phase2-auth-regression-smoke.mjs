@@ -27,6 +27,8 @@ async function main() {
   assertContains(authController, "isAdmin: false", "signup admin hardening", failures);
   assertContains(authController, "allowedSignupRoles", "signup role whitelist", failures);
   assertContains(authController, '"organization-admin"', "org-admin signup role support", failures);
+  assertContains(authController, "googleAuth", "Google auth controller", failures);
+  assertContains(authController, "email_verified !== true", "Google verified email enforcement", failures);
 
   assertContains(usersRoutes, 'requireSelfOrAdmin("userId")', "users self-or-admin checks", failures);
   assertContains(teamRoutes, 'requireSelfOrAdmin("teamMemberId")', "team-member self-or-admin checks", failures);

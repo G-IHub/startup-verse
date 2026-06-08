@@ -37,7 +37,7 @@ export default function EmailSetupPrompt() {
   }
 
   return (
-    <Card className="border-blue-200 dark:border-blue-800">
+    <Card className="border-blue-200">
       <CardHeader>
         <div className="flex items-center gap-2">
           <Mail className="w-5 h-5 text-blue-600" />

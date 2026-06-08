@@ -26,7 +26,7 @@ export function AdminBadge() {
         <TooltipTrigger asChild={true}>
           <Badge
             variant="outline"
-            className="gap-1.5 bg-purple-50 dark:bg-purple-950/30 border-purple-200 dark:border-purple-800 text-purple-700 dark:text-purple-300 hover:bg-purple-100 dark:hover:bg-purple-900/40 cursor-help"
+            className="gap-1.5 bg-purple-50 border-purple-200 text-purple-700 hover:bg-purple-100 cursor-help"
           >
             <Shield className="w-3 h-3" />
             <span className="text-xs font-medium">Admin</span>

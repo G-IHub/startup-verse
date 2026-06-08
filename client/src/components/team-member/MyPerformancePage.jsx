@@ -23,12 +23,12 @@ import { useTeamMemberPerformanceData } from "../../domains/team-member/hooks/us
 
 function momentumTone(tone) {
   if (tone === "strong") {
-    return "border-green-300 bg-green-50 text-green-800 dark:border-green-800 dark:bg-green-950/20 dark:text-green-200";
+    return "border-green-300 bg-green-50 text-green-800";
   }
   if (tone === "steady") {
-    return "border-blue-300 bg-blue-50 text-blue-800 dark:border-blue-800 dark:bg-blue-950/20 dark:text-blue-200";
+    return "border-blue-300 bg-blue-50 text-blue-800";
   }
-  return "border-amber-300 bg-amber-50 text-amber-800 dark:border-amber-800 dark:bg-amber-950/20 dark:text-amber-200";
+  return "border-amber-300 bg-amber-50 text-amber-800";
 }
 
 function formatDate(value) {
@@ -64,19 +64,19 @@ export default function MyPerformancePage({ user }) {
       </section>
 
       {error ? (
-        <Card className="border-amber-300 bg-amber-50 dark:border-amber-800 dark:bg-amber-950/20">
+        <Card className="border-amber-300 bg-amber-50">
           <CardContent className="flex items-start gap-2 py-3">
-            <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-amber-700 dark:text-amber-300" />
-            <p className="text-sm text-amber-800 dark:text-amber-200">{error}</p>
+            <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-amber-700" />
+            <p className="text-sm text-amber-800">{error}</p>
           </CardContent>
         </Card>
       ) : null}
 
       {!loadingMetrics && !hasPerformanceContract ? (
-        <Card className="border-amber-300 bg-amber-50 dark:border-amber-800 dark:bg-amber-950/20">
+        <Card className="border-amber-300 bg-amber-50">
           <CardContent className="flex items-start gap-2 py-3">
-            <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-amber-700 dark:text-amber-300" />
-            <p className="text-sm text-amber-800 dark:text-amber-200">
+            <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-amber-700" />
+            <p className="text-sm text-amber-800">
               Live performance contract data is unavailable right now. The page is using task-driven fallback metrics.
             </p>
           </CardContent>

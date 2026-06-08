@@ -6,6 +6,7 @@
  */
 
 import { request } from "../backendClient";
+import { normalizePresenceRow } from "../../domains/presence/presenceModel.js";
 
 // Helper function for API requests
 async function apiRequest(endpoint, options = {}) {
@@ -101,7 +102,10 @@ export async function getStartupTeamMembers(startupId, params = {}) {
     const presenceRows = Array.isArray(presenceRaw.value) ? presenceRaw.value : [];
 
     const presenceById = new Map(
-      presenceRows.map((row) => [String(row.userId || row.id || ""), row]),
+      presenceRows
+        .map((row) => normalizePresenceRow(row))
+        .filter(Boolean)
+        .map((row) => [row.userId, row]),
     );
 
     const members = baseMembers
@@ -118,6 +122,7 @@ export async function getStartupTeamMembers(startupId, params = {}) {
           avatar: m.avatar || "",
           title: m.title || "",
           skills: Array.isArray(m.skills) ? m.skills : [],
+          connection: presence?.connection || "offline",
           isOnline: presence ? Boolean(presence.isOnline) : false,
           statusText: presence ? String(presence.statusText || "") : "",
           mood: presence ? String(presence.mood || "") : "",
@@ -135,16 +140,19 @@ export async function getStartupTeamMembers(startupId, params = {}) {
     try {
       const presenceRows = await apiRequest(`/presence/${startupId}`, { method: "GET" });
       const members = (Array.isArray(presenceRows) ? presenceRows : [])
-        .map((row) => ({
-          id: String(row.userId || row.id || ""),
-          userId: String(row.userId || row.id || ""),
-          name: String(row.userName || row.name || "Team member"),
-          role: String(row.role || "team-member"),
-          isOnline: Boolean(row.isOnline),
-          statusText: String(row.statusText || ""),
-          mood: String(row.mood || ""),
-          startupId: String(row.startupId || startupId || ""),
-          lastSeenAt: row.lastSeenAt || null,
+        .map((row) => normalizePresenceRow(row))
+        .filter(Boolean)
+        .map((presence) => ({
+          id: presence.userId,
+          userId: presence.userId,
+          name: presence.userName || presence.name || "Team member",
+          role: presence.role || "team-member",
+          connection: presence.connection,
+          isOnline: presence.isOnline,
+          statusText: presence.statusText || "",
+          mood: String(presence.mood || ""),
+          startupId: String(presence.startupId || startupId || ""),
+          lastSeenAt: presence.lastSeenAt || null,
         }))
         .filter((row) => row.id);
       console.log(`Team context fetched from presence fallback: ${members.length}`);

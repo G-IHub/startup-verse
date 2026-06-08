@@ -711,10 +711,8 @@ function AppContent() {
 // ---------------------------------------------------------------------------
 
 function AppProvidersInner() {
-  const { user, isLoading } = useAuth();
-  const userId = user ? String(user._id ?? user.id ?? "") : null;
   return (
-    <ThemeProvider userId={userId} authReady={!isLoading}>
+    <ThemeProvider>
       <NotificationProvider>
         <AppContent />
       </NotificationProvider>

@@ -133,7 +133,7 @@ export default function CompensationDemoPage({ user }) {
     <div className="p-2 md:p-3 space-y-2 md:space-y-2.5">
       <div className="space-y-1">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-primary/10 dark:bg-primary/20 rounded-lg flex items-center justify-center">
+          <div className="w-10 h-10 bg-primary/10 rounded-lg flex items-center justify-center">
             <Users className="w-6 h-6 text-primary" />
           </div>
           <div>
@@ -144,15 +144,15 @@ export default function CompensationDemoPage({ user }) {
           </div>
         </div>
       </div>
-      <Card className="bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-950/20 dark:to-purple-950/20 border-blue-200 dark:border-blue-800">
+      <Card className="bg-gradient-to-r from-blue-50 to-purple-50 border-blue-200">
         <CardContent className="p-4">
           <div className="flex items-start gap-3">
-            <CheckCircle2 className="w-5 h-5 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" />
+            <CheckCircle2 className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
             <div>
-              <p className="text-sm font-medium text-blue-900 dark:text-blue-100 mb-1">
+              <p className="text-sm font-medium text-blue-900 mb-1">
                 Complete Compensation Flow
               </p>
-              <p className="text-sm text-blue-700 dark:text-blue-300">
+              <p className="text-sm text-blue-700">
                 This demo shows the complete flow: Accept Talent → Set
                 Compensation → Create Contract. Try accepting one of the talent
                 below to set up their compensation package.
@@ -175,7 +175,7 @@ export default function CompensationDemoPage({ user }) {
           <CardContent className="space-y-3">
             {pendingApplications.length === 0 ? (
               <div className="text-center py-8">
-                <CheckCircle2 className="w-12 h-12 text-green-600 dark:text-green-400 mx-auto mb-3 opacity-50" />
+                <CheckCircle2 className="w-12 h-12 text-green-600 mx-auto mb-3 opacity-50" />
                 <p className="text-sm font-medium mb-1">
                   All Applications Processed! 🎉
                 </p>
@@ -279,7 +279,7 @@ export default function CompensationDemoPage({ user }) {
                 {contracts.map((contract, idx) => (
                   <div
                     key={idx}
-                    className="p-3 border rounded-lg bg-green-50 dark:bg-green-950/20 border-green-200 dark:border-green-800"
+                    className="p-3 border rounded-lg bg-green-50 border-green-200"
                   >
                     <div className="flex items-start gap-3">
                       <Avatar className="w-8 h-8 flex-shrink-0">
@@ -416,8 +416,8 @@ export default function CompensationDemoPage({ user }) {
               in "Active Contracts"
             </p>
           </div>
-          <div className="mt-4 p-3 bg-blue-50 dark:bg-blue-950/20 rounded-lg">
-            <p className="text-xs text-blue-700 dark:text-blue-300">
+          <div className="mt-4 p-3 bg-blue-50 rounded-lg">
+            <p className="text-xs text-blue-700">
               <strong>💡 Tip:</strong>
               {
                 " To see the team member's view, navigate to the \"Performance\" page in the sidebar. The compensation status will appear there (though you'll need to simulate being a team member with a contract)."

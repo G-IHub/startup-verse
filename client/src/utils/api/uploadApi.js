@@ -17,26 +17,57 @@ import { unwrapData } from "../apiEnvelope.js";
  * @param {string} [scope] - storage namespace
  * @returns {Promise<{ url: string; key: string; mimeType: string; size: number }>}
  */
-export async function uploadFile(file, scope = "general") {
-  if (!file) {
-    throw new Error("uploadFile: file is required");
+function parseUploadResponse(xhr) {
+  let json = {};
+  try {
+    json = JSON.parse(xhr.responseText || "{}");
+  } catch {
+    json = {};
   }
-  const form = new FormData();
-  form.append("file", file);
-  if (scope) form.append("scope", String(scope));
+  if (xhr.status >= 200 && xhr.status < 300) {
+    return unwrapData(json);
+  }
+  const message =
+    json?.message || json?.error || xhr.statusText || "Upload failed.";
+  const err = new Error(message);
+  err.status = xhr.status;
+  throw err;
+}
 
-  const res = await fetch(`${API_BASE_URL}/uploads`, {
-    method: "POST",
-    credentials: "include",
-    body: form,
-  });
-  const json = await res.json().catch(() => ({}));
-  if (!res.ok) {
-    const message =
-      json?.message || json?.error || res.statusText || "Upload failed.";
-    const err = new Error(message);
-    err.status = res.status;
-    throw err;
+/**
+ * Upload with progress events (0–100). Used by chat composer.
+ */
+export function uploadFileWithProgress(file, scope = "general", onProgress) {
+  if (!file) {
+    return Promise.reject(new Error("uploadFileWithProgress: file is required"));
   }
-  return unwrapData(json);
+  return new Promise((resolve, reject) => {
+    const form = new FormData();
+    form.append("file", file);
+    if (scope) form.append("scope", String(scope));
+
+    const xhr = new XMLHttpRequest();
+    xhr.open("POST", `${API_BASE_URL}/uploads`);
+    xhr.withCredentials = true;
+
+    xhr.upload.onprogress = (event) => {
+      if (!event.lengthComputable || typeof onProgress !== "function") return;
+      const pct = Math.round((event.loaded / event.total) * 100);
+      onProgress(pct);
+    };
+
+    xhr.onload = () => {
+      try {
+        resolve(parseUploadResponse(xhr));
+      } catch (err) {
+        reject(err);
+      }
+    };
+    xhr.onerror = () => reject(new Error("Upload failed."));
+    xhr.send(form);
+  });
+}
+
+export async function uploadFile(file, scope = "general") {
+  return uploadFileWithProgress(file, scope);
 }

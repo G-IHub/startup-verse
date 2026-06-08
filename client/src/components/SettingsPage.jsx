@@ -1,17 +1,8 @@
 import React, { useState } from "react";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "./ui/card";
+import { Card, CardContent } from "./ui/card";
 import { Button } from "./ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
-import { Label } from "./ui/label";
-import { Switch } from "./ui/switch";
 import { Badge } from "./ui/badge";
-import { Separator } from "./ui/separator";
 import {
   Dialog,
   DialogContent,
@@ -49,6 +40,17 @@ import { wipeLegacyStartupVerseStorage } from "../utils/clearLegacyClientStorage
 import { leaveStartup } from "../utils/api/teamMemberApi";
 import { AdminDatabaseClear } from "./AdminDatabaseClear";
 import ProfilePage from "./ProfilePage";
+import {
+  SettingsPanelCard,
+  SettingsGroup,
+  SettingsToggleRow,
+  SettingsActionRow,
+  SETTINGS_CARD,
+  settingsBtnPrimary,
+  settingsBtnOutline,
+  settingsBtnDangerOutline,
+  settingsBtnDanger,
+} from "./settings/SettingsPrimitives.jsx";
 export default function SettingsPage({
   user,
   onUpdateUser,
@@ -205,23 +207,23 @@ export default function SettingsPage({
     }
   };
   const tabTriggerClass =
-    "rounded-none border-0 border-b-2 border-transparent bg-transparent font-body font-medium text-text-body shadow-none transition-colors duration-200 ease-in-out hover:text-primary data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:font-semibold data-[state=active]:text-primary data-[state=active]:shadow-none [&_svg]:text-text-muted data-[state=active]:[&_svg]:text-primary hover:[&_svg]:text-primary";
+    "rounded-none border-0 border-b-2 border-transparent bg-transparent px-1 pb-3 pt-1 font-body text-sm font-medium text-text-muted shadow-none transition-colors duration-200 ease-in-out hover:text-primary data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:font-semibold data-[state=active]:text-primary data-[state=active]:shadow-none [&_svg]:text-text-muted data-[state=active]:[&_svg]:text-primary hover:[&_svg]:text-primary";
 
   return (
-    <div className="min-h-full space-y-3 bg-surface-page p-2 font-body md:space-y-4 md:p-3 lg:p-4">
-      <div>
-        <h1 className="mb-2 font-heading text-2xl font-bold text-text-heading">
+    <div className="min-h-full space-y-4 bg-surface-page p-2 font-body md:space-y-5 md:p-3 lg:p-4">
+      <div className="w-full">
+        <h1 className="mb-1 font-heading text-xl font-extrabold text-text-heading md:text-2xl">
           Settings
         </h1>
-        <p className="font-body text-sm text-text-body">
+        <p className="font-body text-xs text-text-body md:text-sm">
           {hasVirtualOffice
-            ? "Manage your platform preferences, Virtual Office settings, and data"
-            : "Manage your platform preferences and data"}
+            ? "Profile, Virtual Office preferences, and data controls"
+            : "Profile, preferences, and account controls"}
         </p>
       </div>
       <Tabs defaultValue="profile" className="w-full">
         {hasVirtualOffice ? (
-          <TabsList className="grid h-auto min-h-10 w-full grid-cols-3 gap-0 rounded-none border-0 border-b border-surface-border bg-transparent p-0 lg:w-[600px]">
+          <TabsList className="grid h-auto min-h-10 w-full grid-cols-3 gap-0 rounded-none border-0 border-b border-surface-border bg-transparent p-0">
             <TabsTrigger value="profile" className={tabTriggerClass}>
               <UserCircle className="mr-2 h-4 w-4" />
               Profile
@@ -236,7 +238,7 @@ export default function SettingsPage({
             </TabsTrigger>
           </TabsList>
         ) : (
-          <TabsList className="grid h-auto min-h-10 w-full grid-cols-2 gap-0 rounded-none border-0 border-b border-surface-border bg-transparent p-0 lg:w-[400px]">
+          <TabsList className="grid h-auto min-h-10 w-full grid-cols-2 gap-0 rounded-none border-0 border-b border-surface-border bg-transparent p-0">
             <TabsTrigger value="profile" className={tabTriggerClass}>
               <UserCircle className="mr-2 h-4 w-4" />
               Profile
@@ -247,74 +249,57 @@ export default function SettingsPage({
             </TabsTrigger>
           </TabsList>
         )}
-        <TabsContent value="profile" className="space-y-0">
+        <TabsContent value="profile" className="mt-4 w-full space-y-4">
           {user && onUpdateUser ? (
             <ProfilePage
               user={user}
               onUpdateUser={onUpdateUser}
               initialEditing={initialProfileEditing}
+              embeddedInSettings
             />
           ) : (
-            <Card className="border-0 bg-surface-card shadow-soft rounded-card">
-              <CardContent className="pt-6">
-                <p className="text-center font-body text-text-muted">
+            <Card className={SETTINGS_CARD}>
+              <CardContent className="py-8">
+                <p className="text-center font-body text-sm text-text-muted">
                   Profile settings not available
                 </p>
               </CardContent>
             </Card>
           )}
           {isTeamMember && (
-            <Card className="mt-4 border-0 bg-surface-card shadow-soft rounded-card">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2 font-heading text-base font-semibold text-text-heading">
-                  <Building2 className="h-5 w-5 text-primary" />
-                  Startup Membership
-                </CardTitle>
-                <CardDescription className="font-body text-text-body">
-                  You are currently an active team member of a startup.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex flex-wrap items-center gap-3">
-                  <div className="flex items-center gap-2">
-                    <Users className="h-4 w-4 text-text-muted" />
-                    <span className="font-body text-sm text-text-muted">
-                      Role:
-                    </span>
-                    <Badge variant="secondary">Team Member</Badge>
-                  </div>
-                  {user?.startupId && (
-                    <div className="flex items-center gap-2">
-                      <Building2 className="h-4 w-4 text-text-muted" />
-                      <span className="font-body text-sm text-text-muted">
-                        Startup ID:
-                      </span>
-                      <Badge variant="outline" className="font-mono text-xs">
-                        {String(user.startupId).slice(-8)}
-                      </Badge>
-                    </div>
-                  )}
-                </div>
-                <Separator className="bg-surface-border" />
-                <div className="space-y-2">
-                  <p className="font-body text-sm text-text-body">
-                    Leaving will revert your role to <strong>talent</strong>{" "}
-                    and detach you from the startup. All your profile data —
-                    skills, experience, education, and certifications — will be
-                    fully preserved. You can be re-onboarded to a startup at any
-                    time.
-                  </p>
-                  <Button
+            <SettingsPanelCard
+              className="mt-4"
+              icon={Building2}
+              title="Startup membership"
+              description="You are an active team member of a startup"
+            >
+              <div className="flex flex-wrap items-center gap-2">
+                <Badge className="rounded-full border-0 bg-primary-tint px-2.5 py-0.5 font-body text-[11px] font-semibold text-primary">
+                  Team member
+                </Badge>
+                {user?.startupId ? (
+                  <Badge
                     variant="outline"
-                    className="rounded-input border border-status-error/40 bg-surface-card font-body font-semibold text-status-error transition-colors duration-200 ease-in-out hover:border-status-error hover:bg-surface-card hover:text-status-error"
-                    onClick={() => setShowLeaveConfirm(true)}
+                    className="rounded-full border-surface-border font-mono text-[10px] text-text-muted"
                   >
-                    <LogOut className="mr-2 h-4 w-4" />
-                    Leave Startup
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
+                    …{String(user.startupId).slice(-8)}
+                  </Badge>
+                ) : null}
+              </div>
+              <p className="font-body text-xs leading-relaxed text-text-body md:text-sm">
+                Leaving reverts your role to <strong className="text-text-heading">talent</strong>{" "}
+                and detaches you from the startup. Your profile data stays intact and you can join
+                another team later.
+              </p>
+              <Button
+                variant="outline"
+                className={settingsBtnDangerOutline}
+                onClick={() => setShowLeaveConfirm(true)}
+              >
+                <LogOut className="mr-2 h-4 w-4" />
+                Leave startup
+              </Button>
+            </SettingsPanelCard>
           )}
         </TabsContent>
 
@@ -342,14 +327,14 @@ export default function SettingsPage({
             <DialogFooter className="gap-2">
               <Button
                 variant="outline"
-                className="rounded-input border border-surface-border bg-surface-card font-body font-semibold text-text-body transition-colors duration-200 ease-in-out hover:border-status-error hover:text-status-error"
+                className={settingsBtnOutline}
                 onClick={() => setShowLeaveConfirm(false)}
                 disabled={isLeaving}
               >
                 Cancel
               </Button>
               <Button
-                variant="destructive"
+                className={settingsBtnDanger}
                 onClick={handleLeaveStartup}
                 disabled={isLeaving}
               >
@@ -363,342 +348,208 @@ export default function SettingsPage({
           </DialogContent>
         </Dialog>
         {hasVirtualOffice && (
-          <TabsContent value="virtual-office" className="space-y-4">
-            <Card className="border-0 bg-surface-card shadow-soft rounded-card">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2 font-heading text-base font-semibold text-text-heading">
-                  <Monitor className="h-5 w-5 text-primary" />
-                  Virtual Office Preferences
-                </CardTitle>
-                <CardDescription className="font-body text-text-body">
-                  Control workspace visibility and collaboration features
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                <div className="space-y-4">
-                  <div className="flex items-start justify-between space-x-4">
-                    <div className="flex-1 space-y-1">
-                      <div className="flex items-center gap-2">
-                        <Radio className="h-4 w-4 text-primary" />
-                        <Label
-                          htmlFor="show-activity-feed"
-                          className="font-body text-base font-medium text-text-heading"
-                        >
-                          Live Activity Feed
-                        </Label>
-                      </div>
-                      <p className="font-body text-sm text-text-muted">
-                        Display real-time team activities in the sidebar
-                      </p>
-                    </div>
-                    <Switch
-                      id="show-activity-feed"
-                      checked={officeSettings.settings.showActivityFeed}
-                      onCheckedChange={(checked) =>
-                        officeSettings.updateSettings({
-                          showActivityFeed: checked,
-                        })
-                      }
-                    />
-                  </div>
-                </div>
-                <Separator className="bg-surface-border" />
-                <div className="space-y-4">
-                  <div className="flex items-start justify-between space-x-4">
-                    <div className="flex-1 space-y-1">
-                      <div className="flex items-center gap-2">
-                        <Users className="h-4 w-4 text-primary" />
-                        <Label
-                          htmlFor="show-presence-bar"
-                          className="font-body text-base font-medium text-text-heading"
-                        >
-                          Team Presence Bar
-                        </Label>
-                      </div>
-                      <p className="font-body text-sm text-text-muted">
-                        Show who's online and their current status
-                      </p>
-                    </div>
-                    <Switch
-                      id="show-presence-bar"
-                      checked={officeSettings.settings.showPresenceBar}
-                      onCheckedChange={(checked) =>
-                        officeSettings.updateSettings({
-                          showPresenceBar: checked,
-                        })
-                      }
-                    />
-                  </div>
-                </div>
-                <Separator className="bg-surface-border" />
-                <div className="space-y-4">
-                  <div className="mb-2 flex items-center gap-2">
-                    <Bell className="h-4 w-4 text-primary" />
-                    <h3 className="font-heading text-base font-semibold text-text-heading">
-                      Notifications
-                    </h3>
-                  </div>
-                  <div className="flex items-start justify-between space-x-4">
-                    <div className="flex-1 space-y-1">
-                      <Label
-                        htmlFor="activity-notifications"
-                        className="font-body text-base font-medium text-text-heading"
-                      >
-                        Activity Notifications
-                      </Label>
-                      <p className="font-body text-sm text-text-muted">
-                        Get notified about team activities and updates
-                      </p>
-                    </div>
-                    <Switch
-                      id="activity-notifications"
-                      checked={officeSettings.settings.activityNotifications}
-                      onCheckedChange={(checked) =>
-                        officeSettings.updateSettings({
-                          activityNotifications: checked,
-                        })
-                      }
-                    />
-                  </div>
-                  <div className="flex items-start justify-between space-x-4">
-                    <div className="flex-1 space-y-1">
-                      <Label
-                        htmlFor="join-leave-alerts"
-                        className="font-body text-base font-medium text-text-heading"
-                      >
-                        Join/Leave Alerts
-                      </Label>
-                      <p className="font-body text-sm text-text-muted">
-                        Show alerts when team members join or leave
-                      </p>
-                    </div>
-                    <Switch
-                      id="join-leave-alerts"
-                      checked={officeSettings.settings.teamJoinLeaveAlerts}
-                      onCheckedChange={(checked) =>
-                        officeSettings.updateSettings({
-                          teamJoinLeaveAlerts: checked,
-                        })
-                      }
-                    />
-                  </div>
-                </div>
-                <Separator className="bg-surface-border" />
-                <div className="pt-2">
-                  <Button
-                    variant="outline"
-                    className="rounded-input border border-surface-border bg-surface-card font-body font-semibold text-text-body shadow-none transition-colors duration-200 ease-in-out hover:border-primary hover:text-primary"
-                    onClick={() => {
-                      officeSettings.resetToDefaults();
-                      toast.success("Settings reset to defaults");
-                    }}
-                  >
-                    Reset to Defaults
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
+          <TabsContent value="virtual-office" className="mt-4 w-full space-y-4">
+            <SettingsPanelCard
+              icon={Monitor}
+              title="Virtual Office"
+              description="Workspace visibility and collaboration"
+            >
+              <SettingsGroup title="Workspace">
+                <SettingsToggleRow
+                  id="show-activity-feed"
+                  icon={Radio}
+                  title="Live activity feed"
+                  description="Show real-time team activities in the sidebar"
+                  checked={officeSettings.settings.showActivityFeed}
+                  onCheckedChange={(checked) =>
+                    officeSettings.updateSettings({ showActivityFeed: checked })
+                  }
+                />
+                <SettingsToggleRow
+                  id="show-presence-bar"
+                  icon={Users}
+                  title="Team presence bar"
+                  description="Show who is online and their current status"
+                  checked={officeSettings.settings.showPresenceBar}
+                  onCheckedChange={(checked) =>
+                    officeSettings.updateSettings({ showPresenceBar: checked })
+                  }
+                />
+              </SettingsGroup>
+              <SettingsGroup title="Notifications" icon={Bell}>
+                <SettingsToggleRow
+                  id="activity-notifications"
+                  title="Activity notifications"
+                  description="Notify you about team activities and updates"
+                  checked={officeSettings.settings.activityNotifications}
+                  onCheckedChange={(checked) =>
+                    officeSettings.updateSettings({ activityNotifications: checked })
+                  }
+                />
+                <SettingsToggleRow
+                  id="join-leave-alerts"
+                  title="Join and leave alerts"
+                  description="Alert when team members join or leave"
+                  checked={officeSettings.settings.teamJoinLeaveAlerts}
+                  onCheckedChange={(checked) =>
+                    officeSettings.updateSettings({ teamJoinLeaveAlerts: checked })
+                  }
+                />
+              </SettingsGroup>
+              <div className="border-t border-surface-border/60 pt-4">
+                <Button
+                  variant="outline"
+                  className={settingsBtnOutline}
+                  onClick={() => {
+                    officeSettings.resetToDefaults();
+                    toast.success("Settings reset to defaults");
+                  }}
+                >
+                  Reset to defaults
+                </Button>
+              </div>
+            </SettingsPanelCard>
           </TabsContent>
         )}
-        <TabsContent value="data" className="space-y-4">
-          <Card className="border-0 bg-surface-card shadow-soft rounded-card">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 font-heading text-base font-semibold text-text-heading">
-                <Database className="h-5 w-5 text-primary" />
-                Data Management
-              </CardTitle>
-              <CardDescription className="font-body text-text-body">
-                Export, import, or reset your StartupVerse data
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex items-start gap-4 rounded-input bg-primary-tint p-4">
-                <Download className="mt-0.5 h-5 w-5 shrink-0 text-primary" />
-                <div className="flex-1 space-y-2">
-                  <div>
-                    <h3 className="font-heading text-base font-semibold text-text-heading">
-                      Export Data
-                    </h3>
-                    <p className="mt-1 font-body text-sm text-text-body">
-                      Download all your data as a JSON file for backup or
-                      migration
-                    </p>
-                  </div>
+        <TabsContent value="data" className="mt-4 w-full space-y-4">
+          <SettingsPanelCard
+            icon={Database}
+            title="Data & backup"
+            description="Export, import, or reset your preferences"
+          >
+            <SettingsGroup title="Backup">
+              <SettingsActionRow
+                icon={Download}
+                iconTint="primary"
+                title="Export data"
+                description="Download your preferences as JSON for backup or migration"
+              >
+                <Button onClick={exportData} size="sm" className={settingsBtnPrimary}>
+                  <Download className="mr-2 h-4 w-4" />
+                  Export JSON
+                </Button>
+              </SettingsActionRow>
+              <SettingsActionRow
+                icon={Upload}
+                iconTint="success"
+                title="Import data"
+                description="Restore from a previously exported JSON file"
+              >
+                <input
+                  type="file"
+                  accept=".json"
+                  onChange={importData}
+                  className="hidden"
+                  id="import-file"
+                />
+                <Button asChild size="sm" className={settingsBtnOutline}>
+                  <label htmlFor="import-file" className="cursor-pointer">
+                    <Upload className="mr-2 h-4 w-4" />
+                    Import JSON
+                  </label>
+                </Button>
+              </SettingsActionRow>
+              <SettingsActionRow
+                icon={FileJson}
+                iconTint="neutral"
+                title="Load sample data"
+                description="Populate the workspace with example data to explore features"
+              >
+                <Button onClick={loadSample} size="sm" className={settingsBtnOutline}>
+                  <FileJson className="mr-2 h-4 w-4" />
+                  Load sample
+                </Button>
+              </SettingsActionRow>
+            </SettingsGroup>
+
+            <SettingsGroup title="Danger zone" icon={AlertCircle}>
+              <SettingsActionRow
+                icon={Trash2}
+                iconTint="danger"
+                danger
+                title="Clear local data"
+                description="Remove legacy browser storage on this device. Cannot be undone."
+              >
+                {!showConfirmClear ? (
                   <Button
-                    onClick={exportData}
+                    onClick={() => setShowConfirmClear(true)}
                     size="sm"
-                    variant="default"
-                    className="rounded-input bg-primary font-body font-semibold text-white shadow-[0_4px_16px_rgba(58,90,254,0.20)] transition-colors duration-200 ease-in-out hover:bg-primary-hover [&_svg]:text-white"
+                    className={settingsBtnDangerOutline}
                   >
-                    <Download className="mr-2 h-4 w-4" />
-                    Export to JSON
+                    <Trash2 className="mr-2 h-4 w-4" />
+                    Clear data
                   </Button>
-                </div>
-              </div>
-              <div className="flex items-start gap-4 rounded-input bg-surface-page p-4">
-                <Upload className="mt-0.5 h-5 w-5 shrink-0 text-status-success" />
-                <div className="flex-1 space-y-2">
-                  <div>
-                    <h3 className="font-heading text-base font-semibold text-text-heading">
-                      Import Data
-                    </h3>
-                    <p className="mt-1 font-body text-sm text-text-body">
-                      Restore your data from a previously exported JSON file
-                    </p>
-                  </div>
-                  <div>
-                    <input
-                      type="file"
-                      accept=".json"
-                      onChange={importData}
-                      className="hidden"
-                      id="import-file"
-                    />
-                    <Button
-                      asChild={true}
-                      size="sm"
-                      variant="default"
-                      className="rounded-input bg-primary font-body font-semibold text-white shadow-[0_4px_16px_rgba(58,90,254,0.20)] transition-colors duration-200 ease-in-out hover:bg-primary-hover [&_svg]:text-white"
-                    >
-                      <label htmlFor="import-file" className="cursor-pointer">
-                        <Upload className="mr-2 h-4 w-4" />
-                        Import from JSON
-                      </label>
+                ) : (
+                  <>
+                    <Button onClick={clearData} size="sm" className={settingsBtnDanger}>
+                      <CheckCircle2 className="mr-2 h-4 w-4" />
+                      Confirm clear
                     </Button>
-                  </div>
-                </div>
-              </div>
-              <div className="flex items-start gap-4 rounded-input bg-surface-page p-4">
-                <FileJson className="mt-0.5 h-5 w-5 shrink-0 text-accent" />
-                <div className="flex-1 space-y-2">
-                  <div>
-                    <h3 className="font-heading text-base font-semibold text-text-heading">
-                      Load Sample Data
-                    </h3>
-                    <p className="mt-1 font-body text-sm text-text-body">
-                      Populate your workspace with example data to explore
-                      features
-                    </p>
-                  </div>
+                    <Button
+                      onClick={() => setShowConfirmClear(false)}
+                      size="sm"
+                      className={settingsBtnOutline}
+                    >
+                      Cancel
+                    </Button>
+                  </>
+                )}
+              </SettingsActionRow>
+              <SettingsActionRow
+                icon={Trash2}
+                iconTint="danger"
+                danger
+                title="Delete account"
+                description="Permanently delete your account and all associated server data."
+              >
+                {!showConfirmDeleteAccount ? (
                   <Button
-                    onClick={loadSample}
+                    onClick={() => setShowConfirmDeleteAccount(true)}
                     size="sm"
-                    variant="default"
-                    className="rounded-input bg-primary font-body font-semibold text-white shadow-[0_4px_16px_rgba(58,90,254,0.20)] transition-colors duration-200 ease-in-out hover:bg-primary-hover [&_svg]:text-white"
+                    className={settingsBtnDangerOutline}
                   >
-                    <FileJson className="mr-2 h-4 w-4" />
-                    Load Sample Data
+                    <Trash2 className="mr-2 h-4 w-4" />
+                    Delete account
                   </Button>
-                </div>
+                ) : (
+                  <>
+                    <Button
+                      onClick={deleteAccount}
+                      size="sm"
+                      className={settingsBtnDanger}
+                      disabled={isDeleting}
+                    >
+                      {isDeleting ? (
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      ) : (
+                        <CheckCircle2 className="mr-2 h-4 w-4" />
+                      )}
+                      {isDeleting ? "Deleting…" : "Confirm delete"}
+                    </Button>
+                    <Button
+                      onClick={() => setShowConfirmDeleteAccount(false)}
+                      size="sm"
+                      className={settingsBtnOutline}
+                      disabled={isDeleting}
+                    >
+                      Cancel
+                    </Button>
+                  </>
+                )}
+              </SettingsActionRow>
+            </SettingsGroup>
+
+            <div className="flex items-center justify-between rounded-input border border-surface-border bg-surface-page px-4 py-3 font-body text-sm">
+              <div className="flex items-center gap-2 text-text-muted">
+                <Calendar className="h-4 w-4" />
+                <span>Last backup</span>
               </div>
-              <Separator className="bg-surface-border" />
-              <div className="space-y-4">
-                <div className="flex items-start gap-4 rounded-input bg-status-error/5 p-4">
-                  <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-status-error" />
-                  <div className="flex-1 space-y-2">
-                    <div>
-                      <h3 className="font-heading text-base font-semibold text-text-heading">
-                        Danger Zone
-                      </h3>
-                      <p className="mt-1 font-body text-sm text-text-body">
-                        Permanently delete all your data from this device. This
-                        action cannot be undone.
-                      </p>
-                    </div>
-                    {!showConfirmClear ? (
-                      <Button
-                        onClick={() => setShowConfirmClear(true)}
-                        size="sm"
-                        variant="destructive"
-                      >
-                        <Trash2 className="mr-2 h-4 w-4" />
-                        Clear All Data
-                      </Button>
-                    ) : (
-                      <div className="flex gap-2">
-                        <Button
-                          onClick={clearData}
-                          size="sm"
-                          variant="destructive"
-                        >
-                          <CheckCircle2 className="mr-2 h-4 w-4" />
-                          Yes, Delete Everything
-                        </Button>
-                        <Button
-                          onClick={() => setShowConfirmClear(false)}
-                          size="sm"
-                          variant="outline"
-                          className="rounded-input border border-surface-border bg-surface-card font-body font-semibold text-text-body transition-colors duration-200 ease-in-out hover:border-status-error hover:text-status-error"
-                        >
-                          Cancel
-                        </Button>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-              <div className="space-y-4">
-                <div className="flex items-start gap-4 rounded-input bg-status-error/5 p-4">
-                  <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-status-error" />
-                  <div className="flex-1 space-y-2">
-                    <div>
-                      <h3 className="font-heading text-base font-semibold text-text-heading">
-                        Delete Account
-                      </h3>
-                      <p className="mt-1 font-body text-sm text-text-body">
-                        Permanently delete your account and all associated data.
-                        This action cannot be undone.
-                      </p>
-                    </div>
-                    {!showConfirmDeleteAccount ? (
-                      <Button
-                        onClick={() => setShowConfirmDeleteAccount(true)}
-                        size="sm"
-                        variant="destructive"
-                      >
-                        <Trash2 className="mr-2 h-4 w-4" />
-                        Delete Account
-                      </Button>
-                    ) : (
-                      <div className="flex gap-2">
-                        <Button
-                          onClick={deleteAccount}
-                          size="sm"
-                          variant="destructive"
-                          disabled={isDeleting}
-                        >
-                          {isDeleting ? (
-                            <CheckCircle2 className="mr-2 h-4 w-4" />
-                          ) : (
-                            <CheckCircle2 className="mr-2 h-4 w-4" />
-                          )}
-                          {isDeleting ? "Deleting..." : "Yes, Delete Account"}
-                        </Button>
-                        <Button
-                          onClick={() => setShowConfirmDeleteAccount(false)}
-                          size="sm"
-                          variant="outline"
-                          className="rounded-input border border-surface-border bg-surface-card font-body font-semibold text-text-body transition-colors duration-200 ease-in-out hover:border-status-error hover:text-status-error"
-                        >
-                          Cancel
-                        </Button>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-              <AdminDatabaseClear />
-              <div className="border-t border-surface-border pt-4">
-                <div className="flex items-center justify-between font-body text-sm text-text-muted">
-                  <div className="flex items-center gap-2">
-                    <Calendar className="h-4 w-4" />
-                    <span>Last backup</span>
-                  </div>
-                  <Badge variant="secondary">No backups yet</Badge>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+              <Badge className="rounded-full border-0 bg-surface-page font-body text-[11px] font-medium text-text-muted ring-1 ring-surface-border">
+                No backups yet
+              </Badge>
+            </div>
+          </SettingsPanelCard>
+          <AdminDatabaseClear />
         </TabsContent>
       </Tabs>
     </div>

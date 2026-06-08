@@ -1,45 +1,17 @@
 import React, { useEffect, useState } from "react";
-import { API_BASE_URL } from "../../config/apiBase.js";
 import { persistCurrentUser } from "../../app/session";
 import { Button } from "../ui/button";
-import { Avatar, AvatarFallback, AvatarImage } from "../ui/avatar";
 import { toast } from "sonner";
-import ThemeToggle from "../ThemeToggle";
 import VerticalSidebar from "./VerticalSidebar";
 import NotificationCenter from "../notifications/NotificationCenter";
 import { MobileActionDock, PageViewport } from "../shell/PageScaffold";
+import { Menu } from "lucide-react";
+import HeaderProfileMenu from "./HeaderProfileMenu";
 import {
-  LogOut,
-  ChevronDown,
-  Users,
-  Rocket,
-  Briefcase,
-  UsersRound,
-  UserCheck,
-  Building,
-  Menu,
-} from "lucide-react";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "../ui/dropdown-menu";
-import {
-  getSentInterests,
-  getReceivedInterests,
-  getSentInvitations,
-  getReceivedInvitations,
+  getSentInterests
 } from "../../utils/api/inboxApi";
-
-// Default fetch options for cookie-based auth
-
-const defaultOptions = {
-  credentials: "include",
-  headers: { "Content-Type": "application/json" },
-};
+import { usePresenceSession } from "../../domains/presence/usePresenceSession";
+import { useNotifications } from "../../contexts/NotificationContext";
 
 const PAGE_META = {
   dashboard: {
@@ -130,9 +102,8 @@ export default function AppLayoutHybrid({
   mobileActions = null,
 }) {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const [unreadMessagesCount, setUnreadMessagesCount] = useState(0);
-  const [sidebarMixCount, setSidebarMixCount] = useState(0);
   const [hasSentInterest, setHasSentInterest] = useState(false);
+  const { unreadCount: notificationUnreadCount = 0 } = useNotifications();
   const pageMeta = resolvePageMeta(currentPage, user.role);
   const normalizedPage = String(currentPage || "dashboard").split(":")[0];
   const isInboxPage = normalizedPage === "inbox";
@@ -144,133 +115,7 @@ export default function AppLayoutHybrid({
     currentPage === "talent-chat" ||
     currentPage === "founder-chat";
 
-  useEffect(() => {
-    const fetchInboxCount = async () => {
-      try {
-        if (user.role === "talent") {
-          const invitationsRes = await fetch(
-            `${API_BASE_URL}/invitations/received/${user.id}`,
-            {
-             ...defaultOptions,
-                          },
-          );
-          if (!invitationsRes.ok) {
-            setUnreadMessagesCount(0);
-            return;
-          }
-          const invitationsData = await invitationsRes.json();
-          const pendingInvitations =
-            invitationsData.invitations?.filter(
-              (inv) => inv.status === "pending",
-            ) || [];
-          setUnreadMessagesCount(pendingInvitations.length);
-        } else if (user.role === "founder") {
-          const interestsRes = await fetch(
-            `${API_BASE_URL}/interests/received/${user.id}`,
-            {
-             ...defaultOptions,
-                          },
-          );
-          if (!interestsRes.ok) {
-            setUnreadMessagesCount(0);
-            return;
-          }
-          const interestsData = await interestsRes.json();
-          const interestList = Array.isArray(interestsData?.data)
-            ? interestsData.data
-            : interestsData?.interests || [];
-          const pendingInterests = interestList.filter(
-            (item) => item.status === "pending",
-          );
-
-          const orgInvitationsRes = await fetch(
-            `${API_BASE_URL}/invitations/founder/${user.id}`,
-            {
-             ...defaultOptions,
-                          },
-          );
-          let pendingOrgInvitations = 0;
-          if (orgInvitationsRes.ok) {
-            const orgInvitationsData = await orgInvitationsRes.json();
-            const orgInviteList = Array.isArray(orgInvitationsData?.data)
-              ? orgInvitationsData.data
-              : orgInvitationsData?.invitations || [];
-            const pendingOrg = orgInviteList.filter(
-              (inv) => inv.status === "pending",
-            );
-            pendingOrgInvitations = pendingOrg.length;
-          }
-          setUnreadMessagesCount(pendingInterests.length + pendingOrgInvitations);
-        } else if (user.role === "team-member") {
-          const invitationsRes = await fetch(
-            `${API_BASE_URL}/invitations/received/${user.id}`,
-            {
-             ...defaultOptions,
-                          },
-          );
-          if (!invitationsRes.ok) {
-            setUnreadMessagesCount(0);
-            return;
-          }
-          const invitationsData = await invitationsRes.json();
-          const pendingInvitations =
-            invitationsData.invitations?.filter(
-              (inv) => inv.status === "pending",
-            ) || [];
-          setUnreadMessagesCount(pendingInvitations.length);
-        }
-      } catch {
-        setUnreadMessagesCount(0);
-      }
-    };
-
-    fetchInboxCount();
-  }, [user.id, user.role]);
-
-  useEffect(() => {
-    let cancelled = false;
-    const uid = String(user._id ?? user.id ?? "");
-    (async () => {
-      if (!uid || (user.role !== "talent" && user.role !== "founder")) {
-        if (!cancelled) setSidebarMixCount(0);
-        return;
-      }
-      try {
-        if (user.role === "talent") {
-          const [recvInv, sentInt] = await Promise.all([
-            getReceivedInvitations(uid),
-            getSentInterests(uid),
-          ]);
-          if (cancelled) return;
-          const pendInv =
-            recvInv.filter((i) => String(i?.status || "") === "pending")
-              .length || 0;
-          const respondedInt =
-            sentInt.filter((i) => String(i?.status || "") !== "pending")
-              .length || 0;
-          setSidebarMixCount(pendInv + respondedInt);
-          return;
-        }
-        const [recvInt, sentInv] = await Promise.all([
-          getReceivedInterests(uid),
-          getSentInvitations(uid),
-        ]);
-        if (cancelled) return;
-        const pendInt =
-          recvInt.filter((i) => String(i?.status || "") === "pending").length ||
-          0;
-        const respondedInv =
-          sentInv.filter((i) => String(i?.status || "") !== "pending").length ||
-          0;
-        setSidebarMixCount(pendInt + respondedInv);
-      } catch {
-        if (!cancelled) setSidebarMixCount(0);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [user.id, user.role, user._id]);
+  usePresenceSession(user);
 
   useEffect(() => {
     if (user.role !== "talent") return;
@@ -306,21 +151,6 @@ export default function AppLayoutHybrid({
 
   const showDevRoleSwitcher = Boolean(import.meta?.env?.DEV);
 
-  const getRoleIcon = (role) => {
-    const icons = {
-      founder: Rocket,
-      "team-member": Users,
-      talent: UsersRound,
-      mentor: Users,
-      investor: Users,
-      freelancer: Briefcase,
-      "organization-admin": Building,
-    };
-    return icons[role] || Building;
-  };
-
-  const RoleIcon = getRoleIcon(user.role);
-
   return (
     <div className="flex h-screen bg-background">
       {user.role !== "organization-admin" && (
@@ -330,15 +160,14 @@ export default function AppLayoutHybrid({
           virtualOfficeView={virtualOfficeView}
           onPageChange={onPageChange}
           onVirtualOfficeViewChange={onVirtualOfficeViewChange}
-          unreadCount={unreadMessagesCount}
-          notificationCount={sidebarMixCount}
+          unreadCount={notificationUnreadCount}
           talentDashboardMode={talentDashboardMode}
           hasSentInterest={hasSentInterest}
           isOpen={isMobileMenuOpen}
           onClose={() => setIsMobileMenuOpen(false)}
         />
       )}
-      <div className="flex flex-1 flex-col overflow-hidden">
+      <div className="flex min-w-0 flex-1 flex-col overflow-hidden bg-surface-page">
         <header
           className={
             isInboxPage || isTeamDashboardPage
@@ -360,135 +189,21 @@ export default function AppLayoutHybrid({
                   <Menu className="h-5 w-5" />
                 </Button>
               )}
-              {user.role !== "organization-admin" ? (
-                <div className="min-w-0">
-                  <p
-                    className={
-                      isInboxPage || isTeamDashboardPage
-                        ? "truncate font-heading text-sm font-bold text-[#0d0d0d]"
-                        : "truncate font-heading text-sm font-bold text-text-heading"
-                    }
-                  >
-                    {pageMeta.title}
-                  </p>
-                  <p
-                    className={
-                      isInboxPage || isTeamDashboardPage
-                        ? "truncate font-body text-xs font-normal text-[#4a4a5a]"
-                        : "truncate font-body text-xs text-text-body"
-                    }
-                  >
-                    {pageMeta.description}
-                  </p>
-                </div>
-              ) : null}
+              {/* Page title/description are rendered inside page content.
+                  Keeping them out of the shell header avoids duplicated headings
+                  across Inbox, dashboards, chats, and other tabs. */}
               <div className="flex-1" />
-              <div className="flex items-center gap-2">
-                <div data-tour="theme-toggle">
-                  <ThemeToggle
-                    variant="ghost"
-                    size="sm"
-                    className="transition-colors duration-200 ease-in-out hover:bg-surface-page [&_svg]:text-text-body"
-                  />
-                </div>
+              <div className="flex items-center gap-1.5 sm:gap-2">
                 <NotificationCenter onNavigate={onPageChange} />
-                {user.role !== "organization-admin" && (
-                  <div data-tour="profile-menu">
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild={true}>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-9 gap-2 rounded-full bg-transparent px-2 transition-colors duration-200 ease-in-out hover:bg-surface-page"
-                        >
-                          <Avatar className="h-7 w-7">
-                            <AvatarImage src={user.profile?.avatar} />
-                            <AvatarFallback className="bg-primary font-body text-xs font-semibold text-primary-foreground">
-                              {user.name.substring(0, 2).toUpperCase()}
-                            </AvatarFallback>
-                          </Avatar>
-                          <ChevronDown className="hidden h-3 w-3 text-text-body sm:block" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end" className="w-64">
-                        <DropdownMenuLabel className="text-xs">
-                          <div className="flex flex-col gap-1">
-                            <span className="text-sm">{user.name}</span>
-                            <span className="font-normal text-muted-foreground">
-                              {user.email}
-                            </span>
-                          </div>
-                        </DropdownMenuLabel>
-                        <DropdownMenuSeparator />
-                        {!user.startupId && (
-                          <>
-                            <div className="mx-2 mb-2 rounded-md bg-primary/5 px-2 py-2">
-                              <p className="mb-1 text-xs text-muted-foreground">
-                                <strong>Solo Mode Active</strong>
-                              </p>
-                              <p className="text-xs text-muted-foreground">
-                                Find a co-founder to unlock team collaboration features.
-                              </p>
-                            </div>
-                            <DropdownMenuSeparator />
-                          </>
-                        )}
-                        <DropdownMenuItem
-                          onClick={() => onPageChange("settings")}
-                          className="text-xs"
-                        >
-                          Settings
-                        </DropdownMenuItem>
-                        {showDevRoleSwitcher ? (
-                          <>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuLabel className="text-xs text-muted-foreground">
-                              <span className="inline-flex items-center gap-2">
-                                <RoleIcon className="h-3.5 w-3.5" />
-                                Dev Tools - Switch Role
-                              </span>
-                            </DropdownMenuLabel>
-                            <DropdownMenuItem
-                              onClick={() => switchRole("founder")}
-                              className="text-xs"
-                              disabled={user.role === "founder"}
-                            >
-                              <Rocket className="mr-2 h-3 w-3" />
-                              {"Founder "}
-                              {user.role === "founder" && "OK"}
-                            </DropdownMenuItem>
-                            <DropdownMenuItem
-                              onClick={() => switchRole("talent")}
-                              className="text-xs"
-                              disabled={user.role === "talent"}
-                            >
-                              <Users className="mr-2 h-3 w-3" />
-                              {"Talent "}
-                              {user.role === "talent" && "OK"}
-                            </DropdownMenuItem>
-                            <DropdownMenuItem
-                              onClick={() => switchRole("team-member")}
-                              className="text-xs"
-                              disabled={user.role === "team-member"}
-                            >
-                              <UserCheck className="mr-2 h-3 w-3" />
-                              {"Team Member "}
-                              {user.role === "team-member" && "OK"}
-                            </DropdownMenuItem>
-                          </>
-                        ) : null}
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem
-                          onClick={onLogout}
-                          className="text-xs text-destructive"
-                        >
-                          <LogOut className="mr-2 h-3 w-3" />
-                          Sign Out
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </div>
-                )}
+                {user.role !== "organization-admin" ? (
+                  <HeaderProfileMenu
+                    user={user}
+                    onPageChange={onPageChange}
+                    onLogout={onLogout}
+                    showDevRoleSwitcher={showDevRoleSwitcher}
+                    onSwitchRole={switchRole}
+                  />
+                ) : null}
               </div>
             </div>
           </PageViewport>

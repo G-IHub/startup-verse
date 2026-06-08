@@ -102,18 +102,18 @@ export default function FounderDeliverablesView({ founderId, onBack }) {
   const getStatusColor = (status) => {
     switch (status) {
       case "approved":
-        return "bg-green-500/10 text-green-700 dark:text-green-400 border-green-500/20";
+        return "bg-green-500/10 text-green-700 border-green-500/20";
       case "revision_requested":
       case "needs-revision":
-        return "bg-yellow-500/10 text-yellow-700 dark:text-yellow-400 border-yellow-500/20";
+        return "bg-yellow-500/10 text-yellow-700 border-yellow-500/20";
       case "rejected":
-        return "bg-red-500/10 text-red-700 dark:text-red-400 border-red-500/20";
+        return "bg-red-500/10 text-red-700 border-red-500/20";
       case "reviewed":
-        return "bg-blue-500/10 text-blue-700 dark:text-blue-400 border-blue-500/20";
+        return "bg-blue-500/10 text-blue-700 border-blue-500/20";
       case "submitted":
-        return "bg-purple-500/10 text-purple-700 dark:text-purple-400 border-purple-500/20";
+        return "bg-purple-500/10 text-purple-700 border-purple-500/20";
       default:
-        return "bg-gray-500/10 text-gray-700 dark:text-gray-400 border-gray-500/20";
+        return "bg-gray-500/10 text-gray-700 border-gray-500/20";
     }
   };
   const isPastDue = (dueDate) => {
@@ -199,7 +199,7 @@ export default function FounderDeliverablesView({ founderId, onBack }) {
                           ) : pastDue ? (
                             <Badge
                               variant="outline"
-                              className="text-[7px] bg-red-500/10 text-red-700 dark:text-red-400 border-red-500/20"
+                              className="text-[7px] bg-red-500/10 text-red-700 border-red-500/20"
                             >
                               <AlertCircle className="w-2.5 h-2.5 mr-0.5" />
                               Past Due
@@ -207,7 +207,7 @@ export default function FounderDeliverablesView({ founderId, onBack }) {
                           ) : daysUntil <= 3 ? (
                             <Badge
                               variant="outline"
-                              className="text-[7px] bg-yellow-500/10 text-yellow-700 dark:text-yellow-400 border-yellow-500/20"
+                              className="text-[7px] bg-yellow-500/10 text-yellow-700 border-yellow-500/20"
                             >
                               <Clock className="w-2.5 h-2.5 mr-0.5" />
                               {"Due in "}

@@ -255,31 +255,31 @@ export const getExecutionScoreLabel = (score) => {
   if (score >= 85) {
     return {
       label: "Exceptional Contributor",
-      color: "text-green-600 dark:text-green-400",
+      color: "text-green-600",
       description: "Top-tier execution with consistent delivery",
     };
   } else if (score >= 70) {
     return {
       label: "Strong Contributor",
-      color: "text-blue-600 dark:text-blue-400",
+      color: "text-blue-600",
       description: "Reliable execution with good consistency",
     };
   } else if (score >= 50) {
     return {
       label: "Active Contributor",
-      color: "text-yellow-600 dark:text-yellow-400",
+      color: "text-yellow-600",
       description: "Regular participation with room for growth",
     };
   } else if (score >= 25) {
     return {
       label: "Emerging Contributor",
-      color: "text-orange-600 dark:text-orange-400",
+      color: "text-orange-600",
       description: "Early stage with building momentum",
     };
   } else {
     return {
       label: "New to Platform",
-      color: "text-gray-600 dark:text-gray-400",
+      color: "text-gray-600",
       description: "Just getting started",
     };
   }

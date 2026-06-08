@@ -612,7 +612,7 @@ export function VideoCallOverlay({
           }}
           className={containerClasses}
         >
-          <Card className="bg-slate-900 border-2 border-slate-700 shadow-2xl overflow-hidden">
+          <Card className="bg-card border-2 border-border shadow-2xl overflow-hidden">
             <div className="p-3 bg-slate-800 border-b border-slate-700 flex items-center justify-between cursor-move">
               <div className="flex items-center gap-2">
                 <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse" />
@@ -835,7 +835,7 @@ export function VideoCallOverlay({
           }}
           className={containerClasses}
         >
-          <Card className="bg-slate-900 border-2 border-slate-700 shadow-2xl overflow-hidden">
+          <Card className="bg-card border-2 border-border shadow-2xl overflow-hidden">
             <div className="p-3 bg-slate-800 border-b border-slate-700 flex items-center justify-between cursor-move">
               <div className="flex items-center gap-2">
                 <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse" />
@@ -1048,7 +1048,7 @@ export function VideoCallOverlay({
               {participants.map((participant, index) => (
                 <div
                   key={participant.id}
-                  className="flex items-center gap-3 p-3 rounded-lg bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
+                  className="flex items-center gap-3 p-3 rounded-lg bg-slate-50 hover:bg-slate-100 transition-colors"
                 >
                   <Avatar>
                     <AvatarImage src={participant.avatar} />
@@ -1063,7 +1063,7 @@ export function VideoCallOverlay({
                         <Crown className="w-4 h-4 text-yellow-500" />
                       )}
                     </div>
-                    <div className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-400">
+                    <div className="flex items-center gap-2 text-sm text-slate-600">
                       {participant.isMuted && (
                         <MicOff className="w-3 h-3 text-red-500" />
                       )}

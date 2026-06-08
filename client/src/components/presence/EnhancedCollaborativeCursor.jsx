@@ -253,7 +253,7 @@ export function EnhancedCollaborativeCursor({
                 opacity: 1,
                 y: 0,
               }}
-              className="absolute top-14 left-3 bg-gray-900 dark:bg-gray-800 text-white px-2 py-0.5 rounded text-[10px] shadow-md"
+              className="absolute top-14 left-3 bg-popover text-popover-foreground border border-border px-2 py-0.5 rounded text-[10px] shadow-md"
             >
               {userRole}
             </motion.div>

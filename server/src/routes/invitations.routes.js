@@ -25,5 +25,11 @@ invitationsRouter.get("/interests/:interestId", requireAuth, asyncHandler(invita
 invitationsRouter.put("/interests/:interestId/status", requireAuth, asyncHandler(invitationsController.updateInterestStatus));
 invitationsRouter.post("/interests/:interestId/messages", requireAuth, asyncHandler(invitationsController.addMessageToInterest));
 invitationsRouter.post("/interests/:interestId/onboard", requireAuth, asyncHandler(invitationsController.onboardInterest));
+invitationsRouter.delete("/interests/:interestId", requireAuth, asyncHandler(invitationsController.deleteInterest));
+invitationsRouter.delete(
+  "/invitations/:invitationId",
+  requireAuth,
+  asyncHandler(invitationsController.deleteFounderTalentInvitation),
+);
 
 export default invitationsRouter;

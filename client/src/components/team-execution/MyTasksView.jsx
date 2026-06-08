@@ -268,7 +268,7 @@ export default function MyTasksView({ userId, userName, founderId }) {
         return (
           <Card
             key={task.id}
-            className={`transition-all ${task.status === "completed" ? "border-green-200 bg-green-50/50 dark:bg-green-950/20" : task.status === "blocked" ? "border-orange-200 bg-orange-50/50 dark:bg-orange-950/20" : task.status === "in-progress" ? "border-blue-200 bg-blue-50/50 dark:bg-blue-950/20" : ""}`}
+            className={`transition-all ${task.status === "completed" ? "border-green-200 bg-green-50/50" : task.status === "blocked" ? "border-orange-200 bg-orange-50/50" : task.status === "in-progress" ? "border-blue-200 bg-blue-50/50" : ""}`}
           >
             <CardHeader>
               <div className="flex items-start gap-3">
@@ -334,8 +334,8 @@ export default function MyTasksView({ userId, userName, founderId }) {
                 </Button>
               </div>
               {task.status === "blocked" && task.blockerNote && (
-                <div className="mt-3 p-3 bg-orange-100 dark:bg-orange-950/30 rounded-lg">
-                  <p className="text-sm text-orange-900 dark:text-orange-100">
+                <div className="mt-3 p-3 bg-orange-100 rounded-lg">
+                  <p className="text-sm text-orange-900">
                     <strong>Blocker:</strong> {task.blockerNote}
                   </p>
                 </div>

@@ -34,6 +34,7 @@ import {
 } from "../utils/apiResponse.js";
 import { emitRealtime } from "../services/realtime.service.js";
 import { createNotification, broadcastNotification } from "../services/notificationService.js";
+import { officeDeepLink } from "../utils/deepLinks.js";
 import { SOCKET_EVENTS } from "../realtime/events.js";
 import { startupRoom } from "../realtime/rooms.js";
 
@@ -457,7 +458,7 @@ export const createTask = async (req, res) => {
       type: "task-assigned",
       title: "New task assigned",
       message: `You have a new task: ${task.title}`,
-      actionUrl: `/?view=virtual-office&tab=tasks&taskId=${task._id}`,
+      actionUrl: officeDeepLink({ tab: "tasks", taskId: task._id }),
       metadata: {
         taskId: String(task._id),
         startupId: String(task.startupId || ""),
@@ -534,7 +535,7 @@ export const updateTask = async (req, res) => {
       type: "task-assigned",
       title: "Task reassigned to you",
       message: `You have been assigned: ${updatedTask.title}`,
-      actionUrl: `/?view=virtual-office&tab=tasks&taskId=${updatedTask._id}`,
+      actionUrl: officeDeepLink({ tab: "tasks", taskId: updatedTask._id }),
       metadata: {
         taskId: String(updatedTask._id),
         startupId: String(updatedTask.startupId || ""),
@@ -554,7 +555,7 @@ export const updateTask = async (req, res) => {
       type: "task-blocked",
       title: "Task blocked",
       message: `Task is blocked: ${updatedTask.title}`,
-      actionUrl: `/?view=virtual-office&tab=tasks&taskId=${updatedTask._id}`,
+      actionUrl: officeDeepLink({ tab: "tasks", taskId: updatedTask._id }),
       metadata: {
         taskId: String(updatedTask._id),
         blockerReason: updatedTask.blockerReason || "",
@@ -637,7 +638,7 @@ export const updateTaskStatus = async (req, res) => {
       type: "task-blocked",
       title: "Task blocked",
       message: `Task is blocked: ${updatedTask.title}`,
-      actionUrl: `/?view=virtual-office&tab=tasks&taskId=${updatedTask._id}`,
+      actionUrl: officeDeepLink({ tab: "tasks", taskId: updatedTask._id }),
       metadata: {
         taskId: String(updatedTask._id),
         blockerReason: updatedTask.blockerReason || "",
@@ -715,7 +716,7 @@ export const assignTask = async (req, res) => {
       type: "task-assigned",
       title: "Task assigned to you",
       message: `You have been assigned: ${task.title}`,
-      actionUrl: `/?view=virtual-office&tab=tasks&taskId=${task._id}`,
+      actionUrl: officeDeepLink({ tab: "tasks", taskId: task._id }),
       metadata: {
         taskId: String(task._id),
         startupId: String(task.startupId || ""),
@@ -882,7 +883,7 @@ export const createWeeklyOutcome = async (req, res) => {
           type: "outcome-submitted",
           title: "Weekly outcome submitted",
           message: `This week's outcome was marked ${requestedStatus}.`,
-          actionUrl: `/?view=virtual-office&tab=weekly`,
+          actionUrl: officeDeepLink({ tab: "weekly" }),
           metadata: {
             outcomeId: String(outcome._id),
             status: requestedStatus,

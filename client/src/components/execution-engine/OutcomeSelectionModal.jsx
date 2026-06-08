@@ -145,7 +145,7 @@ export default function OutcomeSelectionModal({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sv-modal-backdrop">
       <Card className="sv-modal-panel max-h-[85vh] w-full max-w-2xl overflow-y-auto rounded-[16px] border-0 shadow-modal">
-        <CardHeader className="border-b border-primary/12 bg-[color-mix(in_srgb,var(--primary-tint)_42%,white)] px-5 pb-3 pt-4 dark:border-primary/20 dark:bg-[color-mix(in_srgb,var(--primary)_8%,var(--card))]">
+        <CardHeader className="border-b border-primary/12 bg-[color-mix(in_srgb,var(--primary-tint)_42%,white)] px-5 pb-3 pt-4">
           <div className="flex items-start justify-between gap-3">
             <div className="flex-1 min-w-0">
               <CardTitle className="text-[10px] flex items-center gap-1.5 text-card-foreground font-semibold tracking-tight">
@@ -199,7 +199,7 @@ export default function OutcomeSelectionModal({
                   onClick={() => {
                     onOpenIntentCapture();
                   }}
-                  className="group w-full cursor-pointer rounded-xl border border-primary/25 bg-gradient-to-br from-primary/[0.07] via-card to-purple-50/80 p-3.5 text-left shadow-sm transition-all hover:border-primary/40 hover:shadow-md dark:from-primary/[0.12] dark:via-card dark:to-purple-950/30 dark:border-primary/35 dark:hover:border-primary/50"
+                  className="group w-full cursor-pointer rounded-xl border border-primary/25 bg-gradient-to-br from-primary/[0.07] via-card to-purple-50/80 p-3.5 text-left shadow-sm transition-all hover:border-primary/40 hover:shadow-md"
                 >
                   <div className="flex items-start gap-3">
                     <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-sm ring-4 ring-primary/10">
@@ -230,7 +230,7 @@ export default function OutcomeSelectionModal({
               )}
               <div className="relative py-0.5">
                 <div className="absolute inset-0 flex items-center">
-                  <div className="w-full border-t border-primary/12 dark:border-primary/20" />
+                  <div className="w-full border-t border-primary/12" />
                 </div>
                 <div className="relative flex justify-center text-[9px] uppercase tracking-wider">
                   <span className="bg-card px-3 font-medium text-text-muted">
@@ -252,7 +252,7 @@ export default function OutcomeSelectionModal({
                 {templates.map((template) => (
                   <div
                     key={template.id}
-                    className="group cursor-pointer rounded-xl border border-primary/15 bg-card p-3 shadow-sm transition-all hover:border-primary/35 hover:bg-primary/[0.03] hover:shadow dark:border-primary/22 dark:hover:border-primary/45 dark:hover:bg-primary/[0.06]"
+                    className="group cursor-pointer rounded-xl border border-primary/15 bg-card p-3 shadow-sm transition-all hover:border-primary/35 hover:bg-primary/[0.03] hover:shadow"
                     onClick={() => handleSelectTemplate(template.id)}
                   >
                     <div className="flex items-start justify-between gap-2">
@@ -270,7 +270,7 @@ export default function OutcomeSelectionModal({
                             {" milestones"}
                           </span>
                         </div>
-                        <div className="border-t border-primary/10 pt-2 dark:border-primary/15">
+                        <div className="border-t border-primary/10 pt-2">
                           <p className="mb-1.5 text-[8px] font-medium uppercase tracking-wide text-text-muted">
                             Tasks by milestone
                           </p>
@@ -323,7 +323,7 @@ export default function OutcomeSelectionModal({
                   </div>
                 ))}
               </div>
-              <div className="border-t border-primary/12 pt-3 dark:border-primary/20">
+              <div className="border-t border-primary/12 pt-3">
                 <Button
                   variant="outline"
                   className="h-9 w-full rounded-[10px] text-[10px]"
@@ -337,7 +337,7 @@ export default function OutcomeSelectionModal({
           )}
           {step === "review" && selectedTemplate && (
             <>
-              <div className="rounded-xl border border-primary/20 bg-primary/[0.04] p-3 dark:bg-primary/[0.08]">
+              <div className="rounded-xl border border-primary/20 bg-primary/[0.04] p-3">
                 <div className="flex items-start gap-2 mb-2.5">
                   <Target className="w-4 h-4 text-primary flex-shrink-0 mt-0.5" />
                   <div className="flex-1">
@@ -404,7 +404,7 @@ export default function OutcomeSelectionModal({
                   {reviewMilestones.map((draft, index) => (
                     <div
                       key={index}
-                      className="rounded-xl border border-primary/20 bg-card p-2 shadow-sm dark:border-primary/25"
+                      className="rounded-xl border border-primary/20 bg-card p-2 shadow-sm"
                     >
                       <div className="flex items-start gap-2">
                         <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary/10 text-[9px] font-semibold text-primary">
@@ -432,9 +432,9 @@ export default function OutcomeSelectionModal({
                             tasks={draft.tasks}
                             hint=""
                             labelClassName="text-[9px] text-text-muted"
-                            rowClassName="flex items-center gap-1.5 rounded-full border border-primary/22 bg-primary/[0.05] py-0.5 pl-1 pr-0.5 shadow-sm dark:border-primary/30 dark:bg-primary/[0.08]"
+                            rowClassName="flex items-center gap-1.5 rounded-full border border-primary/22 bg-primary/[0.05] py-0.5 pl-1 pr-0.5 shadow-sm"
                             badgeClassName="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary/15 text-[9px] font-semibold tabular-nums text-primary"
-                            inputClassName="h-7 flex-1 min-w-0 border-0 bg-transparent px-1.5 text-[10px] shadow-none focus-visible:ring-0 focus-visible:ring-offset-0 dark:bg-transparent"
+                            inputClassName="h-7 flex-1 min-w-0 border-0 bg-transparent px-1.5 text-[10px] shadow-none focus-visible:ring-0 focus-visible:ring-offset-0"
                             removeButtonClassName="h-7 w-7 shrink-0 rounded-full p-0 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
                             addTaskButtonClassName="h-7 rounded-full border-primary/25 text-[10px] text-primary hover:bg-primary/[0.06]"
                             onChange={(next) =>
@@ -451,7 +451,7 @@ export default function OutcomeSelectionModal({
                   ))}
                 </div>
               </div>
-              <div className="flex gap-2 border-t border-primary/12 pt-3 dark:border-primary/20">
+              <div className="flex gap-2 border-t border-primary/12 pt-3">
                 <Button
                   variant="outline"
                   onClick={() => {
@@ -480,7 +480,7 @@ export default function OutcomeSelectionModal({
           {step === "custom" && (
             <>
               <div className="space-y-4">
-                <div className="rounded-xl border border-primary/20 bg-gradient-to-br from-primary/[0.07] via-card to-purple-50/50 p-3.5 shadow-sm dark:from-primary/[0.12] dark:via-card dark:to-purple-950/25 dark:border-primary/25">
+                <div className="rounded-xl border border-primary/20 bg-gradient-to-br from-primary/[0.07] via-card to-purple-50/50 p-3.5 shadow-sm">
                   <div className="flex gap-3">
                     <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-sm ring-4 ring-primary/10">
                       <Lightbulb className="h-4 w-4" aria-hidden />
@@ -498,8 +498,8 @@ export default function OutcomeSelectionModal({
                   </div>
                 </div>
 
-                <div className="space-y-4 rounded-xl border border-primary/12 bg-card p-4 shadow-sm dark:border-primary/18">
-                  <div className="border-b border-primary/10 pb-3 dark:border-primary/15">
+                <div className="space-y-4 rounded-xl border border-primary/12 bg-card p-4 shadow-sm">
+                  <div className="border-b border-primary/10 pb-3">
                     <p className="text-[9px] font-semibold uppercase tracking-[0.12em] text-text-muted">
                       Outcome details
                     </p>
@@ -546,7 +546,7 @@ export default function OutcomeSelectionModal({
                   </div>
                 </div>
 
-                <div className="flex gap-3 rounded-xl border border-primary/15 bg-primary/[0.04] p-3 dark:border-primary/22 dark:bg-primary/[0.07]">
+                <div className="flex gap-3 rounded-xl border border-primary/15 bg-primary/[0.04] p-3">
                   <Lightbulb
                     className="mt-0.5 h-4 w-4 shrink-0 text-primary"
                     aria-hidden
@@ -562,7 +562,7 @@ export default function OutcomeSelectionModal({
                 </div>
               </div>
 
-              <div className="mt-4 flex gap-2 border-t border-primary/12 pt-4 dark:border-primary/20">
+              <div className="mt-4 flex gap-2 border-t border-primary/12 pt-4">
                 <Button
                   type="button"
                   variant="outline"
@@ -592,7 +592,7 @@ export default function OutcomeSelectionModal({
           {step === "custom-milestones" && (
             <>
               <div className="space-y-4">
-                <div className="rounded-xl border border-primary/20 bg-gradient-to-br from-primary/[0.07] via-card to-purple-50/50 p-3.5 shadow-sm dark:from-primary/[0.12] dark:via-card dark:to-purple-950/25 dark:border-primary/25">
+                <div className="rounded-xl border border-primary/20 bg-gradient-to-br from-primary/[0.07] via-card to-purple-50/50 p-3.5 shadow-sm">
                   <div className="flex gap-3">
                     <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-sm ring-4 ring-primary/10">
                       <Sparkles className="h-4 w-4" aria-hidden />
@@ -610,7 +610,7 @@ export default function OutcomeSelectionModal({
                   </div>
                 </div>
 
-                <div className="rounded-xl border border-primary/20 bg-primary/[0.04] p-3 dark:bg-primary/[0.08]">
+                <div className="rounded-xl border border-primary/20 bg-primary/[0.04] p-3">
                   <div className="flex items-start gap-2">
                     <Target className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
                     <div className="min-w-0 flex-1 space-y-1">
@@ -646,7 +646,7 @@ export default function OutcomeSelectionModal({
                     {customMilestoneDrafts.map((draft, index) => (
                       <div
                         key={index}
-                        className="rounded-xl border border-primary/20 bg-card p-2 shadow-sm dark:border-primary/25"
+                        className="rounded-xl border border-primary/20 bg-card p-2 shadow-sm"
                       >
                         <div className="flex items-start gap-2">
                           <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary/10 text-[9px] font-semibold text-primary">
@@ -693,9 +693,9 @@ export default function OutcomeSelectionModal({
                               tasks={draft.tasks}
                               hint=""
                               labelClassName="text-[9px] text-text-muted"
-                              rowClassName="flex items-center gap-1.5 rounded-full border border-primary/22 bg-primary/[0.05] py-0.5 pl-1 pr-0.5 shadow-sm dark:border-primary/30 dark:bg-primary/[0.08]"
+                              rowClassName="flex items-center gap-1.5 rounded-full border border-primary/22 bg-primary/[0.05] py-0.5 pl-1 pr-0.5 shadow-sm"
                               badgeClassName="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary/15 text-[9px] font-semibold tabular-nums text-primary"
-                              inputClassName="h-7 flex-1 min-w-0 border-0 bg-transparent px-1.5 text-[10px] shadow-none focus-visible:ring-0 focus-visible:ring-offset-0 dark:bg-transparent"
+                              inputClassName="h-7 flex-1 min-w-0 border-0 bg-transparent px-1.5 text-[10px] shadow-none focus-visible:ring-0 focus-visible:ring-offset-0"
                               removeButtonClassName="h-7 w-7 shrink-0 rounded-full p-0 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
                               addTaskButtonClassName="h-7 rounded-full border-primary/25 text-[10px] text-primary hover:bg-primary/[0.06]"
                               onChange={(next) =>
@@ -728,7 +728,7 @@ export default function OutcomeSelectionModal({
                 </div>
               </div>
 
-              <div className="mt-4 flex gap-2 border-t border-primary/12 pt-4 dark:border-primary/20">
+              <div className="mt-4 flex gap-2 border-t border-primary/12 pt-4">
                 <Button
                   type="button"
                   variant="outline"

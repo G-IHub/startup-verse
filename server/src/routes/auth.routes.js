@@ -7,6 +7,7 @@ const authRouter = Router();
 
 authRouter.post("/auth/signup", asyncHandler(authController.signup));
 authRouter.post("/auth/signin", asyncHandler(authController.signin));
+authRouter.post("/auth/google", asyncHandler(authController.googleAuth));
 
 authRouter.put(
   "/auth/profile/:userId",

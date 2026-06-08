@@ -69,11 +69,11 @@ export default function TaskAssignmentModal({
   return (
     <div className="fixed inset-0 z-[70] flex items-center justify-center p-3 sv-modal-backdrop">
       <Card className="sv-modal-panel flex max-h-[82vh] w-full max-w-[min(100%,22rem)] flex-col overflow-hidden rounded-[14px] border-0 shadow-modal sm:max-w-md">
-        <CardHeader className="flex-shrink-0 space-y-0 border-b border-primary/12 pb-3 pt-3 dark:border-primary/18">
+        <CardHeader className="flex-shrink-0 space-y-0 border-b border-primary/12 pb-3 pt-3">
           <div className="flex items-start justify-between gap-2">
             <div className="min-w-0 flex-1">
               <CardTitle className="flex items-center gap-2 text-sm font-semibold leading-snug md:text-[15px]">
-                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/[0.08] text-primary dark:bg-primary/[0.12]">
+                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/[0.08] text-primary">
                   <User className="h-4 w-4" aria-hidden />
                 </span>
                 Assign task
@@ -97,7 +97,7 @@ export default function TaskAssignmentModal({
 
         <CardContent className="flex-1 space-y-3 overflow-y-auto px-3 py-3 md:space-y-4 md:px-4 md:py-4">
           {task.assignedToName && (
-            <div className="rounded-lg border border-primary/18 bg-primary/[0.04] p-2.5 dark:border-primary/22 dark:bg-primary/[0.06]">
+            <div className="rounded-lg border border-primary/18 bg-primary/[0.04] p-2.5">
               <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-wide text-text-muted">
                 Currently assigned
               </p>
@@ -133,7 +133,7 @@ export default function TaskAssignmentModal({
               placeholder="Search team members…"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="h-9 border-primary/18 bg-card pl-9 text-xs hover:border-primary/28 focus-visible:border-primary md:text-sm dark:border-primary/22"
+              className="h-9 border-primary/18 bg-card pl-9 text-xs hover:border-primary/28 focus-visible:border-primary md:text-sm"
               autoComplete="off"
             />
           </div>
@@ -143,7 +143,7 @@ export default function TaskAssignmentModal({
               Team members ({filteredMembers.length})
             </p>
             {filteredMembers.length === 0 && (
-              <div className="rounded-lg border border-dashed border-primary/20 bg-muted/20 py-8 text-center dark:bg-muted/10">
+              <div className="rounded-lg border border-dashed border-primary/20 bg-muted/20 py-8 text-center">
                 <p className="text-sm text-muted-foreground">
                   No members match your search.
                 </p>
@@ -161,12 +161,12 @@ export default function TaskAssignmentModal({
                     onClick={() => !isAssigned && handleAssign(member)}
                     className={`w-full rounded-lg border px-2.5 py-2 text-left transition-colors md:px-3 md:py-2.5 ${
                       isAssigned
-                        ? "cursor-default border-primary/35 bg-primary/[0.06] dark:border-primary/40"
-                        : "border-primary/15 bg-card hover:border-primary/30 hover:bg-primary/[0.04] dark:border-primary/20 dark:hover:border-primary/35"
+                        ? "cursor-default border-primary/35 bg-primary/[0.06]"
+                        : "border-primary/15 bg-card hover:border-primary/30 hover:bg-primary/[0.04]"
                     }`}
                   >
                     <div className="flex items-center gap-3">
-                      <Avatar className="h-9 w-9 border border-primary/12 shadow-none dark:border-primary/18">
+                      <Avatar className="h-9 w-9 border border-primary/12 shadow-none">
                         {member.avatar ? (
                           <AvatarImage src={member.avatar} alt="" />
                         ) : null}
@@ -204,11 +204,11 @@ export default function TaskAssignmentModal({
           </div>
 
           {task.assignedToName && (
-            <div className="border-t border-primary/10 pt-3 dark:border-primary/15">
+            <div className="border-t border-primary/10 pt-3">
               <Button
                 type="button"
                 variant="outline"
-                className="w-full border-primary/22 bg-card text-sm font-semibold hover:bg-primary/[0.04] dark:border-primary/28"
+                className="w-full border-primary/22 bg-card text-sm font-semibold hover:bg-primary/[0.04]"
                 onClick={handleUnassign}
               >
                 Leave unassigned

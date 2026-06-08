@@ -1,6 +1,4 @@
 import React from "react";
-import { Badge } from "../ui/badge";
-import { Separator } from "../ui/separator";
 import { cn } from "../ui/utils";
 import {
   Building,
@@ -14,6 +12,24 @@ import {
   MessageCircle,
 } from "lucide-react";
 
+function formatCount(count) {
+  if (count > 99) return "99+";
+  return String(count);
+}
+
+/** High-contrast count pill — matches status/error tokens, not theme Badge */
+function NavCountBadge({ count }) {
+  if (!count || count <= 0) return null;
+  return (
+    <span
+      className="ml-auto flex h-[18px] min-w-[18px] shrink-0 items-center justify-center rounded-pill bg-status-error px-1.5 font-body text-[10px] font-semibold leading-none text-white shadow-[0_1px_4px_rgba(255,79,107,0.45)]"
+      aria-label={`${count} unread`}
+    >
+      {formatCount(count)}
+    </span>
+  );
+}
+
 export default function VerticalSidebar({
   user,
   currentPage,
@@ -21,18 +37,17 @@ export default function VerticalSidebar({
   onPageChange,
   onVirtualOfficeViewChange,
   unreadCount = 0,
-  notificationCount = 0,
-  talentDashboardMode = "overview",
   isOpen = false,
   onClose,
 }) {
+  const inboxBadgeCount = unreadCount > 0 ? unreadCount : 0;
+
   const allNavItems = [
     {
       id: "dashboard",
       icon: Home,
       label: "Home",
       page: "dashboard",
-      badge: null,
       roles: ["founder", "team-member", "team", "talent", "organization-admin"],
     },
     {
@@ -41,37 +56,31 @@ export default function VerticalSidebar({
       label: "Office",
       page: "startup-office",
       view: "workspace",
-      badge: null,
       roles: ["founder", "team-member", "team"],
     },
     {
-      id: user.role === "talent" ? "browse" : "browse",
+      id: "browse",
       icon: Users,
-      label: user.role === "talent" ? "Browse" : "Browse",
+      label: "Browse",
       page: user.role === "talent" ? "browse-startups" : "startup-office",
       view: user.role === "talent" ? undefined : "matching",
-      badge: null,
       roles: ["founder", "talent"],
     },
-    // Chat icon — for all talents
     ...(user.role === "talent"
       ? [{
           id: "talent-chat",
           icon: MessageCircle,
           label: "Chat",
           page: "talent-chat",
-          badge: null,
           roles: ["talent"],
         }]
       : []),
-    // Chat icon for founders and team members
     ...(user.role === "founder" || user.role === "team-member" || user.role === "team"
       ? [{
           id: "founder-chat",
           icon: MessageCircle,
           label: "Chat",
           page: "founder-chat",
-          badge: null,
           roles: ["founder", "team-member", "team"],
         }]
       : []),
@@ -85,7 +94,7 @@ export default function VerticalSidebar({
       icon: Inbox,
       label: "Inbox",
       page: "inbox",
-      badge: unreadCount > 0 ? unreadCount : notificationCount > 0 ? notificationCount : null,
+      badge: inboxBadgeCount > 0 ? inboxBadgeCount : null,
       roles: ["founder", "team-member", "team", "talent"],
     },
     {
@@ -93,7 +102,6 @@ export default function VerticalSidebar({
       icon: BarChart3,
       label: "Analytics",
       page: "analytics",
-      badge: null,
       roles: ["founder"],
     },
     {
@@ -101,7 +109,6 @@ export default function VerticalSidebar({
       icon: Settings,
       label: "Settings",
       page: "settings",
-      badge: null,
       roles: ["founder", "team-member", "team", "talent", "organization-admin"],
     },
   ];
@@ -133,114 +140,106 @@ export default function VerticalSidebar({
     } else if (item.view && onVirtualOfficeViewChange) {
       onVirtualOfficeViewChange(item.view);
     }
-    if (onClose) {
-      onClose();
-    }
+    if (onClose) onClose();
   };
 
-  const NavButton = ({ item }) => {
+  const NavItem = ({ item }) => {
     const Icon = item.icon;
     const active = isActive(item);
 
     return (
-      <button
-        type="button"
-        data-tour={item.id}
-        className={cn(
-          "group relative mx-1 flex w-[calc(100%-0.5rem)] flex-col items-center justify-center gap-0.5 rounded-lg px-1 py-1 text-center transition-colors duration-200 ease-in-out",
-          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary/45",
-          active
-            ? "bg-[rgba(58,90,254,0.15)] text-primary before:absolute before:left-0 before:top-1/2 before:h-6 before:w-0.5 before:-translate-y-1/2 before:rounded-full before:bg-primary before:content-['']"
-            : "text-[rgba(255,255,255,0.45)] hover:bg-[rgba(255,255,255,0.06)] hover:text-[rgba(255,255,255,0.85)]",
-        )}
-        onClick={() => handleNavClick(item)}
-      >
-        <span
+      <li>
+        <button
+          type="button"
+          data-tour={item.id}
+          onClick={() => handleNavClick(item)}
+          aria-current={active ? "page" : undefined}
           className={cn(
-            "relative inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md transition-colors duration-200 ease-in-out",
+            "group relative flex w-full items-center gap-2.5 rounded-input px-2.5 py-2 text-left font-body transition-all duration-200 ease-in-out",
+            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/25",
             active
-              ? "bg-transparent text-primary"
-              : "bg-transparent text-[rgba(255,255,255,0.45)] group-hover:bg-white/[0.06] group-hover:text-[rgba(255,255,255,0.85)]",
+              ? "sidebar-selected shadow-[inset_3px_0_0_0_var(--primary)]"
+              : "text-text-body hover:bg-surface-page hover:text-text-heading",
           )}
         >
-          <Icon className="h-4 w-4 shrink-0" strokeWidth={1.75} />
-          {item.badge ? (
-            <span className="absolute -right-0.5 -top-0.5 flex">
-              <Badge
-                variant={item.id === "inbox" ? "destructive" : "default"}
-                className="flex h-4 min-h-4 min-w-4 items-center justify-center rounded-full px-1 text-[9px] font-semibold leading-none"
-              >
-                {item.badge}
-              </Badge>
-            </span>
-          ) : null}
-        </span>
-        <span
-          className={cn(
-            "max-w-[4.25rem] truncate text-[10px] font-medium leading-tight tracking-wide transition-colors duration-200 ease-in-out",
-            active
-              ? "text-primary"
-              : "text-[rgba(255,255,255,0.45)] group-hover:text-[rgba(255,255,255,0.85)]",
-          )}
-        >
-          {item.label}
-        </span>
-      </button>
+          <span
+            className={cn(
+              "flex h-8 w-8 shrink-0 items-center justify-center rounded-input transition-colors duration-200",
+              active
+                ? "bg-primary/10 text-primary"
+                : "text-text-muted group-hover:text-primary",
+            )}
+          >
+            <Icon className="h-[17px] w-[17px]" strokeWidth={1.75} aria-hidden />
+          </span>
+          <span className="min-w-0 flex-1 truncate text-[13px] font-medium leading-tight">
+            {item.label}
+          </span>
+          {item.badge ? <NavCountBadge count={item.badge} /> : null}
+        </button>
+      </li>
     );
   };
 
   return (
     <>
       {isOpen && onClose ? (
-        <div className="fixed inset-0 z-40 bg-black/45 md:hidden" onClick={onClose} />
+        <div
+          className="fixed inset-0 z-40 bg-(--modal-overlay)/40 md:hidden"
+          onClick={onClose}
+          aria-hidden
+        />
       ) : null}
       <aside
-        className={[
-          "fixed left-0 top-0 z-50 flex h-screen w-24 flex-col bg-primary-dark shadow-[2px_0_12px_rgba(26,35,126,0.10)]",
+        className={cn(
+          "fixed left-0 top-0 z-50 flex h-screen w-[216px] shrink-0 flex-col border-r border-surface-border bg-surface-card font-body",
           "transition-transform duration-300 ease-out md:static",
           isOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0",
-        ].join(" ")}
+        )}
+        aria-label="Main navigation"
       >
-        <div className="relative flex items-center justify-center px-2 py-2">
-          <button
-            type="button"
-            className="relative inline-flex h-10 w-10 items-center justify-center rounded-[12px] bg-primary text-primary-foreground shadow-none transition-opacity duration-200 ease-in-out hover:bg-primary-hover hover:opacity-100"
-            aria-label="StartupVerse"
-          >
-            <Sparkles className="h-[18px] w-[18px]" strokeWidth={1.75} />
-          </button>
+        <div className="flex shrink-0 items-center gap-2.5 px-4 pb-2 pt-5">
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-input bg-primary text-white shadow-[0_4px_16px_rgba(58,90,254,0.25)]">
+            <Sparkles className="h-[17px] w-[17px]" strokeWidth={1.75} aria-hidden />
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="truncate font-heading text-sm font-bold text-text-heading">
+              StartupVerse
+            </p>
+            <p className="truncate font-body text-[11px] text-text-muted capitalize">
+              {user.role?.replace(/-/g, " ") || "Member"}
+            </p>
+          </div>
           {isOpen && onClose ? (
             <button
               type="button"
-              className="absolute right-2 top-2 inline-flex h-8 w-8 items-center justify-center rounded-lg bg-white/10 text-white transition-colors duration-200 ease-in-out hover:bg-white/15 md:hidden"
+              className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-input text-text-muted transition-colors hover:bg-white/80 hover:text-text-heading md:hidden"
               onClick={onClose}
-              aria-label="Close sidebar"
+              aria-label="Close navigation"
             >
               <X className="h-4 w-4" />
             </button>
           ) : null}
         </div>
 
-        <Separator className="bg-white/10" />
+        <div className="mx-4 mb-2 h-px bg-surface-border/80" aria-hidden />
 
-        <div className="flex-1 overflow-y-auto py-1.5">
-          <div className="flex h-full flex-col">
-          <nav className="space-y-0.5">
-            {primaryNavItems.map((item) => (
-              <NavButton key={item.id} item={item} />
-            ))}
+        <div className="flex min-h-0 flex-1 flex-col overflow-y-auto px-2.5 pb-4">
+          <nav aria-label="Application" className="flex flex-1 flex-col">
+            <ul className="space-y-0.5" role="list">
+              {primaryNavItems.map((item) => (
+                <NavItem key={item.id} item={item} />
+              ))}
+            </ul>
+
+            <div className="my-3 h-px bg-surface-border/60" aria-hidden />
+
+            <ul className="mt-auto space-y-0.5" role="list">
+              {utilityNavItems.map((item) => (
+                <NavItem key={item.id} item={item} />
+              ))}
+            </ul>
           </nav>
-
-          <div className="my-3 flex items-center justify-center px-2">
-            <span className="h-px w-12 bg-white/10" />
-          </div>
-
-          <div className="mt-auto space-y-0.5 pb-2">
-            {utilityNavItems.map((item) => (
-              <NavButton key={item.id} item={item} />
-            ))}
-          </div>
-          </div>
         </div>
       </aside>
     </>

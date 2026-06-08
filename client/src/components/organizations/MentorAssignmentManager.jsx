@@ -661,7 +661,7 @@ export default function MentorAssignmentManager({
       >
         <DialogContent className="sm:max-w-[500px] p-8">
           <div className="flex flex-col items-center space-y-6 text-center">
-            <div className="flex h-20 w-20 items-center justify-center rounded-full bg-primary/10 dark:bg-primary/20">
+            <div className="flex h-20 w-20 items-center justify-center rounded-full bg-primary/10">
               <Video className="h-10 w-10 text-primary" />
             </div>
             <div>

@@ -184,7 +184,7 @@ export default function AdminDashboardRealTime() {
     : [];
   return (
     <div className="min-h-screen bg-background">
-      <div className="border-b bg-purple-50 dark:bg-purple-950/20">
+      <div className="border-b bg-purple-50">
         <div className="container mx-auto px-4 py-6">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
@@ -225,10 +225,10 @@ export default function AdminDashboardRealTime() {
               </Button>
               <Badge
                 variant="outline"
-                className="gap-2 bg-purple-100 dark:bg-purple-900/40 border-purple-300 dark:border-purple-700"
+                className="gap-2 bg-purple-100 border-purple-300"
               >
-                <Shield className="w-4 h-4 text-purple-600 dark:text-purple-400" />
-                <span className="text-purple-700 dark:text-purple-300 font-semibold">
+                <Shield className="w-4 h-4 text-purple-600" />
+                <span className="text-purple-700 font-semibold">
                   {user.name}
                 </span>
               </Badge>
@@ -359,17 +359,17 @@ export default function AdminDashboardRealTime() {
                   </CardHeader>
                   <CardContent>
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                      <div className="p-4 bg-blue-50 dark:bg-blue-950/20 rounded-lg">
+                      <div className="p-4 bg-blue-50 rounded-lg">
                         <div className="flex items-center gap-2 mb-2">
                           <Rocket className="w-5 h-5 text-blue-600" />
-                          <span className="font-semibold text-blue-900 dark:text-blue-100">
+                          <span className="font-semibold text-blue-900">
                             Founders
                           </span>
                         </div>
                         <div className="text-3xl font-bold text-blue-600">
                           {analytics?.users.founders || 0}
                         </div>
-                        <p className="text-sm text-blue-700 dark:text-blue-300 mt-1">
+                        <p className="text-sm text-blue-700 mt-1">
                           {analytics?.users.total
                             ? Math.round(
                                 (analytics.users.founders /
@@ -380,17 +380,17 @@ export default function AdminDashboardRealTime() {
                           % of users
                         </p>
                       </div>
-                      <div className="p-4 bg-green-50 dark:bg-green-950/20 rounded-lg">
+                      <div className="p-4 bg-green-50 rounded-lg">
                         <div className="flex items-center gap-2 mb-2">
                           <UserCheck className="w-5 h-5 text-green-600" />
-                          <span className="font-semibold text-green-900 dark:text-green-100">
+                          <span className="font-semibold text-green-900">
                             Team Members
                           </span>
                         </div>
                         <div className="text-3xl font-bold text-green-600">
                           {analytics?.users.teamMembers || 0}
                         </div>
-                        <p className="text-sm text-green-700 dark:text-green-300 mt-1">
+                        <p className="text-sm text-green-700 mt-1">
                           {analytics?.users.total
                             ? Math.round(
                                 (analytics.users.teamMembers /
@@ -401,17 +401,17 @@ export default function AdminDashboardRealTime() {
                           % of users
                         </p>
                       </div>
-                      <div className="p-4 bg-purple-50 dark:bg-purple-950/20 rounded-lg">
+                      <div className="p-4 bg-purple-50 rounded-lg">
                         <div className="flex items-center gap-2 mb-2">
                           <Award className="w-5 h-5 text-purple-600" />
-                          <span className="font-semibold text-purple-900 dark:text-purple-100">
+                          <span className="font-semibold text-purple-900">
                             Talent
                           </span>
                         </div>
                         <div className="text-3xl font-bold text-purple-600">
                           {analytics?.users.talent || 0}
                         </div>
-                        <p className="text-sm text-purple-700 dark:text-purple-300 mt-1">
+                        <p className="text-sm text-purple-700 mt-1">
                           {analytics?.users.total
                             ? Math.round(
                                 (analytics.users.talent /

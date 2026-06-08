@@ -1,10 +1,48 @@
 import User from "../models/User.js";
+import { OAuth2Client } from "google-auth-library";
 import {
   error as apiError,
   success as apiSuccess,
 } from "../utils/apiResponse.js";
 import { sendTokenResponse } from "../utils/sendToken.js";
 import { sanitizeUser } from "../utils/sanitize.js";
+
+const googleClient = new OAuth2Client();
+const allowedSignupRoles = new Set([
+  "founder",
+  "talent",
+  "team-member",
+  "organization-admin",
+]);
+
+function normalizeEmail(value) {
+  return String(value || "").toLowerCase().trim();
+}
+
+function getGoogleClientId() {
+  return String(process.env.GOOGLE_CLIENT_ID || "").trim();
+}
+
+async function verifyGoogleCredential(credential) {
+  const clientId = getGoogleClientId();
+  if (!clientId) {
+    const err = new Error("Google sign-in is not configured on this server.");
+    err.statusCode = 503;
+    throw err;
+  }
+
+  const ticket = await googleClient.verifyIdToken({
+    idToken: credential,
+    audience: clientId,
+  });
+  return ticket.getPayload();
+}
+
+function addProvider(user, provider) {
+  const providers = new Set(Array.isArray(user.authProviders) ? user.authProviders : []);
+  providers.add(provider);
+  user.authProviders = [...providers];
+}
 
 // - Handle user registration
 export const signup = async (req, res) => {
@@ -14,25 +52,21 @@ export const signup = async (req, res) => {
     return apiError(res, "All fields are required", 400);
   }
 
-  const existing = await User.findOne({ email: String(email).toLowerCase() });
+  const existing = await User.findOne({ email: normalizeEmail(email) });
   if (existing) {
     return apiError(res, "Account already exists.", 409);
   }
-  
-  const allowedSignupRoles = new Set([
-    "founder",
-    "talent",
-    "team-member",
-    "organization-admin",
-  ]);
+
   const requestedRole = String(req.body?.role || "founder").toLowerCase();
   const role = allowedSignupRoles.has(requestedRole) ? requestedRole : "founder";
 
   const user = await User.create({
     name: String(name).trim(),
-    email: String(email).toLowerCase().trim(),
+    email: normalizeEmail(email),
     password: String(password),
     role,
+    authProviders: ["local"],
+    emailVerified: false,
     isAdmin: false,
   });
 
@@ -48,7 +82,7 @@ export const signin = async (req, res) => {
   }
 
   const user = await User.findOne({
-    email: String(email).toLowerCase().trim(),
+    email: normalizeEmail(email),
   }).select("+password");
 
   if (!user) {
@@ -61,6 +95,103 @@ export const signin = async (req, res) => {
   }
 
   return sendTokenResponse(user, 200, res, "Login successful");
+};
+
+// - Handle Google Identity Services sign-in / role-selected signup
+export const googleAuth = async (req, res) => {
+  const credential = String(req.body?.credential || "").trim();
+  const requestedRole = String(req.body?.role || "").toLowerCase().trim();
+
+  if (!credential) {
+    return apiError(res, "Google credential is required.", 400);
+  }
+
+  let payload;
+  try {
+    payload = await verifyGoogleCredential(credential);
+  } catch (error) {
+    const status = error?.statusCode || 401;
+    return apiError(
+      res,
+      status === 503
+        ? error.message
+        : "Google sign-in could not be verified. Please try again.",
+      status,
+    );
+  }
+
+  if (!payload?.sub || !payload?.email) {
+    return apiError(res, "Google sign-in response is missing account details.", 401);
+  }
+
+  if (payload.email_verified !== true) {
+    return apiError(res, "Google account email must be verified before sign-in.", 401);
+  }
+
+  const googleId = String(payload.sub).trim();
+  const email = normalizeEmail(payload.email);
+  const displayName = String(payload.name || email.split("@")[0] || "Google User").trim();
+  const picture = String(payload.picture || "").trim();
+
+  let user = await User.findOne({ googleId });
+  if (!user) {
+    user = await User.findOne({ email });
+  }
+
+  if (user) {
+    if (user.googleId && user.googleId !== googleId) {
+      return apiError(res, "This email is already linked to a different Google account.", 409);
+    }
+
+    let changed = false;
+    if (!user.googleId) {
+      user.googleId = googleId;
+      changed = true;
+    }
+    if (user.emailVerified !== true) {
+      user.emailVerified = true;
+      changed = true;
+    }
+    if (picture && !user.avatarUrl) {
+      user.avatarUrl = picture;
+      changed = true;
+    }
+
+    const previousProviders = Array.isArray(user.authProviders)
+      ? user.authProviders.join("|")
+      : "";
+    addProvider(user, "google");
+    if ((user.authProviders || []).join("|") !== previousProviders) {
+      changed = true;
+    }
+
+    if (changed) {
+      await user.save();
+    }
+
+    return sendTokenResponse(user, 200, res, "Google sign-in successful");
+  }
+
+  if (!requestedRole) {
+    return apiError(res, "No account exists for this Google email. Please sign up first.", 404);
+  }
+
+  if (!allowedSignupRoles.has(requestedRole) || requestedRole === "team-member") {
+    return apiError(res, "Invalid role for Google signup.", 400);
+  }
+
+  const created = await User.create({
+    name: displayName,
+    email,
+    role: requestedRole,
+    googleId,
+    authProviders: ["google"],
+    emailVerified: true,
+    avatarUrl: picture,
+    isAdmin: false,
+  });
+
+  return sendTokenResponse(created, 201, res, "Google signup successful");
 };
 
 // - Update authenticated user's profile

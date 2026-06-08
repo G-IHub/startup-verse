@@ -10,6 +10,7 @@ import Event from "../models/Event.js";
 import CohortInvitation from "../models/CohortInvitation.js";
 import CohortMembership from "../models/CohortMembership.js";
 import { createNotification, broadcastNotification } from "./notificationService.js";
+import { officeDeepLink } from "../utils/deepLinks.js";
 import { logger } from "../config/logger.js";
 
 function startOfWeek(d) {
@@ -45,7 +46,7 @@ export async function runWeeklyOutcomeReminderJob() {
         type: "weekly-outcome-reminder",
         title: "Set your weekly goal",
         message: "Plan your focus for the week ahead — set your weekly outcome.",
-        actionUrl: "/?view=virtual-office&tab=weekly",
+        actionUrl: officeDeepLink({ tab: "weekly" }),
         metadata: { weekOf: upcomingWeekStart.toISOString(), job: "weekly-outcome-reminder" },
       }).catch(() => null);
       reminded += 1;
@@ -73,7 +74,7 @@ export async function runWeeklyReviewReminderJob() {
         type: "weekly-review-reminder",
         title: "Weekly review",
         message: "Wrap up your week — review and submit your weekly outcome.",
-        actionUrl: "/?view=virtual-office&tab=weekly",
+        actionUrl: officeDeepLink({ tab: "weekly" }),
         metadata: { outcomeId: String(active._id), job: "weekly-review-reminder" },
       }).catch(() => null);
       reminded += 1;
@@ -123,7 +124,7 @@ export async function runStreakAtRiskJob() {
         type: "streak-at-risk",
         title: "Streak at risk",
         message: `You have a ${streak}-week execution streak — submit this week's outcome before it resets.`,
-        actionUrl: "/?view=virtual-office&tab=weekly",
+        actionUrl: officeDeepLink({ tab: "weekly" }),
         metadata: { streak, job: "streak-at-risk" },
       }).catch(() => null);
       reminded += 1;
@@ -160,7 +161,7 @@ export async function runDeliverableDueSoonJob() {
         type: "deliverable-due-soon",
         title: "Deliverable due soon",
         message: `"${d.title}" is due within 24 hours.`,
-        actionUrl: `/?view=virtual-office&tab=deliverables&deliverableId=${d._id}`,
+        actionUrl: officeDeepLink({ tab: "deliverables", deliverableId: d._id }),
         metadata: { deliverableId: String(d._id), job: "deliverable-due-soon" },
       }).catch(() => null);
       notified += 1;
@@ -199,7 +200,7 @@ export async function runEventReminderJob() {
       type: "event-reminder",
       title: "Event starting soon",
       message: `"${ev.title}" starts within the hour.`,
-      actionUrl: "/?view=virtual-office&tab=calendar",
+      actionUrl: officeDeepLink({ tab: "calendar" }),
       metadata: { eventId: String(ev._id), job: "event-reminder" },
     });
     reminded += userIds.size;

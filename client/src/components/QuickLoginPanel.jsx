@@ -39,7 +39,7 @@ export default function QuickLoginPanel({ onLogin }) {
         location: "San Francisco, CA",
       },
       icon: UserCircle,
-      color: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300",
+      color: "bg-primary-tint text-primary",
     },
     {
       id: "user-team-001",
@@ -59,8 +59,7 @@ export default function QuickLoginPanel({ onLogin }) {
         department: "Engineering",
       },
       icon: Briefcase,
-      color:
-        "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300",
+      color: "bg-accent-tint text-accent",
     },
     {
       id: "user-team-002",
@@ -80,7 +79,7 @@ export default function QuickLoginPanel({ onLogin }) {
         department: "Design",
       },
       icon: UserCircle,
-      color: "bg-pink-100 text-pink-700 dark:bg-pink-900/30 dark:text-pink-300",
+      color: "bg-primary-tint text-primary",
     },
     {
       id: "user-team-003",
@@ -100,8 +99,7 @@ export default function QuickLoginPanel({ onLogin }) {
         department: "Marketing",
       },
       icon: UserCircle,
-      color:
-        "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300",
+      color: "bg-status-success/15 text-status-success",
     },
     {
       id: "user-team-004",
@@ -121,8 +119,7 @@ export default function QuickLoginPanel({ onLogin }) {
         department: "Engineering",
       },
       icon: UserCircle,
-      color:
-        "bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300",
+      color: "bg-accent-tint text-accent",
     },
     {
       id: "user-talent-001",
@@ -137,8 +134,7 @@ export default function QuickLoginPanel({ onLogin }) {
         location: "Seattle, WA",
       },
       icon: UserCircle,
-      color:
-        "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300",
+      color: "bg-status-warning/15 text-status-warning",
     },
   ];
   const handleLogin = (mockUser) => {
@@ -200,7 +196,7 @@ export default function QuickLoginPanel({ onLogin }) {
   }
   return (
     <div className="fixed bottom-4 right-4 z-50 w-96">
-      <Card className="shadow-2xl border-2">
+      <Card className="rounded-card border border-surface-border bg-surface-card shadow-modal">
         <CardHeader className="pb-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">

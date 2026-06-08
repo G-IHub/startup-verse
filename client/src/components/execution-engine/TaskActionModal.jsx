@@ -58,13 +58,13 @@ export default function TaskActionModal({
   const getStatusColor = (status) => {
     switch (status) {
       case "completed":
-        return "bg-green-100 text-green-800 dark:bg-green-950 dark:text-green-100";
+        return "bg-green-100 text-green-800";
       case "in-progress":
-        return "bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-100";
+        return "bg-blue-100 text-blue-800";
       case "blocked":
-        return "bg-orange-100 text-orange-800 dark:bg-orange-950 dark:text-orange-100";
+        return "bg-orange-100 text-orange-800";
       default:
-        return "bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-100";
+        return "bg-gray-100 text-gray-800";
     }
   };
   return (
@@ -139,15 +139,15 @@ export default function TaskActionModal({
             )}
           </div>
           {task.status === "blocked" && task.blockerNote && (
-            <div className="p-4 bg-orange-50 dark:bg-orange-950/20 border border-orange-200 dark:border-orange-800 rounded-lg">
+            <div className="p-4 bg-orange-50 border border-orange-200 rounded-lg">
               <div className="flex items-start gap-2 mb-2">
                 <AlertCircle className="w-5 h-5 text-orange-600 flex-shrink-0 mt-0.5" />
                 <div className="flex-1">
-                  <p className="font-semibold text-sm text-orange-900 dark:text-orange-100 mb-1">
+                  <p className="font-semibold text-sm text-orange-900 mb-1">
                     {blockerReasons.find((r) => r.value === task.blockerReason)
                       ?.label || "Blocked"}
                   </p>
-                  <p className="text-sm text-orange-800 dark:text-orange-200">
+                  <p className="text-sm text-orange-800">
                     {task.blockerNote}
                   </p>
                 </div>
@@ -155,14 +155,14 @@ export default function TaskActionModal({
             </div>
           )}
           {task.status === "completed" && task.completedAt && (
-            <div className="p-4 bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-800 rounded-lg">
+            <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
               <div className="flex items-center gap-2">
                 <CheckCircle2 className="w-5 h-5 text-green-600" />
                 <div>
-                  <p className="font-semibold text-sm text-green-900 dark:text-green-100">
+                  <p className="font-semibold text-sm text-green-900">
                     Completed
                   </p>
-                  <p className="text-xs text-green-700 dark:text-green-300">
+                  <p className="text-xs text-green-700">
                     {new Date(task.completedAt).toLocaleString()}
                   </p>
                 </div>

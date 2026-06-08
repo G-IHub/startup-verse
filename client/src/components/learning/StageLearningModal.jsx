@@ -278,7 +278,7 @@ export default function StageLearningModal({
             </div>
           </div>
         </DialogHeader>
-        <div className="overflow-y-scroll flex-1 scrollbar-thin scrollbar-thumb-gray-300 dark:scrollbar-thumb-gray-700 scrollbar-track-transparent">
+        <div className="overflow-y-scroll flex-1 scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-transparent">
           {selectedVideo ? (
             <div className="p-4 space-y-4 pb-16">
               <Button
@@ -403,7 +403,7 @@ export default function StageLearningModal({
                                   {watched && (
                                     <Badge
                                       variant="secondary"
-                                      className="text-[9px] h-4 flex items-center gap-0.5 bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 border-green-200 dark:border-green-800"
+                                      className="text-[9px] h-4 flex items-center gap-0.5 bg-green-100 text-green-700 border-green-200"
                                     >
                                       <CheckCircle2 className="w-2.5 h-2.5" />
                                       Watched

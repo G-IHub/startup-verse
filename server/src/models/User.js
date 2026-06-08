@@ -23,9 +23,25 @@ const userSchema = new mongoose.Schema(
     },
     password: {
       type: String,
-      required: [true, "Password is required"],
+      required: [
+        function () {
+          return !Array.isArray(this.authProviders) || this.authProviders.includes("local");
+        },
+        "Password is required",
+      ],
       select: false,
     },
+    googleId: {
+      type: String,
+      trim: true,
+      default: "",
+      sparse: true,
+    },
+    authProviders: {
+      type: [{ type: String, enum: ["local", "google"] }],
+      default: ["local"],
+    },
+    emailVerified: { type: Boolean, default: false },
     role: {
       type: String,
       enum: {
@@ -63,6 +79,10 @@ const userSchema = new mongoose.Schema(
 
 userSchema.index({ email: 1 }, { unique: true });
 userSchema.index({ role: 1 });
+userSchema.index(
+  { googleId: 1 },
+  { unique: true, sparse: true, partialFilterExpression: { googleId: { $type: "string", $gt: "" } } },
+);
 
 // Pre-save hook to hash the password before saving
 userSchema.pre("save", async function () {
@@ -75,6 +95,9 @@ userSchema.pre("save", async function () {
 
 // Method to compare candidate password with hashed password
 userSchema.methods.comparePassword = async function (candidatePassword) {
+  if (!this.password) {
+    return false;
+  }
   return await bcrypt.compare(candidatePassword, this.password);
 };
 

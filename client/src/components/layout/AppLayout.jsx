@@ -4,7 +4,6 @@ import { Button } from "../ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "../ui/avatar";
 import { Badge } from "../ui/badge";
 import { toast } from "sonner";
-import ThemeToggle from "../ThemeToggle";
 import {
   Bell,
   Settings,
@@ -262,11 +261,6 @@ export default function AppLayout({
                 </TooltipContent>
               </Tooltip>
             </TooltipProvider>
-            <ThemeToggle
-              variant="ghost"
-              size="sm"
-              className="bg-muted/80 hover:bg-accent/20 transition-colors"
-            />
             <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger asChild={true}>

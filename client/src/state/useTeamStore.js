@@ -138,4 +138,4 @@ export const useTeamStore = create((set, get) => ({
 
 export const selectTeamMembers = (state) => state.members;
 export const selectOnlineTeamCount = (state) =>
-  state.members.filter((m) => m.isOnline || m.status === "online").length;
+  state.members.filter((m) => m.isOnline).length;

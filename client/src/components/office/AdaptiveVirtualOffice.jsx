@@ -13,8 +13,6 @@ export default function AdaptiveVirtualOffice({
   onTaskOpened,
   announcementToOpen,
   onAnnouncementOpened,
-  messageUserToOpen,
-  onMessageUserOpened,
   winToOpen,
   onWinOpened,
 }) {
@@ -30,8 +28,6 @@ export default function AdaptiveVirtualOffice({
             onTaskOpened={onTaskOpened}
             announcementToOpen={announcementToOpen}
             onAnnouncementOpened={onAnnouncementOpened}
-            messageUserToOpen={messageUserToOpen}
-            onMessageUserOpened={onMessageUserOpened}
             winToOpen={winToOpen}
             onWinOpened={onWinOpened}
           />

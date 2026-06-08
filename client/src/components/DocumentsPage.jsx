@@ -93,7 +93,7 @@ export default function DocumentsPage({ user, onNavigate }) {
         </p>
       </div>
       <Card
-        className={`border-2 ${documents[0].borderColor} bg-gradient-to-br ${documents[0].bgColor} dark:from-purple-950/20 dark:to-background overflow-hidden relative`}
+        className={`border-2 ${documents[0].borderColor} bg-gradient-to-br ${documents[0].bgColor} overflow-hidden relative`}
       >
         <div className="absolute top-0 right-0 w-64 h-64 bg-gradient-to-br from-purple-500/10 to-primary/10 rounded-full blur-3xl -z-10" />
         <CardHeader>
@@ -198,7 +198,7 @@ export default function DocumentsPage({ user, onNavigate }) {
             return (
               <Card
                 key={doc.id}
-                className={`border-2 ${doc.borderColor} bg-gradient-to-br ${doc.bgColor} dark:from-${doc.color.split("-")[1]}-950/20 dark:to-background relative overflow-hidden ${!doc.available && "opacity-60"}`}
+                className={"border-2 " + doc.borderColor + " bg-gradient-to-br " + doc.bgColor + " relative overflow-hidden " + (!doc.available ? "opacity-60" : "")}
               >
                 <CardHeader>
                   <div className="flex items-start gap-3 mb-2">

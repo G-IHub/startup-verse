@@ -43,28 +43,28 @@ export default function TaskIncentiveModal({
       label: "Equity Only",
       description: "Offer equity compensation",
       icon: TrendingUp,
-      color: "text-blue-600 dark:text-blue-400",
+      color: "text-blue-600",
     },
     {
       type: "paid",
       label: "Fixed Payment",
       description: "One-time or monthly stipend",
       icon: DollarSign,
-      color: "text-green-600 dark:text-green-400",
+      color: "text-green-600",
     },
     {
       type: "hourly",
       label: "Hourly Rate",
       description: "Pay by the hour",
       icon: Clock,
-      color: "text-purple-600 dark:text-purple-400",
+      color: "text-purple-600",
     },
     {
       type: "unpaid",
       label: "Unpaid / Volunteer",
       description: "No immediate compensation",
       icon: Gift,
-      color: "text-gray-600 dark:text-gray-400",
+      color: "text-gray-600",
     },
   ];
   return (
@@ -188,8 +188,8 @@ export default function TaskIncentiveModal({
               </p>
             </div>
           )}
-          <div className="p-3 bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-900 rounded-lg">
-            <p className="text-xs text-blue-900 dark:text-blue-100">
+          <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+            <p className="text-xs text-blue-900">
               <strong>Note:</strong>
               {
                 " StartupVerse records compensation terms but does not handle payments or equity issuance. You're responsible for fulfilling these commitments through your company."

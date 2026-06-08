@@ -143,7 +143,7 @@ export default function CurrentOutcome({
             {outcome.milestones.map((milestone) => (
               <div
                 key={milestone.id}
-                className={`flex items-center justify-between p-3 rounded-lg border ${milestone.status === "completed" ? "bg-green-50 dark:bg-green-950/20 border-green-200 dark:border-green-900" : milestone.status === "in-progress" ? "bg-primary/5 border-primary/20" : "bg-muted/30"}`}
+                className={`flex items-center justify-between p-3 rounded-lg border ${milestone.status === "completed" ? "bg-green-50 border-green-200" : milestone.status === "in-progress" ? "bg-primary/5 border-primary/20" : "bg-muted/30"}`}
               >
                 <div className="flex items-center gap-3 flex-1">
                   {getMilestoneIcon(milestone.status)}

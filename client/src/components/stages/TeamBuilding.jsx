@@ -237,11 +237,11 @@ export default function TeamBuilding({ user, onBack }) {
                 Assemble your founding team and early hires
               </p>
             </div>
-            <Card className="border-orange-200 dark:border-orange-800 bg-orange-50/50 dark:bg-orange-950/20">
+            <Card className="border-orange-200 bg-orange-50/50">
               <CardContent className="py-4">
                 <div className="flex items-center justify-between gap-4">
                   <div className="flex items-center gap-3">
-                    <FastForward className="w-5 h-5 text-orange-600 dark:text-orange-400" />
+                    <FastForward className="w-5 h-5 text-orange-600" />
                     <div>
                       <p className="font-semibold text-sm">
                         Already Have Your Team?
@@ -413,7 +413,7 @@ export default function TeamBuilding({ user, onBack }) {
               <CardContent className="space-y-3">
                 {pendingApplications.length === 0 ? (
                   <div className="text-center py-8">
-                    <CheckCircle2 className="w-12 h-12 text-green-600 dark:text-green-400 mx-auto mb-3 opacity-50" />
+                    <CheckCircle2 className="w-12 h-12 text-green-600 mx-auto mb-3 opacity-50" />
                     <p className="text-sm font-medium mb-1">
                       All Applications Processed! 🎉
                     </p>
@@ -520,7 +520,7 @@ export default function TeamBuilding({ user, onBack }) {
                     {contracts.map((contract, idx) => (
                       <div
                         key={idx}
-                        className="p-3 border rounded-lg bg-green-50 dark:bg-green-950/20 border-green-200 dark:border-green-800"
+                        className="p-3 border rounded-lg bg-green-50 border-green-200"
                       >
                         <div className="flex items-start gap-3">
                           <Avatar className="w-8 h-8 flex-shrink-0">

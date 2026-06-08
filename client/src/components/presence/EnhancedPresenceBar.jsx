@@ -9,7 +9,12 @@ const USER_COLORS = {
   "user-5": "#C7B3E5",
   "user-6": "#FF9A76",
 };
-function getStatusColor(status) {
+function isUserOnline(user) {
+  return Boolean(user?.isOnline || user?.connection === "online");
+}
+
+function getStatusColor(status, user) {
+  if (user && isUserOnline(user)) return "#2ECC71";
   switch (status) {
     case "active":
       return "#2ECC71";
@@ -44,19 +49,20 @@ function getInitials(name) {
 export function EnhancedPresenceBar({ users, onUserClick, currentUserId }) {
   const [hoveredUserId, setHoveredUserId] = useState(null);
   return (
-    <div className="fixed top-0 left-0 right-0 z-40 bg-white/95 dark:bg-gray-900/95 backdrop-blur-md border-b border-gray-200 dark:border-gray-700 shadow-md">
+    <div className="fixed top-0 left-0 right-0 z-40 bg-white/95 backdrop-blur-md border-b border-gray-200 shadow-md">
       <div className="flex items-center justify-between gap-3 px-4 py-2 overflow-x-auto">
         <div className="flex items-center gap-2">
           <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
-          <span className="text-xs text-gray-600 dark:text-gray-300">
-            {users.filter((u) => u.status === "active").length}
+          <span className="text-xs text-gray-600">
+            {users.filter((u) => isUserOnline(u)).length}
             {" online"}
           </span>
         </div>
         <div className="flex items-center gap-2">
           {users.map((user, index) => {
             const color = USER_COLORS[user.id] || "#95A5A6";
-            const statusColor = getStatusColor(user.status);
+            const statusColor = getStatusColor(user.status, user);
+            const online = isUserOnline(user);
             const isHovered = hoveredUserId === user.id;
             return (
               <motion.div
@@ -140,21 +146,21 @@ export function EnhancedPresenceBar({ users, onUserClick, currentUserId }) {
                   )}
                 </div>
                 <motion.div
-                  className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-white dark:border-gray-900 flex items-center justify-center"
+                  className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-white flex items-center justify-center"
                   style={{
                     backgroundColor: statusColor,
                   }}
                   animate={{
-                    scale: user.status === "active" ? [1, 1.2, 1] : 1,
+                    scale: online ? [1, 1.2, 1] : 1,
                   }}
                   transition={{
-                    repeat: user.status === "active" ? Infinity : 0,
+                    repeat: online ? Infinity : 0,
                     duration: 2,
                   }}
                 />
                 {user.activity && user.activity !== "idle" && (
                   <motion.div
-                    className="absolute -top-0.5 -right-0.5 w-5 h-5 rounded-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 flex items-center justify-center text-gray-600 dark:text-gray-300 shadow-sm"
+                    className="absolute -top-0.5 -right-0.5 w-5 h-5 rounded-full bg-white border border-gray-200 flex items-center justify-center text-gray-600 shadow-sm"
                     initial={{
                       scale: 0,
                     }}
@@ -191,7 +197,7 @@ export function EnhancedPresenceBar({ users, onUserClick, currentUserId }) {
                       transition={{
                         duration: 0.2,
                       }}
-                      className="absolute top-full mt-3 left-0 bg-gray-900 dark:bg-gray-800 text-white px-4 py-3 rounded-xl text-xs whitespace-nowrap pointer-events-none shadow-xl z-50 min-w-[160px]"
+                      className="absolute top-full mt-3 left-0 bg-popover text-popover-foreground border border-border px-4 py-3 rounded-xl text-xs whitespace-nowrap pointer-events-none shadow-xl z-50 min-w-[160px]"
                     >
                       <div className="flex items-center gap-2 mb-2">
                         <div
@@ -221,12 +227,12 @@ export function EnhancedPresenceBar({ users, onUserClick, currentUserId }) {
                           )}
                         </div>
                       </div>
-                      <div className="mt-2 pt-2 border-t border-gray-700">
+                      <div className="mt-2 pt-2 border-t border-border">
                         <span className="text-blue-400 text-[10px]">
                           Click to message
                         </span>
                       </div>
-                      <div className="absolute -top-1 left-4 w-2 h-2 bg-gray-900 dark:bg-gray-800 rotate-45" />
+                      <div className="absolute -top-1 left-4 w-2 h-2 bg-popover border-l border-t border-border rotate-45" />
                     </motion.div>
                   )}
                 </AnimatePresence>
@@ -237,9 +243,9 @@ export function EnhancedPresenceBar({ users, onUserClick, currentUserId }) {
             whileHover={{
               scale: 1.05,
             }}
-            className="flex-shrink-0 w-10 h-10 rounded-full border-2 border-dashed border-gray-300 dark:border-gray-600 flex items-center justify-center cursor-pointer hover:border-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors"
+            className="flex-shrink-0 w-10 h-10 rounded-full border-2 border-dashed border-gray-300 flex items-center justify-center cursor-pointer hover:border-blue-500 hover:bg-blue-50 transition-colors"
           >
-            <span className="text-gray-400 dark:text-gray-500 text-base">
+            <span className="text-gray-400 text-base">
               +
             </span>
           </motion.div>

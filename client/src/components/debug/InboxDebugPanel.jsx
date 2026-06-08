@@ -118,9 +118,9 @@ export default function InboxDebugPanel({ userId, userEmail, role }) {
             </div>
           </div>
           {debugData?.organizationInvitations && (
-            <div className="p-2 bg-blue-50 dark:bg-blue-950/20 rounded border border-blue-200 dark:border-blue-800">
+            <div className="p-2 bg-blue-50 rounded border border-blue-200">
               <div className="flex items-center justify-between mb-2">
-                <p className="font-semibold text-[10px] text-blue-900 dark:text-blue-100 uppercase">
+                <p className="font-semibold text-[10px] text-blue-900 uppercase">
                   Organization Invitations
                 </p>
                 <Badge className="text-[9px]">
@@ -136,7 +136,7 @@ export default function InboxDebugPanel({ userId, userEmail, role }) {
                   {debugData.organizationInvitations.map((inv, idx) => (
                     <div
                       key={idx}
-                      className="p-2 bg-white dark:bg-gray-900 rounded border text-[10px]"
+                      className="p-2 bg-white rounded border text-[10px]"
                     >
                       <div className="flex items-start justify-between mb-1">
                         <p className="font-medium">{inv.organizationName}</p>
@@ -169,9 +169,9 @@ export default function InboxDebugPanel({ userId, userEmail, role }) {
             </div>
           )}
           {debugData?.interestMessages && (
-            <div className="p-2 bg-purple-50 dark:bg-purple-950/20 rounded border border-purple-200 dark:border-purple-800">
+            <div className="p-2 bg-purple-50 rounded border border-purple-200">
               <div className="flex items-center justify-between mb-2">
-                <p className="font-semibold text-[10px] text-purple-900 dark:text-purple-100 uppercase">
+                <p className="font-semibold text-[10px] text-purple-900 uppercase">
                   Interest Messages
                 </p>
                 <Badge className="text-[9px]">
@@ -191,25 +191,25 @@ export default function InboxDebugPanel({ userId, userEmail, role }) {
             </div>
           )}
           {debugData?.error && (
-            <div className="p-2 bg-red-50 dark:bg-red-950/20 rounded border border-red-200 dark:border-red-800">
+            <div className="p-2 bg-red-50 rounded border border-red-200">
               <div className="flex items-start gap-2">
                 <AlertCircle className="w-4 h-4 text-red-600 flex-shrink-0" />
                 <div>
-                  <p className="font-semibold text-[10px] text-red-900 dark:text-red-100 uppercase mb-1">
+                  <p className="font-semibold text-[10px] text-red-900 uppercase mb-1">
                     Error
                   </p>
-                  <p className="text-[10px] text-red-700 dark:text-red-300">
+                  <p className="text-[10px] text-red-700">
                     {debugData.error}
                   </p>
                 </div>
               </div>
             </div>
           )}
-          <div className="p-2 bg-green-50 dark:bg-green-950/20 rounded border border-green-200 dark:border-green-800">
-            <p className="font-semibold text-[10px] text-green-900 dark:text-green-100 uppercase mb-2">
+          <div className="p-2 bg-green-50 rounded border border-green-200">
+            <p className="font-semibold text-[10px] text-green-900 uppercase mb-2">
               Troubleshooting
             </p>
-            <ul className="space-y-1 text-[10px] text-green-700 dark:text-green-300">
+            <ul className="space-y-1 text-[10px] text-green-700">
               <li className="flex items-start gap-1">
                 <Check className="w-3 h-3 mt-0.5 flex-shrink-0" />
                 <span>
