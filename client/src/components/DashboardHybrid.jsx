@@ -124,10 +124,6 @@ export default function DashboardHybrid({ user, onLogout, onUpdateUser }) {
     [location.pathname, location.search, user.role],
   );
 
-  const [taskToOpen, setTaskToOpen] = useState(null);
-  const [announcementToOpen, setAnnouncementToOpen] = useState(null);
-  const [messageUserToOpen, setMessageUserToOpen] = useState(null);
-  const [winToOpen, setWinToOpen] = useState(null);
   const [selectedTalent, setSelectedTalent] = useState(null);
   const [selectedStartup, setSelectedStartup] = useState(null);
 
@@ -144,59 +140,43 @@ export default function DashboardHybrid({ user, onLogout, onUpdateUser }) {
     [navigate],
   );
 
-  const handleNavigate = (page, options) => {
-    if (options?.taskId) {
-      setTaskToOpen(options.taskId);
-      navigate(
-        dashboardStateToPath({
-          currentPage: "startup-office",
-          virtualOfficeView: "workspace",
-        }),
-      );
-      return;
-    }
-    if (options?.announcementId) {
-      setAnnouncementToOpen(options.announcementId);
-      navigate(
-        dashboardStateToPath({
-          currentPage: "startup-office",
-          virtualOfficeView: "workspace",
-        }),
-      );
-      return;
-    }
-    if (options?.messageUserId) {
-      setMessageUserToOpen(options.messageUserId);
-      if (page === "founder-chat" || page === "talent-chat") {
-        const targetPath = dashboardStateToPath({ currentPage: page });
-        navigate(targetPath);
-        return;
+  const handleNavigate = (page, options = {}) => {
+    if (page === "talent-profile" && (options?.talent || options?.talentId)) {
+      if (options?.talent) {
+        setSelectedTalent(options.talent);
       }
-    }
-    if (options?.openTeamHub) {
-      if (options?.winId) {
-        setWinToOpen(options.winId);
-      }
+      const talentId = String(
+        options.talentId ||
+          options.talent?.userId?._id ||
+          options.talent?.userId ||
+          options.talent?._id ||
+          options.talent?.id ||
+          "",
+      );
       navigate(
         dashboardStateToPath({
-          currentPage: "startup-office",
-          virtualOfficeView: "workspace",
+          currentPage: "talent-profile",
+          ...(talentId ? { talentId } : {}),
         }),
       );
       return;
     }
 
-    if (page === "talent-profile" && options?.talent) {
-      setSelectedTalent(options.talent);
-      navigate("/talent-profile");
-      return;
-    }
     if (
       page === "startup-detail" &&
       (options?.startup || options?.startupId)
     ) {
-      setSelectedStartup(options?.startup || { id: options.startupId });
-      navigate("/startup-detail");
+      const startup = options?.startup || { id: options.startupId };
+      setSelectedStartup(startup);
+      const startupId = String(
+        options.startupId || startup.id || startup._id || "",
+      );
+      navigate(
+        dashboardStateToPath({
+          currentPage: "startup-detail",
+          ...(startupId ? { startupId } : {}),
+        }),
+      );
       return;
     }
 
@@ -226,9 +206,30 @@ export default function DashboardHybrid({ user, onLogout, onUpdateUser }) {
           page === "settings"
             ? Boolean(options?.editProfile)
             : false,
+        messageUserId: options?.messageUserId,
+        taskId: options?.taskId,
+        announcementId: options?.announcementId,
+        winId: options?.winId,
+        deliverableId: options?.deliverableId,
+        officeTab: options?.officeTab,
+        startupId: options?.startupId,
+        talentId: options?.talentId,
+        invitationId: options?.invitationId,
       }),
     );
   };
+
+  const clearEntityFromUrl = useCallback(
+    (entityKeys) => {
+      if (!derivedNav) return;
+      const next = { ...derivedNav };
+      for (const key of entityKeys) {
+        delete next[key];
+      }
+      navigate(dashboardStateToPath(next), { replace: true });
+    },
+    [derivedNav, navigate],
+  );
 
   if (!derivedNav || !validPages.has(derivedNav.currentPage)) {
     return <Navigate to="/home" replace />;
@@ -239,6 +240,12 @@ export default function DashboardHybrid({ user, onLogout, onUpdateUser }) {
     virtualOfficeView = "workspace",
     talentDashboardMode = "overview",
     initialProfileEditing = false,
+    messageUserId,
+    taskId,
+    announcementId,
+    winId,
+    startupId: urlStartupId,
+    talentId: urlTalentId,
   } = derivedNav;
 
   const renderPageContent = () => {
@@ -416,7 +423,10 @@ export default function DashboardHybrid({ user, onLogout, onUpdateUser }) {
         return (
           <Suspense fallback={<PageLoadingFallback />}>
             <TalentProfilePage
-              talent={selectedTalent}
+              talent={
+                selectedTalent ||
+                (urlTalentId ? { id: urlTalentId, userId: urlTalentId } : null)
+              }
               currentUser={user}
               onBack={() => {
                 setSelectedTalent(null);
@@ -526,8 +536,7 @@ export default function DashboardHybrid({ user, onLogout, onUpdateUser }) {
             <FounderChatPage
               user={user}
               onNavigate={handleNavigate}
-              initialSelectedUserId={messageUserToOpen}
-              onInitialSelectionApplied={() => setMessageUserToOpen(null)}
+              initialSelectedUserId={messageUserId || null}
             />
           </Suspense>
         );
@@ -539,8 +548,7 @@ export default function DashboardHybrid({ user, onLogout, onUpdateUser }) {
             <TalentChatPage
               user={user}
               onNavigate={handleNavigate}
-              initialSelectedUserId={messageUserToOpen}
-              onInitialSelectionApplied={() => setMessageUserToOpen(null)}
+              initialSelectedUserId={messageUserId || null}
             />
           </Suspense>
         );
@@ -563,8 +571,7 @@ export default function DashboardHybrid({ user, onLogout, onUpdateUser }) {
               user={user}
               onNavigate={handleNavigate}
               onViewStartup={(startup) => {
-                setSelectedStartup(startup);
-                handleNavigate("startup-detail");
+                handleNavigate("startup-detail", { startup });
               }}
             />
           </Suspense>
@@ -576,7 +583,12 @@ export default function DashboardHybrid({ user, onLogout, onUpdateUser }) {
             <StartupDetailPage
               user={user}
               startup={selectedStartup}
-              startupId={selectedStartup?.id || selectedStartup?._id || ""}
+              startupId={
+                selectedStartup?.id ||
+                selectedStartup?._id ||
+                urlStartupId ||
+                ""
+              }
               onNavigate={handleNavigate}
             />
           </Suspense>
@@ -644,14 +656,14 @@ export default function DashboardHybrid({ user, onLogout, onUpdateUser }) {
             onUpdateUser={onUpdateUser}
             view={virtualOfficeView}
             onViewChange={handleVirtualOfficeViewChange}
-            taskToOpen={taskToOpen}
-            onTaskOpened={() => setTaskToOpen(null)}
-            announcementToOpen={announcementToOpen}
-            onAnnouncementOpened={() => setAnnouncementToOpen(null)}
-            messageUserToOpen={messageUserToOpen}
-            onMessageUserOpened={() => setMessageUserToOpen(null)}
-            winToOpen={winToOpen}
-            onWinOpened={() => setWinToOpen(null)}
+            taskToOpen={taskId || null}
+            onTaskOpened={() => clearEntityFromUrl(["taskId", "officeTab"])}
+            announcementToOpen={announcementId || null}
+            onAnnouncementOpened={() =>
+              clearEntityFromUrl(["announcementId", "officeTab"])
+            }
+            winToOpen={winId || null}
+            onWinOpened={() => clearEntityFromUrl(["winId", "officeTab"])}
           />
         );
     }

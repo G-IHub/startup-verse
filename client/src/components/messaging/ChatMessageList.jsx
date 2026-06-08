@@ -1,13 +1,15 @@
 import React, { useCallback, useEffect } from "react";
 import { Avatar, AvatarFallback } from "../ui/avatar";
 import { cn } from "../ui/utils";
-import { Check, MessageSquare } from "lucide-react";
+import { Check, Loader2, MessageSquare } from "lucide-react";
 import { useIsMobile } from "../ui/use-mobile";
 import { MessageAttachmentBubble } from "./MessageAttachmentBubble";
 import { MessageActionsMenu } from "./MessageActionsMenu";
 import { SwipeableMessageRow } from "./SwipeableMessageRow";
 import { normalizeMessageAttachments } from "../../utils/messageAttachmentUtils";
 import { formatMessageTime, isServerMessageId } from "../../utils/messaging";
+import { MessageMentionCards } from "./MessageMentionCards";
+import { MessageMentionText } from "./mentionUi";
 import { useMessageSelection, useLongPress } from "./useMessageSelection";
 import {
   avatarFallbackClass,
@@ -129,6 +131,7 @@ function ChatMessageRow({
   const caption = String(message.content || "").trim();
   const hasMedia = attachments.length > 0 || Boolean(message._uploading);
   const hasTextOnly = !hasMedia && Boolean(caption);
+  const hasMentions = Array.isArray(message?.metadata?.mentions) && message.metadata.mentions.length > 0;
   const senderName = resolveSenderName?.(message) || message.senderName || "?";
   const forwarded = message.forwardedFrom;
   const forwardedAttachments =
@@ -169,7 +172,7 @@ function ChatMessageRow({
   }
 
   const hasForwardContent = forwardedAttachments.length > 0 || forwarded?.bodySnippet;
-  if (!hasMedia && !hasTextOnly && !hasForwardContent) return null;
+  if (!hasMedia && !hasTextOnly && !hasForwardContent && !hasMentions) return null;
 
   const bubbleBody = (
     <>
@@ -200,8 +203,13 @@ function ChatMessageRow({
           uploading={Boolean(message._uploading)}
         />
       ) : hasTextOnly ? (
-        <p className="wrap-break-word">{caption}</p>
+        hasMentions ? (
+          <MessageMentionText text={caption} isMe={isMe} />
+        ) : (
+          <p className="wrap-break-word">{caption}</p>
+        )
       ) : null}
+      {hasMentions ? <MessageMentionCards message={message} isMe={isMe} /> : null}
     </>
   );
 
@@ -243,6 +251,7 @@ function ChatMessageRow({
                   isMe,
                   hasMedia: hasMedia || forwardedAttachments.length > 0,
                 }),
+                hasMentions && !hasMedia && "px-2.5 py-2.5",
                 selectionBubbleClass(isSelected),
               )}
             >
@@ -272,6 +281,8 @@ export function ChatMessageList({
   currentUserId,
   resolveSenderName,
   emptyLabel = "No messages yet — say hi!",
+  loading = false,
+  loadingLabel = "Loading messages...",
   messagesEndRef,
   className,
   onReply,
@@ -327,6 +338,20 @@ export function ChatMessageList({
   ]);
 
   const swipeEnabled = isMobile;
+
+  if (loading) {
+    return (
+      <div className="flex min-h-[220px] flex-col items-center justify-center py-12 text-center">
+        <div className="mb-3 flex h-11 w-11 items-center justify-center rounded-full bg-primary-tint text-primary">
+          <Loader2 className="h-5 w-5 animate-spin" />
+        </div>
+        <p className="font-body text-sm font-medium text-text-heading">{loadingLabel}</p>
+        <p className="mt-1 font-body text-xs text-text-muted">
+          Pulling the latest conversation.
+        </p>
+      </div>
+    );
+  }
 
   if (messages.length === 0) {
     return (

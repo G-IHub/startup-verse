@@ -16,6 +16,7 @@ import {
 import { error as apiError, success as apiSuccess } from "../utils/apiResponse.js";
 import { mapActivityToDto } from "../utils/activityDto.js";
 import { createNotification } from "../services/notificationService.js";
+import { officeDeepLink } from "../utils/deepLinks.js";
 
 export const createOrUpdateProfile = async (req, res) => {
   const requestedUserId = String(req.body?.userId || "").trim();
@@ -112,7 +113,7 @@ export const updateTask = async (req, res) => {
       type: "task-blocked",
       title: "Task blocked by team member",
       message: `${task.assignedToName || "A team member"} blocked: ${task.title}`,
-      actionUrl: `/?view=virtual-office&tab=tasks&taskId=${task._id}`,
+      actionUrl: officeDeepLink({ tab: "tasks", taskId: task._id }),
       metadata: {
         taskId: String(task._id),
         teamMemberId: String(req.params.teamMemberId),

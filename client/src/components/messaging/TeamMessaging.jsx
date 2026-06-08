@@ -38,6 +38,7 @@ export function TeamMessaging({ currentUser, teamMembers }) {
   const [conversations, setConversations] = useState([]);
   const [selectedConversation, setSelectedConversation] = useState(null);
   const [messages, setMessages] = useState([]);
+  const [messagesLoading, setMessagesLoading] = useState(false);
   const [newMessage, setNewMessage] = useState("");
   const [pendingFile, setPendingFile] = useState(null);
   const [isUploading, setIsUploading] = useState(false);
@@ -151,12 +152,20 @@ export function TeamMessaging({ currentUser, teamMembers }) {
   };
 
   const loadMessages = async (otherUserId) => {
-    const msgs = await getConversation(
-      currentUser.id,
-      otherUserId,
-      currentUser.startupId,
-    );
-    setMessages(msgs);
+    setMessagesLoading(true);
+    try {
+      const msgs = await getConversation(
+        currentUser.id,
+        otherUserId,
+        currentUser.startupId,
+      );
+      setMessages(msgs);
+    } catch (err) {
+      toast.error(err?.message || "Failed to load messages");
+      setMessages([]);
+    } finally {
+      setMessagesLoading(false);
+    }
   };
 
   const handleSendMessage = async () => {
@@ -328,6 +337,7 @@ export function TeamMessaging({ currentUser, teamMembers }) {
                 <div className={chatShell.threadColumn}>
                   <ChatMessageList
                     messages={messages}
+                    loading={messagesLoading}
                     currentUserId={currentUser.id}
                     resolveSenderName={(m) => m.senderName || nameForMessage(m)}
                     messagesEndRef={messagesEndRef}

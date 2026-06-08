@@ -4,6 +4,7 @@
  */
 
 import { API_BASE_URL } from "../config/apiBase.js";
+import { buildChatPath, buildOfficePath } from "../app/deepLinks.js";
 
 // Default fetch options for cookie-based auth
 const defaultOptions = {
@@ -72,11 +73,12 @@ export async function notifyTeamMemberJoined(params) {
     type: "team-member-joined",
     title: "New Team Member Joined",
     message: `${params.teamMemberName} joined your team as ${params.role}`,
-    actionUrl: "/team",
+    actionUrl: buildChatPath(params.teamMemberId),
     metadata: {
       teamMemberId: params.teamMemberId,
       teamMemberName: params.teamMemberName,
       role: params.role,
+      talentId: params.teamMemberId ? String(params.teamMemberId) : "",
     },
   });
 }
@@ -110,7 +112,10 @@ export async function notifyAnnouncementReaction(params) {
     type: "announcement-reaction",
     title: "New Reaction",
     message: `${params.reactedByName} reacted ${params.reaction} to "${params.announcementTitle}"`,
-    actionUrl: `/announcements/${params.announcementId}`,
+    actionUrl: buildOfficePath({
+      tab: "announcements",
+      announcementId: params.announcementId,
+    }),
     metadata: {
       reactedBy: params.reactedBy,
       reactedByName: params.reactedByName,
@@ -130,7 +135,10 @@ export async function notifyAnnouncementComment(params) {
     type: "announcement-comment",
     title: "New Comment on Announcement",
     message: `${params.commentedByName} commented on "${params.announcementTitle}"`,
-    actionUrl: `/announcements/${params.announcementId}`,
+    actionUrl: buildOfficePath({
+      tab: "announcements",
+      announcementId: params.announcementId,
+    }),
     metadata: {
       commentedBy: params.commentedBy,
       commentedByName: params.commentedByName,
@@ -243,7 +251,7 @@ export async function notifyWeeklyReviewReminder(params) {
     type: "weekly-review-reminder",
     title: "📋 Weekly Review Time",
     message: "Time to review this week's progress and set next week's outcome",
-    actionUrl: "/weekly-review",
+    actionUrl: buildOfficePath({ tab: "weekly" }),
     metadata: {
       weekId: params.weekId,
     },

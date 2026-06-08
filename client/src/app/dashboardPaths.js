@@ -5,7 +5,7 @@
 
 const DEFAULT_OFFICE_VIEW = "workspace";
 
-/** @typedef {{ currentPage: string, virtualOfficeView?: string, talentDashboardMode?: string, initialProfileEditing?: boolean }} DashboardNavState */
+/** @typedef {{ currentPage: string, virtualOfficeView?: string, talentDashboardMode?: string, initialProfileEditing?: boolean, messageUserId?: string, taskId?: string, announcementId?: string, winId?: string, deliverableId?: string, officeTab?: string, startupId?: string, talentId?: string, invitationId?: string }} DashboardNavState */
 
 const PATH_TO_PAGE = Object.freeze({
   "/home": "dashboard",
@@ -89,9 +89,15 @@ export function pathToDashboardState(pathname, search, role) {
 
   if (path === "/office") {
     const view = q.get("view") || DEFAULT_OFFICE_VIEW;
+    const tab = q.get("tab") || undefined;
     return {
       currentPage: "startup-office",
       virtualOfficeView: view,
+      officeTab: tab,
+      taskId: q.get("taskId") || undefined,
+      announcementId: q.get("announcementId") || undefined,
+      winId: q.get("winId") || undefined,
+      deliverableId: q.get("deliverableId") || undefined,
     };
   }
 
@@ -113,7 +119,11 @@ export function pathToDashboardState(pathname, search, role) {
   }
 
   if (path === "/chat") {
-    return { currentPage: chatPageForRole(role) };
+    const withUser = q.get("with") || undefined;
+    return {
+      currentPage: chatPageForRole(role),
+      ...(withUser ? { messageUserId: withUser } : {}),
+    };
   }
 
   if (path === "/analytics") {
@@ -129,6 +139,36 @@ export function pathToDashboardState(pathname, search, role) {
   if (path === "/browse-talent") {
     if (role !== "founder" && role !== "talent") return null;
     return { currentPage: role === "talent" ? "browse-startups" : "team-matching" };
+  }
+
+  if (path === "/startup-detail") {
+    const id = q.get("id") || undefined;
+    return {
+      currentPage: "startup-detail",
+      ...(id ? { startupId: id } : {}),
+    };
+  }
+
+  if (path === "/talent-profile") {
+    const id = q.get("id") || undefined;
+    return {
+      currentPage: "talent-profile",
+      ...(id ? { talentId: id } : {}),
+    };
+  }
+
+  if (path === "/inbox" || path === "/inbox/received" || path === "/inbox/sent") {
+    const invitationId = q.get("invitationId") || undefined;
+    const page =
+      path === "/inbox/sent"
+        ? "inbox:sent"
+        : path === "/inbox/received"
+          ? "inbox:received"
+          : "inbox";
+    return {
+      currentPage: page,
+      ...(invitationId ? { invitationId } : {}),
+    };
   }
 
   const page = PATH_TO_PAGE[path];
@@ -149,12 +189,32 @@ export function pathToDashboardState(pathname, search, role) {
  * @param {DashboardNavState & { taskId?: string, announcementId?: string }} state
  * @returns {string} pathname + optional search
  */
+function appendEntityParams(path, params) {
+  const entries = Object.entries(params).filter(([, v]) => v != null && v !== "");
+  if (!entries.length) return path;
+  const qs = new URLSearchParams();
+  for (const [key, value] of entries) {
+    qs.set(key, String(value));
+  }
+  const joiner = path.includes("?") ? "&" : "?";
+  return `${path}${joiner}${qs.toString()}`;
+}
+
 export function dashboardStateToPath(state) {
   const {
     currentPage,
     virtualOfficeView,
     talentDashboardMode,
     initialProfileEditing,
+    messageUserId,
+    taskId,
+    announcementId,
+    winId,
+    deliverableId,
+    officeTab,
+    startupId,
+    talentId,
+    invitationId,
   } = state;
 
   switch (currentPage) {
@@ -167,20 +227,32 @@ export function dashboardStateToPath(state) {
     }
     case "startup-office": {
       const v = virtualOfficeView || DEFAULT_OFFICE_VIEW;
-      if (!v || v === DEFAULT_OFFICE_VIEW) return "/office";
-      return `/office?view=${encodeURIComponent(v)}`;
+      return appendEntityParams("/office", {
+        ...(v && v !== DEFAULT_OFFICE_VIEW ? { view: v } : {}),
+        ...(officeTab ? { tab: officeTab } : {}),
+        ...(taskId ? { taskId } : {}),
+        ...(announcementId ? { announcementId } : {}),
+        ...(winId ? { winId } : {}),
+        ...(deliverableId ? { deliverableId } : {}),
+      });
     }
     case "inbox":
-      return "/inbox";
+      return invitationId
+        ? appendEntityParams("/inbox", { invitationId })
+        : "/inbox";
     case "inbox:received":
-      return "/inbox/received";
+      return invitationId
+        ? appendEntityParams("/inbox/received", { invitationId })
+        : "/inbox/received";
     case "inbox:sent":
       return "/inbox/sent";
     case "team-matching":
       return "/browse-talent";
     case "founder-chat":
     case "talent-chat":
-      return "/chat";
+      return messageUserId
+        ? appendEntityParams("/chat", { with: messageUserId })
+        : "/chat";
     case "analytics":
       return "/analytics";
     case "settings":
@@ -212,9 +284,13 @@ export function dashboardStateToPath(state) {
     case "browse-startups":
       return "/browse-startups";
     case "startup-detail":
-      return "/startup-detail";
+      return startupId
+        ? appendEntityParams("/startup-detail", { id: startupId })
+        : "/startup-detail";
     case "talent-profile":
-      return "/talent-profile";
+      return talentId
+        ? appendEntityParams("/talent-profile", { id: talentId })
+        : "/talent-profile";
     case "compensation-demo":
       return "/compensation-demo";
     default:

@@ -7,6 +7,8 @@ import { error as apiError, success as apiSuccess } from "../utils/apiResponse.j
 import Message from "../models/Message.js";
 import User from "../models/User.js";
 import Startup from "../models/Startup.js";
+import Milestone from "../models/Milestone.js";
+import Task from "../models/Task.js";
 import { emitRealtime } from "../services/realtime.service.js";
 import { SOCKET_EVENTS } from "../realtime/events.js";
 import { startupRoom, userRoom, organizationRoom } from "../realtime/rooms.js";
@@ -15,6 +17,8 @@ import {
   normalizeAttachments,
   messageHasContent,
 } from "../utils/messageAttachments.js";
+import { createNotification } from "../services/notificationService.js";
+import { chatDeepLink } from "../utils/deepLinks.js";
 import {
   buildForwardedFromSnapshot,
   canDeleteForEveryone,
@@ -44,6 +48,95 @@ async function canAccessStartupMessages(req, startupId) {
   if (String(me.startupId || "") === normalizedStartupId) return true;
   const founded = await Startup.findOne({ founderId: req.user.id }, { _id: 1 });
   return String(founded?._id || "") === normalizedStartupId;
+}
+
+async function resolveCanonicalStartupId(rawValue) {
+  const value = String(rawValue || "").trim();
+  if (!value) return null;
+  const byId = await Startup.findById(value, { _id: 1, founderId: 1 });
+  if (byId?._id) {
+    return { startupId: String(byId._id), founderId: String(byId.founderId || "") };
+  }
+  const byFounder = await Startup.findOne({ founderId: value }, { _id: 1, founderId: 1 });
+  if (byFounder?._id) {
+    return { startupId: String(byFounder._id), founderId: String(byFounder.founderId || value) };
+  }
+  return null;
+}
+
+async function canAccessStartup(req, startupId) {
+  const resolved = await resolveCanonicalStartupId(startupId);
+  if (!resolved) return null;
+  if (req.user?.isAdmin) return resolved;
+
+  const me = await User.findById(req.user.id, { startupId: 1, founderId: 1 });
+  if (!me) return null;
+
+  const candidateIds = [req.user.id, me.startupId, me.founderId];
+  for (const candidateId of candidateIds) {
+    const candidate = await resolveCanonicalStartupId(candidateId);
+    if (candidate && candidate.startupId === resolved.startupId) {
+      return resolved;
+    }
+  }
+  return null;
+}
+
+async function sanitizeMentionMetadata(metadata, startupScope) {
+  if (!metadata || typeof metadata !== "object") return {};
+  const mentions = Array.isArray(metadata.mentions) ? metadata.mentions : [];
+  if (mentions.length === 0) return metadata;
+
+  if (!startupScope?.founderId) {
+    return { ...metadata, mentions: [] };
+  }
+
+  const founderId = startupScope.founderId;
+  const milestoneIds = new Set();
+  const taskIds = new Set();
+  for (const mention of mentions) {
+    if (!mention || typeof mention !== "object") continue;
+    const type = String(mention.type || "");
+    const id = String(mention.id || "");
+    if (!id) continue;
+    if (type === "milestone") milestoneIds.add(id);
+    else if (type === "task") taskIds.add(id);
+  }
+
+  const [validMilestones, validTasks] = await Promise.all([
+    milestoneIds.size
+      ? Milestone.find(
+          { _id: { $in: Array.from(milestoneIds) }, founderId },
+          { _id: 1 },
+        ).lean()
+      : [],
+    taskIds.size
+      ? Task.find({ _id: { $in: Array.from(taskIds) }, founderId }, { _id: 1 }).lean()
+      : [],
+  ]);
+
+  const validMilestoneSet = new Set(validMilestones.map((row) => String(row._id)));
+  const validTaskSet = new Set(validTasks.map((row) => String(row._id)));
+
+  const sanitizedMentions = mentions
+    .filter((mention) => {
+      if (!mention || typeof mention !== "object") return false;
+      const type = String(mention.type || "");
+      const id = String(mention.id || "");
+      if (!id || !mention.label) return false;
+      if (type === "milestone") return validMilestoneSet.has(id);
+      if (type === "task") return validTaskSet.has(id);
+      return false;
+    })
+    .map((mention) => ({
+      type: String(mention.type),
+      id: String(mention.id),
+      label: String(mention.label || ""),
+      snapshot:
+        mention.snapshot && typeof mention.snapshot === "object" ? mention.snapshot : {},
+    }));
+
+  return { ...metadata, mentions: sanitizedMentions };
 }
 
 async function createMessage(payload) {
@@ -81,6 +174,9 @@ messagesRouter.post(
       return apiError(res, "Forbidden.", 403);
     }
 
+    const startupScope = startupId ? await resolveCanonicalStartupId(startupId) : null;
+    const sanitizedMetadata = await sanitizeMentionMetadata(metadata, startupScope);
+
     let replyPreview = null;
     let replyToId = null;
     if (replyToMessageId) {
@@ -108,12 +204,25 @@ messagesRouter.post(
       toUserId,
       body: String(body || "").trim(),
       attachments,
-      metadata,
+      metadata: sanitizedMetadata,
       replyToMessageId: replyToId,
       replyPreview,
       forwardedFrom,
       messageType: "dm",
     });
+
+    const sender = await User.findById(req.user.id, { name: 1 }).lean();
+    await createNotification({
+      userId: toUserId,
+      type: "message-received",
+      title: "New message",
+      message: `${sender?.name || "Someone"} sent you a message.`,
+      actionUrl: chatDeepLink(req.user.id),
+      metadata: {
+        senderId: String(req.user.id),
+        messageId: String(message._id),
+      },
+    }).catch(() => null);
 
     return apiSuccess(res, dtoForViewer(message, req.user.id), 201);
   }),
@@ -378,6 +487,66 @@ messagesRouter.post(
     }
     const result = await Message.updateMany(query, { $set: { readAt: new Date() } });
     return apiSuccess(res, { markedRead: true, count: Number(result.modifiedCount || 0) });
+  }),
+);
+
+messagesRouter.get(
+  "/startups/:startupId/chat-mentionables",
+  requireAuth,
+  asyncHandler(async (req, res) => {
+    const startupScope = await canAccessStartup(req, req.params.startupId);
+    if (!startupScope?.founderId) {
+      return apiError(res, "Forbidden.", 403);
+    }
+
+    const founderId = startupScope.founderId;
+    const [milestones, tasks] = await Promise.all([
+      Milestone.find({ founderId }).sort({ sequence: 1 }).lean(),
+      Task.find({ founderId }).sort({ createdAt: -1 }).lean(),
+    ]);
+
+    const milestoneTitleById = new Map(
+      milestones.map((row) => [String(row._id), String(row.title || "Milestone")]),
+    );
+
+    const countsByMilestone = new Map();
+    for (const task of tasks) {
+      const key = String(task.milestoneId || "");
+      const prev = countsByMilestone.get(key) || { totalTasks: 0, tasksCompleted: 0 };
+      prev.totalTasks += 1;
+      if (task.status === "completed") prev.tasksCompleted += 1;
+      countsByMilestone.set(key, prev);
+    }
+
+    const milestoneRows = milestones.map((row) => {
+      const counters = countsByMilestone.get(String(row._id)) || {
+        totalTasks: 0,
+        tasksCompleted: 0,
+      };
+      return {
+        id: String(row._id),
+        title: String(row.title || "Milestone"),
+        status: String(row.status || "pending"),
+        totalTasks: counters.totalTasks,
+        tasksCompleted: counters.tasksCompleted,
+      };
+    });
+
+    const taskRows = tasks.map((row) => {
+      const milestoneId = row.milestoneId ? String(row.milestoneId) : "";
+      return {
+        id: String(row._id),
+        title: String(row.title || "Untitled task"),
+        status: String(row.status || "pending"),
+        priority: String(row.priority || "medium"),
+        assignedTo: row.assignedTo ? String(row.assignedTo) : "",
+        assignedToName: String(row.assignedToName || ""),
+        milestoneId,
+        milestoneName: milestoneId ? milestoneTitleById.get(milestoneId) || "" : "",
+      };
+    });
+
+    return apiSuccess(res, { milestones: milestoneRows, tasks: taskRows });
   }),
 );
 

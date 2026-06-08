@@ -65,6 +65,7 @@ export function mapMessageDto(row) {
     replyTo: row.replyTo && typeof row.replyTo === "object" ? row.replyTo : null,
     forwardedFrom:
       row.forwardedFrom && typeof row.forwardedFrom === "object" ? row.forwardedFrom : null,
+    metadata: row.metadata && typeof row.metadata === "object" ? row.metadata : {},
     deletedForEveryone,
     deletedForEveryoneAt: row.deletedForEveryoneAt || null,
     hiddenForUserIds: Array.isArray(row.hiddenForUserIds)
@@ -159,6 +160,9 @@ export async function sendMessage(
           ? { replyToMessageId: options.replyToMessageId }
           : {}),
         ...(options.forwardedFrom ? { forwardedFrom: options.forwardedFrom } : {}),
+        ...(options.metadata && typeof options.metadata === "object"
+          ? { metadata: options.metadata }
+          : {}),
       }),
     });
     const serverMessage = mapMessageDto(payload?.data || payload?.message);

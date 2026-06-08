@@ -485,12 +485,16 @@
   .office-workspace-grid-top,
   .office-workspace-grid-bottom,
   .office-calendar-split {
+    display: grid;
+    gap: 1rem;
+    align-items: stretch;
     grid-template-columns: minmax(0, 1fr);
   }
 
   @media (min-width: 960px) {
     .office-workspace-grid-top {
-      grid-template-columns: 1.05fr 2.2fr 1.1fr;
+      grid-template-columns: minmax(280px, 1.05fr) minmax(0, 2.2fr) minmax(260px, 1.1fr);
+      min-height: 320px;
     }
 
     .office-workspace-grid-top__activity {

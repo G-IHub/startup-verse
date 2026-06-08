@@ -14,9 +14,10 @@ function _extends() {
 }
 import * as React from "react";
 import { cn } from "./utils";
-function Textarea({ className, ...props }) {
+const Textarea = React.forwardRef(function Textarea({ className, ...props }, ref) {
   return (
     <textarea
+      ref={ref}
       {..._extends(
         {
           "data-slot": "textarea",
@@ -29,5 +30,5 @@ function Textarea({ className, ...props }) {
       )}
     />
   );
-}
+});
 export { Textarea };

@@ -80,8 +80,8 @@ export function composerDockClass() {
 
 export function composerInputClass() {
   return cn(
-    "min-h-9 flex-1 resize-none border-0 bg-transparent font-body text-sm text-text-heading sm:min-h-10",
-    "placeholder:text-text-muted focus-visible:outline-none focus-visible:ring-0",
+    "h-10 min-h-10 flex-1 resize-none self-center border-0 bg-transparent px-2 py-2.5 font-body text-sm leading-5 text-text-heading",
+    "placeholder:text-sm placeholder:text-text-muted focus-visible:outline-none focus-visible:ring-0",
   );
 }
 
@@ -95,7 +95,7 @@ export function composerSendButtonClass(disabled) {
 
 export function composerIconButtonClass() {
   return cn(
-    "flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-text-muted sm:h-9 sm:w-9",
+    "flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-text-muted",
     "transition-colors hover:bg-primary-tint hover:text-primary",
   );
 }

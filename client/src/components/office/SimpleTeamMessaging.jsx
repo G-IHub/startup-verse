@@ -34,6 +34,8 @@ import {
   useReplyState,
 } from "../messaging/useChatMessageHandlers";
 import { mergeMessageIntoThread } from "../../utils/messaging";
+import { useChatMentionables } from "../messaging/useChatMentionables";
+import { buildMessageMentionMetadata } from "../../utils/chatMentions";
 import {
   avatarFallbackClass,
   chatShell,
@@ -51,6 +53,7 @@ export function SimpleTeamMessaging({
   teamMembers = [],
   onActivity,
   initialSelectedUserId = null,
+  onSelectedPeerChange,
   embedded = false,
   fullPage = false,
   strictMode = false,
@@ -60,8 +63,21 @@ export function SimpleTeamMessaging({
   const [selectedConversation, setSelectedConversation] = useState(null);
   const [messages, setMessages] = useState([]);
   const [messageInput, setMessageInput] = useState("");
+  const [pendingMentions, setPendingMentions] = useState([]);
   const [searchQuery, setSearchQuery] = useState("");
+  const mentionsEnabled =
+    Boolean(startupId) &&
+    (currentUserRole === "founder" || currentUserRole === "team-member");
+  const {
+    mentionables,
+    loading: mentionablesLoading,
+    error: mentionablesError,
+  } = useChatMentionables({
+    startupId,
+    enabled: mentionsEnabled,
+  });
   const [pendingFile, setPendingFile] = useState(null);
+  const [messagesLoading, setMessagesLoading] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const messagesEndRef = useRef(null);
@@ -103,11 +119,16 @@ export function SimpleTeamMessaging({
     onForward: openForward,
   });
   useEffect(() => { teamMembersRef.current = teamMembers; }, [teamMembers]);
-  // Set initial selected conversation if provided
+
+  const selectConversation = (peerUserId) => {
+    const next = peerUserId ? String(peerUserId) : null;
+    setSelectedConversation(next);
+    onSelectedPeerChange?.(next);
+  };
+
+  // Keep local selection in sync with URL-driven initialSelectedUserId
   useEffect(() => {
-    if (initialSelectedUserId) {
-      setSelectedConversation(initialSelectedUserId);
-    }
+    setSelectedConversation(initialSelectedUserId ? String(initialSelectedUserId) : null);
   }, [initialSelectedUserId]);
 
   // Load conversations — only re-run when the user or startup changes,
@@ -199,11 +220,19 @@ export function SimpleTeamMessaging({
       otherUserId,
       startupId,
     });
-    const msgs = await getConversation(currentUserId, otherUserId, startupId, {
+    setMessagesLoading(true);
+    try {
+      const msgs = await getConversation(currentUserId, otherUserId, startupId, {
       strict: strictMode,
     });
     console.log("📥 Loaded messages:", msgs.length, msgs);
     setMessages(msgs);
+    } catch (err) {
+      toast.error(err?.message || "Failed to load messages");
+      setMessages([]);
+    } finally {
+      setMessagesLoading(false);
+    }
   };
   const resolveSenderName = (message) => {
     const roster =
@@ -222,6 +251,7 @@ export function SimpleTeamMessaging({
 
     const recipient = conversations.find((c) => c.userId === selectedConversation);
     const optimisticId = `opt-${Date.now()}`;
+    const mentionMetadata = buildMessageMentionMetadata(text, pendingMentions);
     let attachmentPayload = null;
 
     if (pendingFile) {
@@ -237,9 +267,11 @@ export function SimpleTeamMessaging({
           timestamp: Date.now(),
           _uploading: true,
           attachments: [],
+          metadata: mentionMetadata,
         },
       ]);
       setMessageInput("");
+      setPendingMentions([]);
 
       try {
         const uploadResult = await uploadMessageFile(
@@ -273,6 +305,7 @@ export function SimpleTeamMessaging({
       }
     } else {
       setMessageInput("");
+      setPendingMentions([]);
     }
 
     setMessages((prev) => prev.filter((m) => m.id !== optimisticId));
@@ -295,6 +328,9 @@ export function SimpleTeamMessaging({
           strict: strictMode,
           attachments: attachmentPayload ? [attachmentPayload] : [],
           ...(replyingTo?.id ? { replyToMessageId: replyingTo.id } : {}),
+          ...(Object.keys(mentionMetadata).length > 0
+            ? { metadata: mentionMetadata }
+            : {}),
         },
       );
       clearReply();
@@ -421,7 +457,7 @@ export function SimpleTeamMessaging({
                   return (
                     <div
                       key={member.id}
-                      onClick={() => setSelectedConversation(member.id)}
+                      onClick={() => selectConversation(member.id)}
                       className={sidebarRowClass(isSel)}
                     >
                       <Avatar className="h-9 w-9 shrink-0 rounded-card">
@@ -506,7 +542,7 @@ export function SimpleTeamMessaging({
                       size="sm"
                       variant="ghost"
                       className="h-8 w-8 shrink-0 p-0"
-                      onClick={() => setSelectedConversation(null)}
+                      onClick={() => selectConversation(null)}
                       aria-label="Back to conversations"
                     >
                       <ArrowLeft className="h-4 w-4" />
@@ -537,6 +573,7 @@ export function SimpleTeamMessaging({
                   <div className={chatShell.threadColumn}>
                     <ChatMessageList
                       messages={messages}
+                      loading={messagesLoading}
                       currentUserId={currentUserId}
                       resolveSenderName={resolveSenderName}
                       messagesEndRef={messagesEndRef}
@@ -560,6 +597,12 @@ export function SimpleTeamMessaging({
                       disabled={!selectedConversation}
                       replyingTo={replyingTo}
                       onCancelReply={clearReply}
+                      mentionsEnabled={mentionsEnabled}
+                      mentionables={mentionables}
+                      mentionablesLoading={mentionablesLoading}
+                      mentionablesError={mentionablesError}
+                      pendingMentions={pendingMentions}
+                      onMentionsChange={setPendingMentions}
                     />
                   </div>
                 </div>
@@ -639,7 +682,7 @@ export function SimpleTeamMessaging({
                 filteredConversations.map(({ member, conversation }) => (
                   <motion.div
                     key={member.id}
-                    onClick={() => setSelectedConversation(member.id)}
+                    onClick={() => selectConversation(member.id)}
                     className="flex w-full items-start gap-3 overflow-hidden px-4 py-3 cursor-pointer border-b border-gray-100 hover:bg-gray-50 transition-colors"
                   >
                     <div className="relative flex-shrink-0">
@@ -725,7 +768,7 @@ export function SimpleTeamMessaging({
                     size="sm"
                     variant="ghost"
                     className="h-8 w-8 p-0 flex-shrink-0"
-                    onClick={() => setSelectedConversation(null)}
+                    onClick={() => selectConversation(null)}
                   >
                     <ArrowLeft className="w-4 h-4" />
                   </Button>
@@ -775,6 +818,7 @@ export function SimpleTeamMessaging({
                 <div className={chatShell.threadColumn}>
                   <ChatMessageList
                     messages={messages}
+                    loading={messagesLoading}
                     currentUserId={currentUserId}
                     resolveSenderName={resolveSenderName}
                     emptyLabel="No messages yet"
@@ -799,6 +843,12 @@ export function SimpleTeamMessaging({
                     disabled={!selectedConversation}
                     replyingTo={replyingTo}
                     onCancelReply={clearReply}
+                    mentionsEnabled={mentionsEnabled}
+                    mentionables={mentionables}
+                    mentionablesLoading={mentionablesLoading}
+                    mentionablesError={mentionablesError}
+                    pendingMentions={pendingMentions}
+                    onMentionsChange={setPendingMentions}
                   />
                 </div>
               </div>

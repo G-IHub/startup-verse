@@ -9,6 +9,7 @@ import TeamMemberProfile from "../models/TeamMemberProfile.js";
 import { error as apiError, success as apiSuccess } from "../utils/apiResponse.js";
 import { emitRealtime } from "../services/realtime.service.js";
 import { broadcastNotification } from "../services/notificationService.js";
+import { officeDeepLink } from "../utils/deepLinks.js";
 import { SOCKET_EVENTS } from "../realtime/events.js";
 import { announcementRoom } from "../realtime/rooms.js";
 
@@ -147,7 +148,7 @@ announcementsRouter.post(
           type: "announcement-created",
           title: dto.title || "New announcement",
           message: dto.message || "A new announcement was posted.",
-          actionUrl: `/?view=virtual-office&tab=announcements&announcementId=${dto.id}`,
+          actionUrl: officeDeepLink({ tab: "announcements", announcementId: dto.id }),
           metadata: { announcementId: dto.id, startupId: dto.startupId },
         });
       }

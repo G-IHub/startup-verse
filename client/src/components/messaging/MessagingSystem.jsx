@@ -47,6 +47,7 @@ export default function MessagingSystem({
   const [conversations, setConversations] = useState([]);
   const [selectedConversation, setSelectedConversation] = useState(null);
   const [messages, setMessages] = useState([]);
+  const [messagesLoading, setMessagesLoading] = useState(false);
   const [newMessage, setNewMessage] = useState("");
   const [pendingFile, setPendingFile] = useState(null);
   const [isUploading, setIsUploading] = useState(false);
@@ -201,8 +202,16 @@ export default function MessagingSystem({
     setConversations(convs);
   };
   const loadMessages = async (otherUserId) => {
-    const msgs = await getConversation(userId, otherUserId, startupId);
-    setMessages(msgs);
+    setMessagesLoading(true);
+    try {
+      const msgs = await getConversation(userId, otherUserId, startupId);
+      setMessages(msgs);
+    } catch (err) {
+      toast.error(err?.message || "Failed to load messages");
+      setMessages([]);
+    } finally {
+      setMessagesLoading(false);
+    }
   };
   const handleSendMessage = async () => {
     if (!selectedConversation) return;
@@ -609,6 +618,7 @@ export default function MessagingSystem({
               <div className={chatShell.threadColumn}>
                 <ChatMessageList
                   messages={messages}
+                  loading={messagesLoading}
                   currentUserId={userId}
                   resolveSenderName={(m) => m.senderName || nameForMessage(m)}
                   messagesEndRef={messagesEndRef}

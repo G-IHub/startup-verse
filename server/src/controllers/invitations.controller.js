@@ -19,6 +19,7 @@ import { error as apiError, success as apiSuccess } from "../utils/apiResponse.j
 import { sendTokenResponse } from "../utils/sendToken.js";
 import { emitRealtime } from "../services/realtime.service.js";
 import { createNotification, broadcastNotification } from "../services/notificationService.js";
+import { chatDeepLink, officeDeepLink } from "../utils/deepLinks.js";
 import { SOCKET_EVENTS } from "../realtime/events.js";
 import { startupRoom, userRoom } from "../realtime/rooms.js";
 import { mapActivityToDto } from "../utils/activityDto.js";
@@ -779,7 +780,7 @@ export const sendFounderTalentInvitation = async (req, res) => {
       message: body.message
         ? String(body.message).slice(0, 200)
         : "You have a new invitation from a founder.",
-      actionUrl: `/?view=virtual-office&tab=invitations&invitationId=${invitation._id}`,
+      actionUrl: chatDeepLink(founderId),
       metadata: {
         invitationId: String(invitation._id),
         founderId: String(founderId),
@@ -1041,10 +1042,11 @@ export const createInterest = async (req, res) => {
     messages: [],
   });
 
+  const talentUser = await User.findById(talentId, { name: 1 }).lean();
+  const talentName = talentUser?.name || "A talent";
+
   // Auto-send DM to founder so the interest appears in the Virtual Office chat
   try {
-    const talent = await User.findById(talentId, { name: 1 }).lean();
-    const talentName = talent?.name || "A talent";
     const startupLabel = body.startupTitle ? ` in "${body.startupTitle}"` : "";
     const dmBody = body.message
       ? `${talentName} is interested${startupLabel}: ${body.message}`
@@ -1085,6 +1087,19 @@ export const createInterest = async (req, res) => {
       createdAt: interest.createdAt,
     },
   }, [userRoom(body.founderId)]);
+
+  await createNotification({
+    userId: body.founderId,
+    type: "interest-received",
+    title: "New talent interest",
+    message: `${talentName} expressed interest in your startup.`,
+    actionUrl: chatDeepLink(talentId),
+    metadata: {
+      talentId: String(talentId),
+      interestId: String(interest._id),
+      founderId: String(body.founderId),
+    },
+  }).catch(() => null);
 
   return apiSuccess(res, interest, 201);
 };
@@ -1462,7 +1477,7 @@ export const onboardFounderTalentInvitation = async (req, res) => {
             type: "team-member-joined",
             title: "Team member joined",
             message: "A new team member has been onboarded to your startup.",
-            actionUrl: `/?view=virtual-office&tab=team`,
+            actionUrl: chatDeepLink(onboardedInvitation.talentId),
             metadata: {
               invitationId: String(onboardedInvitation._id),
               talentId: String(onboardedInvitation.talentId || ""),
@@ -1473,7 +1488,7 @@ export const onboardFounderTalentInvitation = async (req, res) => {
             type: "team-member-onboarded",
             title: "Welcome to the team",
             message: "You've been onboarded. Open the Virtual Office to begin.",
-            actionUrl: `/?view=virtual-office`,
+            actionUrl: officeDeepLink({ tab: "team" }),
             metadata: { invitationId: String(onboardedInvitation._id) },
           }).catch(() => null),
         ]);
@@ -1593,7 +1608,7 @@ export const onboardInterest = async (req, res) => {
             type: "team-member-joined",
             title: "Team member joined",
             message: "A new team member has joined your startup.",
-            actionUrl: `/?view=virtual-office&tab=team`,
+            actionUrl: chatDeepLink(onboardedInterest.talentId),
             metadata: {
               interestId: String(onboardedInterest._id),
               talentId: String(onboardedInterest.talentId || ""),
@@ -1604,7 +1619,7 @@ export const onboardInterest = async (req, res) => {
             type: "team-member-onboarded",
             title: "Welcome to the team",
             message: "You've been onboarded. Open the Virtual Office to begin.",
-            actionUrl: `/?view=virtual-office`,
+            actionUrl: officeDeepLink({ tab: "team" }),
             metadata: { interestId: String(onboardedInterest._id) },
           }).catch(() => null),
         ]);

@@ -1844,7 +1844,7 @@ export default function Inbox({ user, onBack, initialTab = "received", onNavigat
           : "") || "",
     };
     setSelectedItem(null);
-    onNavigate("talent-profile", { talent });
+    onNavigate("talent-profile", { talent, talentId });
   };
   const renderConversationDialog = () => {
     if (!selectedItem) return null;

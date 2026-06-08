@@ -10,7 +10,6 @@ export default function FounderChatPage({
   user,
   onNavigate,
   initialSelectedUserId = null,
-  onInitialSelectionApplied,
 }) {
   const currentUserId = String(user._id ?? user.id ?? "");
   const startupId = getStartupId(user);
@@ -43,12 +42,6 @@ export default function FounderChatPage({
 
     loadData();
   }, [currentUserId]);
-
-  useEffect(() => {
-    if (initialSelectedUserId && onInitialSelectionApplied) {
-      onInitialSelectionApplied();
-    }
-  }, [initialSelectedUserId, onInitialSelectionApplied]);
 
   // Build unified roster combining interests, invitations, and team members
   const roster = useMemo(() => {
@@ -104,6 +97,12 @@ export default function FounderChatPage({
         startupId={startupId}
         teamMembers={roster}
         initialSelectedUserId={initialSelectedUserId}
+        onSelectedPeerChange={(peerUserId) => {
+          onNavigate?.(
+            "founder-chat",
+            peerUserId ? { messageUserId: peerUserId } : {},
+          );
+        }}
         strictMode={true}
       />
     </div>

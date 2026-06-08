@@ -1,8 +1,9 @@
-import React, { useRef, useState, useCallback } from "react";
+import React, { useRef, useState, useCallback, useMemo } from "react";
 import { Paperclip, Send, Smile, Loader2, X } from "lucide-react";
 import { Textarea } from "../ui/textarea";
 import { cn } from "../ui/utils";
 import { PendingAttachmentPreview } from "./PendingAttachmentPreview";
+import { ChatMentionPicker } from "./ChatMentionPicker";
 import {
   composerDockClass,
   composerIconButtonClass,
@@ -10,6 +11,14 @@ import {
   composerReplyStripClass,
   composerSendButtonClass,
 } from "./chatStyles";
+import {
+  createMentionFromMilestone,
+  createMentionFromTask,
+  detectMentionQuery,
+  getFilteredMentionables,
+  insertMentionIntoText,
+  reconcileMentionsWithBody,
+} from "../../utils/chatMentions";
 
 export const CHAT_FILE_ACCEPT = "image/*,video/*,.pdf,.doc,.docx,.txt";
 
@@ -33,15 +42,108 @@ export function ChatComposer({
   replyingTo = null,
   onCancelReply,
   className,
+  mentionsEnabled = false,
+  mentionables = { milestones: [], tasks: [] },
+  mentionablesLoading = false,
+  mentionablesError = "",
+  pendingMentions = [],
+  onMentionsChange,
 }) {
   const fileInputRef = useRef(null);
+  const textareaRef = useRef(null);
   const [emojiOpen, setEmojiOpen] = useState(false);
   const [dragOver, setDragOver] = useState(false);
+  const [caretIndex, setCaretIndex] = useState(0);
+  const [mentionHighlightIndex, setMentionHighlightIndex] = useState(0);
+
+  const mentionDetection = useMemo(() => {
+    if (!mentionsEnabled) return null;
+    return detectMentionQuery(value, caretIndex);
+  }, [mentionsEnabled, value, caretIndex]);
+
+  const filteredMentionables = useMemo(() => {
+    if (!mentionDetection) return { milestones: [], tasks: [], flat: [] };
+    return getFilteredMentionables(mentionables, mentionDetection.query);
+  }, [mentionDetection, mentionables]);
+
+  const mentionPickerOpen = mentionsEnabled && Boolean(mentionDetection);
 
   const canSend =
     !disabled && !uploading && (Boolean(value?.trim()) || Boolean(pendingFile));
 
+  const updateCaret = useCallback((target) => {
+    if (!target) return;
+    setCaretIndex(target.selectionStart ?? 0);
+  }, []);
+
+  const applyMention = useCallback(
+    (mention) => {
+      if (!mention) return;
+      const { text, caret } = insertMentionIntoText(value, caretIndex, mention.label);
+      const nextMentions = [
+        ...reconcileMentionsWithBody(value, pendingMentions),
+        mention,
+      ];
+      onChange?.(text);
+      onMentionsChange?.(nextMentions);
+      setMentionHighlightIndex(0);
+      requestAnimationFrame(() => {
+        const el = textareaRef.current;
+        if (!el) return;
+        el.focus();
+        el.setSelectionRange(caret, caret);
+        setCaretIndex(caret);
+      });
+    },
+    [caretIndex, onChange, onMentionsChange, pendingMentions, value],
+  );
+
+  const handleValueChange = useCallback(
+    (nextValue, target) => {
+      onChange?.(nextValue);
+      if (mentionsEnabled && onMentionsChange) {
+        onMentionsChange(reconcileMentionsWithBody(nextValue, pendingMentions));
+      }
+      updateCaret(target || textareaRef.current);
+      setMentionHighlightIndex(0);
+    },
+    [mentionsEnabled, onChange, onMentionsChange, pendingMentions, updateCaret],
+  );
+
   const handleKeyDown = (e) => {
+    if (mentionPickerOpen) {
+      const { flat } = filteredMentionables;
+      if (e.key === "ArrowDown") {
+        e.preventDefault();
+        if (flat.length === 0) return;
+        setMentionHighlightIndex((prev) => (prev + 1) % flat.length);
+        return;
+      }
+      if (e.key === "ArrowUp") {
+        e.preventDefault();
+        if (flat.length === 0) return;
+        setMentionHighlightIndex((prev) => (prev - 1 + flat.length) % flat.length);
+        return;
+      }
+      if (e.key === "Enter" && !e.shiftKey) {
+        e.preventDefault();
+        const selected = flat[mentionHighlightIndex] || flat[0];
+        if (!selected) return;
+        const mention =
+          selected.kind === "milestone"
+            ? createMentionFromMilestone(selected.row)
+            : createMentionFromTask(selected.row);
+        applyMention(mention);
+        return;
+      }
+      if (e.key === "Escape") {
+        e.preventDefault();
+        const next = `${String(value || "").slice(0, mentionDetection.caret)} ${String(value || "").slice(mentionDetection.caret)}`;
+        handleValueChange(next, e.target);
+        return;
+      }
+    }
+
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       if (canSend) onSend?.();
@@ -75,6 +177,16 @@ export function ChatComposer({
       onDragLeave={() => setDragOver(false)}
       onDrop={onDrop}
     >
+      <ChatMentionPicker
+        open={mentionPickerOpen}
+        query={mentionDetection?.query || ""}
+        mentionables={filteredMentionables}
+        loading={mentionablesLoading}
+        error={mentionablesError}
+        highlightIndex={mentionHighlightIndex}
+        onSelect={applyMention}
+      />
+
       <div className={composerDockClass()}>
         {replyingTo && (
           <div className={composerReplyStripClass()}>
@@ -136,7 +248,7 @@ export function ChatComposer({
           />
         )}
 
-        <div className="flex items-end gap-1.5">
+        <div className="flex items-center gap-1.5">
           <input
             ref={fileInputRef}
             type="file"
@@ -168,9 +280,12 @@ export function ChatComposer({
             </button>
           )}
           <Textarea
+            ref={textareaRef}
             placeholder={placeholder}
             value={value}
-            onChange={(e) => onChange?.(e.target.value)}
+            onChange={(e) => handleValueChange(e.target.value, e.target)}
+            onClick={(e) => updateCaret(e.target)}
+            onKeyUp={(e) => updateCaret(e.target)}
             onKeyDown={handleKeyDown}
             disabled={disabled || uploading}
             rows={1}

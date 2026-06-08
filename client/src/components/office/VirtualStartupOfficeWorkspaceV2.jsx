@@ -104,7 +104,7 @@ function buildMonthGrid(date = new Date()) {
 const ACTIVITY_PRESETS = [
   { key: "today", label: "Today" },
   { key: "yesterday", label: "Yesterday" },
-  { key: "3days", label: "Last 3 days" },
+  { key: "3days", label: "3 days" },
 ];
 
 function getPresetRange(key) {
@@ -206,53 +206,52 @@ function ActivityDateFilter({ activities, children }) {
   const error = customRange?.error || "";
 
   return (
-    <div className="flex flex-col gap-2.5">
-      {/* Filter controls row */}
-      <div className="flex items-center justify-between gap-2">
-        {/* Segmented preset control */}
-        <div className="flex items-center gap-1">
+    <div className="flex min-h-0 flex-1 flex-col gap-2">
+      {/* Tier 1: full-width segmented preset control */}
+      <div className="shrink-0 rounded-input border border-surface-border bg-surface-page p-0.5">
+        <div className="grid grid-cols-3 gap-0.5">
           {ACTIVITY_PRESETS.map((p) => (
             <button
               key={p.key}
               type="button"
               onClick={() => handlePreset(p.key)}
               className={cn(
-                "cursor-pointer rounded-pill px-2.5 py-1 text-[12px] font-medium transition-all duration-200 ease-in-out",
+                "h-8 cursor-pointer rounded-[6px] font-body text-[11px] font-medium transition-all duration-200 ease-in-out",
                 preset === p.key
-                  ? "bg-primary text-white"
-                  : "bg-surface-page text-text-body hover:text-primary",
+                  ? "bg-primary text-white shadow-sm"
+                  : "text-text-body hover:bg-surface-card hover:text-primary",
               )}
             >
               {p.label}
             </button>
           ))}
         </div>
+      </div>
 
-        {/* Right side: Custom + Clear */}
-        <div className="flex items-center gap-1.5">
+      {/* Tier 2: Custom + Reset */}
+      <div className="flex shrink-0 items-center justify-between gap-2">
+        <button
+          type="button"
+          onClick={() => { setShowCustom((v) => !v); setPreset(null); }}
+          className={cn(
+            "inline-flex h-8 cursor-pointer items-center gap-1.5 rounded-input border bg-surface-card px-3 font-body text-[11px] font-medium transition-all duration-200 ease-in-out hover:border-primary hover:text-primary",
+            showCustom ? "border-primary text-primary" : "border-surface-border text-text-body",
+          )}
+        >
+          <Filter className="h-3 w-3 shrink-0" />
+          Custom
+          <ChevronRight className={cn("h-3 w-3 shrink-0 transition-transform duration-200", showCustom && "rotate-90")} />
+        </button>
+        {hasActiveFilter && (
           <button
             type="button"
-            onClick={() => { setShowCustom((v) => !v); setPreset(null); }}
-            className={cn(
-              "flex cursor-pointer items-center gap-1 rounded-input border bg-surface-card px-2.5 py-1 text-[12px] font-medium text-text-body transition-all duration-200 ease-in-out hover:border-primary hover:text-primary",
-              showCustom ? "border-primary text-primary" : "border-surface-border",
-            )}
+            onClick={() => { setPreset(null); setFromStr(""); setToStr(""); setCustomError(""); setShowCustom(false); }}
+            className="inline-flex h-8 items-center gap-1 rounded-input px-2 font-body text-[11px] font-medium text-text-muted transition-colors duration-200 ease-in-out hover:text-destructive"
           >
-            <Filter className="h-2.5 w-2.5" />
-            Custom
-            <ChevronRight className={cn("h-2.5 w-2.5 transition-transform duration-200", showCustom && "rotate-90")} />
+            <X className="h-3 w-3 shrink-0" />
+            Reset
           </button>
-          {hasActiveFilter && (
-            <button
-              type="button"
-              onClick={() => { setPreset(null); setFromStr(""); setToStr(""); setCustomError(""); setShowCustom(false); }}
-              className="flex items-center gap-0.5 rounded-md px-1.5 py-[3px] text-[10px] font-medium text-text-muted transition-colors duration-200 ease-in-out hover:text-destructive"
-            >
-              <X className="h-2.5 w-2.5" />
-              Reset
-            </button>
-          )}
-        </div>
+        )}
       </div>
 
       {/* Custom date range panel */}
@@ -301,15 +300,16 @@ function ActivityDateFilter({ activities, children }) {
   );
 }
 
-function OfficePanelCard({ title, action, children, className = "" }) {
+function OfficePanelCard({ title, action, children, className = "", fill = false }) {
   return (
     <Card
       className={cn(
         "office-animate-in rounded-card border border-surface-border bg-surface-card shadow-soft transition-shadow duration-200 ease-in-out hover:shadow-[0_2px_12px_rgba(0,0,0,0.06)]",
+        fill && "flex h-full flex-col",
         className,
       )}
     >
-      <CardHeader className="border-0 bg-surface-card px-5 pb-2 pt-4">
+      <CardHeader className="shrink-0 border-0 bg-surface-card px-5 pb-2 pt-4">
         <div className="flex items-center justify-between gap-3">
           <CardTitle className="font-heading text-base font-semibold text-text-heading">
             {title}
@@ -317,7 +317,14 @@ function OfficePanelCard({ title, action, children, className = "" }) {
           {action}
         </div>
       </CardHeader>
-      <CardContent className="space-y-2.5 px-5 pb-5">{children}</CardContent>
+      <CardContent
+        className={cn(
+          "px-5 pb-5",
+          fill ? "flex min-h-0 flex-1 flex-col space-y-2.5" : "space-y-2.5",
+        )}
+      >
+        {children}
+      </CardContent>
     </Card>
   );
 }
@@ -472,10 +479,11 @@ export default function VirtualStartupOfficeWorkspaceV2({
         </Card>
       ) : null}
 
-      <div className="office-workspace-grid-top" style={{display: 'grid', gridTemplateColumns: '280px 1fr 300px', gap: 16, alignItems: 'start'}}>
-        <div style={{position: 'relative'}}>
+      <div className="office-workspace-grid-top">
+        <div className="h-full min-h-0">
         <OfficePanelCard
           title="Live Activity"
+          fill
           action={
             <span className="flex items-center gap-1.5">
               <span className="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-status-success" />
@@ -485,11 +493,11 @@ export default function VirtualStartupOfficeWorkspaceV2({
           className="office-workspace-grid-top__activity"
         >
           {office.loading && recentActivities.length === 0 ? (
-            <div className="flex min-h-[145px] items-center justify-center font-body text-[11px] text-text-muted">
+            <div className="flex flex-1 items-center justify-center font-body text-[11px] text-text-muted">
               Loading activity...
             </div>
           ) : recentActivities.length === 0 ? (
-            <div className="flex min-h-[145px] flex-col items-center justify-center gap-1.5 text-center">
+            <div className="flex flex-1 flex-col items-center justify-center gap-1.5 text-center">
               <CircleDot className="h-4 w-4 text-surface-border" />
               <p className="font-heading text-[11px] font-semibold text-text-heading">No activity yet</p>
               <p className="font-body text-[11px] text-text-muted">Team activity will appear here</p>
@@ -497,8 +505,8 @@ export default function VirtualStartupOfficeWorkspaceV2({
           ) : (
             <ActivityDateFilter activities={recentActivities}>
               {(filtered, hasActiveFilter) => (
-                <>
-                  <div className="mb-1 flex items-center justify-between">
+                <div className="flex min-h-0 flex-1 flex-col">
+                  <div className="mb-1 shrink-0">
                     <span className="font-body text-[11px] text-text-body">
                       {hasActiveFilter
                         ? `${filtered.length} of ${recentActivities.length} activities`
@@ -506,12 +514,12 @@ export default function VirtualStartupOfficeWorkspaceV2({
                     </span>
                   </div>
                   {filtered.length === 0 ? (
-                    <div className="flex min-h-[80px] flex-col items-center justify-center gap-1 text-center">
+                    <div className="flex flex-1 flex-col items-center justify-center gap-1 text-center">
                       <CircleDot className="h-4 w-4 text-surface-border/80" />
                       <p className="font-body text-[11px] text-text-muted">No activity in this period</p>
                     </div>
                   ) : (
-                    <div className="overflow-y-auto" style={{ maxHeight: 280 }}>
+                    <div className="min-h-0 flex-1 overflow-y-auto">
                       {filtered.map((activity, idx) => (
                         <div
                           key={activity.id}
@@ -532,16 +540,17 @@ export default function VirtualStartupOfficeWorkspaceV2({
                       ))}
                     </div>
                   )}
-                </>
+                </div>
               )}
             </ActivityDateFilter>
           )}
         </OfficePanelCard>
         </div>
 
-        <div style={{position: 'relative'}}>
+        <div className="h-full min-h-0">
         <OfficePanelCard
           title="Team Grid View"
+          fill
           action={
             <button
               type="button"
@@ -551,13 +560,14 @@ export default function VirtualStartupOfficeWorkspaceV2({
               + Invite Team
             </button>
           }
-          className="min-h-[232px] office-workspace-grid-top__team"
+          className="office-workspace-grid-top__team"
         >
           {roster.length === 0 ? (
-            <div className="flex min-h-[145px] items-center justify-center font-body text-[11px] text-text-muted">
+            <div className="flex flex-1 items-center justify-center font-body text-[11px] text-text-muted">
               No team members yet.
             </div>
           ) : (
+            <div className="min-h-0 flex-1 overflow-y-auto">
             <div className="grid grid-cols-1 gap-3">
               {roster.map((member) => {
                 const isOnline = Boolean(member.isOnline);
@@ -592,16 +602,18 @@ export default function VirtualStartupOfficeWorkspaceV2({
                 );
               })}
             </div>
+            </div>
           )}
         </OfficePanelCard>
         </div>
 
-        <div style={{position: 'relative'}}>
+        <div className="h-full min-h-0">
         <OfficePanelCard
           title="Team Energy & Pulse"
-          className="min-h-[232px] office-workspace-grid-top__energy"
+          fill
+          className="office-workspace-grid-top__energy"
         >
-          <div className="flex flex-col gap-3">
+          <div className="flex min-h-0 flex-1 flex-col justify-between gap-3">
             <div className="py-4 text-center">
               <p className="font-heading text-[22px] font-extrabold leading-none text-primary">
                 {office.teamEnergy.percentage >= 70
@@ -946,7 +958,7 @@ export default function VirtualStartupOfficeWorkspaceV2({
                   currentUserRole={user.role}
                   startupId={office.startupId}
                   teamMembers={office.chatRoster}
-                  initialSelectedUserId={selectedMessageUserId}
+                  initialSelectedUserId={null}
                   strictMode={true}
                 />
               )}
