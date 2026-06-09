@@ -687,6 +687,33 @@ export function subscribeToPresence(startupId, userId, _userName, onPresenceChan
 }
 
 // ========================================
+// CALLS — call:started / call:ended
+// ========================================
+
+export function subscribeToCallEvents({ currentUserId, onStarted, onEnded } = {}) {
+  const socket = SocketEngine.getSocket();
+  const currentId = String(currentUserId || "");
+
+  const handleStarted = (payload) => {
+    const initiatorId = String(payload?.initiatorId || "");
+    if (currentId && initiatorId === currentId) return;
+    onStarted?.(payload);
+  };
+
+  const handleEnded = (payload) => {
+    onEnded?.(payload);
+  };
+
+  socket.on("call:started", handleStarted);
+  socket.on("call:ended", handleEnded);
+
+  return () => {
+    socket.off("call:started", handleStarted);
+    socket.off("call:ended", handleEnded);
+  };
+}
+
+// ========================================
 // UNREAD — notification:created (bump only)
 // ========================================
 

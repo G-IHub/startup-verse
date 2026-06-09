@@ -6,11 +6,11 @@ import App from "./App";
 import "./index.css";
 import { applyConsolePolicy } from "./utils/consolePolicy";
 import { wipeLegacyStartupVerseStorage } from "./utils/clearLegacyClientStorage";
+import '@livekit/components-styles'
 
 applyConsolePolicy();
 wipeLegacyStartupVerseStorage();
 
-// Light-only: strip legacy dark class from persisted HTML (old theme toggle)
 document.documentElement.classList.remove("dark");
 
 createRoot(document.getElementById("root")).render(

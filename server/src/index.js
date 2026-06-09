@@ -61,7 +61,8 @@ function startBackgroundWorkers() {
 
 async function startServer() {
   const httpServer = http.createServer(app);
-  initSocketServer(httpServer, corsOptions);
+  const io = initSocketServer(httpServer, corsOptions);
+  app.set("io", io);
 
   httpServer.on("error", (err) => {
     logger.error("HTTP server error.", {

@@ -13,7 +13,10 @@ import WeeklyOutcome from "../models/WeeklyOutcome.js";
 import TeamMemberProfile from "../models/TeamMemberProfile.js";
 import Startup from "../models/Startup.js";
 import User from "../models/User.js";
-import { error as apiError, success as apiSuccess } from "../utils/apiResponse.js";
+import {
+  error as apiError,
+  success as apiSuccess,
+} from "../utils/apiResponse.js";
 import { broadcastNotification } from "../services/notificationService.js";
 import { emitRealtime } from "../services/realtime.service.js";
 import { SOCKET_EVENTS } from "../realtime/events.js";
@@ -119,13 +122,15 @@ function coerceEventPayload(body, { isUpdate = false } = {}) {
   if (!isUpdate || has("title")) out.title = body.title || "Event";
   if (!isUpdate || has("description")) out.description = body.description || "";
   if (!isUpdate || has("startsAt") || has("startTime")) {
-    out.startsAt = body.startsAt || body.startTime || (isUpdate ? undefined : new Date());
+    out.startsAt =
+      body.startsAt || body.startTime || (isUpdate ? undefined : new Date());
   }
   if (!isUpdate || has("endsAt") || has("endTime")) {
     out.endsAt = body.endsAt ?? body.endTime ?? null;
   }
   if (!isUpdate || has("location")) out.location = body.location || "";
-  if (!isUpdate || has("attendees")) out.attendees = Array.isArray(body.attendees) ? body.attendees : [];
+  if (!isUpdate || has("attendees"))
+    out.attendees = Array.isArray(body.attendees) ? body.attendees : [];
   if (!isUpdate || has("eventType")) {
     out.eventType = coerceEnum(body.eventType, EVENT_TYPES, "other");
   }
@@ -152,7 +157,11 @@ function coerceAnnouncementPayload(body, { isUpdate = false } = {}) {
     out.priority = coerceEnum(body.priority, ANNOUNCEMENT_PRIORITIES, "normal");
   }
   if (!isUpdate || has("category")) {
-    out.category = coerceEnum(body.category, ANNOUNCEMENT_CATEGORIES, "general");
+    out.category = coerceEnum(
+      body.category,
+      ANNOUNCEMENT_CATEGORIES,
+      "general",
+    );
   }
   if (!isUpdate || has("emoji")) {
     out.emoji = typeof body.emoji === "string" ? body.emoji : "";
@@ -173,13 +182,16 @@ function coerceResourcePayload(body, { isUpdate = false } = {}) {
   if (!isUpdate || has("type")) {
     out.type = coerceEnum(body.type, RESOURCE_TYPES, "other");
   }
-  if (!isUpdate || has("url")) out.url = typeof body.url === "string" ? body.url : "";
+  if (!isUpdate || has("url"))
+    out.url = typeof body.url === "string" ? body.url : "";
   if (!isUpdate || has("tags")) out.tags = normalizeTags(body.tags);
   return out;
 }
 
 export const listCohortEvents = async (req, res) => {
-  const rows = await Event.find({ cohortId: req.params.cohortId }).sort({ startsAt: 1 });
+  const rows = await Event.find({ cohortId: req.params.cohortId }).sort({
+    startsAt: 1,
+  });
   return apiSuccess(res, { events: rows.map(mapEvent) });
 };
 
@@ -248,7 +260,8 @@ export const deleteCohortEvent = async (req, res) => {
   // "Late cancellation" - emit a separate cancellation signal so clients can
   // surface a notice in addition to removing the card from the list.
   const startsAtMs = event.startsAt ? new Date(event.startsAt).getTime() : 0;
-  const isImminent = startsAtMs > 0 && startsAtMs - Date.now() < 24 * 3600 * 1000;
+  const isImminent =
+    startsAtMs > 0 && startsAtMs - Date.now() < 24 * 3600 * 1000;
   if (isImminent && rooms.length) {
     emitRealtime(SOCKET_EVENTS.EVENT_CANCELLED, dto, rooms);
   }
@@ -266,7 +279,9 @@ export const deleteCohortEvent = async (req, res) => {
 };
 
 export const listCohortAnnouncements = async (req, res) => {
-  const rows = await Announcement.find({ cohortId: req.params.cohortId }).sort({ createdAt: -1 });
+  const rows = await Announcement.find({ cohortId: req.params.cohortId }).sort({
+    createdAt: -1,
+  });
   return apiSuccess(res, { announcements: rows.map(mapAnnouncement) });
 };
 
@@ -291,7 +306,10 @@ export const createCohortAnnouncement = async (req, res) => {
 
   // Notify every founder in the cohort.
   try {
-    const memberships = await CohortMembership.find({ cohortId }, { founderId: 1 }).lean();
+    const memberships = await CohortMembership.find(
+      { cohortId },
+      { founderId: 1 },
+    ).lean();
     const recipients = memberships.map((m) => m.founderId).filter(Boolean);
     if (recipients.length) {
       await broadcastNotification(recipients, {
@@ -338,7 +356,9 @@ export const updateCohortAnnouncement = async (req, res) => {
   const dto = mapAnnouncement(announcement);
   const orgId = await resolveCohortOrgId(announcement, cohortId);
   if (orgId) {
-    emitRealtime(SOCKET_EVENTS.ANNOUNCEMENT_UPDATED, dto, [organizationRoom(orgId)]);
+    emitRealtime(SOCKET_EVENTS.ANNOUNCEMENT_UPDATED, dto, [
+      organizationRoom(orgId),
+    ]);
   }
   return apiSuccess(res, { announcement: dto });
 };
@@ -405,7 +425,11 @@ export const markAnnouncementRead = async (req, res) => {
       [organizationRoom(orgId)],
     );
   }
-  return apiSuccess(res, { marked: true, id: String(announcementId), readCount });
+  return apiSuccess(res, {
+    marked: true,
+    id: String(announcementId),
+    readCount,
+  });
 };
 
 export const listCohortResources = async (req, res) => {
@@ -446,9 +470,13 @@ export const updateCohortResource = async (req, res) => {
   const cohortOrg = await Cohort.findOne({ _id: cohortId, deletedAt: null })
     .select("organizationId")
     .lean();
-  const orgId = cohortOrg?.organizationId ? String(cohortOrg.organizationId) : null;
+  const orgId = cohortOrg?.organizationId
+    ? String(cohortOrg.organizationId)
+    : null;
   if (orgId) {
-    emitRealtime(SOCKET_EVENTS.RESOURCE_UPDATED, dto, [organizationRoom(orgId)]);
+    emitRealtime(SOCKET_EVENTS.RESOURCE_UPDATED, dto, [
+      organizationRoom(orgId),
+    ]);
   }
   return apiSuccess(res, { resource: dto });
 };
@@ -470,7 +498,9 @@ export const deleteCohortResource = async (req, res) => {
   const cohortOrg = await Cohort.findOne({ _id: cohortId, deletedAt: null })
     .select("organizationId")
     .lean();
-  const orgId = cohortOrg?.organizationId ? String(cohortOrg.organizationId) : null;
+  const orgId = cohortOrg?.organizationId
+    ? String(cohortOrg.organizationId)
+    : null;
   if (orgId) {
     emitRealtime(
       SOCKET_EVENTS.RESOURCE_DELETED,
@@ -508,9 +538,15 @@ export const getCohortAnalyticsOverview = async (req, res) => {
     TeamMemberProfile.countDocuments({ startupId: { $in: startupIds } }),
     WeeklyOutcome.countDocuments({ founderId: { $in: founderIds } }),
     Task.countDocuments({ startupId: { $in: startupIds } }),
-    Task.countDocuments({ startupId: { $in: startupIds }, status: "completed" }),
+    Task.countDocuments({
+      startupId: { $in: startupIds },
+      status: "completed",
+    }),
     Milestone.countDocuments({ founderId: { $in: founderIds } }),
-    Milestone.countDocuments({ founderId: { $in: founderIds }, status: "completed" }),
+    Milestone.countDocuments({
+      founderId: { $in: founderIds },
+      status: "completed",
+    }),
     ProgramMilestone.countDocuments({ cohortId }),
     Deliverable.countDocuments({ cohortId }),
   ]);
@@ -520,25 +556,36 @@ export const getCohortAnalyticsOverview = async (req, res) => {
   const totalSubmissions =
     deliverableIds.length === 0
       ? 0
-      : await DeliverableSubmission.countDocuments({ deliverableId: { $in: deliverableIds } });
+      : await DeliverableSubmission.countDocuments({
+          deliverableId: { $in: deliverableIds },
+        });
 
   const taskCompletionRate =
     totalTasks === 0 ? 0 : Math.round((completedTasks / totalTasks) * 100);
   const milestoneCompletionRate =
-    totalMilestones === 0 ? 0 : Math.round((completedMilestones / totalMilestones) * 100);
+    totalMilestones === 0
+      ? 0
+      : Math.round((completedMilestones / totalMilestones) * 100);
   const expectedSubs = totalDeliverables * Math.max(cohortSize, 1);
   const submissionRate =
-    expectedSubs === 0 ? 0 : Math.min(100, Math.round((totalSubmissions / expectedSubs) * 100));
+    expectedSubs === 0
+      ? 0
+      : Math.min(100, Math.round((totalSubmissions / expectedSubs) * 100));
 
   const analytics = {
     cohortSize,
     recentJoinsLast30Days: recentJoins,
     aggregateMetrics: {
       totalTeamMembers,
-      avgTeamSize: cohortSize === 0 ? 0 : Math.round((totalTeamMembers / cohortSize) * 10) / 10,
+      avgTeamSize:
+        cohortSize === 0
+          ? 0
+          : Math.round((totalTeamMembers / cohortSize) * 10) / 10,
       totalWeeklyOutcomes,
       avgWeeklyOutcomesPerStartup:
-        cohortSize === 0 ? 0 : Math.round((totalWeeklyOutcomes / cohortSize) * 10) / 10,
+        cohortSize === 0
+          ? 0
+          : Math.round((totalWeeklyOutcomes / cohortSize) * 10) / 10,
       totalTasks,
       completedTasks,
       taskCompletionRate,
@@ -569,7 +616,9 @@ export const getCohortPortfolioHealth = async (req, res) => {
   const members = await CohortMembership.find({ cohortId }).lean();
   const founderIds = members.map((m) => m.founderId).filter(Boolean);
 
-  const startups = await Startup.find({ founderId: { $in: founderIds } }).lean();
+  const startups = await Startup.find({
+    founderId: { $in: founderIds },
+  }).lean();
   const users = await User.find({ _id: { $in: founderIds } }).lean();
   const userById = new Map(users.map((u) => [String(u._id), u]));
 
@@ -579,7 +628,10 @@ export const getCohortPortfolioHealth = async (req, res) => {
     const startup = startups.find((s) => String(s.founderId) === fid);
     const user = userById.get(fid);
     const total = await Task.countDocuments({ founderId });
-    const completed = await Task.countDocuments({ founderId, status: "completed" });
+    const completed = await Task.countDocuments({
+      founderId,
+      status: "completed",
+    });
     const score = total === 0 ? 50 : Math.round((completed / total) * 100);
     let status = "healthy";
     if (score < 40) status = "critical";
@@ -599,11 +651,15 @@ export const getCohortPortfolioHealth = async (req, res) => {
 
   const healthy = portfolio.filter((p) => p.health.status === "healthy").length;
   const warning = portfolio.filter((p) => p.health.status === "warning").length;
-  const critical = portfolio.filter((p) => p.health.status === "critical").length;
+  const critical = portfolio.filter(
+    (p) => p.health.status === "critical",
+  ).length;
   const avgScore =
     portfolio.length === 0
       ? 0
-      : Math.round(portfolio.reduce((s, p) => s + p.health.score, 0) / portfolio.length);
+      : Math.round(
+          portfolio.reduce((s, p) => s + p.health.score, 0) / portfolio.length,
+        );
 
   const cohortStats = {
     total: portfolio.length,

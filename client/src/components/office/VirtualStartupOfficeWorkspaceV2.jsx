@@ -30,9 +30,14 @@ import { TaskManagementPanel } from "./TaskManagementPanel";
 import { TeamHubPanel } from "./TeamHubPanel";
 import CalendarHubPanel from "./CalendarHubPanel";
 import MeetingScheduler from "../calendar/MeetingScheduler";
+import CallRoom from "../calls/CallRoom";
+import IncomingCallBanner from "../calls/IncomingCallBanner";
+import TeamCallModal from "../calls/TeamCallModal";
 import { useOfficePanels } from "../../domains/office/hooks/useOfficePanels";
 import { useOfficeWorkspaceData } from "../../domains/office/hooks/useOfficeWorkspaceData";
+import useCallToken from "../../hooks/useCallToken.js";
 import { useOfficeStore } from "../../state/useOfficeStore";
+import { subscribeToCallEvents } from "../../utils/socketIoRealtime.js";
 import PresenceIndicator from "../presence/PresenceIndicator";
 
 function formatRelativeTime(dateValue) {
@@ -346,8 +351,12 @@ export default function VirtualStartupOfficeWorkspaceV2({
   const announcements = useOfficeStore((s) => s.announcements);
   const wins = useOfficeStore((s) => s.wins);
   const panels = useOfficePanels();
+  const { createCall, joinCall, loading, error } = useCallToken();
   const [mobileTaskManagerOpen, setMobileTaskManagerOpen] = useState(false);
   const [mobileMeetingSchedulerOpen, setMobileMeetingSchedulerOpen] = useState(false);
+  const [showCallModal, setShowCallModal] = useState(false);
+  const [activeCall, setActiveCall] = useState(null);
+  const [incomingCall, setIncomingCall] = useState(null);
 
   useEffect(() => {
     if (!taskToOpen) return;
@@ -372,9 +381,53 @@ export default function VirtualStartupOfficeWorkspaceV2({
     onWinOpened?.();
   }, [winToOpen, onWinOpened, panels.openPanel]);
 
+  useEffect(() => {
+    const currentUserId = user?._id ?? user?.id;
+    if (!currentUserId) return undefined;
+
+    return subscribeToCallEvents({
+      currentUserId,
+      onStarted: (data) => {
+        setIncomingCall(data);
+      },
+      onEnded: (data) => {
+        setIncomingCall((prev) =>
+          prev?.roomName === data?.roomName ? null : prev,
+        );
+        setActiveCall((prev) =>
+          prev?.roomName === data?.roomName ? null : prev,
+        );
+      },
+    });
+  }, [user?._id, user?.id]);
+
+  async function handleStartCall(callType) {
+    setShowCallModal(false);
+    const result = await createCall(callType);
+    if (result) {
+      setActiveCall(result);
+    }
+  }
+
+  function handleLeaveCall() {
+    setActiveCall(null);
+  }
+
+  async function handleJoinIncomingCall(roomName) {
+    const callType = incomingCall?.callType || "video";
+    setIncomingCall(null);
+    const result = await joinCall(roomName);
+    if (result) {
+      setActiveCall({
+        ...result,
+        callType: result.callType || callType,
+      });
+    }
+  }
+
   const actionButtons = useMemo(
     () => [
-      { key: "team-call", label: "Team Call", panel: "calendar", icon: PhoneCall },
+      { key: "team-call", label: "Team Call", panel: null, icon: PhoneCall },
       { key: "tasks", label: "Tasks", panel: "tasks", icon: Target },
       { key: "calendar", label: "Calendar", panel: "calendar", icon: CalendarDays },
       { key: "updates", label: "Updates", panel: "updates", icon: Sparkles },
@@ -441,21 +494,31 @@ export default function VirtualStartupOfficeWorkspaceV2({
       <div className="flex flex-wrap items-center gap-0 border-b border-surface-border bg-surface-card px-3">
         {actionButtons.map((item) => {
           const Icon = item.icon;
-          const active = panels.isOpen(item.panel);
+          const active =
+            item.key === "team-call"
+              ? showCallModal
+              : panels.isOpen(item.panel);
           return (
             <button
               key={item.key}
               type="button"
-              onClick={() => panels.openPanel(item.panel)}
+              disabled={item.key === "team-call" && loading}
+              onClick={() => {
+                if (item.key === "team-call") {
+                  setShowCallModal(true);
+                  return;
+                }
+                panels.openPanel(item.panel);
+              }}
               className={cn(
-                "inline-flex h-10 cursor-pointer items-center gap-1.5 border-0 border-b-2 bg-transparent px-3 text-[13px] transition-colors duration-200 ease-in-out",
+                "inline-flex h-10 cursor-pointer items-center gap-1.5 border-0 border-b-2 bg-transparent px-3 text-[13px] transition-colors duration-200 ease-in-out disabled:cursor-not-allowed disabled:opacity-50",
                 active
                   ? "border-primary font-semibold text-primary"
                   : "border-transparent font-medium text-text-body hover:text-primary",
               )}
             >
               <Icon className="h-4 w-4 shrink-0" />
-              {item.label}
+              {item.key === "team-call" && loading ? "Connecting..." : item.label}
             </button>
           );
         })}
@@ -470,6 +533,9 @@ export default function VirtualStartupOfficeWorkspaceV2({
           </button>
         </div>
       </div>
+      {error && (
+        <p className="-mt-4 px-3 text-xs text-red-500">{error}</p>
+      )}
 
       {office.error ? (
         <Card className="border-amber-300 bg-amber-50 shadow-none">
@@ -1076,6 +1142,29 @@ export default function VirtualStartupOfficeWorkspaceV2({
           teamMembers={office.teamRoster}
           onMeetingScheduled={() => setMobileMeetingSchedulerOpen(false)}
         />
+      )}
+
+      <TeamCallModal
+        isOpen={showCallModal}
+        onClose={() => setShowCallModal(false)}
+        onStart={handleStartCall}
+      />
+
+      <IncomingCallBanner
+        callData={incomingCall}
+        onJoin={() => handleJoinIncomingCall(incomingCall.roomName)}
+        onDismiss={() => setIncomingCall(null)}
+      />
+
+      {activeCall && (
+        <div className="fixed inset-0 z-[999] flex flex-col bg-white">
+          <CallRoom
+            token={activeCall.token}
+            roomName={activeCall.roomName}
+            callType={activeCall.callType}
+            onLeave={handleLeaveCall}
+          />
+        </div>
       )}
     </div>
   );
