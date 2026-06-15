@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { SimpleTeamMessaging } from "../office/SimpleTeamMessaging";
 import { useOfficeWorkspaceData } from "../../domains/office/hooks/useOfficeWorkspaceData";
+import { useCallCoordinator } from "../../contexts/CallCoordinatorContext";
 import { getStartupId } from "../../utils/startupId";
 import { MessageCircle } from "lucide-react";
 import { buildFounderChatRoster } from "../../utils/chatRosterBuilder";
@@ -14,6 +15,7 @@ export default function FounderChatPage({
   const currentUserId = String(user._id ?? user.id ?? "");
   const startupId = getStartupId(user);
   const office = useOfficeWorkspaceData({ user });
+  const { startDirectCall, registerTeamRoster } = useCallCoordinator();
 
   // Fetch interests and invitations
   const [receivedInterests, setReceivedInterests] = useState([]);
@@ -59,6 +61,10 @@ export default function FounderChatPage({
     office.chatRoster.map((m) => m.id).join(","),
   ]);
 
+  useEffect(() => {
+    registerTeamRoster(roster);
+  }, [roster, registerTeamRoster]);
+
   const isLoading = loading || (office.loading && roster.length === 0);
 
   if (isLoading) {
@@ -103,6 +109,7 @@ export default function FounderChatPage({
             peerUserId ? { messageUserId: peerUserId } : {},
           );
         }}
+        onStartVideoCall={(peerUserId) => startDirectCall(peerUserId)}
         strictMode={true}
       />
     </div>
