@@ -11,6 +11,8 @@ function normalizeCallPayload(payload) {
     token: data?.token,
     roomName: data?.roomName,
     callType: data?.callType,
+    initiatorId: data?.initiatorId ? String(data.initiatorId) : undefined,
+    startupId: data?.startupId ? String(data.startupId) : undefined,
   };
 }
 
@@ -102,7 +104,7 @@ export default function useCallToken() {
     async (roomName) => {
       try {
         const { userId, userName } = getAuthenticatedUser();
-        return await requestCallToken(
+        const result = await requestCallToken(
           `/calls/join/${encodeURIComponent(roomName)}`,
           {
             userId,
@@ -110,6 +112,10 @@ export default function useCallToken() {
           },
           { requireCallType: false },
         );
+        return {
+          ...result,
+          callType: result.callType || "video",
+        };
       } catch (joinError) {
         const message = joinError?.message || "Failed to join call.";
         setError(message);
@@ -119,9 +125,71 @@ export default function useCallToken() {
     [getAuthenticatedUser, requestCallToken],
   );
 
+  const inviteToCall = useCallback(
+    async (roomName, inviteeUserId) => {
+      setLoading(true);
+      setError(null);
+      try {
+        const response = await fetch(
+          `${API_BASE_URL}/calls/invite/${encodeURIComponent(roomName)}`,
+          {
+            method: "POST",
+            credentials: "include",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ inviteeUserId }),
+          },
+        );
+        const payload = await response.json().catch(() => null);
+        if (!response.ok) {
+          throw new Error(
+            resolveErrorMessage(payload, `Invite failed with status ${response.status}.`),
+          );
+        }
+        return payload;
+      } catch (inviteError) {
+        const message = inviteError?.message || "Failed to send invite.";
+        setError(message);
+        throw inviteError;
+      } finally {
+        setLoading(false);
+      }
+    },
+    [],
+  );
+
+  const endCall = useCallback(async (roomName) => {
+    setLoading(true);
+    setError(null);
+    try {
+      const response = await fetch(
+        `${API_BASE_URL}/calls/end/${encodeURIComponent(roomName)}`,
+        {
+          method: "POST",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+        },
+      );
+      const payload = await response.json().catch(() => null);
+      if (!response.ok) {
+        throw new Error(
+          resolveErrorMessage(payload, `End call failed with status ${response.status}.`),
+        );
+      }
+      return payload;
+    } catch (endError) {
+      const message = endError?.message || "Failed to end call.";
+      setError(message);
+      throw endError;
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
   return {
     createCall,
     joinCall,
+    inviteToCall,
+    endCall,
     loading,
     error,
   };

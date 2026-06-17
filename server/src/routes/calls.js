@@ -3,6 +3,7 @@ import {
   createCall,
   endCall,
   getActiveCalls,
+  inviteToCall,
   joinCall,
 } from "../controllers/callsController.js";
 import requireAuth from "../middleware/requireAuth.js";
@@ -11,6 +12,7 @@ const callsRouter = Router();
 
 callsRouter.post("/create", requireAuth, createCall);
 callsRouter.post("/join/:roomName", requireAuth, joinCall);
+callsRouter.post("/invite/:roomName", requireAuth, inviteToCall);
 callsRouter.get("/active", requireAuth, getActiveCalls);
 callsRouter.post("/end/:roomName", requireAuth, endCall);
 

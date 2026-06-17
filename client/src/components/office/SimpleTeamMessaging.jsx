@@ -14,7 +14,7 @@ import {
   Search,
   ArrowLeft,
   MessageSquare,
-  Paperclip,
+  Video,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -46,6 +46,7 @@ import {
 export function SimpleTeamMessaging({
   onClose,
   onStartCall,
+  onStartVideoCall,
   currentUserId,
   currentUserName,
   currentUserRole,
@@ -558,7 +559,7 @@ export function SimpleTeamMessaging({
                         .toUpperCase()}
                     </AvatarFallback>
                   </Avatar>
-                  <div className="min-w-0">
+                  <div className="min-w-0 flex-1">
                     <p className="truncate font-heading text-sm font-semibold text-text-heading">
                       {selectedDisplayName}
                     </p>
@@ -566,6 +567,21 @@ export function SimpleTeamMessaging({
                       {selectedMember?.title || "Founder"}
                     </p>
                   </div>
+                  {onStartVideoCall &&
+                    selectedConversation &&
+                    selectedConversation !== currentUserId && (
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="ghost"
+                        className="h-8 w-8 shrink-0 p-0"
+                        data-tour="video-call-button"
+                        onClick={() => onStartVideoCall(selectedConversation)}
+                        aria-label={`Start video call with ${selectedDisplayName}`}
+                      >
+                        <Video className="h-4 w-4" />
+                      </Button>
+                    )}
                 </div>
               )}
               <div className={chatShell.threadScroll}>

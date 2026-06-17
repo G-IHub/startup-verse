@@ -62,6 +62,7 @@ const StartupDetailPage = lazy(() => import("./founders/StartupDetailPage"));
 import * as inboxApi from "../utils/api/inboxApi";
 import * as founderApi from "../utils/api/founderApi";
 import { broadcastMessageUpdate } from "../utils/realtimeSubscriptions";
+import { CallCoordinatorProvider } from "../contexts/CallCoordinatorContext";
 import { toast } from "sonner";
 
 // ⚡ LOADING FALLBACK - Minimal spinner for fast perceived performance
@@ -678,7 +679,7 @@ export default function DashboardHybrid({ user, onLogout, onUpdateUser }) {
           </Suspense>
         </>
       ) : (
-        <>
+        <CallCoordinatorProvider user={user}>
           <AppLayoutHybrid
             user={user}
             onLogout={onLogout}
@@ -693,7 +694,7 @@ export default function DashboardHybrid({ user, onLogout, onUpdateUser }) {
           <Suspense fallback={<PageLoadingFallback />}>
             <AdminDebugIndicator />
           </Suspense>
-        </>
+        </CallCoordinatorProvider>
       )}
     </>
   );

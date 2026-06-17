@@ -30,14 +30,10 @@ import { TaskManagementPanel } from "./TaskManagementPanel";
 import { TeamHubPanel } from "./TeamHubPanel";
 import CalendarHubPanel from "./CalendarHubPanel";
 import MeetingScheduler from "../calendar/MeetingScheduler";
-import CallRoom from "../calls/CallRoom";
-import IncomingCallBanner from "../calls/IncomingCallBanner";
-import TeamCallModal from "../calls/TeamCallModal";
+import { useCallCoordinator } from "../../contexts/CallCoordinatorContext";
 import { useOfficePanels } from "../../domains/office/hooks/useOfficePanels";
 import { useOfficeWorkspaceData } from "../../domains/office/hooks/useOfficeWorkspaceData";
-import useCallToken from "../../hooks/useCallToken.js";
 import { useOfficeStore } from "../../state/useOfficeStore";
-import { subscribeToCallEvents } from "../../utils/socketIoRealtime.js";
 import PresenceIndicator from "../presence/PresenceIndicator";
 
 function formatRelativeTime(dateValue) {
@@ -351,12 +347,16 @@ export default function VirtualStartupOfficeWorkspaceV2({
   const announcements = useOfficeStore((s) => s.announcements);
   const wins = useOfficeStore((s) => s.wins);
   const panels = useOfficePanels();
-  const { createCall, joinCall, loading, error } = useCallToken();
+  const {
+    showCallModal,
+    setShowCallModal,
+    registerTeamRoster,
+    startDirectCall,
+    loading,
+    error: callError,
+  } = useCallCoordinator();
   const [mobileTaskManagerOpen, setMobileTaskManagerOpen] = useState(false);
   const [mobileMeetingSchedulerOpen, setMobileMeetingSchedulerOpen] = useState(false);
-  const [showCallModal, setShowCallModal] = useState(false);
-  const [activeCall, setActiveCall] = useState(null);
-  const [incomingCall, setIncomingCall] = useState(null);
 
   useEffect(() => {
     if (!taskToOpen) return;
@@ -382,48 +382,8 @@ export default function VirtualStartupOfficeWorkspaceV2({
   }, [winToOpen, onWinOpened, panels.openPanel]);
 
   useEffect(() => {
-    const currentUserId = user?._id ?? user?.id;
-    if (!currentUserId) return undefined;
-
-    return subscribeToCallEvents({
-      currentUserId,
-      onStarted: (data) => {
-        setIncomingCall(data);
-      },
-      onEnded: (data) => {
-        setIncomingCall((prev) =>
-          prev?.roomName === data?.roomName ? null : prev,
-        );
-        setActiveCall((prev) =>
-          prev?.roomName === data?.roomName ? null : prev,
-        );
-      },
-    });
-  }, [user?._id, user?.id]);
-
-  async function handleStartCall(callType) {
-    setShowCallModal(false);
-    const result = await createCall(callType);
-    if (result) {
-      setActiveCall(result);
-    }
-  }
-
-  function handleLeaveCall() {
-    setActiveCall(null);
-  }
-
-  async function handleJoinIncomingCall(roomName) {
-    const callType = incomingCall?.callType || "video";
-    setIncomingCall(null);
-    const result = await joinCall(roomName);
-    if (result) {
-      setActiveCall({
-        ...result,
-        callType: result.callType || callType,
-      });
-    }
-  }
+    registerTeamRoster(office.teamRoster);
+  }, [office.teamRoster, registerTeamRoster]);
 
   const actionButtons = useMemo(
     () => [
@@ -533,8 +493,8 @@ export default function VirtualStartupOfficeWorkspaceV2({
           </button>
         </div>
       </div>
-      {error && (
-        <p className="-mt-4 px-3 text-xs text-red-500">{error}</p>
+      {callError && (
+        <p className="-mt-4 px-3 text-xs text-red-500">{callError}</p>
       )}
 
       {office.error ? (
@@ -1019,6 +979,10 @@ export default function VirtualStartupOfficeWorkspaceV2({
                     panels.closeAll();
                     setMobileMeetingSchedulerOpen(true);
                   }}
+                  onStartVideoCall={(peerUserId) => {
+                    panels.closeAll();
+                    void startDirectCall(peerUserId);
+                  }}
                   currentUserId={String(user._id ?? user.id ?? "")}
                   currentUserName={user.name}
                   currentUserRole={user.role}
@@ -1144,28 +1108,6 @@ export default function VirtualStartupOfficeWorkspaceV2({
         />
       )}
 
-      <TeamCallModal
-        isOpen={showCallModal}
-        onClose={() => setShowCallModal(false)}
-        onStart={handleStartCall}
-      />
-
-      <IncomingCallBanner
-        callData={incomingCall}
-        onJoin={() => handleJoinIncomingCall(incomingCall.roomName)}
-        onDismiss={() => setIncomingCall(null)}
-      />
-
-      {activeCall && (
-        <div className="fixed inset-0 z-[999] flex flex-col bg-white">
-          <CallRoom
-            token={activeCall.token}
-            roomName={activeCall.roomName}
-            callType={activeCall.callType}
-            onLeave={handleLeaveCall}
-          />
-        </div>
-      )}
     </div>
   );
 }
