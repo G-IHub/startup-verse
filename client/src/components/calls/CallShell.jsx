@@ -8,16 +8,16 @@ import {
   useRoomContext,
 } from "@livekit/components-react";
 import { callShell } from "./callStyles";
-import { cn } from "../ui/utils";
 import CallHeader from "./CallHeader";
 import CallStage from "./CallStage";
 import CallControlBar from "./CallControlBar";
-import CallSidePanel from "./CallSidePanel";
+import CallCollapsibleSidePanel from "./CallCollapsibleSidePanel";
 import CallSideDrawer from "./CallSideDrawer";
 import CallInlineLeaveConfirm from "./CallInlineLeaveConfirm";
 import { useCallSession } from "./CallSessionContext";
 import { useCallPresence } from "./useCallPresence";
 import { useCallKeyboardShortcuts } from "./useCallKeyboardShortcuts";
+import { useCallSidePanelCollapsed } from "./useCallSidePanelCollapsed";
 
 export default function CallShell({ callTitle, callType, onLeave }) {
   const connectionState = useConnectionState();
@@ -38,6 +38,8 @@ export default function CallShell({ callTitle, callType, onLeave }) {
   const [activeTab, setActiveTab] = useState("participants");
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [leaveDialogOpen, setLeaveDialogOpen] = useState(false);
+  const { collapsed: sidePanelCollapsed, toggleCollapsed: toggleSidePanel } =
+    useCallSidePanelCollapsed();
   const micControlRef = useRef(null);
   const previousFocusRef = useRef(null);
 
@@ -119,36 +121,40 @@ export default function CallShell({ callTitle, callType, onLeave }) {
         <CallHeader callTitle={callTitle} />
 
         <div className={callShell.bodyRow}>
-          <div className={callShell.stageCard}>
-            <CallStage callType={callType} />
-            {overlayMessage && (
-              <div
-                className={callShell.stageOverlay}
-                role="status"
-                aria-live="polite"
-              >
-                {overlayMessage}
+          <div className={callShell.videoColumn}>
+            <div className={callShell.videoMain}>
+              <div className={callShell.stageCard}>
+                <CallStage callType={callType} />
+                {overlayMessage && (
+                  <div
+                    className={callShell.stageOverlay}
+                    role="status"
+                    aria-live="polite"
+                  >
+                    {overlayMessage}
+                  </div>
+                )}
               </div>
-            )}
+
+              <div className={callShell.controlsRow}>
+                <CallControlBar
+                  ref={micControlRef}
+                  callType={callType}
+                  isInitiator={isInitiator}
+                  onRequestLeave={handleRequestLeave}
+                  onOpenParticipants={() => openDrawerTab("participants")}
+                  onOpenMessages={() => openDrawerTab("messages")}
+                />
+              </div>
+            </div>
           </div>
 
-          <div className={callShell.sidePanelCard}>
-            <CallSidePanel
-              activeTab={activeTab}
-              onTabChange={setActiveTab}
-              messageCount={chatMessages.length}
-            />
-          </div>
-        </div>
-
-        <div className={cn(callShell.controlFloat, "relative")}>
-          <CallControlBar
-            ref={micControlRef}
-            callType={callType}
-            isInitiator={isInitiator}
-            onRequestLeave={handleRequestLeave}
-            onOpenParticipants={() => openDrawerTab("participants")}
-            onOpenMessages={() => openDrawerTab("messages")}
+          <CallCollapsibleSidePanel
+            collapsed={sidePanelCollapsed}
+            onToggle={toggleSidePanel}
+            activeTab={activeTab}
+            onTabChange={setActiveTab}
+            messageCount={chatMessages.length}
           />
         </div>
 

@@ -57,7 +57,7 @@ export default function CallRoom({
       connect={true}
       audio={true}
       video={isVideoCall}
-      className="h-full w-full"
+      className="h-full min-h-0 w-full"
       data-lk-theme="default"
     >
       <RoomAudioRenderer />

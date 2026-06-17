@@ -63,11 +63,12 @@ export default function ParticipantGrid({ participants, speakingSet }) {
               maxWidth,
               width: maxWidth ? "100%" : undefined,
             }}
-            className="min-h-0 min-w-0"
+            className="flex min-h-0 min-w-0 h-full w-full"
           >
             <ParticipantTile
               participant={participant}
               isSpeaking={speakingSet.has(key)}
+              fillStage={participants.length === 1}
             />
           </div>
         );

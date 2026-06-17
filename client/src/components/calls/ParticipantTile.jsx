@@ -28,7 +28,9 @@ export default function ParticipantTile({
   isSpeaking = false,
   compact = false,
   isMain = false,
+  fillStage = false,
   showName = true,
+  screenShareLayout = false,
   className,
 }) {
   const cameraOn = isCameraEnabled(participant);
@@ -56,8 +58,13 @@ export default function ParticipantTile({
   );
 
   const tileWrapperClass = compact
-    ? cn(filmstripTileClass(), className)
-    : cn(tileClass({ isSpeaking: showSpeakingRing, compact, isMain }), className);
+    ? cn(filmstripTileClass({ screenShare: screenShareLayout }), className)
+    : cn(
+        tileClass({ isSpeaking: showSpeakingRing, compact, isMain, fillStage }),
+        className,
+      );
+
+  const videoObjectFit = screenOn ? "object-contain" : "object-cover";
 
   const videoState = screenOn
     ? "presenting screen"
@@ -72,12 +79,12 @@ export default function ParticipantTile({
       {screenOn && screenTrack ? (
         <VideoTrack
           trackRef={screenTrack}
-          className="h-full w-full bg-slate-900 object-contain"
+          className={cn("h-full w-full bg-slate-950", videoObjectFit)}
         />
       ) : cameraOn && cameraTrack ? (
         <VideoTrack
           trackRef={cameraTrack}
-          className="h-full w-full object-cover"
+          className={cn("h-full w-full bg-slate-950", videoObjectFit)}
         />
       ) : (
         <div className={tileAvatarOffClass(compact)}>

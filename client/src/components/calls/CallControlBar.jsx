@@ -77,9 +77,10 @@ const CallControlBar = forwardRef(function CallControlBar(
   );
 
   return (
-    <>
+    <div className="flex w-full justify-center">
+      <div className="relative">
       {deviceError && (
-        <p className="pointer-events-auto absolute bottom-full left-1/2 mb-2 w-max max-w-[min(100vw-2rem,320px)] -translate-x-1/2 rounded-2xl border border-status-error/20 bg-surface-card px-3 py-2 text-center font-body text-xs text-status-error shadow-soft">
+        <p className="absolute bottom-full left-1/2 mb-2 w-max max-w-[min(100vw-2rem,320px)] -translate-x-1/2 rounded-2xl border border-status-error/20 bg-surface-card px-3 py-2 text-center font-body text-xs text-status-error shadow-soft">
           {deviceError}
         </p>
       )}
@@ -166,7 +167,8 @@ const CallControlBar = forwardRef(function CallControlBar(
           <PhoneOff className="h-5 w-5" aria-hidden />
         </button>
       </div>
-    </>
+    </div>
+    </div>
   );
 });
 

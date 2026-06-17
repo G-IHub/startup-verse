@@ -19,9 +19,9 @@ export function getGridLayout(count, viewport = {}) {
       ...baseLayout(safeCount),
       gridTemplateColumns: "1fr",
       gridTemplateRows: "1fr",
-      justifyItems: "center",
-      alignItems: "center",
-      maxTileWidth: isMobile ? "100%" : "640px",
+      justifyItems: "stretch",
+      alignItems: "stretch",
+      maxTileWidth: null,
       tileSpans: [{ col: "1", row: "1" }],
     };
   }

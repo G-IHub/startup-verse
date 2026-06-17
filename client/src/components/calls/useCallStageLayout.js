@@ -7,6 +7,7 @@ import {
 import {
   anyParticipantVideoOn,
   dedupeParticipants,
+  findScreenShareParticipant,
   isCameraEnabled,
   isScreenShareEnabled,
   pickMainParticipant,
@@ -95,6 +96,9 @@ export function useCallStageLayout({ callType, forceGrid = false } = {}) {
     [dedupedParticipants],
   );
 
+  const screenSharer = findScreenShareParticipant(dedupedParticipants);
+  const isScreenSharing = Boolean(screenSharer);
+
   return {
     layoutMode,
     dedupedParticipants,
@@ -104,5 +108,6 @@ export function useCallStageLayout({ callType, forceGrid = false } = {}) {
     speakingSet,
     localParticipant,
     isSolo: dedupedParticipants.length <= 1,
+    isScreenSharing,
   };
 }

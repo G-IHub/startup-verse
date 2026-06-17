@@ -3,7 +3,6 @@ import { callShell } from "./callStyles";
 import { useCallStageLayout } from "./useCallStageLayout";
 import ParticipantGrid from "./ParticipantGrid";
 import SpotlightLayout from "./SpotlightLayout";
-import CallSoloEmptyState from "./CallSoloEmptyState";
 
 export default function CallStage({ callType }) {
   const {
@@ -12,7 +11,7 @@ export default function CallStage({ callType }) {
     mainParticipant,
     filmstripParticipants,
     speakingSet,
-    isSolo,
+    isScreenSharing,
   } = useCallStageLayout({ callType });
 
   return (
@@ -26,6 +25,7 @@ export default function CallStage({ callType }) {
           mainParticipant={mainParticipant}
           filmstripParticipants={filmstripParticipants}
           speakingSet={speakingSet}
+          isScreenSharing={isScreenSharing}
         />
       ) : (
         <ParticipantGrid
@@ -33,8 +33,6 @@ export default function CallStage({ callType }) {
           speakingSet={speakingSet}
         />
       )}
-
-      {isSolo && <CallSoloEmptyState />}
     </div>
   );
 }

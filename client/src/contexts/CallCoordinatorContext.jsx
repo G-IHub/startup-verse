@@ -403,7 +403,7 @@ export function CallCoordinatorProvider({ user, children }) {
         </div>
       )}
       {activeCall && !restoringCall && (
-        <div className="fixed inset-0 z-[999]">
+        <div className="fixed inset-0 z-[999] h-dvh w-full">
           <CallRoom
             token={activeCall.token}
             roomName={activeCall.roomName}
