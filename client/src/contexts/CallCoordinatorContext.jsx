@@ -4,6 +4,7 @@ import React, {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from "react";
 import CallRoom from "../components/calls/CallRoom";
@@ -12,6 +13,11 @@ import TeamCallModal from "../components/calls/TeamCallModal";
 import useCallToken from "../hooks/useCallToken";
 import { subscribeToCallEvents } from "../utils/socketIoRealtime";
 import { getStartupId } from "../utils/startupId";
+import {
+  clearStoredActiveCall,
+  readStoredActiveCall,
+  writeStoredActiveCall,
+} from "../utils/callSessionStorage";
 
 const CallCoordinatorContext = createContext(null);
 
@@ -21,6 +27,8 @@ export function CallCoordinatorProvider({ user, children }) {
   const [activeCall, setActiveCall] = useState(null);
   const [incomingCall, setIncomingCall] = useState(null);
   const [teamRoster, setTeamRoster] = useState([]);
+  const [restoringCall, setRestoringCall] = useState(false);
+  const restoreAttemptedRef = useRef(false);
 
   const currentUserId = String(user?._id ?? user?.id ?? "");
   const startupId = getStartupId(user);
@@ -41,9 +49,11 @@ export function CallCoordinatorProvider({ user, children }) {
         setIncomingCall((prev) =>
           prev?.roomName === data?.roomName ? null : prev,
         );
-        setActiveCall((prev) =>
-          prev?.roomName === data?.roomName ? null : prev,
-        );
+        setActiveCall((prev) => {
+          if (prev?.roomName !== data?.roomName) return prev;
+          clearStoredActiveCall();
+          return null;
+        });
       },
     });
   }, [currentUserId, startupId]);
@@ -53,12 +63,53 @@ export function CallCoordinatorProvider({ user, children }) {
       token: result.token,
       roomName: result.roomName,
       callType: result.callType,
-      initiatorId: String(result.initiatorId || currentUserId),
-      startupId: String(result.startupId || startupId || ""),
+      initiatorId: String(result.initiatorId || extras.initiatorId || currentUserId),
+      startupId: String(result.startupId || extras.startupId || startupId || ""),
       ...extras,
     }),
     [currentUserId, startupId],
   );
+
+  useEffect(() => {
+    writeStoredActiveCall(activeCall);
+  }, [activeCall]);
+
+  useEffect(() => {
+    if (!currentUserId || activeCall || restoreAttemptedRef.current) return undefined;
+    const stored = readStoredActiveCall();
+    if (!stored?.roomName) return undefined;
+
+    restoreAttemptedRef.current = true;
+    let cancelled = false;
+
+    (async () => {
+      setRestoringCall(true);
+      try {
+        const result = await joinCall(stored.roomName);
+        if (cancelled || !result) return;
+        setActiveCall(
+          buildActiveCall(
+            {
+              ...result,
+              callType: result.callType || stored.callType,
+            },
+            {
+              initiatorId: stored.initiatorId,
+              startupId: stored.startupId,
+            },
+          ),
+        );
+      } catch {
+        clearStoredActiveCall();
+      } finally {
+        if (!cancelled) setRestoringCall(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [activeCall, buildActiveCall, currentUserId, joinCall]);
 
   const startTeamCall = useCallback(
     async (callType) => {
@@ -106,6 +157,7 @@ export function CallCoordinatorProvider({ user, children }) {
   const leaveCall = useCallback(() => {
     const call = activeCall;
     setActiveCall(null);
+    clearStoredActiveCall();
     if (
       call?.roomName &&
       currentUserId &&
@@ -166,7 +218,7 @@ export function CallCoordinatorProvider({ user, children }) {
         }
         onDismiss={() => setIncomingCall(null)}
       />
-      {activeCall && (
+      {activeCall && !restoringCall && (
         <div className="fixed inset-0 z-[999]">
           <CallRoom
             token={activeCall.token}

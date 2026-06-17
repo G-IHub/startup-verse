@@ -2,6 +2,11 @@ import { AccessToken, RoomServiceClient } from "livekit-server-sdk";
 import User from "../models/User.js";
 import { startupRoom, userRoom } from "../realtime/rooms.js";
 import { emitRealtime } from "../services/realtime.service.js";
+import {
+  getClientStartupBucketId,
+  resolveUserStartupScope,
+  usersShareStartupScope,
+} from "../utils/startupScope.js";
 
 const VALID_CALL_TYPES = new Set(["voice", "video"]);
 
@@ -48,7 +53,7 @@ async function getAuthenticatedUser(req) {
     throw new Error("Authenticated user is missing.");
   }
 
-  const user = await User.findById(userId).select("_id name startupId");
+  const user = await User.findById(userId).select("_id name startupId founderId role");
   if (!user) {
     throw new Error("Authenticated user was not found.");
   }
@@ -123,7 +128,8 @@ export async function createCall(req, res) {
     const roomName = `call-${Date.now()}-${user._id}`;
     const jwt = await createAccessTokenForUser(user, roomName);
 
-    const startupId = String(user.startupId || "");
+    const scope = await resolveUserStartupScope(user);
+    const startupId = getClientStartupBucketId(scope);
     const initiatorId = String(user._id);
 
     setCallRoomMeta(roomName, {
@@ -267,7 +273,7 @@ export async function inviteToCall(req, res) {
       });
     }
 
-    const invitee = await User.findById(inviteeUserId).select("_id name startupId");
+    const invitee = await User.findById(inviteeUserId).select("_id name startupId founderId role");
     if (!invitee) {
       return res.status(404).json({
         success: false,
@@ -275,15 +281,16 @@ export async function inviteToCall(req, res) {
       });
     }
 
-    const inviterStartupId = String(inviter.startupId || "");
-    const inviteeStartupId = String(invitee.startupId || "");
-
-    if (!inviterStartupId || inviterStartupId !== inviteeStartupId) {
+    const sharesStartup = await usersShareStartupScope(inviter, invitee);
+    if (!sharesStartup) {
       return res.status(403).json({
         success: false,
         error: "You can only invite members of your startup.",
       });
     }
+
+    const inviterScope = await resolveUserStartupScope(inviter);
+    const inviterStartupId = getClientStartupBucketId(inviterScope);
 
     const meta = getCallRoomMeta(roomName);
     if (!meta) {

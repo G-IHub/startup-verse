@@ -100,7 +100,7 @@ export default function CallShell({ callTitle, callType, onLeave }) {
   });
 
   return (
-    <FocusScope.Root trapped loop asChild>
+    <FocusScope.Root trapped={!leaveDialogOpen} loop asChild>
       <div
         role="dialog"
         aria-modal="true"

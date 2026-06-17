@@ -24,7 +24,10 @@ export default function CallLeaveDialog({
 
   return (
     <AlertDialog open={open} onOpenChange={onOpenChange}>
-      <AlertDialogContent>
+      <AlertDialogContent
+        overlayClassName="z-[1001]"
+        className="z-[1001]"
+      >
         <AlertDialogHeader>
           <AlertDialogTitle className="font-heading text-base font-bold text-text-heading">
             {title}
@@ -37,7 +40,10 @@ export default function CallLeaveDialog({
           <AlertDialogCancel>Stay in call</AlertDialogCancel>
           <AlertDialogAction
             className="bg-status-error text-white hover:bg-status-error/90"
-            onClick={onConfirm}
+            onClick={(event) => {
+              event.preventDefault();
+              onConfirm?.();
+            }}
           >
             {confirmLabel}
           </AlertDialogAction>
