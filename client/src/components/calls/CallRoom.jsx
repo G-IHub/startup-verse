@@ -17,12 +17,12 @@ export default function CallRoom({
   onLeave,
 }) {
   const serverUrl = import.meta.env.VITE_LIVEKIT_URL;
-  const leaveCalledRef = useRef(false);
   const isVideoCall = callType === "video";
+  const leavingRef = useRef(false);
 
-  const handleLeaveOnce = useCallback(() => {
-    if (leaveCalledRef.current) return;
-    leaveCalledRef.current = true;
+  const handleLeave = useCallback(() => {
+    if (leavingRef.current) return;
+    leavingRef.current = true;
     onLeave?.();
   }, [onLeave]);
 
@@ -42,7 +42,7 @@ export default function CallRoom({
         <button
           type="button"
           className="rounded-lg bg-primary px-4 py-2 font-body text-sm text-white"
-          onClick={handleLeaveOnce}
+          onClick={handleLeave}
         >
           Close
         </button>
@@ -57,7 +57,6 @@ export default function CallRoom({
       connect={true}
       audio={true}
       video={isVideoCall}
-      onDisconnected={handleLeaveOnce}
       className="h-full w-full"
       data-lk-theme="default"
     >
@@ -71,12 +70,12 @@ export default function CallRoom({
         userName={userName}
         userRole={userRole}
         teamRoster={teamRoster}
-        onLeave={handleLeaveOnce}
+        onLeave={handleLeave}
       >
         <CallShell
           callTitle={resolvedTitle}
           callType={callType}
-          onLeave={handleLeaveOnce}
+          onLeave={handleLeave}
         />
       </CallSessionProvider>
     </LiveKitRoom>

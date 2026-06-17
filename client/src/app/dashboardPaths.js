@@ -3,6 +3,8 @@
  * Maps between browser paths and DashboardHybrid internal keys.
  */
 
+import { parseOfficeCallRoute } from "../utils/callRouteUtils.js";
+
 const DEFAULT_OFFICE_VIEW = "workspace";
 
 /** @typedef {{ currentPage: string, virtualOfficeView?: string, talentDashboardMode?: string, initialProfileEditing?: boolean, messageUserId?: string, taskId?: string, announcementId?: string, winId?: string, deliverableId?: string, officeTab?: string, startupId?: string, talentId?: string, invitationId?: string }} DashboardNavState */
@@ -87,9 +89,12 @@ export function pathToDashboardState(pathname, search, role) {
     search.startsWith("?") ? search.slice(1) : search,
   );
 
-  if (path === "/office") {
+  if (path === "/office" || path.startsWith("/office/call/")) {
     const view = q.get("view") || DEFAULT_OFFICE_VIEW;
     const tab = q.get("tab") || undefined;
+    const callRoute = path.startsWith("/office/call/")
+      ? parseOfficeCallRoute(path, search)
+      : null;
     return {
       currentPage: "startup-office",
       virtualOfficeView: view,
@@ -98,6 +103,8 @@ export function pathToDashboardState(pathname, search, role) {
       announcementId: q.get("announcementId") || undefined,
       winId: q.get("winId") || undefined,
       deliverableId: q.get("deliverableId") || undefined,
+      activeCallRoom: callRoute?.roomName,
+      activeCallType: callRoute?.callType,
     };
   }
 
@@ -302,6 +309,7 @@ export function dashboardStateToPath(state) {
 export const DASHBOARD_ROUTE_PATHS = Object.freeze([
   "/home",
   "/office",
+  "/office/call/:roomName",
   "/inbox",
   "/inbox/received",
   "/inbox/sent",

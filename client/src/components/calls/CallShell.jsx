@@ -1,7 +1,12 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { ConnectionState } from "livekit-client";
 import * as FocusScope from "@radix-ui/react-focus-scope";
-import { useChat, useConnectionState, useLocalParticipant } from "@livekit/components-react";
+import {
+  useChat,
+  useConnectionState,
+  useLocalParticipant,
+  useRoomContext,
+} from "@livekit/components-react";
 import { callShell } from "./callStyles";
 import { cn } from "../ui/utils";
 import CallHeader from "./CallHeader";
@@ -9,13 +14,14 @@ import CallStage from "./CallStage";
 import CallControlBar from "./CallControlBar";
 import CallSidePanel from "./CallSidePanel";
 import CallSideDrawer from "./CallSideDrawer";
-import CallLeaveDialog from "./CallLeaveDialog";
+import CallInlineLeaveConfirm from "./CallInlineLeaveConfirm";
 import { useCallSession } from "./CallSessionContext";
 import { useCallPresence } from "./useCallPresence";
 import { useCallKeyboardShortcuts } from "./useCallKeyboardShortcuts";
 
 export default function CallShell({ callTitle, callType, onLeave }) {
   const connectionState = useConnectionState();
+  const room = useRoomContext();
   const { localParticipant } = useLocalParticipant();
   const { chatMessages } = useChat();
   const {
@@ -24,6 +30,8 @@ export default function CallShell({ callTitle, callType, onLeave }) {
     userName,
     userRole,
     isInitiator,
+    roomName,
+    callType: sessionCallType,
   } = useCallSession();
 
   const [wasConnected, setWasConnected] = useState(false);
@@ -38,8 +46,9 @@ export default function CallShell({ callTitle, callType, onLeave }) {
     userName,
     role: userRole,
     startupId,
+    roomName,
+    callType: sessionCallType,
     isInCall: true,
-    connectionState,
   });
 
   useEffect(() => {
@@ -88,9 +97,9 @@ export default function CallShell({ callTitle, callType, onLeave }) {
 
   const handleConfirmLeave = useCallback(() => {
     setLeaveDialogOpen(false);
-    localParticipant?.room?.disconnect();
+    void room?.disconnect(true);
     onLeave?.();
-  }, [localParticipant, onLeave]);
+  }, [room, onLeave]);
 
   useCallKeyboardShortcuts({
     enabled: isConnected && !leaveDialogOpen,
@@ -151,10 +160,10 @@ export default function CallShell({ callTitle, callType, onLeave }) {
           messageCount={chatMessages.length}
         />
 
-        <CallLeaveDialog
+        <CallInlineLeaveConfirm
           open={leaveDialogOpen}
-          onOpenChange={setLeaveDialogOpen}
           isInitiator={isInitiator}
+          onCancel={() => setLeaveDialogOpen(false)}
           onConfirm={handleConfirmLeave}
         />
       </div>

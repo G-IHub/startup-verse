@@ -81,10 +81,22 @@ export async function upsertPresence({
   metadata = {},
   activity = null,
 }) {
+  const sid = String(startupId || "");
+  const uid = String(userId || "");
+  const existing = sid && uid
+    ? await Presence.findOne({ startupId: sid, userId: uid }).lean()
+    : null;
+
+  const baseMeta =
+    existing?.metadata && typeof existing.metadata === "object"
+      ? existing.metadata
+      : {};
+  const incomingMeta =
+    metadata && typeof metadata === "object" ? metadata : {};
   const mergedMetadata =
     activity && typeof activity === "object"
-      ? { ...metadata, lastFeedActivity: activity }
-      : metadata;
+      ? { ...baseMeta, ...incomingMeta, lastFeedActivity: activity }
+      : { ...baseMeta, ...incomingMeta };
 
   const normalizedOnline =
     typeof isOnline === "boolean"
@@ -112,24 +124,36 @@ export async function upsertPresence({
   emitRealtime(SOCKET_EVENTS.PRESENCE_UPDATED, dto, [startupRoom(startupId)]);
 
   if (activity && typeof activity === "object" && startupId) {
-    const { lastFeedActivity: _ignored, ...activityMetadata } =
-      mergedMetadata && typeof mergedMetadata === "object" ? mergedMetadata : {};
-    const activityDoc = await Activity.create({
-      startupId: String(startupId),
-      userId: String(userId),
-      type: String(activity.type || "update"),
-      text: String(activity.message || ""),
-      metadata: {
-        ...activityMetadata,
-        userName: String(activity.userName || userName || ""),
-        icon: String(activity.icon || "📋"),
-      },
-    });
-    emitRealtime(
-      SOCKET_EVENTS.ACTIVITY_CREATED,
-      mapActivityToDto(activityDoc),
-      [startupRoom(startupId)],
-    );
+    const activityType = String(activity.type || "update");
+    const activityMessage = String(activity.message || "").trim();
+    const prevActivity = existing?.metadata?.lastFeedActivity;
+    const isDuplicate =
+      prevActivity &&
+      String(prevActivity.type || "") === activityType &&
+      String(prevActivity.message || "").trim() === activityMessage;
+    const skipFeedEntry =
+      activityType === "in-call" || !activityMessage || isDuplicate;
+
+    if (!skipFeedEntry) {
+      const { lastFeedActivity: _ignored, ...activityMetadata } =
+        mergedMetadata && typeof mergedMetadata === "object" ? mergedMetadata : {};
+      const activityDoc = await Activity.create({
+        startupId: String(startupId),
+        userId: String(userId),
+        type: activityType,
+        text: activityMessage,
+        metadata: {
+          ...activityMetadata,
+          userName: String(activity.userName || userName || ""),
+          icon: String(activity.icon || "📋"),
+        },
+      });
+      emitRealtime(
+        SOCKET_EVENTS.ACTIVITY_CREATED,
+        mapActivityToDto(activityDoc),
+        [startupRoom(startupId)],
+      );
+    }
   }
 
   return dto;

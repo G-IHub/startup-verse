@@ -352,6 +352,9 @@ export default function VirtualStartupOfficeWorkspaceV2({
     setShowCallModal,
     registerTeamRoster,
     startDirectCall,
+    activeCall,
+    teamLiveCall,
+    joinCall,
     loading,
     error: callError,
   } = useCallCoordinator();
@@ -397,6 +400,19 @@ export default function VirtualStartupOfficeWorkspaceV2({
 
   const recentActivities = office.activities;
   const roster = office.teamRoster.slice(0, 10);
+  const currentUserId = String(user._id ?? user.id ?? "");
+  const teammatesInCall = roster.filter(
+    (member) => member.isInCall && String(member.id) !== currentUserId,
+  );
+  const joinableCallRoom =
+    teamLiveCall?.roomName ||
+    teammatesInCall.find((member) => member.callRoomName)?.callRoomName ||
+    "";
+  const joinableCallType =
+    teamLiveCall?.callType ||
+    teammatesInCall.find((member) => member.callType)?.callType ||
+    "video";
+  const canJoinTeamCall = Boolean(joinableCallRoom && !activeCall);
   const upcomingAgenda = office.agenda.slice(0, 8);
   const myTasks = office.myTasks.slice(0, 8);
   const unassignedByMilestone = office.unassignedByMilestone || [];
@@ -505,8 +521,8 @@ export default function VirtualStartupOfficeWorkspaceV2({
         </Card>
       ) : null}
 
-      <div className="office-workspace-grid-top">
-        <div className="h-full min-h-0">
+      <div className="office-workspace-grid-top min-h-0 max-h-[min(360px,45vh)] overflow-hidden md:max-h-[360px]">
+        <div className="flex h-full min-h-0 flex-col overflow-hidden">
         <OfficePanelCard
           title="Live Activity"
           fill
@@ -573,18 +589,31 @@ export default function VirtualStartupOfficeWorkspaceV2({
         </OfficePanelCard>
         </div>
 
-        <div className="h-full min-h-0">
+        <div className="flex h-full min-h-0 flex-col overflow-hidden">
         <OfficePanelCard
           title="Team Grid View"
           fill
           action={
-            <button
-              type="button"
-              className="inline-flex h-7 cursor-pointer items-center rounded-input border border-surface-border bg-surface-page px-2.5 font-body text-[12px] font-semibold text-primary transition-colors duration-200 ease-in-out hover:border-primary hover:bg-primary-tint"
-              onClick={() => panels.openPanel("chat")}
-            >
-              + Invite Team
-            </button>
+            <div className="flex items-center gap-2">
+              {canJoinTeamCall ? (
+                <button
+                  type="button"
+                  className="inline-flex h-7 cursor-pointer items-center gap-1 rounded-input border border-primary bg-primary px-2.5 font-body text-[12px] font-semibold text-white transition-colors duration-200 ease-in-out hover:bg-primary/90"
+                  onClick={() => joinCall(joinableCallRoom, joinableCallType)}
+                  disabled={loading}
+                >
+                  <PhoneCall className="h-3.5 w-3.5" aria-hidden />
+                  Join call
+                </button>
+              ) : null}
+              <button
+                type="button"
+                className="inline-flex h-7 cursor-pointer items-center rounded-input border border-surface-border bg-surface-page px-2.5 font-body text-[12px] font-semibold text-primary transition-colors duration-200 ease-in-out hover:border-primary hover:bg-primary-tint"
+                onClick={() => panels.openPanel("chat")}
+              >
+                + Invite Team
+              </button>
+            </div>
           }
           className="office-workspace-grid-top__team"
         >
@@ -597,6 +626,15 @@ export default function VirtualStartupOfficeWorkspaceV2({
             <div className="grid grid-cols-1 gap-3">
               {roster.map((member) => {
                 const isOnline = Boolean(member.isOnline);
+                const memberInCall = Boolean(member.isInCall);
+                const isSelf = String(member.id) === currentUserId;
+                const showMemberJoin =
+                  memberInCall && !isSelf && canJoinTeamCall;
+                const memberStatusText = memberInCall
+                  ? "In a team call"
+                  : isOnline
+                    ? member.statusText || "Online"
+                    : "Offline";
                 return (
                   <div
                     key={member.id}
@@ -606,24 +644,46 @@ export default function VirtualStartupOfficeWorkspaceV2({
                       <div className="relative flex h-[38px] w-[38px] flex-shrink-0 items-center justify-center rounded-[10px] bg-primary font-heading text-[13px] font-bold text-white">
                         {getInitials(member.name)}
                         {isOnline && (
-                          <span className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border-2 border-surface-card bg-status-success" />
+                          <span
+                            className={`absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border-2 border-surface-card ${
+                              memberInCall ? "bg-primary" : "bg-status-success"
+                            }`}
+                          />
                         )}
                       </div>
-                      <div className="min-w-0">
+                      <div className="min-w-0 flex-1">
                         <p className="truncate font-heading text-sm font-semibold text-text-heading">{member.name}</p>
                         <p className="truncate font-body text-xs text-text-body">
                           {member.title || member.role}
                         </p>
                       </div>
                     </div>
-                    <PresenceIndicator
-                      connection={member.connection}
-                      isOnline={member.isOnline}
-                      showLabel
-                      size="sm"
-                      statusText={isOnline ? member.statusText || "Online" : "Offline"}
-                      lastSeenAt={member.lastSeenAt}
-                    />
+                    <div className="flex items-center justify-between gap-2">
+                      <PresenceIndicator
+                        connection={member.connection}
+                        isOnline={member.isOnline}
+                        showLabel
+                        size="sm"
+                        statusText={memberStatusText}
+                        lastSeenAt={member.lastSeenAt}
+                      />
+                      {showMemberJoin ? (
+                        <button
+                          type="button"
+                          className="inline-flex h-7 shrink-0 items-center gap-1 rounded-input border border-primary bg-primary-tint px-2.5 font-body text-[11px] font-semibold text-primary transition-colors hover:bg-primary hover:text-white"
+                          onClick={() =>
+                            joinCall(
+                              member.callRoomName || joinableCallRoom,
+                              member.callType || joinableCallType,
+                            )
+                          }
+                          disabled={loading}
+                        >
+                          <PhoneCall className="h-3 w-3" aria-hidden />
+                          Join call
+                        </button>
+                      ) : null}
+                    </div>
                   </div>
                 );
               })}
@@ -633,7 +693,7 @@ export default function VirtualStartupOfficeWorkspaceV2({
         </OfficePanelCard>
         </div>
 
-        <div className="h-full min-h-0">
+        <div className="flex h-full min-h-0 flex-col overflow-hidden">
         <OfficePanelCard
           title="Team Energy & Pulse"
           fill

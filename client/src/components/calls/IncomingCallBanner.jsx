@@ -1,42 +1,18 @@
 import React, { useCallback, useEffect, useRef } from "react";
 import { PhoneIncoming } from "lucide-react";
 
-const AUTO_DISMISS_MS = 30000;
-
 export default function IncomingCallBanner({ callData, onJoin, onDismiss }) {
-  const timerRef = useRef(null);
   const joinButtonRef = useRef(null);
   const lastFocusedRoomRef = useRef(null);
   const isVisible = Boolean(callData);
 
-  const clearDismissTimer = useCallback(() => {
-    if (!timerRef.current) return;
-    clearTimeout(timerRef.current);
-    timerRef.current = null;
-  }, []);
+  const handleJoin = useCallback(() => {
+    onJoin?.();
+  }, [onJoin]);
 
   const handleDismiss = useCallback(() => {
-    clearDismissTimer();
     onDismiss?.();
-  }, [clearDismissTimer, onDismiss]);
-
-  const handleJoin = useCallback(() => {
-    clearDismissTimer();
-    onJoin?.();
-  }, [clearDismissTimer, onJoin]);
-
-  useEffect(() => {
-    clearDismissTimer();
-
-    if (!callData) return undefined;
-
-    timerRef.current = setTimeout(() => {
-      timerRef.current = null;
-      onDismiss?.();
-    }, AUTO_DISMISS_MS);
-
-    return clearDismissTimer;
-  }, [callData, clearDismissTimer, onDismiss]);
+  }, [onDismiss]);
 
   useEffect(() => {
     if (!callData?.roomName) return;
@@ -62,46 +38,59 @@ export default function IncomingCallBanner({ callData, onJoin, onDismiss }) {
 
   return (
     <div
-      className={`fixed left-0 right-0 top-0 z-[1000] flex justify-center px-3 transition-all duration-300 ease-out sm:px-4 ${
+      className={`fixed inset-x-0 z-[1000] flex justify-center px-3 transition-all duration-300 ease-out sm:px-4 ${
         isVisible
-          ? "translate-y-0 opacity-100 pointer-events-auto"
-          : "-translate-y-full opacity-0 pointer-events-none"
+          ? "top-14 translate-y-0 opacity-100 pointer-events-auto sm:top-16"
+          : "top-0 -translate-y-full opacity-0 pointer-events-none"
       }`}
       role={isVisible ? "alertdialog" : undefined}
-      aria-label={isVisible ? "Incoming call" : undefined}
+      aria-label={isVisible ? "Team call in progress" : undefined}
       aria-live="polite"
       aria-hidden={!isVisible}
     >
-      <div className="flex w-full items-center gap-3 rounded-b-2xl border-l-4 border-l-[#FF6B00] bg-white px-4 py-3 shadow-[0_14px_36px_rgba(15,23,42,0.16)] sm:max-w-[420px]">
-        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#FFF0E6] text-[#FF6B00]">
-          <PhoneIncoming className="h-5 w-5" aria-hidden />
+      <div className="pointer-events-auto w-full max-w-xl overflow-hidden rounded-2xl border border-surface-border bg-surface-card shadow-[0_16px_40px_rgba(15,23,42,0.14)] ring-1 ring-primary/10">
+        <div className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center">
+          <div className="flex min-w-0 flex-1 items-start gap-3">
+            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-primary-tint text-primary">
+              <PhoneIncoming className="h-5 w-5" aria-hidden />
+            </div>
+
+            <div className="min-w-0 flex-1">
+              <p className="font-heading text-sm font-semibold leading-snug text-text-heading">
+                {title}
+              </p>
+              <p className="mt-0.5 font-body text-xs text-text-muted">
+                {isInvite ? "Tap join to enter the call" : "Team call in progress"}
+              </p>
+            </div>
+          </div>
+
+          <div className="flex shrink-0 items-center gap-2 sm:pl-0 pl-14">
+            <button
+              ref={joinButtonRef}
+              type="button"
+              className="inline-flex h-9 items-center justify-center rounded-lg bg-primary px-4 text-xs font-semibold text-white transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+              onClick={handleJoin}
+              aria-label={`Join ${callTypeLabel} call with ${initiatorName}`}
+            >
+              Join call
+            </button>
+            <button
+              type="button"
+              className="inline-flex h-9 items-center justify-center rounded-lg px-3 text-xs font-semibold text-text-muted transition-colors hover:bg-surface-page hover:text-text-heading focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+              onClick={handleDismiss}
+              aria-label="Dismiss call notification"
+            >
+              Dismiss
+            </button>
+          </div>
         </div>
 
-        <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-semibold text-[#1A1A1A]">{title}</p>
-          <p className="mt-0.5 font-body text-xs text-text-muted">
-            {isInvite ? "Tap join to enter the call" : "Team call in progress"}
-          </p>
-        </div>
-
-        <div className="flex shrink-0 items-center gap-2">
-          <button
-            ref={joinButtonRef}
-            type="button"
-            className="h-9 rounded-lg bg-[#FF6B00] px-3 text-xs font-semibold text-white transition-colors hover:bg-[#e86100]"
-            onClick={handleJoin}
-            aria-label={`Join ${callTypeLabel} call with ${initiatorName}`}
-          >
-            Join
-          </button>
-          <button
-            type="button"
-            className="h-9 rounded-lg px-3 text-xs font-semibold text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-700"
-            onClick={handleDismiss}
-            aria-label="Dismiss incoming call"
-          >
-            Dismiss
-          </button>
+        <div
+          className="h-1 bg-primary/15"
+          aria-hidden
+        >
+          <div className="h-full w-2/5 animate-pulse bg-primary/70" />
         </div>
       </div>
     </div>

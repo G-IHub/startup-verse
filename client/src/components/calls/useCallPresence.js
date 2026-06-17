@@ -1,23 +1,24 @@
-import React, { useEffect } from "react";
-import { ConnectionState } from "livekit-client";
+import { useEffect } from "react";
 import * as presenceApi from "../../utils/presenceApi";
 
-const IN_CALL_ACTIVITY = { type: "in-call", message: "In a team call" };
-const WORKING_ACTIVITY = { type: "working", message: "" };
-const PRESENCE_REFRESH_MS = 20_000;
+const PRESENCE_HEARTBEAT_MS = 20_000;
 
 export function useCallPresence({
   userId,
   userName,
   role,
   startupId,
+  roomName,
+  callType = "video",
   isInCall,
-  connectionState,
 }) {
   useEffect(() => {
     const normalizedUserId = String(userId || "");
     const normalizedStartupId = String(startupId || "");
-    if (!isInCall || !normalizedUserId || !normalizedStartupId) return undefined;
+    const normalizedRoomName = String(roomName || "");
+    if (!isInCall || !normalizedUserId || !normalizedStartupId || !normalizedRoomName) {
+      return undefined;
+    }
 
     const base = {
       userId: normalizedUserId,
@@ -27,41 +28,36 @@ export function useCallPresence({
       isOnline: true,
     };
 
-    const assertInCall = () => {
+    const inCallMetadata = {
+      inCall: true,
+      callRoomName: normalizedRoomName,
+      callType: String(callType || "video"),
+    };
+
+    const heartbeat = () => {
       void presenceApi.updatePresence({
         ...base,
         status: "in-meeting",
-        activity: IN_CALL_ACTIVITY,
+        statusText: "In a team call",
+        metadata: inCallMetadata,
       });
     };
 
-    assertInCall();
-    const interval = setInterval(assertInCall, PRESENCE_REFRESH_MS);
+    heartbeat();
+    const interval = setInterval(heartbeat, PRESENCE_HEARTBEAT_MS);
 
     return () => {
       clearInterval(interval);
       void presenceApi.updatePresence({
         ...base,
         status: "available",
-        activity: WORKING_ACTIVITY,
+        statusText: "",
+        metadata: {
+          inCall: false,
+          callRoomName: "",
+          callType: "",
+        },
       });
     };
-  }, [isInCall, userId, startupId, userName, role]);
-
-  useEffect(() => {
-    if (!isInCall || connectionState !== ConnectionState.Connected) return;
-    const normalizedUserId = String(userId || "");
-    const normalizedStartupId = String(startupId || "");
-    if (!normalizedUserId || !normalizedStartupId) return;
-
-    void presenceApi.updatePresence({
-      userId: normalizedUserId,
-      startupId: normalizedStartupId,
-      userName: String(userName || "Team member"),
-      role: String(role || "team-member"),
-      isOnline: true,
-      status: "in-meeting",
-      activity: IN_CALL_ACTIVITY,
-    });
-  }, [connectionState, isInCall, userId, startupId, userName, role]);
+  }, [callType, isInCall, roomName, role, startupId, userId, userName]);
 }

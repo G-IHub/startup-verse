@@ -39,9 +39,17 @@ function normalizeActivity(row) {
 function normalizePresence(row) {
   const normalized = normalizePresenceRow(row);
   if (!normalized) return null;
+  const metadata = normalized.metadata || {};
+  const inCall = Boolean(metadata.inCall);
   return {
     ...normalized,
-    activity: String(normalized.activity?.type || normalized.activity || "working"),
+    activity: inCall
+      ? "in-call"
+      : String(normalized.activity?.type || normalized.activity || "working"),
+    isInCall: inCall,
+    callRoomName: inCall ? String(metadata.callRoomName || "") : "",
+    callType: inCall ? String(metadata.callType || "video") : "video",
+    statusText: inCall ? "In a team call" : normalized.statusText,
     avatar: row?.avatar || "",
   };
 }
@@ -209,7 +217,9 @@ export function mapOfficeWorkspaceModel({
   const activities = mergeByIdInternal(
     [...(activityRows || []), ...(winRows || [])].map(normalizeActivity).filter(Boolean),
     (row) => row.id,
-  ).sort((left, right) => compareByDateDesc(left, right, (row) => row.timestamp));
+  )
+    .filter((row) => row.type !== "in-call")
+    .sort((left, right) => compareByDateDesc(left, right, (row) => row.timestamp));
 
   const announcements = mergeByIdInternal(
     (announcementRows || []).map(normalizeAnnouncement).filter(Boolean),
@@ -272,7 +282,7 @@ export function mapOfficeWorkspaceModel({
   ).sort((left, right) => left.date.getTime() - right.date.getTime());
 
   const onlineCount = teamRoster.filter((row) => row.isOnline).length;
-  const inCallCount = teamRoster.filter((row) => row.activity === "in-call").length;
+  const inCallCount = teamRoster.filter((row) => row.isInCall || row.activity === "in-call").length;
   const workingCount = teamRoster.filter((row) => row.activity === "working").length;
 
   // chatRoster extends teamRoster with pending talents (interests not yet accepted)

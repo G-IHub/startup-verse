@@ -26,6 +26,7 @@ export async function updatePresence({
   mood = "",
   activity = null,
   cameraEnabled = false,
+  metadata: extraMetadata = null,
 }) {
   try {
     const controller = new AbortController();
@@ -44,7 +45,10 @@ export async function updatePresence({
         statusText,
         mood,
         activity,
-        metadata: { cameraEnabled: Boolean(cameraEnabled) },
+        metadata: {
+          cameraEnabled: Boolean(cameraEnabled),
+          ...(extraMetadata && typeof extraMetadata === "object" ? extraMetadata : {}),
+        },
       }),
       signal: controller.signal,
     });
