@@ -690,26 +690,57 @@ export function subscribeToPresence(startupId, userId, _userName, onPresenceChan
 // CALLS — call:started / call:ended
 // ========================================
 
-export function subscribeToCallEvents({ currentUserId, onStarted, onEnded } = {}) {
+export function subscribeToCallEvents({
+  currentUserId,
+  startupId,
+  onStarted,
+  onEnded,
+  onInvited,
+} = {}) {
   const socket = SocketEngine.getSocket();
   const currentId = String(currentUserId || "");
+  const scopedStartupId = startupId ? String(startupId) : "";
+  const userRoomId = currentId ? userSocketRoom(currentId) : null;
+  const startupRoomId = scopedStartupId ? startupSocketRoom(scopedStartupId) : null;
+
+  const matchesStartup = (payload) => {
+    const payloadStartupId = String(payload?.startupId || "");
+    if (!payloadStartupId) return true;
+    if (!scopedStartupId) return true;
+    return payloadStartupId === scopedStartupId;
+  };
 
   const handleStarted = (payload) => {
+    if (!matchesStartup(payload)) return;
     const initiatorId = String(payload?.initiatorId || "");
     if (currentId && initiatorId === currentId) return;
     onStarted?.(payload);
   };
 
   const handleEnded = (payload) => {
+    if (!matchesStartup(payload)) return;
     onEnded?.(payload);
   };
 
+  const handleInvited = (payload) => {
+    onInvited?.(payload);
+  };
+
+  if (userRoomId) {
+    joinRoom(userRoomId);
+  }
+  if (startupRoomId) {
+    joinRoom(startupRoomId);
+  }
+
   socket.on("call:started", handleStarted);
   socket.on("call:ended", handleEnded);
+  socket.on("call:invited", handleInvited);
 
   return () => {
     socket.off("call:started", handleStarted);
     socket.off("call:ended", handleEnded);
+    socket.off("call:invited", handleInvited);
   };
 }
 

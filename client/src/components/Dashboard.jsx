@@ -2,7 +2,6 @@ import React, { useState, useEffect } from "react";
 
 import AppLayout from "./layout/AppLayout";
 import MessagingSystem from "./messaging/MessagingSystem";
-import VideoCallSystem from "./video/VideoCallSystem";
 import AdaptiveVirtualOffice from "./office/AdaptiveVirtualOffice";
 import TeamManagement from "./team/TeamManagement";
 import TaskBoard from "./tasks/TaskBoard";
@@ -78,8 +77,6 @@ export default function Dashboard({ user, onLogout, onUpdateUser }) {
         );
       case "messages":
         return <MessagingSystem user={user} />;
-      case "video-call":
-        return <VideoCallSystem user={user} />;
       case "settings":
         return (
           <SettingsPage

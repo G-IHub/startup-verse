@@ -1,7 +1,28 @@
 import { AccessToken, RoomServiceClient } from "livekit-server-sdk";
 import User from "../models/User.js";
+import { startupRoom, userRoom } from "../realtime/rooms.js";
+import { emitRealtime } from "../services/realtime.service.js";
 
 const VALID_CALL_TYPES = new Set(["voice", "video"]);
+
+/** @type {Map<string, { callType: string, startupId: string, initiatorId: string }>} */
+const callRoomRegistry = new Map();
+
+function isCallRoomName(roomName) {
+  return String(roomName || "").startsWith("call-");
+}
+
+function getCallRoomMeta(roomName) {
+  return callRoomRegistry.get(String(roomName || "")) || null;
+}
+
+function setCallRoomMeta(roomName, meta) {
+  callRoomRegistry.set(String(roomName), meta);
+}
+
+function clearCallRoomMeta(roomName) {
+  callRoomRegistry.delete(String(roomName || ""));
+}
 
 function getLiveKitCredentials() {
   const apiKey = process.env.LIVEKIT_API_KEY;
@@ -27,7 +48,7 @@ async function getAuthenticatedUser(req) {
     throw new Error("Authenticated user is missing.");
   }
 
-  const user = await User.findById(userId).select("_id name");
+  const user = await User.findById(userId).select("_id name startupId");
   if (!user) {
     throw new Error("Authenticated user was not found.");
   }
@@ -59,10 +80,24 @@ function createRoomServiceClient() {
   return new RoomServiceClient(getRoomServiceHost(livekitUrl), apiKey, apiSecret);
 }
 
-function emitCallEvent(req, eventName, payload) {
+function emitStartupCallEvent(eventName, payload, startupId) {
+  const normalizedStartupId = String(startupId || "");
+  if (!normalizedStartupId) {
+    console.warn(`Skipped ${eventName} emit — missing startupId`);
+    return;
+  }
+
+  emitRealtime(
+    eventName,
+    { ...payload, startupId: normalizedStartupId },
+    [startupRoom(normalizedStartupId)],
+  );
+}
+
+function emitToUser(req, userId, eventName, payload) {
   const io = req.app.get("io");
-  if (io && typeof io.emit === "function") {
-    io.emit(eventName, payload);
+  if (io && typeof io.to === "function") {
+    io.to(userRoom(userId)).emit(eventName, payload);
   }
 }
 
@@ -88,18 +123,29 @@ export async function createCall(req, res) {
     const roomName = `call-${Date.now()}-${user._id}`;
     const jwt = await createAccessTokenForUser(user, roomName);
 
-    emitCallEvent(req, "call:started", {
+    const startupId = String(user.startupId || "");
+    const initiatorId = String(user._id);
+
+    setCallRoomMeta(roomName, {
+      callType,
+      startupId,
+      initiatorId,
+    });
+
+    emitStartupCallEvent("call:started", {
       roomName,
       callType,
-      initiatorId: user._id,
+      initiatorId,
       initiatorName: user.name,
-    });
+    }, startupId);
 
     return res.json({
       success: true,
       roomName,
       token: jwt,
       callType,
+      initiatorId,
+      startupId,
     });
   } catch (error) {
     return sendControllerError(res, error);
@@ -116,13 +162,22 @@ export async function joinCall(req, res) {
       });
     }
 
+    if (!isCallRoomName(roomName)) {
+      return res.status(400).json({
+        success: false,
+        error: "Invalid call room.",
+      });
+    }
+
     const user = await getAuthenticatedUser(req);
     const jwt = await createAccessTokenForUser(user, roomName);
+    const meta = getCallRoomMeta(roomName);
 
     return res.json({
       success: true,
       roomName,
       token: jwt,
+      callType: meta?.callType || "video",
     });
   } catch (error) {
     return sendControllerError(res, error);
@@ -160,10 +215,101 @@ export async function endCall(req, res) {
       });
     }
 
+    const meta = getCallRoomMeta(roomName);
     const roomService = createRoomServiceClient();
     await roomService.deleteRoom(roomName);
 
-    emitCallEvent(req, "call:ended", { roomName });
+    clearCallRoomMeta(roomName);
+
+    emitStartupCallEvent(
+      "call:ended",
+      { roomName },
+      meta?.startupId || "",
+    );
+
+    return res.json({ success: true });
+  } catch (error) {
+    return sendControllerError(res, error);
+  }
+}
+
+async function roomExists(roomName) {
+  const roomService = createRoomServiceClient();
+  const rooms = await roomService.listRooms();
+  return rooms.some((room) => room.name === roomName);
+}
+
+export async function inviteToCall(req, res) {
+  try {
+    const roomName = String(req.params?.roomName || "").trim();
+    const inviteeUserId = String(req.body?.inviteeUserId || "").trim();
+
+    if (!roomName || !isCallRoomName(roomName)) {
+      return res.status(400).json({
+        success: false,
+        error: "A valid call room name is required.",
+      });
+    }
+
+    if (!inviteeUserId) {
+      return res.status(400).json({
+        success: false,
+        error: "inviteeUserId is required.",
+      });
+    }
+
+    const inviter = await getAuthenticatedUser(req);
+
+    if (String(inviter._id) === inviteeUserId) {
+      return res.status(403).json({
+        success: false,
+        error: "You cannot invite yourself.",
+      });
+    }
+
+    const invitee = await User.findById(inviteeUserId).select("_id name startupId");
+    if (!invitee) {
+      return res.status(404).json({
+        success: false,
+        error: "Invitee was not found.",
+      });
+    }
+
+    const inviterStartupId = String(inviter.startupId || "");
+    const inviteeStartupId = String(invitee.startupId || "");
+
+    if (!inviterStartupId || inviterStartupId !== inviteeStartupId) {
+      return res.status(403).json({
+        success: false,
+        error: "You can only invite members of your startup.",
+      });
+    }
+
+    const meta = getCallRoomMeta(roomName);
+    if (!meta) {
+      const exists = await roomExists(roomName);
+      if (!exists) {
+        return res.status(404).json({
+          success: false,
+          error: "Call room was not found.",
+        });
+      }
+    } else if (meta.startupId && meta.startupId !== inviterStartupId) {
+      return res.status(403).json({
+        success: false,
+        error: "You cannot invite to this call.",
+      });
+    }
+
+    const callType = meta?.callType || "video";
+
+    emitToUser(req, inviteeUserId, "call:invited", {
+      roomName,
+      callType,
+      initiatorId: String(inviter._id),
+      initiatorName: inviter.name,
+      invited: true,
+    });
 
     return res.json({ success: true });
   } catch (error) {
