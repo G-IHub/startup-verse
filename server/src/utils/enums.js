@@ -11,6 +11,10 @@ export const USER_ROLES = [
 
 export const TASK_STATUSES = ["pending", "in-progress", "completed", "blocked"];
 export const TASK_PRIORITIES = ["low", "medium", "high"];
+export const PROJECT_STATUSES = ["active", "paused", "completed", "archived"];
+export const PROJECT_PRIORITIES = ["low", "medium", "high"];
+export const PROJECT_MEMBER_ROLES = ["owner", "member", "viewer"];
+export const MILESTONE_STATUSES = ["pending", "in-progress", "completed", "blocked"];
 export const WEEKLY_OUTCOME_STATUSES = ["active", "completed", "partial", "missed"];
 export const INVITATION_STATUSES = ["pending", "accepted", "declined", "cancelled"];
 export const INTEREST_STATUSES = ["pending", "accepted", "declined", "proposed-by-founder", "proposed-by-talent", "left"];
