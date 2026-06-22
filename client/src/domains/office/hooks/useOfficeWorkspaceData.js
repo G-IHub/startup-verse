@@ -28,6 +28,7 @@ export function useOfficeWorkspaceData({ user }) {
   const taskRows = useOfficeStore((s) => s.tasks);
   const agendaRows = useOfficeStore((s) => s.agenda);
   const patchTask = useOfficeStore((s) => s.patchTask);
+  const removeTask = useOfficeStore((s) => s.removeTask);
   const patchActivity = useOfficeStore((s) => s.patchActivity);
   const patchAnnouncement = useOfficeStore((s) => s.patchAnnouncement);
   const patchWin = useOfficeStore((s) => s.patchWin);
@@ -104,13 +105,17 @@ export function useOfficeWorkspaceData({ user }) {
     const unsubscribe = subscribeToTasks(
       startupId,
       (update) => {
+        if (update?.action === "deleted") {
+          removeTask(update.task?.id || update.task?._id);
+          return;
+        }
         if (!update?.task) return;
         patchTask(update.task);
       },
       pollContext,
     );
     return () => unsubscribe?.();
-  }, [startupId, resolvedUserId, user?.role, patchTask]);
+  }, [startupId, resolvedUserId, user?.role, patchTask, removeTask]);
 
   const model = useMemo(
     () =>

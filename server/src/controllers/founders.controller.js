@@ -740,6 +740,17 @@ export const deleteTask = async (req, res) => {
       text: `Task deleted: ${deleted.title}`,
       metadata: { taskId: deleted._id },
     });
+    if (deleted.startupId) {
+      emitRealtime(
+        SOCKET_EVENTS.TASK_DELETED,
+        {
+          taskId: String(deleted._id),
+          milestoneId: deleted.milestoneId ? String(deleted.milestoneId) : null,
+          deleted: true,
+        },
+        [startupRoom(deleted.startupId)],
+      );
+    }
   }
   return apiSuccess(res, { deleted: true });
 };

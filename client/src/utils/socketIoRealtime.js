@@ -205,6 +205,16 @@ export function subscribeToTasks(startupId, onUpdate, pollContext = null) {
     },
   );
 
+  const offTaskDeleted = createSubscription(
+    startupSocketRoom(startupId),
+    "task:deleted",
+    (payload) => {
+      const taskId = payload?.taskId != null ? String(payload.taskId) : "";
+      if (!taskId) return;
+      onUpdate({ action: "deleted", task: { id: taskId, _id: taskId } });
+    },
+  );
+
   const socket = SocketEngine.getSocket();
   const manager = socket.io;
   const onDisconnect = () => armPollingIfNeeded();
@@ -219,6 +229,7 @@ export function subscribeToTasks(startupId, onUpdate, pollContext = null) {
     socket.off("disconnect", onDisconnect);
     manager.off("reconnect", onReconnect);
     offTask?.();
+    offTaskDeleted?.();
   };
 }
 

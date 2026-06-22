@@ -193,6 +193,15 @@ export const useOfficeStore = create((set, get) => ({
     set((previous) => ({ tasks: mergeById(previous.tasks, [task]) }));
   },
 
+  removeTask(taskId) {
+    if (!taskId) return;
+    set((previous) => ({
+      tasks: previous.tasks.filter(
+        (row) => String(row?.id || row?._id || "") !== String(taskId),
+      ),
+    }));
+  },
+
   patchActivity(activity) {
     if (!activity) return;
     set((previous) => ({ activities: mergeById(previous.activities, [activity]) }));
@@ -243,11 +252,7 @@ export const useOfficeStore = create((set, get) => ({
     const founderId = get().founderId;
     if (!founderId) throw new Error("Founder context missing for task deletion.");
     await taskApi.deleteTask(founderId, taskId);
-    set((previous) => ({
-      tasks: previous.tasks.filter(
-        (row) => String(row?.id || row?._id || "") !== String(taskId),
-      ),
-    }));
+    get().removeTask(taskId);
   },
 
   async createAnnouncement(input) {

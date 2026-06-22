@@ -6,6 +6,7 @@ export const SOCKET_EVENTS = Object.freeze({
   ANNOUNCEMENT_CREATED: "announcement:created",
   NOTIFICATION_CREATED: "notification:created",
   TASK_UPDATED: "task:updated",
+  TASK_DELETED: "task:deleted",
   ACTIVITY_CREATED: "activity:created",
   WIN_CREATED: "win:created",
   POLL_CREATED: "poll:created",
