@@ -16,12 +16,12 @@ import StageCompletion from "../models/StageCompletion.js";
 import LearningProgress from "../models/LearningProgress.js";
 import TeamMemberProfile from "../models/TeamMemberProfile.js";
 import {
-  computeMilestoneCounters,
   ensureOutcomeMutable,
   validateTaskStatusTransition,
   validateBlockedTaskPayload,
   computeExecutionScoreMetrics,
 } from "../domain/weeklyLoopRules.js";
+import { syncMilestoneCounters } from "../utils/syncMilestoneCounters.js";
 import {
   normalizeJourney,
   validateJourneyPut,
@@ -54,13 +54,6 @@ function unwrapPayload(req, key) {
     return body[key];
   }
   return body;
-}
-
-async function syncMilestoneCounters(milestoneId) {
-  if (!milestoneId) return;
-  const milestoneTasks = await Task.find({ milestoneId }, { status: 1 });
-  const counters = computeMilestoneCounters(milestoneTasks);
-  await Milestone.findByIdAndUpdate(milestoneId, counters, { new: false });
 }
 
 const MAX_COMPLETION_JSON = 32000;
