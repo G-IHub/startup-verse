@@ -2,6 +2,7 @@ import crypto from "crypto";
 import User from "../models/User.js";
 import FounderProfile from "../models/FounderProfile.js";
 import Startup from "../models/Startup.js";
+import Project from "../models/Project.js";
 import Milestone from "../models/Milestone.js";
 import Task from "../models/Task.js";
 import WeeklyOutcome from "../models/WeeklyOutcome.js";
@@ -234,6 +235,16 @@ export const createMilestone = async (req, res) => {
 
   const payload = unwrapPayload(req, "milestone");
   const weeklyOutcomeId = payload?.weeklyOutcomeId || null;
+  const projectId = payload?.projectId || null;
+  if (!weeklyOutcomeId && !projectId) {
+    return apiError(res, "Milestone requires projectId or weeklyOutcomeId.", 400);
+  }
+  if (projectId) {
+    const project = await Project.findOne({ _id: projectId, founderId });
+    if (!project) {
+      return apiError(res, "Project not found.", 404);
+    }
+  }
   if (weeklyOutcomeId) {
     const outcome = await WeeklyOutcome.findOne({
       _id: weeklyOutcomeId,
@@ -263,6 +274,7 @@ export const createMilestone = async (req, res) => {
     description: payload?.description || "",
     dueDate: payload?.dueDate || null,
     weeklyOutcomeId,
+    projectId,
     sequence,
     status: payload?.status || "pending",
   });
@@ -1102,6 +1114,14 @@ export const createWeeklyPlan = async (req, res) => {
     );
   }
 
+  const projectId = plan.projectId || null;
+  if (projectId) {
+    const project = await Project.findOne({ _id: projectId, founderId });
+    if (!project) {
+      return apiError(res, "Project not found.", 404);
+    }
+  }
+
   const incomingWeek = plan.weekOf ? new Date(plan.weekOf) : new Date();
   const weekStart = new Date(incomingWeek);
   weekStart.setHours(0, 0, 0, 0);
@@ -1192,6 +1212,7 @@ export const createWeeklyPlan = async (req, res) => {
         founderId,
         startupId: startup._id,
         weeklyOutcomeId: outcome._id,
+        projectId,
         title: String(m?.title || "Milestone")
           .trim()
           .slice(0, 200),
@@ -1220,6 +1241,7 @@ export const createWeeklyPlan = async (req, res) => {
               : "",
           status: "pending",
           milestoneId: milestone._id,
+          projectId,
           actionButton,
         });
       }
