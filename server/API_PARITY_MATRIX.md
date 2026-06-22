@@ -35,6 +35,7 @@ Envelope standard:
 | `/users/*` (`:id`, `search-by-email`) | Canonical | Yes | `userId` or `email` | user/search result | Implemented |
 | `/users/:id/notifications*` + `notification-preferences` | Compatibility alias | Yes | user-scoped payloads | notifications/preferences | Implemented |
 | `/founders/*` | Canonical | Yes | founder/startup/task/milestone/outcome payloads | founder domain records | Implemented |
+| `/founders/:founderId/projects` | Canonical | Yes | project CRUD, members, GitHub connect/sync, milestones/tasks by slug | project records + live counts | Implemented |
 | `/founder/:founderId/events` | Canonical (founders router) | Yes | none | founder events list | Implemented |
 | `/founder/:founderId/announcements` | Canonical (founders router) | Yes | none | founder announcements list | Implemented |
 | `/team-members/*` | Canonical | Yes | profile/task/status payloads | profile/tasks/status/performance | Implemented |
