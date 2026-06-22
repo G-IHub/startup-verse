@@ -30,6 +30,14 @@ const taskSchema = new mongoose.Schema(
     assignedToName: { type: String, default: "", trim: true, maxlength: 200 },
     assignedToAvatar: { type: String, default: "", trim: true, maxlength: 2000 },
     milestoneId: { type: mongoose.Schema.Types.ObjectId, ref: "Milestone", index: true },
+    projectId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Project",
+      index: true,
+      default: null,
+    },
+    githubIssueId: { type: String, default: null, index: true, sparse: true },
+    githubIssueUrl: { type: String, default: "" },
     priority: {
       type: String,
       enum: {
