@@ -17,6 +17,11 @@ const FINAL_OUTCOME = new Set(["completed", "partial", "missed"]);
 export const MIN_WEEKLY_MILESTONE_TITLE_LEN = 2;
 export const MIN_WEEKLY_TASK_TITLE_LEN = 2;
 
+function withOptionalProjectId(plan, projectId) {
+  if (!plan || !projectId) return plan;
+  return { ...plan, projectId };
+}
+
 /**
  * Validates milestones for POST /weekly-plan and for draft commits from the milestone editor.
  * @param {unknown} milestones
@@ -122,7 +127,7 @@ export function buildWeeklyPlanFromTemplate(
   templateId,
   stageId,
   weekNumber,
-  { customTitle, customDescription, customMilestones } = {},
+  { customTitle, customDescription, customMilestones, projectId } = {},
   existingOutcomes = [],
 ) {
   const outcome = createOutcomeFromTemplate(templateId, stageId, weekNumber);
@@ -163,13 +168,16 @@ export function buildWeeklyPlanFromTemplate(
           ),
         }));
 
-  return {
-    goal,
-    summary,
-    weekOf: nextPlanWeekOfIso(existingOutcomes),
-    status: "active",
-    milestones,
-  };
+  return withOptionalProjectId(
+    {
+      goal,
+      summary,
+      weekOf: nextPlanWeekOfIso(existingOutcomes),
+      status: "active",
+      milestones,
+    },
+    projectId,
+  );
 }
 
 /**
@@ -182,6 +190,7 @@ export function buildWeeklyPlanCustom(
   _weekNumber,
   existingOutcomes = [],
   customMilestones = null,
+  projectId = null,
 ) {
   const goal = String(customTitle || "").trim();
   const summary = String(customDescription || "").trim();
@@ -201,13 +210,16 @@ export function buildWeeklyPlanCustom(
         ),
       };
     });
-    return {
-      goal,
-      summary,
-      weekOf: nextPlanWeekOfIso(existingOutcomes),
-      status: "active",
-      milestones,
-    };
+    return withOptionalProjectId(
+      {
+        goal,
+        summary,
+        weekOf: nextPlanWeekOfIso(existingOutcomes),
+        status: "active",
+        milestones,
+      },
+      projectId,
+    );
   }
 
   const lines = summary
@@ -236,25 +248,28 @@ export function buildWeeklyPlanCustom(
           { title: ensureTaskTitle("Review results and document learnings") },
         ];
 
-  return {
-    goal,
-    summary,
-    weekOf: nextPlanWeekOfIso(existingOutcomes),
-    status: "active",
-    milestones: [
-      {
-        title: goal.slice(0, 200),
-        description: summary,
-        tasks,
-      },
-    ],
-  };
+  return withOptionalProjectId(
+    {
+      goal,
+      summary,
+      weekOf: nextPlanWeekOfIso(existingOutcomes),
+      status: "active",
+      milestones: [
+        {
+          title: goal.slice(0, 200),
+          description: summary,
+          tasks,
+        },
+      ],
+    },
+    projectId,
+  );
 }
 
 export function buildWeeklyPlanFromIntent(
   parsedIntent,
   weekNumber,
-  { customTitle, customDescription } = {},
+  { customTitle, customDescription, projectId } = {},
   existingOutcomes = [],
 ) {
   const outcome = createOutcomeFromIntent(parsedIntent, weekNumber);
@@ -286,11 +301,14 @@ export function buildWeeklyPlanFromIntent(
     };
   });
 
-  return {
-    goal,
-    summary,
-    weekOf: nextPlanWeekOfIso(existingOutcomes),
-    status: "active",
-    milestones,
-  };
+  return withOptionalProjectId(
+    {
+      goal,
+      summary,
+      weekOf: nextPlanWeekOfIso(existingOutcomes),
+      status: "active",
+      milestones,
+    },
+    projectId,
+  );
 }

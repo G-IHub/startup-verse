@@ -132,7 +132,7 @@ export const useWeeklyLoopStore = create((set, get) => ({
 
   /**
    * Atomically create weekly outcome + milestones + tasks (server orchestration).
-   * @param {object} plan
+   * @param {object} plan — may include optional `projectId` to scope milestones/tasks to a project
    * @param {string} [founderIdOverride] Logged-in founder id when store has not hydrated yet.
    */
   async saveWeeklyPlan(plan, founderIdOverride) {
