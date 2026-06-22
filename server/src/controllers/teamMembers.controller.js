@@ -17,6 +17,7 @@ import { error as apiError, success as apiSuccess } from "../utils/apiResponse.j
 import { mapActivityToDto } from "../utils/activityDto.js";
 import { createNotification } from "../services/notificationService.js";
 import { officeDeepLink } from "../utils/deepLinks.js";
+import { syncMilestoneCounters } from "../utils/syncMilestoneCounters.js";
 
 export const createOrUpdateProfile = async (req, res) => {
   const requestedUserId = String(req.body?.userId || "").trim();
@@ -96,6 +97,10 @@ export const updateTask = async (req, res) => {
   );
   if (!task) {
     return apiError(res, "Task not found.", 404);
+  }
+
+  if (task.milestoneId) {
+    await syncMilestoneCounters(task.milestoneId);
   }
 
   if (task.startupId) {
