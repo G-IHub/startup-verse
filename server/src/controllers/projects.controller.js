@@ -13,6 +13,9 @@ import {
 import { error as apiError, success as apiSuccess } from "../utils/apiResponse.js";
 import { syncProjectCounters } from "../utils/syncProjectCounters.js";
 import { syncProjectIssues } from "../services/githubSyncService.js";
+import { emitRealtime } from "../services/realtime.service.js";
+import { SOCKET_EVENTS } from "../realtime/events.js";
+import { startupRoom } from "../realtime/rooms.js";
 
 function founderGuard(req, founderId) {
   return req.user.isAdmin === true || req.user.id === String(founderId);
@@ -131,6 +134,12 @@ export const createProject = async (req, res) => {
     members: [{ userId: founderId, role: "owner" }],
   });
 
+  if (project.startupId) {
+    emitRealtime(SOCKET_EVENTS.PROJECT_CREATED, { project }, [
+      startupRoom(project.startupId),
+    ]);
+  }
+
   return apiSuccess(res, project, 201);
 };
 
@@ -232,6 +241,14 @@ export const updateProject = async (req, res) => {
   });
   await syncProjectCounters(updated._id);
 
+  if (updated.startupId) {
+    emitRealtime(
+      SOCKET_EVENTS.PROJECT_UPDATED,
+      { projectId: String(updated._id), changes: updates },
+      [startupRoom(updated.startupId)],
+    );
+  }
+
   return apiSuccess(res, updated);
 };
 
@@ -251,6 +268,14 @@ export const archiveProject = async (req, res) => {
     { status: "archived" },
     { new: true, runValidators: true },
   );
+
+  if (updated.startupId) {
+    emitRealtime(
+      SOCKET_EVENTS.PROJECT_ARCHIVED,
+      { projectId: String(updated._id) },
+      [startupRoom(updated.startupId)],
+    );
+  }
 
   return apiSuccess(res, updated);
 };
@@ -377,6 +402,17 @@ export const syncGithub = async (req, res) => {
   try {
     const result = await syncProjectIssues(project);
     const refreshed = await Project.findById(project._id).lean();
+    if (project.startupId) {
+      emitRealtime(
+        SOCKET_EVENTS.PROJECT_SYNCED,
+        {
+          projectId: String(project._id),
+          created: result.created,
+          updated: result.updated,
+        },
+        [startupRoom(project.startupId)],
+      );
+    }
     return apiSuccess(res, {
       ...result,
       lastSyncedAt: refreshed?.githubRepo?.lastSyncedAt || new Date(),
