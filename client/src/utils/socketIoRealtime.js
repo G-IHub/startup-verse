@@ -237,6 +237,42 @@ export async function broadcastTaskUpdate() {
   return false;
 }
 
+/**
+ * Project board realtime: task updates + project metadata + GitHub sync completion.
+ */
+export function subscribeToProjectRealtime(startupId, callbacks = {}) {
+  if (!startupId) return () => {};
+
+  const room = startupSocketRoom(startupId);
+  const offs = [];
+
+  if (typeof callbacks.onTaskUpdated === "function") {
+    offs.push(
+      createSubscription(room, "task:updated", (task) => {
+        callbacks.onTaskUpdated(mapTaskDoc(task));
+      }),
+    );
+  }
+  if (typeof callbacks.onProjectUpdated === "function") {
+    offs.push(
+      createSubscription(room, "project:updated", (payload) => {
+        callbacks.onProjectUpdated(payload);
+      }),
+    );
+  }
+  if (typeof callbacks.onProjectSynced === "function") {
+    offs.push(
+      createSubscription(room, "project:synced", (payload) => {
+        callbacks.onProjectSynced(payload);
+      }),
+    );
+  }
+
+  return () => {
+    offs.forEach((off) => off?.());
+  };
+}
+
 // ========================================
 // MESSAGES — server emits message:created
 // ========================================
