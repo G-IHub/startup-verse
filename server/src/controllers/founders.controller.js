@@ -1808,7 +1808,7 @@ export const getExecutionData = async (req, res) => {
     Task.find({ founderId }).sort({ createdAt: -1 }).lean(),
     WeeklyOutcome.find({ founderId }).sort({ weekOf: -1 }).lean(),
   ]);
-  const metrics = computeExecutionScoreMetrics({ tasks, outcomes });
+  const metrics = computeExecutionScoreMetrics(tasks, outcomes);
   return apiSuccess(res, {
     milestones,
     tasks,
@@ -1842,7 +1842,7 @@ export const getStartupSnapshot = async (req, res) => {
     Task.find({ founderId }, { status: 1, milestoneId: 1 }).lean(),
     WeeklyOutcome.find({ founderId }, { status: 1, weekOf: 1 }).lean(),
   ]);
-  const metrics = computeExecutionScoreMetrics({ tasks, outcomes });
+  const metrics = computeExecutionScoreMetrics(tasks, outcomes);
   return apiSuccess(res, {
     startup,
     activeWeeklyOutcome: activeOutcome || null,
