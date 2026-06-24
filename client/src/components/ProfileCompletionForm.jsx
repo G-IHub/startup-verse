@@ -7,17 +7,9 @@ import React, {
 } from "react";
 import { createPortal } from "react-dom";
 import { Button } from "./ui/button";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-  CardDescription,
-} from "./ui/card";
 import { Input } from "./ui/input";
-import { Label } from "./ui/label";
 import { Textarea } from "./ui/textarea";
-import { ArrowLeft, ChevronDown } from "lucide-react";
+import { ArrowLeft, ChevronDown, Rocket, Building, Users } from "lucide-react";
 import TalentProfileForm from "./TalentProfileForm";
 import {
   determineInitialStage,
@@ -40,8 +32,26 @@ import {
   validateFounderStartupFields,
 } from "../domains/founder/founderProfileConfig";
 import { persistedTalentToFormInitialData } from "../utils/talentProfileCompletion";
-import { AUTH_CARD, authBtnOutline } from "./auth/AuthPrimitives";
+import {
+  AuthFormCard,
+  AuthField,
+  AuthSplitLayout,
+  authBtnOutline,
+  authBtnPrimary,
+  authFieldClass,
+  getOnboardingRoleContent,
+} from "./auth/AuthPrimitives";
+import { SettingsGroup } from "./settings/SettingsPrimitives";
+import { cn } from "./ui/utils";
 
+const dropdownTriggerClass = cn(
+  authFieldClass,
+  "flex w-full items-center justify-between px-3 text-left disabled:opacity-50",
+);
+const dropdownMenuClass =
+  "fixed z-[10000] overflow-y-auto overflow-x-hidden rounded-input border border-surface-border bg-surface-card font-body text-text-body shadow-soft";
+const dropdownItemClass =
+  "flex w-full px-3 py-2.5 text-left text-xs leading-snug whitespace-normal break-words transition-colors hover:bg-surface-page";
 const industryOptions = FOUNDER_INDUSTRY_OPTIONS;
 const audienceOptions = FOUNDER_TARGET_AUDIENCE_OPTIONS;
 const rolesOptions = FOUNDER_ROLES_NEEDED_OPTIONS;
@@ -141,14 +151,12 @@ function SingleSelectDropdown({
     createPortal(
       <div
         ref={menuRef}
-        className="fixed z-[10000] overflow-y-auto overflow-x-hidden rounded-md border border-border text-popover-foreground"
+        className={dropdownMenuClass}
         style={{
           top: menuBox.top,
           left: menuBox.left,
           width: menuBox.width,
           maxHeight: menuBox.maxHeight,
-          backgroundColor: "var(--popover)",
-          boxShadow: "var(--elevation-3)",
         }}
       >
         {options.map((option) => (
@@ -159,7 +167,10 @@ function SingleSelectDropdown({
               onChange(option);
               setIsOpen(false);
             }}
-            className={`flex w-full px-3 py-2.5 text-left text-xs leading-snug whitespace-normal break-words transition-colors hover:bg-muted ${value === option ? "bg-muted" : ""}`}
+            className={cn(
+              dropdownItemClass,
+              value === option ? "bg-surface-page font-medium" : "",
+            )}
           >
             {option}
           </button>
@@ -168,34 +179,43 @@ function SingleSelectDropdown({
       document.body,
     );
 
+  const fieldId = `select-${label.replace(/\s+/g, "-").toLowerCase()}`;
+
   return (
-    <div className="space-y-2">
-      <Label>
-        {label} {required && "*"}
-      </Label>
+    <AuthField
+      id={fieldId}
+      label={`${label}${required ? " *" : ""}`}
+    >
       <div ref={dropdownRef} className="relative">
         <button
           ref={buttonRef}
           type="button"
+          id={fieldId}
           onClick={() => {
             if (disabled) return;
             setIsOpen(!isOpen);
           }}
           disabled={disabled}
-          className="flex h-10 w-full items-center justify-between rounded-md border border-border/70 bg-background px-3 text-left text-foreground disabled:opacity-50"
+          className={dropdownTriggerClass}
         >
           <span
-            className={`truncate ${isPlaceholder ? "text-xs text-muted-foreground" : "text-xs"}`}
+            className={cn(
+              "truncate text-sm",
+              isPlaceholder ? "text-text-muted" : "text-text-body",
+            )}
           >
             {displayValue}
           </span>
           <ChevronDown
-            className={`h-4 w-4 shrink-0 transition-transform ${isOpen ? "rotate-180" : ""}`}
+            className={cn(
+              "h-4 w-4 shrink-0 text-text-muted transition-transform",
+              isOpen ? "rotate-180" : "",
+            )}
           />
         </button>
       </div>
       {menuPortal}
-    </div>
+    </AuthField>
   );
 }
 
@@ -265,20 +285,21 @@ function MultiSelectDropdown({
     createPortal(
       <div
         ref={menuRef}
-        className="fixed z-[10000] overflow-y-auto overflow-x-hidden rounded-md border border-border text-popover-foreground"
+        className={dropdownMenuClass}
         style={{
           top: menuBox.top,
           left: menuBox.left,
           width: menuBox.width,
           maxHeight: menuBox.maxHeight,
-          backgroundColor: "var(--popover)",
-          boxShadow: "var(--elevation-3)",
         }}
       >
         {options.map((option) => (
           <label
             key={option}
-            className="flex cursor-pointer items-start gap-2 px-3 py-2.5 text-xs leading-snug hover:bg-muted"
+            className={cn(
+              dropdownItemClass,
+              "cursor-pointer items-start gap-2",
+            )}
           >
             <input
               type="checkbox"
@@ -295,40 +316,48 @@ function MultiSelectDropdown({
       document.body,
     );
 
+  const fieldId = `multi-${label.replace(/\s+/g, "-").toLowerCase()}`;
+
   return (
-    <div className="space-y-2">
-      <Label>{label}</Label>
+    <AuthField id={fieldId} label={label}>
       <div ref={dropdownRef} className="relative">
         <button
           ref={buttonRef}
           type="button"
+          id={fieldId}
           onClick={() => {
             if (disabled) return;
             setIsOpen(!isOpen);
           }}
           disabled={disabled}
-          className="flex h-10 w-full items-center justify-between rounded-md border border-border/70 bg-background px-3 text-left text-foreground disabled:opacity-50"
+          className={dropdownTriggerClass}
         >
           <span
-            className={`truncate ${isPlaceholder ? "text-xs text-muted-foreground" : "text-xs"}`}
+            className={cn(
+              "truncate text-sm",
+              isPlaceholder ? "text-text-muted" : "text-text-body",
+            )}
           >
             {displayValue}
           </span>
           <ChevronDown
-            className={`h-4 w-4 shrink-0 transition-transform ${isOpen ? "rotate-180" : ""}`}
+            className={cn(
+              "h-4 w-4 shrink-0 text-text-muted transition-transform",
+              isOpen ? "rotate-180" : "",
+            )}
           />
         </button>
       </div>
-      {selected.length > 0 && (
-        <p className="text-xs text-muted-foreground">
+      {selected.length > 0 ? (
+        <p className="text-xs text-text-muted">
           {selected.length}
           {" item"}
           {selected.length !== 1 ? "s" : ""}
           {" selected"}
         </p>
-      )}
+      ) : null}
       {menuPortal}
-    </div>
+    </AuthField>
   );
 }
 export default function ProfileCompletionForm({
@@ -337,6 +366,8 @@ export default function ProfileCompletionForm({
   onBack,
   onComplete,
   onUpdateUser,
+  variant = "inline",
+  showBack = true,
 }) {
   const [loading, setLoading] = useState(false);
   const talentFormRef = useRef(null);
@@ -671,32 +702,37 @@ export default function ProfileCompletionForm({
       }
     }
   };
-  return (
-    <div className="w-full animate-in fade-in slide-in-from-right duration-300">
-      <Button
-        variant="ghost"
-        size="sm"
-        onClick={onBack}
-        className={`mb-4 h-8 px-3 text-xs ${authBtnOutline}`}
-        disabled={loading}
+  const isPage = variant === "page";
+  const shouldShowBack = showBack && typeof onBack === "function";
+  const onboardingContent = getOnboardingRoleContent(role);
+  const RoleIcon = onboardingContent.icon;
+
+  const formContent = (
+    <div
+      className={
+        isPage
+          ? "w-full"
+          : "w-full animate-in fade-in slide-in-from-right duration-300"
+      }
+    >
+      {shouldShowBack ? (
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={onBack}
+          className={`mb-4 h-8 px-3 text-xs ${authBtnOutline}`}
+          disabled={loading}
+        >
+          <ArrowLeft className="w-3.5 h-3.5 mr-1.5" />
+          Back
+        </Button>
+      ) : null}
+      <AuthFormCard
+        icon={RoleIcon}
+        title="Complete Your Profile"
+        description={onboardingContent.description}
+        className={isPage ? "max-w-none" : undefined}
       >
-        <ArrowLeft className="w-3.5 h-3.5 mr-1.5" />
-        Back
-      </Button>
-      <Card className={AUTH_CARD}>
-        <CardHeader className="border-b border-surface-border p-4 md:p-5">
-          <CardTitle className="font-heading text-lg font-extrabold text-text-heading">
-            Complete Your Profile
-          </CardTitle>
-          <CardDescription className="font-body text-xs text-text-muted md:text-sm">
-            {role === "founder"
-              ? "Tell us about your startup to get personalized guidance"
-              : role === "talent"
-                ? "Complete your profile to get matched with great startups"
-                : "Set up your organization profile"}
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="p-6">
           {role === "talent" ? (
             <TalentProfileForm
               loading={loading}
@@ -757,59 +793,59 @@ export default function ProfileCompletionForm({
               }}
             />
           ) : (
-            <form onSubmit={handleSubmit} className="space-y-6">
-              <div className="space-y-4">
-                <div>
-                  <h3 className="mb-4 text-sm font-semibold">
-                    {role === "founder"
-                      ? "Startup Information"
-                      : "Organization Information"}
-                  </h3>
-                  <div className="space-y-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="startupName">
-                        {role === "founder"
-                          ? "Startup Name"
-                          : "Organization Name"}
-                        {" *"}
-                      </Label>
-                      <Input
-                        id="startupName"
-                        type="text"
-                        placeholder={
-                          role === "founder"
-                            ? "e.g., TechVenture AI"
-                            : "e.g., StartupAccelerator Inc."
-                        }
-                        value={startupName}
-                        onChange={(e) => setStartupName(e.target.value)}
-                        required={true}
-                        disabled={loading}
-                        className="border-border/70"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="startupDescription">
-                        {role === "founder"
-                          ? "Startup Description"
-                          : "Organization Description"}
-                        {" *"}
-                      </Label>
-                      <Textarea
-                        id="startupDescription"
-                        placeholder={
-                          role === "founder"
-                            ? "Describe what your startup does and the problem it solves..."
-                            : "Describe your organization and what programs you offer..."
-                        }
-                        value={startupDescription}
-                        onChange={(e) => setStartupDescription(e.target.value)}
-                        required={true}
-                        disabled={loading}
-                        rows={4}
-                        className="border-border/70"
-                      />
-                    </div>
+            <form onSubmit={handleSubmit} className="space-y-5">
+              <SettingsGroup
+                title={
+                  role === "founder"
+                    ? "Startup Information"
+                    : "Organization Information"
+                }
+                icon={role === "founder" ? Rocket : Building}
+              >
+                <AuthField
+                  id="startupName"
+                  label={
+                    role === "founder" ? "Startup Name *" : "Organization Name *"
+                  }
+                >
+                  <Input
+                    id="startupName"
+                    type="text"
+                    placeholder={
+                      role === "founder"
+                        ? "e.g., TechVenture AI"
+                        : "e.g., StartupAccelerator Inc."
+                    }
+                    value={startupName}
+                    onChange={(e) => setStartupName(e.target.value)}
+                    required={true}
+                    disabled={loading}
+                    className={authFieldClass}
+                  />
+                </AuthField>
+                <AuthField
+                  id="startupDescription"
+                  label={
+                    role === "founder"
+                      ? "Startup Description *"
+                      : "Organization Description *"
+                  }
+                >
+                  <Textarea
+                    id="startupDescription"
+                    placeholder={
+                      role === "founder"
+                        ? "Describe what your startup does and the problem it solves..."
+                        : "Describe your organization and what programs you offer..."
+                    }
+                    value={startupDescription}
+                    onChange={(e) => setStartupDescription(e.target.value)}
+                    required={true}
+                    disabled={loading}
+                    rows={4}
+                    className={cn(authFieldClass, "min-h-[100px] py-2")}
+                  />
+                </AuthField>
                     <SingleSelectDropdown
                       label="Startup type (industry)"
                       options={industryOptions}
@@ -820,10 +856,7 @@ export default function ProfileCompletionForm({
                       required={true}
                     />
                     {industryFocus === "Others" && (
-                      <div className="space-y-2">
-                        <Label htmlFor="otherIndustry">
-                          Please specify your industry
-                        </Label>
+                      <AuthField id="otherIndustry" label="Please specify your industry *">
                         <Input
                           id="otherIndustry"
                           type="text"
@@ -832,9 +865,9 @@ export default function ProfileCompletionForm({
                           onChange={(e) => setOtherIndustry(e.target.value)}
                           required={true}
                           disabled={loading}
-                          className="border-border/70"
+                          className={authFieldClass}
                         />
-                      </div>
+                      </AuthField>
                     )}
                     {role === "founder" && (
                       <>
@@ -895,14 +928,9 @@ export default function ProfileCompletionForm({
                       disabled={loading}
                       required={true}
                     />
-                  </div>
-                </div>
-                {role === "founder" && (
-                  <div>
-                    <h3 className="mb-4 text-sm font-semibold">
-                      Team & Background
-                    </h3>
-                    <div className="space-y-4">
+              </SettingsGroup>
+              {role === "founder" && (
+                <SettingsGroup title="Team & Background" icon={Users}>
                       <MultiSelectDropdown
                         label="Roles Needed"
                         options={rolesOptions}
@@ -912,10 +940,7 @@ export default function ProfileCompletionForm({
                         disabled={loading}
                       />
                       {rolesNeeded.includes("Others") && (
-                        <div className="space-y-2">
-                          <Label htmlFor="otherRole">
-                            Please specify the role
-                          </Label>
+                        <AuthField id="otherRole" label="Please specify the role">
                           <Input
                             id="otherRole"
                             type="text"
@@ -923,12 +948,11 @@ export default function ProfileCompletionForm({
                             value={otherRole}
                             onChange={(e) => setOtherRole(e.target.value)}
                             disabled={loading}
-                            className="border-border/70"
+                            className={authFieldClass}
                           />
-                        </div>
+                        </AuthField>
                       )}
-                      <div className="space-y-2">
-                        <Label htmlFor="bio">Your Bio & Experience</Label>
+                      <AuthField id="bio" label="Your Bio & Experience">
                         <Textarea
                           id="bio"
                           placeholder="Tell us about your background, expertise, and what drives you..."
@@ -936,18 +960,13 @@ export default function ProfileCompletionForm({
                           onChange={(e) => setBio(e.target.value)}
                           disabled={loading}
                           rows={4}
-                          className="border-border/70"
+                          className={cn(authFieldClass, "min-h-[100px] py-2")}
                         />
-                      </div>
-                    </div>
-                  </div>
-                )}
-                {role === "organization-admin" && (
-                  <div>
-                    <h3 className="mb-4 text-sm font-semibold">
-                      Organization Details
-                    </h3>
-                    <div className="space-y-4">
+                      </AuthField>
+                </SettingsGroup>
+              )}
+              {role === "organization-admin" && (
+                <SettingsGroup title="Organization Details" icon={Building}>
                       <SingleSelectDropdown
                         label="Organization Type"
                         options={organizationTypeOptions}
@@ -958,10 +977,10 @@ export default function ProfileCompletionForm({
                         required={true}
                       />
                       {organizationType === "Others" && (
-                        <div className="space-y-2">
-                          <Label htmlFor="otherOrgType">
-                            Please specify the organization type
-                          </Label>
+                        <AuthField
+                          id="otherOrgType"
+                          label="Please specify the organization type"
+                        >
                           <Input
                             id="otherOrgType"
                             type="text"
@@ -969,9 +988,9 @@ export default function ProfileCompletionForm({
                             value={otherOrgType}
                             onChange={(e) => setOtherOrgType(e.target.value)}
                             disabled={loading}
-                            className="border-border/70"
+                            className={authFieldClass}
                           />
-                        </div>
+                        </AuthField>
                       )}
                       <SingleSelectDropdown
                         label="Expected Cohorts"
@@ -1016,19 +1035,33 @@ export default function ProfileCompletionForm({
                         placeholder="Select supported industries..."
                         disabled={loading}
                       />
-                    </div>
-                  </div>
-                )}
-              </div>
-              <div className="flex justify-end gap-3 pt-4 border-t border-border/70">
-                <Button type="submit" disabled={loading} className="px-8">
+                </SettingsGroup>
+              )}
+              <div className="border-t border-surface-border/60 pt-4">
+                <Button
+                  type="submit"
+                  disabled={loading}
+                  className={cn("w-full", authBtnPrimary)}
+                >
                   {loading ? "Saving..." : "Complete Profile"}
                 </Button>
               </div>
             </form>
           )}
-        </CardContent>
-      </Card>
+      </AuthFormCard>
     </div>
   );
+
+  if (isPage) {
+    return (
+      <AuthSplitLayout
+        marketingBreakpoint="lg"
+        formClassName="items-start overflow-y-auto py-8 md:py-10"
+      >
+        <div className="w-full max-w-lg">{formContent}</div>
+      </AuthSplitLayout>
+    );
+  }
+
+  return formContent;
 }

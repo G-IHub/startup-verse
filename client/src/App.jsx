@@ -37,8 +37,8 @@ import {
   DASHBOARD_ROUTE_PATHS,
 } from "./app/dashboardPaths";
 const DashboardHybrid = lazy(() => import("./components/DashboardHybrid"));
-const ProfileCompletionModal = lazy(
-  () => import("./components/ProfileCompletionModal"),
+const ProfileCompletionForm = lazy(
+  () => import("./components/ProfileCompletionForm"),
 );
 const TeamMemberOnboarding = lazy(() =>
   import("./components/TeamMemberOnboarding").then((m) => ({
@@ -644,27 +644,13 @@ function AppContent() {
   const onboardingRouteElement =
     user ? (
       <Suspense fallback={<LoadingSpinner />}>
-        <ProfileCompletionModal
+        <ProfileCompletionForm
           variant="page"
+          showBack={false}
           role={user.role}
           user={user}
           onUpdateUser={handleUpdateUser}
           onComplete={() => navigate("/home", { replace: true })}
-          onClose={async () => {
-            if (user?.role === "founder") {
-              const fid = String(user._id ?? user.id);
-              if (fid) {
-                const startup = await founderApi.getFounderStartupSafe(fid);
-                if (!startup) {
-                  toast.error(
-                    "Complete startup profile (including startup name and type) before continuing.",
-                  );
-                  return;
-                }
-              }
-            }
-            navigate("/home", { replace: true });
-          }}
         />
       </Suspense>
     ) : (

@@ -21,7 +21,7 @@ function listCompleteness(rows, keyFns) {
 
 /**
  * Flatten persisted user + nested profile into one shape used for completion.
- * Matches fields written by ProfileCompletionModal / ProfileCompletionForm for talent.
+ * Matches fields written by ProfileCompletionForm for talent.
  */
 export function flattenTalentUserForCompletion(user) {
   if (!user || typeof user !== "object") {

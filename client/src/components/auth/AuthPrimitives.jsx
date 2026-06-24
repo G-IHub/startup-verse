@@ -220,6 +220,26 @@ export function getAuthRoleContent(role) {
   };
 }
 
+export function getOnboardingRoleContent(role) {
+  const meta = ROLE_META[role] || ROLE_META.founder;
+  if (role === "founder") {
+    return {
+      description: "Tell us about your startup to get personalized guidance",
+      ...meta,
+    };
+  }
+  if (role === "talent") {
+    return {
+      description: "Complete your profile to get matched with great startups",
+      ...meta,
+    };
+  }
+  return {
+    description: "Set up your organization profile",
+    ...meta,
+  };
+}
+
 export function AuthRoleIcon({ role, className }) {
   const meta = ROLE_META[role] || ROLE_META.founder;
   const Icon = meta.icon;

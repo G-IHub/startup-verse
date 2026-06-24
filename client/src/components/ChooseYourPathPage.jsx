@@ -11,7 +11,6 @@ import {
   ArrowRight,
 } from "lucide-react";
 import InlineSignupForm from "./InlineSignupForm";
-import InlineProfileCompletion from "./InlineProfileCompletion";
 import AuthMarketingPanel from "./auth/AuthMarketingPanel";
 import {
   AUTH_CARD,
@@ -29,11 +28,7 @@ const PATH_CARD = cn(
 
 export default function ChooseYourPathPage({ onBack, onComplete, onPersistUser }) {
   const [selectedRole, setSelectedRole] = useState(null);
-  const [showProfileSetup, setShowProfileSetup] = useState(false);
-  const [newUser, setNewUser] = useState(null);
-  const [pendingAccessToken, setPendingAccessToken] = useState("");
   const isMountedRef = useRef(true);
-  const latestUserRef = useRef(null);
   const [view, setView] = useState("choose-path");
 
   useEffect(() => {
@@ -51,7 +46,7 @@ export default function ChooseYourPathPage({ onBack, onComplete, onPersistUser }
 
   const handleSignup = (role, data) => {
     if (!isMountedRef.current) return;
-    setPendingAccessToken(data.backendToken || "");
+    const accessToken = data.backendToken || "";
     let user;
     if (data.backendUser) {
       user = data.backendUser;
@@ -67,70 +62,28 @@ export default function ChooseYourPathPage({ onBack, onComplete, onPersistUser }
       };
     }
     if (!isMountedRef.current) return;
-    latestUserRef.current = user;
-    setNewUser(user);
-    setSelectedRole(role);
-    setShowProfileSetup(true);
-    setView("profile-setup");
-  };
-
-  const handleProfileComplete = () => {
-    if (!isMountedRef.current) return;
-    const base = latestUserRef.current ?? newUser;
-    if (selectedRole && base) {
-      onComplete(
-        selectedRole,
-        { ...base, onboardingComplete: true },
-        pendingAccessToken,
-      );
-    }
-  };
-
-  const handleProfileUpdateUser = (updatedUser) => {
-    if (!isMountedRef.current) return;
-    latestUserRef.current = updatedUser;
-    setNewUser(updatedUser);
-    onPersistUser?.(updatedUser);
+    onPersistUser?.(user);
+    onComplete(role, { ...user, onboardingComplete: false }, accessToken);
   };
 
   const handleSignupModalClose = () => {
     if (!isMountedRef.current) return;
-    setPendingAccessToken("");
     setSelectedRole(null);
     setView("choose-path");
   };
 
-  const handleProfileSetupClose = () => {
-    if (!isMountedRef.current) return;
-    latestUserRef.current = null;
-    setShowProfileSetup(false);
-    setNewUser(null);
-    setPendingAccessToken("");
-    setSelectedRole(null);
-    setView("choose-path");
-  };
-
-  if (view === "signup" || view === "profile-setup") {
+  if (view === "signup") {
     return (
       <AuthPageShell className="flex flex-col items-stretch">
         <div className="flex flex-1 w-full justify-center px-6 pb-[calc(8rem+env(safe-area-inset-bottom,0px))] pt-14 sm:px-8 sm:pt-16 md:px-8 md:py-10 md:pb-10">
           <div className="my-auto w-full max-w-md">
-            {view === "signup" && selectedRole && (
+            {selectedRole ? (
               <InlineSignupForm
                 role={selectedRole}
                 onBack={handleSignupModalClose}
                 onSignup={handleSignup}
               />
-            )}
-            {view === "profile-setup" && newUser && selectedRole && (
-              <InlineProfileCompletion
-                user={newUser}
-                role={selectedRole}
-                onBack={handleProfileSetupClose}
-                onComplete={handleProfileComplete}
-                onUpdateUser={handleProfileUpdateUser}
-              />
-            )}
+            ) : null}
           </div>
         </div>
       </AuthPageShell>

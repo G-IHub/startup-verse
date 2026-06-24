@@ -1818,31 +1818,6 @@ export default function FounderDashboard({
           </div>
         </div>
       </div>
-      {!user.onboardingComplete && (
-        <Card className="border-2 border-orange-200 bg-orange-50/50 mt-1.5 flex-shrink-0">
-          <CardContent className="p-1.5">
-            <div className="flex items-start gap-1.5">
-              <AlertCircle className="w-3.5 h-3.5 text-orange-600 flex-shrink-0 mt-0.5" />
-              <div className="flex-1">
-                <p className="font-medium text-[11px] text-orange-900">
-                  Complete your profile to unlock your journey
-                </p>
-                <p className="text-[9px] text-orange-700 mt-0.5">
-                  Tell us about your startup to get personalized guidance and
-                  team recommendations.
-                </p>
-                <Button
-                  size="sm"
-                  className="mt-1 h-5 text-[9px] px-2"
-                  onClick={() => navigate("/onboarding")}
-                >
-                  Complete Profile
-                </Button>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      )}
       {user.onboardingComplete && user.startupId && (
         <div className="mt-3">
           <PendingCompensationCard
