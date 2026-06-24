@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import { cn } from "../ui/utils";
 import {
   Building,
@@ -10,8 +10,9 @@ import {
   BarChart3,
   X,
   MessageCircle,
+  FolderKanban,
 } from "lucide-react";
-
+import ProjectsSidebarPanel from "../projects/ProjectsSidebarPanel";
 function formatCount(count) {
   if (count > 99) return "99+";
   return String(count);
@@ -39,8 +40,13 @@ export default function VerticalSidebar({
   unreadCount = 0,
   isOpen = false,
   onClose,
+  projectSlug,
+  milestoneId,
+  projectTaskId,
 }) {
   const inboxBadgeCount = unreadCount > 0 ? unreadCount : 0;
+  const isProjectsPage = currentPage === "projects-workspace";
+  const [createProjectOpen, setCreateProjectOpen] = useState(false);
 
   const allNavItems = [
     {
@@ -56,6 +62,13 @@ export default function VerticalSidebar({
       label: "Office",
       page: "startup-office",
       view: "workspace",
+      roles: ["founder", "team-member", "team"],
+    },
+    {
+      id: "projects",
+      icon: FolderKanban,
+      label: "Projects",
+      page: "projects-workspace",
       roles: ["founder", "team-member", "team"],
     },
     {
@@ -118,6 +131,9 @@ export default function VerticalSidebar({
   );
 
   const isActive = (item) => {
+    if (item.id === "projects") {
+      return currentPage === "projects-workspace";
+    }
     if (user.role === "talent" && item.id === "browse") {
       return currentPage === "browse-startups";
     }
@@ -140,12 +156,66 @@ export default function VerticalSidebar({
     } else if (item.view && onVirtualOfficeViewChange) {
       onVirtualOfficeViewChange(item.view);
     }
-    if (onClose) onClose();
+    if (onClose && item.id !== "projects") onClose();
   };
 
   const NavItem = ({ item }) => {
     const Icon = item.icon;
     const active = isActive(item);
+
+    if (item.id === "projects") {
+      return (
+        <li>
+          <button
+            type="button"
+            data-tour={item.id}
+            onClick={() => handleNavClick(item)}
+            aria-current={active ? "page" : undefined}
+            className={cn(
+              "group relative flex w-full items-center gap-2.5 rounded-input px-2.5 py-2 text-left font-body transition-all duration-200 ease-in-out",
+              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/25",
+              active
+                ? "sidebar-selected shadow-[inset_3px_0_0_0_var(--primary)]"
+                : "text-text-body hover:bg-surface-page hover:text-text-heading",
+            )}
+          >
+            <span
+              className={cn(
+                "flex h-8 w-8 shrink-0 items-center justify-center rounded-input transition-colors duration-200",
+                active
+                  ? "bg-primary/10 text-primary"
+                  : "text-text-muted group-hover:text-primary",
+              )}
+            >
+              <Icon className="h-[17px] w-[17px]" strokeWidth={1.75} aria-hidden />
+            </span>
+            <span className="min-w-0 flex-1 truncate text-[13px] font-medium leading-tight">
+              {item.label}
+            </span>
+            {active ? (
+              <span
+                role="button"
+                tabIndex={0}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setCreateProjectOpen(true);
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    setCreateProjectOpen(true);
+                  }
+                }}
+                className="shrink-0 px-0.5 font-body text-[12px] text-[#6B7280] opacity-60 transition-opacity group-hover:opacity-100 hover:text-[#374151]"
+              >
+                + New project
+              </span>
+            ) : null}
+          </button>
+        </li>
+      );
+    }
 
     return (
       <li>
@@ -192,8 +262,9 @@ export default function VerticalSidebar({
       ) : null}
       <aside
         className={cn(
-          "fixed left-0 top-0 z-50 flex h-screen w-[216px] shrink-0 flex-col border-r border-surface-border bg-surface-card font-body",
-          "transition-transform duration-300 ease-out md:static",
+          "fixed left-0 top-0 z-50 flex h-screen shrink-0 flex-col border-r border-surface-border bg-surface-card font-body",
+          "transition-[width,transform] duration-300 ease-out md:static",
+          isProjectsPage ? "w-[260px]" : "w-[216px]",
           isOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0",
         )}
         aria-label="Main navigation"
@@ -228,7 +299,22 @@ export default function VerticalSidebar({
           <nav aria-label="Application" className="flex flex-1 flex-col">
             <ul className="space-y-0.5" role="list">
               {primaryNavItems.map((item) => (
-                <NavItem key={item.id} item={item} />
+                <React.Fragment key={item.id}>
+                  <NavItem item={item} />
+                  {item.id === "projects" && isProjectsPage ? (
+                    <li className="list-none">
+                      <ProjectsSidebarPanel
+                        user={user}
+                        onNavigate={onPageChange}
+                        projectSlug={projectSlug}
+                        milestoneId={milestoneId}
+                        projectTaskId={projectTaskId}
+                        createProjectOpen={createProjectOpen}
+                        onCreateProjectOpenChange={setCreateProjectOpen}
+                      />
+                    </li>
+                  ) : null}
+                </React.Fragment>
               ))}
             </ul>
 

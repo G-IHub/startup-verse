@@ -71,6 +71,24 @@ assert(
   "dashboardStateToPath round-trip for chat",
 );
 
+const projectsState = pathToDashboardState("/projects", "", "founder");
+assert(
+  projectsState?.currentPage === "projects-workspace",
+  "pathToDashboardState /projects",
+);
+
+const projectMilestoneState = pathToDashboardState(
+  "/projects/build-mvp/milestones/ms1",
+  "",
+  "founder",
+);
+assert(
+  projectMilestoneState?.currentPage === "projects-workspace" &&
+    projectMilestoneState?.projectSlug === "build-mvp" &&
+    projectMilestoneState?.milestoneId === "ms1",
+  "pathToDashboardState /projects/:slug/milestones/:id",
+);
+
 const metadataFallback = parseDeepLink(
   "/?view=virtual-office&tab=invitations",
   { founderId: "founder1" },

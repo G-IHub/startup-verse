@@ -7,7 +7,7 @@ import { parseOfficeCallRoute } from "../utils/callRouteUtils.js";
 
 const DEFAULT_OFFICE_VIEW = "workspace";
 
-/** @typedef {{ currentPage: string, virtualOfficeView?: string, talentDashboardMode?: string, initialProfileEditing?: boolean, messageUserId?: string, taskId?: string, announcementId?: string, winId?: string, deliverableId?: string, officeTab?: string, startupId?: string, talentId?: string, invitationId?: string }} DashboardNavState */
+/** @typedef {{ currentPage: string, virtualOfficeView?: string, talentDashboardMode?: string, initialProfileEditing?: boolean, messageUserId?: string, taskId?: string, announcementId?: string, winId?: string, deliverableId?: string, officeTab?: string, startupId?: string, talentId?: string, invitationId?: string, projectSlug?: string, milestoneId?: string, projectTaskId?: string }} DashboardNavState */
 
 const PATH_TO_PAGE = Object.freeze({
   "/home": "dashboard",
@@ -55,6 +55,7 @@ export const DASHBOARD_PATH_PREFIXES = Object.freeze(
       "startup-detail",
       "talent-profile",
       "compensation-demo",
+      "projects",
     ],
   ),
 );
@@ -68,6 +69,10 @@ function normalizePath(pathname) {
 function chatPageForRole(role) {
   if (role === "talent") return "talent-chat";
   return "founder-chat";
+}
+
+function canAccessProjects(role) {
+  return role === "founder" || role === "team-member" || role === "team";
 }
 
 /**
@@ -178,6 +183,46 @@ export function pathToDashboardState(pathname, search, role) {
     };
   }
 
+  if (path === "/projects") {
+    if (!canAccessProjects(role)) return null;
+    return { currentPage: "projects-workspace" };
+  }
+
+  const projectTaskMatch = path.match(
+    /^\/projects\/([^/]+)\/tasks\/([^/]+)$/,
+  );
+  if (projectTaskMatch) {
+    if (!canAccessProjects(role)) return null;
+    const [, projectSlug, projectTaskId] = projectTaskMatch;
+    return {
+      currentPage: "projects-workspace",
+      projectSlug: decodeURIComponent(projectSlug),
+      projectTaskId: decodeURIComponent(projectTaskId),
+    };
+  }
+
+  const projectMilestoneMatch = path.match(
+    /^\/projects\/([^/]+)\/milestones\/([^/]+)$/,
+  );
+  if (projectMilestoneMatch) {
+    if (!canAccessProjects(role)) return null;
+    const [, projectSlug, milestoneId] = projectMilestoneMatch;
+    return {
+      currentPage: "projects-workspace",
+      projectSlug: decodeURIComponent(projectSlug),
+      milestoneId: decodeURIComponent(milestoneId),
+    };
+  }
+
+  const projectSlugMatch = path.match(/^\/projects\/([^/]+)$/);
+  if (projectSlugMatch) {
+    if (!canAccessProjects(role)) return null;
+    return {
+      currentPage: "projects-workspace",
+      projectSlug: decodeURIComponent(projectSlugMatch[1]),
+    };
+  }
+
   const page = PATH_TO_PAGE[path];
   if (!page) return null;
 
@@ -222,6 +267,9 @@ export function dashboardStateToPath(state) {
     startupId,
     talentId,
     invitationId,
+    projectSlug,
+    milestoneId,
+    projectTaskId,
   } = state;
 
   switch (currentPage) {
@@ -300,6 +348,17 @@ export function dashboardStateToPath(state) {
         : "/talent-profile";
     case "compensation-demo":
       return "/compensation-demo";
+    case "projects-workspace": {
+      if (!projectSlug) return "/projects";
+      const encoded = encodeURIComponent(projectSlug);
+      if (projectTaskId) {
+        return `/projects/${encoded}/tasks/${encodeURIComponent(projectTaskId)}`;
+      }
+      if (milestoneId) {
+        return `/projects/${encoded}/milestones/${encodeURIComponent(milestoneId)}`;
+      }
+      return `/projects/${encoded}`;
+    }
     default:
       return "/home";
   }
@@ -332,6 +391,10 @@ export const DASHBOARD_ROUTE_PATHS = Object.freeze([
   "/startup-detail",
   "/talent-profile",
   "/compensation-demo",
+  "/projects",
+  "/projects/:slug",
+  "/projects/:slug/milestones/:milestoneId",
+  "/projects/:slug/tasks/:taskId",
 ]);
 
 /**

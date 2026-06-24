@@ -35,6 +35,7 @@ import CohortMembershipBadge from "../organizations/CohortMembershipBadge";
 import { useHomeStore } from "../../state/useHomeStore";
 import { useStageTaskStore } from "../../state/useStageTaskStore";
 import { useWeeklyLoopStore } from "../../state/useWeeklyLoopStore";
+import { useProjectStore } from "../../state/useProjectStore";
 import { useExecutionScoreStore } from "../../state/useExecutionScoreStore";
 import { useTeamStore } from "../../state/useTeamStore";
 import { useDeliverablesStore } from "../../state/useDeliverablesStore";
@@ -69,6 +70,7 @@ import {
   Share2,
   Copy,
   Loader2,
+  FolderKanban,
 } from "lucide-react";
 import {
   generateSmartTeamRecommendations,
@@ -607,6 +609,7 @@ export default function FounderDashboard({
   // Modal state
   const [showOutcomeModal, setShowOutcomeModal] = useState(false);
   const [showIntentCaptureModal, setShowIntentCaptureModal] = useState(false);
+  const [weeklyFlowProjectId, setWeeklyFlowProjectId] = useState(null);
   const [showMilestoneDetailView, setShowMilestoneDetailView] = useState(false);
   const [showWeeklyReviewModal, setShowWeeklyReviewModal] = useState(false);
   /** True while saving a new weekly outcome (modal closes; this section shows progress). */
@@ -634,6 +637,9 @@ export default function FounderDashboard({
   const weeklyLoopLoading = useWeeklyLoopStore((s) => s.loading);
   const weeklyLoopLastLoadedAt = useWeeklyLoopStore((s) => s.lastLoadedAt);
   const weeklyLoop = useWeeklyLoopStore();
+  const projectViewModel = useProjectStore((s) => s.viewModel);
+  const loadProjects = useProjectStore((s) => s.load);
+  const setProjectFounderId = useProjectStore((s) => s.setFounderId);
 
   /** API + stores use string id; session user may only have Mongo `_id`. */
   const founderId = useMemo(() => {
@@ -826,6 +832,33 @@ export default function FounderDashboard({
 
     return undefined;
   }, [founderId, user?.startupId, loadHome]);
+
+  useEffect(() => {
+    if (!founderId) return;
+    setProjectFounderId(founderId);
+    loadProjects(founderId).catch(() => {});
+  }, [founderId, loadProjects, setProjectFounderId]);
+
+  const weeklyProjectName = useMemo(() => {
+    const fromTask = (tasks || []).find(
+      (t) => t.projectId || t.raw?.projectId,
+    );
+    const fromMilestone = (milestonesRaw || []).find(
+      (m) => m.projectId || m.raw?.projectId,
+    );
+    const pid = String(
+      fromTask?.projectId ||
+        fromTask?.raw?.projectId ||
+        fromMilestone?.projectId ||
+        fromMilestone?.raw?.projectId ||
+        "",
+    );
+    if (!pid) return "";
+    const match = (projectViewModel?.projects || []).find(
+      (p) => String(p.id) === pid,
+    );
+    return match?.name || "";
+  }, [tasks, milestonesRaw, projectViewModel?.projects]);
 
   // Generate team recommendations for Stage 3
   useEffect(() => {
@@ -1163,6 +1196,7 @@ export default function FounderDashboard({
     customTitle,
     customDescription,
     customMilestones,
+    projectId = null,
   ) => {
     if (!founderId) {
       toast.error("Could not identify your account", {
@@ -1181,12 +1215,13 @@ export default function FounderDashboard({
             weekNumber,
             outcomesRaw,
             customMilestones,
+            projectId,
           )
         : buildWeeklyPlanFromTemplate(
             templateId,
             currentStageId,
             weekNumber,
-            { customTitle, customDescription, customMilestones },
+            { customTitle, customDescription, customMilestones, projectId },
             outcomesRaw,
           );
     if (!plan?.goal) {
@@ -1492,6 +1527,7 @@ export default function FounderDashboard({
       {
         customTitle,
         customDescription,
+        projectId: weeklyFlowProjectId,
       },
       outcomesRaw,
     );
@@ -2078,6 +2114,12 @@ export default function FounderDashboard({
                       )}
                     </div>
                   </div>
+                  {weeklyProjectName ? (
+                    <p className="mt-2 flex items-center gap-1.5 font-body text-xs font-medium text-primary">
+                      <FolderKanban className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                      {weeklyProjectName}
+                    </p>
+                  ) : null}
                   {executionData?.currentOutcome && tasks.length > 0 && (
                     <p className="mt-1 font-body text-[13px] font-medium leading-snug text-text-heading md:text-[14px]">
                       {executionData.currentOutcome.title}
@@ -2485,6 +2527,9 @@ export default function FounderDashboard({
             stageName={currentStage.name}
             weekNumber={(executionData?.weekHistory.length || 0) + 1}
             onSelectOutcome={handleSelectOutcome}
+            projects={projectViewModel?.projects || []}
+            selectedProjectId={weeklyFlowProjectId}
+            onSelectedProjectIdChange={setWeeklyFlowProjectId}
             onOpenIntentCapture={() => {
               setShowOutcomeModal(false);
               setShowIntentCaptureModal(true);

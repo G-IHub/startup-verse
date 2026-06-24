@@ -61,6 +61,7 @@ import * as teamMemberApi from "../../utils/api/teamMemberApi";
 import * as taskApi from "../../utils/api/taskApi";
 import { subscribeToTasks } from "../../utils/socketIoRealtime";
 import { useWeeklyLoopStore } from "../../state/useWeeklyLoopStore";
+import { useProjectStore } from "../../state/useProjectStore";
 
 export function TaskManagementPanel({
   open,
@@ -85,6 +86,7 @@ export function TaskManagementPanel({
   const [searchQuery, setSearchQuery] = useState("");
   const [filterPriority, setFilterPriority] = useState("all");
   const [filterStatus, setFilterStatus] = useState("all");
+  const [filterProjectId, setFilterProjectId] = useState("all");
   const [draggedTask, setDraggedTask] = useState(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
@@ -93,6 +95,10 @@ export function TaskManagementPanel({
   const [activeOutcomeId, setActiveOutcomeId] = useState("");
   const [showMilestoneDialog, setShowMilestoneDialog] = useState(false);
   const [newMilestone, setNewMilestone] = useState({ title: "", description: "" });
+
+  const projectList = useProjectStore((s) => s.viewModel?.projects || []);
+  const loadProjects = useProjectStore((s) => s.load);
+  const setProjectFounderId = useProjectStore((s) => s.setFounderId);
 
   const defaultKanbanHeight = () =>
     Math.round(Math.min(window.innerHeight * 0.5, 420));
@@ -272,6 +278,12 @@ export function TaskManagementPanel({
           );
         }
       }
+
+      if (user.role === "founder" && founderIdValue) {
+        setProjectFounderId(founderIdValue);
+        loadProjects(founderIdValue).catch(() => {});
+      }
+
       setLoading(false);
     };
     loadData();
@@ -767,7 +779,10 @@ export function TaskManagementPanel({
         .includes(searchQuery.toLowerCase());
     const matchesStatus =
       filterStatus === "all" || task.status === filterStatus;
-    return matchesSearch && matchesStatus;
+    const matchesProject =
+      filterProjectId === "all" ||
+      String(task.projectId || "") === filterProjectId;
+    return matchesSearch && matchesStatus && matchesProject;
   });
 
   const canEditTask = user.role === "founder";
@@ -985,6 +1000,21 @@ export function TaskManagementPanel({
                       className="h-9 border-primary/18 bg-white pl-9 hover:border-primary/28 focus-visible:border-primary"
                     />
                   </div>
+                  {user.role === "founder" && projectList.length > 0 ? (
+                    <Select value={filterProjectId} onValueChange={setFilterProjectId}>
+                      <SelectTrigger className="h-9 w-[9.5rem] border-primary/18 bg-white hover:border-primary/30">
+                        <SelectValue placeholder="All projects" />
+                      </SelectTrigger>
+                      <SelectContent className="z-[75]">
+                        <SelectItem value="all">All projects</SelectItem>
+                        {projectList.map((p) => (
+                          <SelectItem key={p.id || p.slug} value={String(p.id)}>
+                            {p.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  ) : null}
                   <Select value={filterStatus} onValueChange={setFilterStatus}>
                     <SelectTrigger className="h-9 w-[8.5rem] border-primary/18 bg-white hover:border-primary/30">
                       <Filter className="w-3.5 h-3.5 mr-1" />

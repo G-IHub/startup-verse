@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Card,
   CardContent,
@@ -45,6 +45,9 @@ export default function OutcomeSelectionModal({
   weekNumber,
   onSelectOutcome,
   onOpenIntentCapture,
+  projects = [],
+  selectedProjectId,
+  onSelectedProjectIdChange,
 }) {
   const [selectedTemplateId, setSelectedTemplateId] = useState(null);
   const [customMode, setCustomMode] = useState(false);
@@ -52,7 +55,21 @@ export default function OutcomeSelectionModal({
   const [customDescription, setCustomDescription] = useState("");
   const [reviewMilestones, setReviewMilestones] = useState([]);
   const [customMilestoneDrafts, setCustomMilestoneDrafts] = useState([]);
-  const [step, setStep] = useState("select");
+  const [step, setStep] = useState("project");
+
+  useEffect(() => {
+    if (!isOpen) return;
+    setStep("project");
+    setSelectedTemplateId(null);
+    setCustomMode(false);
+    setCustomTitle("");
+    setCustomDescription("");
+    setReviewMilestones([]);
+    setCustomMilestoneDrafts([]);
+    onSelectedProjectIdChange?.(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- reset only when modal opens
+  }, [isOpen]);
+
   if (!isOpen) return null;
   const templates = getOutcomeTemplatesForStage(currentStage);
   const selectedTemplate = templates.find((t) => t.id === selectedTemplateId);
@@ -101,6 +118,7 @@ export default function OutcomeSelectionModal({
         customMode ? customTitle : undefined,
         customMode ? customDescription : undefined,
         customMilestones,
+        selectedProjectId || null,
       );
     } catch {
       /* parent toasts and may re-open modal */
@@ -137,6 +155,7 @@ export default function OutcomeSelectionModal({
         customTitle,
         customDescription,
         payload,
+        selectedProjectId || null,
       );
     } catch {
       /* parent toasts */
@@ -153,7 +172,9 @@ export default function OutcomeSelectionModal({
                 Select Your Weekly Outcome
               </CardTitle>
               <CardDescription className="mt-1 text-[9px] text-text-muted">
-                {step === "custom-milestones" ? (
+                {step === "project" ? (
+                  <>Step 1 of 3 — Choose a project</>
+                ) : step === "custom-milestones" ? (
                   <>
                     {"Week "}
                     {weekNumber}
@@ -190,6 +211,71 @@ export default function OutcomeSelectionModal({
           </div>
         </CardHeader>
         <CardContent className="space-y-4 px-5 pb-5 pt-4 sm:px-6">
+          {step === "project" && (
+            <div className="space-y-4">
+              <div>
+                <h3 className="mb-1 text-sm font-semibold text-card-foreground">
+                  Which project is this week&apos;s work for?
+                </h3>
+                <p className="text-xs text-text-muted">
+                  Link your weekly goal to a project, or continue with general work.
+                </p>
+              </div>
+              <div className="space-y-2">
+                {(projects || []).map((p) => {
+                  const pid = String(p.id || p.raw?.id || p.raw?._id || "");
+                  const checked = selectedProjectId === pid;
+                  const pending =
+                    Number(p.totalTasks || 0) - Number(p.completedTasks || 0);
+                  return (
+                    <label
+                      key={pid || p.slug}
+                      className="flex cursor-pointer items-start gap-3 rounded-lg border border-primary/15 p-3 transition-colors hover:bg-primary/5"
+                    >
+                      <input
+                        type="radio"
+                        name="weekly-project"
+                        checked={checked}
+                        onChange={() => onSelectedProjectIdChange?.(pid)}
+                        className="mt-1"
+                      />
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-medium text-card-foreground">
+                          {p.name}
+                        </p>
+                        <p className="text-xs text-text-muted">
+                          {pending > 0 ? `${pending} tasks pending` : "No pending tasks"}
+                        </p>
+                      </div>
+                    </label>
+                  );
+                })}
+                <label className="flex cursor-pointer items-start gap-3 rounded-lg border border-primary/15 p-3 transition-colors hover:bg-primary/5">
+                  <input
+                    type="radio"
+                    name="weekly-project"
+                    checked={!selectedProjectId}
+                    onChange={() => onSelectedProjectIdChange?.(null)}
+                    className="mt-1"
+                  />
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-medium text-card-foreground">
+                      + No project (general work)
+                    </p>
+                    <p className="text-xs text-text-muted">
+                      Weekly plan won&apos;t be linked to a specific project.
+                    </p>
+                  </div>
+                </label>
+              </div>
+              <div className="flex justify-end">
+                <Button type="button" size="sm" onClick={() => setStep("select")}>
+                  Next
+                  <ChevronRight className="ml-1 h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+          )}
           {step === "select" && (
             <>
               {onOpenIntentCapture && (

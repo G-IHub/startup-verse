@@ -100,6 +100,9 @@ export default function AppLayoutHybrid({
   onVirtualOfficeViewChange,
   talentDashboardMode = "overview",
   mobileActions = null,
+  projectSlug,
+  milestoneId,
+  projectTaskId,
 }) {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [hasSentInterest, setHasSentInterest] = useState(false);
@@ -113,7 +116,8 @@ export default function AppLayoutHybrid({
   const isWorkspacePage =
     currentPage === "startup-office" ||
     currentPage === "talent-chat" ||
-    currentPage === "founder-chat";
+    currentPage === "founder-chat" ||
+    currentPage === "projects-workspace";
 
   usePresenceSession(user);
 
@@ -165,6 +169,9 @@ export default function AppLayoutHybrid({
           hasSentInterest={hasSentInterest}
           isOpen={isMobileMenuOpen}
           onClose={() => setIsMobileMenuOpen(false)}
+          projectSlug={projectSlug}
+          milestoneId={milestoneId}
+          projectTaskId={projectTaskId}
         />
       )}
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden bg-surface-page">

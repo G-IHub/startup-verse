@@ -57,7 +57,6 @@ const TalentProfilePage = lazy(() => import("./TalentProfilePage"));
 const PostStartupPage = lazy(() => import("./founders/PostStartupPage"));
 const BrowseStartupsPage = lazy(() => import("./founders/BrowseStartupsPage"));
 const StartupDetailPage = lazy(() => import("./founders/StartupDetailPage"));
-
 // API and realtime imports
 import * as inboxApi from "../utils/api/inboxApi";
 import * as founderApi from "../utils/api/founderApi";
@@ -111,6 +110,7 @@ export default function DashboardHybrid({ user, onLogout, onUpdateUser }) {
         "startup-detail",
         "talent-profile",
         "compensation-demo",
+        "projects-workspace",
       ]),
     [],
   );
@@ -216,6 +216,9 @@ export default function DashboardHybrid({ user, onLogout, onUpdateUser }) {
         startupId: options?.startupId,
         talentId: options?.talentId,
         invitationId: options?.invitationId,
+        projectSlug: options?.projectSlug,
+        milestoneId: options?.milestoneId,
+        projectTaskId: options?.projectTaskId,
       }),
     );
   };
@@ -247,6 +250,9 @@ export default function DashboardHybrid({ user, onLogout, onUpdateUser }) {
     winId,
     startupId: urlStartupId,
     talentId: urlTalentId,
+    projectSlug,
+    milestoneId,
+    projectTaskId,
   } = derivedNav;
 
   const renderPageContent = () => {
@@ -595,6 +601,9 @@ export default function DashboardHybrid({ user, onLogout, onUpdateUser }) {
           </Suspense>
         );
 
+      case "projects-workspace":
+        return null;
+
       // Inbox
       case "inbox":
       case "inbox:sent":
@@ -688,6 +697,9 @@ export default function DashboardHybrid({ user, onLogout, onUpdateUser }) {
             virtualOfficeView={virtualOfficeView}
             onVirtualOfficeViewChange={handleVirtualOfficeViewChange}
             talentDashboardMode={talentDashboardMode}
+            projectSlug={projectSlug}
+            milestoneId={milestoneId}
+            projectTaskId={projectTaskId}
           >
             {renderPageContent()}
           </AppLayoutHybrid>
