@@ -37,8 +37,10 @@ async function apiCall(endpoint, options = {}) {
   if (!response.ok) {
     const error = await response
       .json()
-      .catch(() => ({ error: "Unknown error" }));
-    throw new Error(error.error || `API call failed: ${response.statusText}`);
+      .catch(() => ({ message: "Unknown error" }));
+    const err = new Error(error.message || error.error || `API call failed: ${response.statusText}`);
+    err.status = response.status;
+    throw err;
   }
 
   return response.json();
@@ -127,6 +129,10 @@ export async function saveTalentProfile(userId, profileData) {
     educationList: mapEducationForTalentProfile(rawEdu),
     certifications: mapCertificationsForTalentProfile(rawCert),
     portfolioItems: profileData?.portfolioItems || [],
+    resumeUrl: profileData?.resumeUrl || "",
+    resumeKey: profileData?.resumeKey || "",
+    resumeFileName: profileData?.resumeFileName || "",
+    resumeParsedAt: profileData?.resumeParsedAt || null,
   };
 
   return apiCall("/talent/profile", {
@@ -142,6 +148,68 @@ export async function getTalentProfile(userId) {
   return apiCall(`/talent/profile/${userId}`, {
     method: "GET",
   });
+}
+
+/**
+ * Check whether resume import (OpenAI) is configured on the server.
+ */
+export async function getResumeParseStatus() {
+  const json = await apiCall("/talent/resume/status", { method: "GET" });
+  return json?.data ?? json;
+}
+
+function parseResumeResponse(xhr) {
+  let json = {};
+  try {
+    json = JSON.parse(xhr.responseText || "{}");
+  } catch {
+    json = {};
+  }
+  if (xhr.status >= 200 && xhr.status < 300) {
+    return json?.data !== undefined ? json.data : json;
+  }
+  const message =
+    json?.message || json?.error || xhr.statusText || "Failed to parse resume.";
+  const err = new Error(message);
+  err.status = xhr.status;
+  throw err;
+}
+
+/**
+ * Upload and parse a resume file in one request.
+ */
+export function parseResumeFromFile(file) {
+  if (!file) {
+    return Promise.reject(new Error("No file selected."));
+  }
+  return new Promise((resolve, reject) => {
+    const form = new FormData();
+    form.append("file", file);
+
+    const xhr = new XMLHttpRequest();
+    xhr.open("POST", `${API_BASE}/talent/resume/parse`);
+    xhr.withCredentials = true;
+    xhr.onload = () => {
+      try {
+        resolve(parseResumeResponse(xhr));
+      } catch (err) {
+        reject(err);
+      }
+    };
+    xhr.onerror = () => reject(new Error("Failed to parse resume."));
+    xhr.send(form);
+  });
+}
+
+/**
+ * Parse a previously uploaded resume by storage key or URL.
+ */
+export async function parseResumeFromKey({ key, url, mimeType, fileName }) {
+  const json = await apiCall("/talent/resume/parse", {
+    method: "POST",
+    body: JSON.stringify({ key, url, mimeType, fileName }),
+  });
+  return json?.data ?? json;
 }
 
 /**

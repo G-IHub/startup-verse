@@ -70,14 +70,6 @@ async function main() {
     "debug leave-startup admin-guarded",
     failures,
   );
-  // Admin destructive endpoints must require admin
-  assertMatches(
-    adminRoutes,
-    /\/admin\/clear-all-data[\s\S]*?requireRole\("admin"\)/,
-    "admin clear-all-data admin-guarded",
-    failures,
-  );
-
   if (failures.length) {
     console.error("Phase 8 security alignment smoke FAILED");
     failures.forEach((f) => console.error(`- ${f}`));

@@ -75,6 +75,12 @@ const talentProfileSchema = new mongoose.Schema(
     educationList: { type: [educationSchema], default: [] },
     certifications: { type: [certificationSchema], default: [] },
     portfolioItems: { type: [portfolioItemSchema], default: [] },
+
+    // Stored CV reference (optional)
+    resumeUrl: { type: String, default: "", maxlength: [1000, "URL cannot exceed 1000 characters"] },
+    resumeKey: { type: String, default: "", maxlength: [500, "Key cannot exceed 500 characters"] },
+    resumeFileName: { type: String, default: "", maxlength: [255, "Filename cannot exceed 255 characters"] },
+    resumeParsedAt: { type: Date, default: null },
   },
   { timestamps: true },
 );

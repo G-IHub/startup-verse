@@ -1,3 +1,5 @@
+import { getResumeMaxBytes, isResumeScope } from "./resumeAttachments.js";
+
 const DEFAULT_MAX_BYTES = 10 * 1024 * 1024;
 const MESSAGES_MAX_BYTES = 40 * 1024 * 1024;
 
@@ -12,6 +14,7 @@ const MESSAGES_MIME_EXACT = new Set([
 export function getMaxUploadBytesForScope(scope) {
   const norm = typeof scope === "string" ? scope.trim().toLowerCase() : "";
   if (norm === "messages") return MESSAGES_MAX_BYTES;
+  if (isResumeScope(norm)) return getResumeMaxBytes();
   return DEFAULT_MAX_BYTES;
 }
 

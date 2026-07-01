@@ -1,4 +1,5 @@
 import { useState } from "react";
+import StartupVerseLogo from "./brand/StartupVerseLogo";
 import {
   ArrowRight,
   Check,
@@ -56,9 +57,7 @@ export default function TalentWaitlistPage({ onBack }) {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20 lg:py-32">
           <div className="text-center mb-12">
             <div className="flex justify-center mb-8">
-              <div className="w-20 h-20 rounded-full bg-gradient-to-br from-[#3A5AFE] to-[#2ECC71] flex items-center justify-center shadow-lg">
-                <Star className="w-10 h-10 text-white" />
-              </div>
+              <StartupVerseLogo className="h-20" />
             </div>
             <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-[#3A5AFE]/10 text-[#3A5AFE] border border-[#3A5AFE]/20 mb-6">
               <span className="relative flex h-2 w-2">

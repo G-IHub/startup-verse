@@ -20,6 +20,7 @@ import {
   DollarSign,
 } from "lucide-react";
 import { ImageWithFallback } from "./components/figma/ImageWithFallback";
+import StartupVerseLogo from "./components/brand/StartupVerseLogo";
 export default function LandingPage() {
   const [email, setEmail] = useState("");
   const [isSubmitted, setIsSubmitted] = useState(false);
@@ -39,14 +40,7 @@ export default function LandingPage() {
       <nav className="fixed top-0 w-full bg-white/80 backdrop-blur-lg border-b border-gray-200 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-[#3A5AFE] to-[#2ECC71] flex items-center justify-center">
-                <Sparkles className="w-5 h-5 text-white" />
-              </div>
-              <span className="text-gray-900">
-                StartupVerse
-              </span>
-            </div>
+            <StartupVerseLogo className="h-8" />
             <div className="hidden md:flex items-center gap-8">
               <a
                 href="#features"
@@ -1608,11 +1602,8 @@ export default function LandingPage() {
         <div className="max-w-7xl mx-auto">
           <div className="grid md:grid-cols-4 gap-8 mb-8">
             <div>
-              <div className="flex items-center gap-2 mb-4">
-                <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-[#3A5AFE] to-[#2ECC71] flex items-center justify-center">
-                  <Sparkles className="w-5 h-5 text-white" />
-                </div>
-                <span className="text-white">StartupVerse</span>
+              <div className="mb-4">
+                <StartupVerseLogo className="h-8" />
               </div>
               <p className="text-sm">
                 Everything you need to build your startup: Roadmap, Team,

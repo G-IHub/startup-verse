@@ -1,21 +1,18 @@
 import React from "react";
-import { Building } from "lucide-react";
+import StartupVerseLogo from "../brand/StartupVerseLogo";
 import { AUTH_FEATURES } from "./authFeatures";
 import { useAuthCarousel } from "./useAuthCarousel";
 
-const slideTransition =
-  "transition-all duration-[2000ms] ease-out";
-const slideTransitionIn =
-  "transition-all duration-[2000ms] ease-in";
+const fadeTransition = "transition-opacity duration-[2000ms] ease-in-out";
 
-function slideClass(isActive, isExiting) {
+function fadeClass(isActive, isExiting) {
   if (isActive && !isExiting) {
-    return `translate-x-0 opacity-100 ${slideTransition}`;
+    return `opacity-100 ${fadeTransition}`;
   }
   if (isActive && isExiting) {
-    return `-translate-x-full opacity-0 ${slideTransitionIn}`;
+    return `opacity-0 ${fadeTransition}`;
   }
-  return "translate-x-full opacity-0 transition-none";
+  return "opacity-0 transition-none";
 }
 
 export default function AuthMarketingPanel({
@@ -28,34 +25,31 @@ export default function AuthMarketingPanel({
 
   return (
     <div
-      className={`${hiddenClass} ${widthClass} relative overflow-hidden bg-primary`}
+      className={`${hiddenClass} ${widthClass} relative shrink-0 min-h-[100dvh] overflow-x-hidden overflow-y-auto bg-primary`}
     >
       <div className="absolute inset-0 opacity-10">
         <div className="absolute left-20 top-1/4 h-16 w-16 rounded-full bg-white" />
         <div className="absolute bottom-1/3 right-32 h-12 w-12 rounded-full bg-white" />
         <div className="absolute right-16 top-1/3 h-8 w-8 rounded-full bg-white" />
       </div>
-      <div className="relative z-10 flex w-full flex-col items-center justify-center p-8 text-white lg:p-12">
+      <div className="relative z-10 flex w-full flex-col items-center justify-start px-6 py-10 text-white sm:px-8 lg:px-10 lg:py-12">
         <div className={`absolute top-8 ${breakpoint === "lg" ? "left-10" : "left-8"}`}>
-          <div className="flex items-center gap-2">
-            <Building className="h-6 w-6 text-white" aria-hidden />
-            <span className="font-heading text-lg font-semibold">StartupVerse</span>
-          </div>
+          <StartupVerseLogo className="h-7 lg:h-8" />
         </div>
-        <h1 className="mb-14 text-center font-heading text-3xl font-bold tracking-tight text-white lg:mb-16 lg:text-4xl">
+        <h1 className="mb-10 mt-12 text-center font-heading text-2xl font-bold tracking-tight text-white lg:mb-14 lg:mt-14 lg:text-3xl">
           Welcome!
         </h1>
-        <div className="relative mb-8 h-32 w-full max-w-sm overflow-hidden">
+        <div className="relative mb-6 h-28 w-full max-w-[min(100%,20rem)] overflow-hidden sm:mb-8 sm:h-32">
           {features.map((feature, index) => {
             const isActive = currentSlide === index;
             const Icon = feature.icon;
             return (
               <div
                 key={feature.title}
-                className={`absolute inset-0 flex items-center justify-center ${slideClass(isActive, isExiting)}`}
+                className={`absolute inset-0 flex items-center justify-center ${fadeClass(isActive, isExiting)}`}
               >
                 <Icon
-                  className="h-24 w-24 text-white drop-shadow-md sm:h-28 sm:w-28"
+                  className="h-20 w-20 text-white drop-shadow-md sm:h-24 sm:w-24 lg:h-28 lg:w-28"
                   strokeWidth={1.35}
                   aria-hidden
                 />
@@ -64,27 +58,27 @@ export default function AuthMarketingPanel({
           })}
         </div>
         <div
-          className="relative mb-10 w-full max-w-md overflow-hidden text-center lg:mb-12"
-          style={{ minHeight: "140px" }}
+          className="relative mb-8 w-full max-w-[min(100%,20rem)] overflow-hidden text-center lg:mb-10"
+          style={{ minHeight: "120px" }}
         >
           {features.map((feature, index) => {
             const isActive = currentSlide === index;
             return (
               <div
                 key={`text-${feature.title}`}
-                className={`absolute inset-0 ${slideClass(isActive, isExiting)}`}
+                className={`absolute inset-0 ${fadeClass(isActive, isExiting)}`}
               >
-                <h2 className="mb-3 font-heading text-xl font-semibold tracking-tight text-white">
+                <h2 className="mb-2 font-heading text-lg font-semibold tracking-tight text-white lg:mb-3 lg:text-xl">
                   {feature.title}
                 </h2>
-                <p className="mx-auto max-w-sm text-sm leading-relaxed text-white/90">
+                <p className="mx-auto px-2 text-balance text-xs leading-relaxed text-white/90 lg:text-sm">
                   {feature.description}
                 </p>
               </div>
             );
           })}
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 pb-4">
           {features.map((_, index) => (
             <button
               key={index}

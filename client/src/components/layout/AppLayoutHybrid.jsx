@@ -7,6 +7,7 @@ import NotificationCenter from "../notifications/NotificationCenter";
 import { MobileActionDock, PageViewport } from "../shell/PageScaffold";
 import { Menu } from "lucide-react";
 import HeaderProfileMenu from "./HeaderProfileMenu";
+import StartupVerseLogo from "../brand/StartupVerseLogo";
 import {
   getSentInterests
 } from "../../utils/api/inboxApi";
@@ -49,6 +50,10 @@ const PAGE_META = {
   "founder-chat": {
     title: "Team Chat",
     description: "Messages with team members and interested talents",
+  },
+  "post-startup": {
+    title: "Launch Startup",
+    description: "Publish your startup to browse and invite talent",
   },
   "my-performance": {
     title: "My Performance",
@@ -178,7 +183,7 @@ export default function AppLayoutHybrid({
           <PageViewport>
             <div className="flex items-center gap-3 py-2">
               {user.role === "organization-admin" ? (
-                <h1 className="text-headline-small text-primary">StartupVerse</h1>
+                <StartupVerseLogo className="h-8" />
               ) : (
                 <Button
                   variant="ghost"

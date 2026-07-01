@@ -12,9 +12,11 @@ import {
 } from "lucide-react";
 import InlineSignupForm from "./InlineSignupForm";
 import AuthMarketingPanel from "./auth/AuthMarketingPanel";
+import StartupVerseLogo from "./brand/StartupVerseLogo";
 import {
   AUTH_CARD,
   AuthPageShell,
+  AuthCenteredShell,
   authBtnPrimary,
   authBtnAccent,
   authBtnOutline,
@@ -23,8 +25,31 @@ import { cn } from "./ui/utils";
 
 const PATH_CARD = cn(
   AUTH_CARD,
-  "transition-all duration-200 hover:shadow-card active:scale-[0.99] md:hover:-translate-y-0.5",
+  "min-w-0 overflow-hidden transition-all duration-200 hover:shadow-card active:scale-[0.99] md:hover:-translate-y-0.5",
 );
+
+const PATH_CARD_CONTENT = "flex min-h-0 flex-col px-6 pt-8 pb-6 sm:px-7 md:px-6 md:pt-7";
+
+const PATH_BTN = cn(
+  authBtnPrimary,
+  "h-11 w-full min-w-0 whitespace-normal text-center leading-snug sm:h-12 lg:h-11",
+);
+
+const PATH_BTN_ACCENT = cn(
+  authBtnAccent,
+  "h-11 w-full min-w-0 whitespace-normal text-center leading-snug sm:h-12 lg:h-11",
+);
+
+const CONTENT_COLUMN =
+  "relative flex w-full min-w-0 max-h-[100dvh] items-start justify-center overflow-y-auto px-4 pb-[calc(2rem+env(safe-area-inset-bottom,0px))] pt-14 sm:px-6 sm:pt-16 md:px-8 md:py-10 md:pb-10 lg:min-h-[100dvh] lg:w-[58%] lg:px-10 lg:py-10";
+
+function MobileLogoHeader() {
+  return (
+    <div className="mb-8 flex justify-center lg:hidden">
+      <StartupVerseLogo className="h-8" />
+    </div>
+  );
+}
 
 export default function ChooseYourPathPage({ onBack, onComplete, onPersistUser }) {
   const [selectedRole, setSelectedRole] = useState(null);
@@ -74,28 +99,26 @@ export default function ChooseYourPathPage({ onBack, onComplete, onPersistUser }
 
   if (view === "signup") {
     return (
-      <AuthPageShell className="flex flex-col items-stretch">
-        <div className="flex flex-1 w-full justify-center px-6 pb-[calc(8rem+env(safe-area-inset-bottom,0px))] pt-14 sm:px-8 sm:pt-16 md:px-8 md:py-10 md:pb-10">
-          <div className="my-auto w-full max-w-md">
-            {selectedRole ? (
-              <InlineSignupForm
-                role={selectedRole}
-                onBack={handleSignupModalClose}
-                onSignup={handleSignup}
-              />
-            ) : null}
-          </div>
-        </div>
-      </AuthPageShell>
+      <AuthCenteredShell>
+        <MobileLogoHeader />
+        {selectedRole ? (
+          <InlineSignupForm
+            role={selectedRole}
+            onBack={handleSignupModalClose}
+            onSignup={handleSignup}
+          />
+        ) : null}
+      </AuthCenteredShell>
     );
   }
 
   return (
-    <AuthPageShell className="lg:flex">
+    <AuthPageShell className="lg:flex lg:items-stretch">
       <AuthMarketingPanel breakpoint="lg" />
-      <div className="relative flex w-full max-h-[100dvh] items-start justify-center overflow-y-auto px-6 pb-[calc(8rem+env(safe-area-inset-bottom,0px))] pt-14 sm:px-8 sm:pt-16 md:max-h-screen md:px-8 md:py-10 md:pb-10 lg:w-[58%] lg:px-10 lg:py-10">
+      <div className={CONTENT_COLUMN}>
         <div className="my-auto w-full max-w-2xl md:max-w-6xl">
-          <header className="relative mb-12 text-center md:mb-14">
+          <MobileLogoHeader />
+          <header className="relative mb-10 text-center md:mb-12">
             <h1 className="font-heading text-2xl font-extrabold tracking-tight text-text-heading sm:text-3xl md:text-4xl">
               Choose Your Path
             </h1>
@@ -103,15 +126,15 @@ export default function ChooseYourPathPage({ onBack, onComplete, onPersistUser }
               Select the option that fits you best
             </p>
           </header>
-          <div className="flex flex-col gap-14 md:gap-10">
-            <div className="mx-auto grid w-full max-w-6xl grid-cols-1 gap-8 md:grid-cols-2 md:gap-x-10 md:gap-y-8">
+          <div className="flex flex-col gap-10 md:gap-8">
+            <div className="mx-auto grid w-full min-w-0 max-w-6xl grid-cols-1 gap-6 md:grid-cols-2 md:gap-x-8 md:gap-y-6 lg:grid-cols-1 2xl:grid-cols-2 2xl:gap-x-10">
               <Card className={PATH_CARD}>
-                <CardContent className="flex flex-col px-6 pt-8 pb-14 sm:px-7 md:px-6 md:pt-7 md:pb-10">
+                <CardContent className={PATH_CARD_CONTENT}>
                   <div className="mb-5 flex items-center space-x-3 md:mb-4">
                     <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary-tint">
                       <Rocket className="h-5 w-5 text-primary" />
                     </div>
-                    <div className="text-left">
+                    <div className="min-w-0 text-left">
                       <h4 className="font-heading text-base font-semibold tracking-tight text-text-heading md:text-lg">
                         I&apos;m a Founder
                       </h4>
@@ -137,24 +160,24 @@ export default function ChooseYourPathPage({ onBack, onComplete, onPersistUser }
                       </li>
                     ))}
                   </ul>
-                  <div className="mt-12 flex shrink-0 justify-center md:mt-9 md:block">
+                  <div className="mt-auto flex shrink-0 justify-center pt-6">
                     <Button
-                      className={`h-12 w-full max-w-sm md:h-11 md:max-w-none ${authBtnPrimary}`}
+                      className={PATH_BTN}
                       onClick={() => handleRoleClick("founder")}
                     >
                       Create Founder Account
-                      <ArrowRight className="ml-2 h-3.5 w-3.5" />
+                      <ArrowRight className="ml-2 h-3.5 w-3.5 shrink-0" />
                     </Button>
                   </div>
                 </CardContent>
               </Card>
               <Card className={PATH_CARD}>
-                <CardContent className="flex flex-col px-6 pt-8 pb-14 sm:px-7 md:px-6 md:pt-7 md:pb-10">
+                <CardContent className={PATH_CARD_CONTENT}>
                   <div className="mb-5 flex items-center space-x-3 md:mb-4">
                     <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary-tint">
                       <Star className="h-5 w-5 text-primary" />
                     </div>
-                    <div className="text-left">
+                    <div className="min-w-0 text-left">
                       <h4 className="font-heading text-base font-semibold tracking-tight text-text-heading md:text-lg">
                         I&apos;m Looking to Join
                       </h4>
@@ -180,19 +203,19 @@ export default function ChooseYourPathPage({ onBack, onComplete, onPersistUser }
                       </li>
                     ))}
                   </ul>
-                  <div className="mt-12 flex shrink-0 justify-center md:mt-9 md:block">
+                  <div className="mt-auto flex shrink-0 justify-center pt-6">
                     <Button
-                      className={`h-12 w-full max-w-sm md:h-11 md:max-w-none ${authBtnPrimary}`}
+                      className={PATH_BTN}
                       onClick={() => handleRoleClick("talent")}
                     >
                       Create Talent Account
-                      <ArrowRight className="ml-2 h-3.5 w-3.5" />
+                      <ArrowRight className="ml-2 h-3.5 w-3.5 shrink-0" />
                     </Button>
                   </div>
                 </CardContent>
               </Card>
             </div>
-            <div className="mx-auto w-full max-w-2xl md:max-w-6xl">
+            <div className="mx-auto w-full min-w-0 max-w-2xl md:max-w-6xl">
               <details className="group rounded-card py-2">
                 <summary className="mx-auto flex max-w-md cursor-pointer list-none flex-wrap items-center justify-center gap-x-2 gap-y-2 px-2 py-4 text-center font-body text-sm leading-snug text-text-muted transition-colors hover:text-text-heading md:py-3">
                   <Building className="h-3.5 w-3.5" />
@@ -200,12 +223,12 @@ export default function ChooseYourPathPage({ onBack, onComplete, onPersistUser }
                   <ArrowRight className="h-3 w-3 transition-transform group-open:rotate-90" />
                 </summary>
                 <Card className={cn(PATH_CARD, "mt-6 md:mt-5")}>
-                  <CardContent className="flex flex-col px-6 pt-8 pb-14 sm:px-7 md:px-6 md:pt-7 md:pb-10">
+                  <CardContent className={PATH_CARD_CONTENT}>
                     <div className="mb-5 flex items-center space-x-3 md:mb-4">
                       <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-accent-tint">
                         <Building className="h-5 w-5 text-accent" />
                       </div>
-                      <div className="text-left">
+                      <div className="min-w-0 text-left">
                         <h4 className="font-heading text-base font-semibold tracking-tight text-text-heading md:text-lg">
                           Organization Admin
                         </h4>
@@ -231,13 +254,13 @@ export default function ChooseYourPathPage({ onBack, onComplete, onPersistUser }
                         </li>
                       ))}
                     </ul>
-                    <div className="mt-12 flex shrink-0 justify-center md:mt-9 md:block">
+                    <div className="mt-auto flex shrink-0 justify-center pt-6">
                       <Button
-                        className={`h-12 w-full max-w-sm md:h-11 md:max-w-none ${authBtnAccent}`}
+                        className={PATH_BTN_ACCENT}
                         onClick={() => handleRoleClick("organization-admin")}
                       >
                         Create Organization Account
-                        <ArrowRight className="ml-2 h-3.5 w-3.5" />
+                        <ArrowRight className="ml-2 h-3.5 w-3.5 shrink-0" />
                       </Button>
                     </div>
                     <p className="mt-5 text-center font-body text-xs leading-relaxed text-text-muted md:mt-4">

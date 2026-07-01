@@ -98,15 +98,29 @@ export const createOrUpdateProfile = async (req, res) => {
     bio = "",
     background = "",
     links = {},
+    targetAudience,
+    rolesNeeded,
+    teamSize,
+    hasValidatedIdea,
+    hasMVP,
+    hasCustomers,
   } = req.body || {};
 
   if (!userId || !startupId) {
     return apiError(res, "userId and startupId are required.", 400);
   }
 
+  const update = { userId, startupId, bio, background, links };
+  if (targetAudience !== undefined) update.targetAudience = targetAudience;
+  if (rolesNeeded !== undefined) update.rolesNeeded = rolesNeeded;
+  if (teamSize !== undefined) update.teamSize = teamSize;
+  if (hasValidatedIdea !== undefined) update.hasValidatedIdea = hasValidatedIdea;
+  if (hasMVP !== undefined) update.hasMVP = hasMVP;
+  if (hasCustomers !== undefined) update.hasCustomers = hasCustomers;
+
   const profile = await FounderProfile.findOneAndUpdate(
     { userId },
-    { userId, startupId, bio, background, links },
+    update,
     { upsert: true, new: true, runValidators: true },
   );
 
@@ -1410,6 +1424,7 @@ export const createPost = async (req, res) => {
       salaryMin: src.salaryMin != null ? String(src.salaryMin) : "",
       salaryMax: src.salaryMax != null ? String(src.salaryMax) : "",
       currency: src.currency || "",
+      compensationCountry: src.compensationCountry || "",
       notes: src.notes || "",
     };
   };
@@ -1436,6 +1451,10 @@ export const createPost = async (req, res) => {
     githubUrl: String(p.githubUrl || "").slice(0, 1000),
     contactEmail: String(p.contactEmail || "").slice(0, 200),
     pitchDeckUrl: String(p.pitchDeckUrl || "").slice(0, 1000),
+    logoUrl: String(p.logoUrl || p.logo || "").slice(0, 1000),
+    tagline: String(p.tagline || "").slice(0, 160),
+    brandColor: String(p.brandColor || "").slice(0, 7),
+    twitterUrl: String(p.twitterUrl || "").slice(0, 1000),
     content: p.content || JSON.stringify(p),
     visibility: p.visibility || req.body?.visibility || "public",
   };
@@ -1445,6 +1464,47 @@ export const createPost = async (req, res) => {
     new: true,
     runValidators: true,
   });
+
+  const brandingData = {
+    ...(fields.tagline ? { tagline: fields.tagline } : {}),
+    ...(fields.brandColor ? { brandColor: fields.brandColor } : {}),
+  };
+
+  const startupPayload = {
+    ...(fields.title ? { name: fields.title } : {}),
+    ...(fields.description ? { description: fields.description } : {}),
+    ...(fields.industry ? { industry: fields.industry } : {}),
+    ...(fields.stage ? { stage: fields.stage } : {}),
+    ...(fields.website ? { website: fields.website } : {}),
+    ...(fields.logoUrl ? { logo: fields.logoUrl } : {}),
+    ...(Object.keys(brandingData).length
+      ? {
+          data: {
+            ...((startup && startup.data) || {}),
+            ...brandingData,
+          },
+        }
+      : {}),
+  };
+
+  if (startup) {
+    await Startup.findOneAndUpdate({ founderId }, startupPayload);
+  } else if (fields.title) {
+    const created = await Startup.create({
+      founderId,
+      name: fields.title,
+      description: fields.description || "",
+      industry: fields.industry || "",
+      stage: fields.stage || "",
+      website: fields.website || "",
+      logo: fields.logoUrl || "",
+      data: brandingData,
+    });
+    if (!post.startupId) {
+      post.startupId = created._id;
+      await post.save();
+    }
+  }
 
   return apiSuccess(res, post, 201);
 };

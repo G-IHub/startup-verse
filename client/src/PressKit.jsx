@@ -9,6 +9,7 @@ import {
   Twitter,
   Linkedin,
 } from "lucide-react";
+import { STARTUP_VERSE_LOGO_SRC } from "./config/brand";
 export default function PressKit() {
   const [copiedItem, setCopiedItem] = useState(null);
   const copyToClipboard = (text, item) => {
@@ -18,22 +19,11 @@ export default function PressKit() {
   };
   const pressAssets = [
     {
-      name: "Logo (PNG - Transparent)",
-      size: "512x512px",
+      name: "Logo (PNG)",
+      size: "Wordmark",
       type: "image",
-      file: "logo-transparent.png",
-    },
-    {
-      name: "Logo (SVG - Vector)",
-      size: "Scalable",
-      type: "image",
-      file: "logo.svg",
-    },
-    {
-      name: "Wordmark (PNG)",
-      size: "1024x256px",
-      type: "image",
-      file: "wordmark.png",
+      file: "startup verse.png",
+      href: STARTUP_VERSE_LOGO_SRC,
     },
     {
       name: "Product Screenshots",
@@ -268,10 +258,14 @@ export default function PressKit() {
                 <p className="text-sm text-gray-600 mb-4">
                   {asset.size}
                 </p>
-                <button className="w-full px-4 py-2 bg-white border border-gray-300 text-gray-900 rounded-lg hover:bg-gray-50 transition-colors flex items-center justify-center gap-2">
+                <a
+                  href={asset.href || `/images/${asset.file}`}
+                  download={asset.file}
+                  className="w-full px-4 py-2 bg-white border border-gray-300 text-gray-900 rounded-lg hover:bg-gray-50 transition-colors flex items-center justify-center gap-2"
+                >
                   <Download className="w-4 h-4" />
                   Download
-                </button>
+                </a>
               </div>
             ))}
           </div>
@@ -294,7 +288,11 @@ export default function PressKit() {
           </h2>
           <div className="grid md:grid-cols-3 gap-8">
             <div className="md:col-span-1">
-              <div className="aspect-square bg-gradient-to-br from-[#3A5AFE] to-[#2ECC71] rounded-2xl" />
+              <img
+                src={STARTUP_VERSE_LOGO_SRC}
+                alt="StartupVerse logo"
+                className="aspect-square w-full rounded-2xl object-contain bg-black p-4"
+              />
             </div>
             <div className="md:col-span-2">
               <h3 className="text-2xl text-gray-900 mb-4">

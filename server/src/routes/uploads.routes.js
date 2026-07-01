@@ -8,6 +8,10 @@ import {
   getMaxUploadBytesForScope,
   isAllowedMessagesMime,
 } from "../utils/messageAttachments.js";
+import {
+  isAllowedResumeMime,
+  isResumeScope,
+} from "../utils/resumeAttachments.js";
 
 const MESSAGES_MAX_UPLOAD_BYTES = 40 * 1024 * 1024;
 
@@ -56,6 +60,13 @@ uploadsRouter.post(
       return apiError(
         res,
         "File type not allowed for chat. Use images, videos, PDF, or documents.",
+        400,
+      );
+    }
+    if (isResumeScope(scope) && !isAllowedResumeMime(req.file.mimetype)) {
+      return apiError(
+        res,
+        "Resume must be a PDF or DOCX file (max 5MB).",
         400,
       );
     }

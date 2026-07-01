@@ -2,17 +2,6 @@
   "generatedAt": "2026-04-11T13:13:05.718Z",
   "calls": [
     {
-      "path": "/admin",
-      "method": "GET",
-      "files": [
-        "components/AdminDatabaseClear.jsx",
-        "components/AdminMegaNuclear.jsx",
-        "components/AdminNuclearReset.jsx",
-        "components/AdminSuperNuclear.jsx",
-        "utils/nuclearWipe.js"
-      ]
-    },
-    {
       "path": "/agenda",
       "method": "GET",
       "files": [

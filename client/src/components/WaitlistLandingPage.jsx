@@ -1,4 +1,5 @@
 import { useState } from "react";
+import StartupVerseLogo from "./brand/StartupVerseLogo";
 import {
   ArrowRight,
   Check,
@@ -42,9 +43,7 @@ export default function WaitlistLandingPage() {
           <div className="grid lg:grid-cols-2 gap-12 items-center">
             <div className="space-y-8 text-center lg:text-left">
               <div className="flex justify-center lg:justify-start">
-                <div className="w-20 h-20 rounded-full bg-gradient-to-br from-[#3A5AFE] to-[#2ECC71] flex items-center justify-center shadow-lg">
-                  <Rocket className="w-10 h-10 text-white" />
-                </div>
+                <StartupVerseLogo className="h-20" />
               </div>
               <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-[#3A5AFE]/10 text-[#3A5AFE] border border-[#3A5AFE]/20">
                 <span className="relative flex h-2 w-2">
@@ -950,12 +949,7 @@ export default function WaitlistLandingPage() {
       <footer className="py-12 border-t border-border">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex flex-col md:flex-row justify-between items-center gap-4">
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[#3A5AFE] to-[#2ECC71] flex items-center justify-center">
-                <Rocket className="w-4 h-4 text-white" />
-              </div>
-              <span>StartupVerse</span>
-            </div>
+            <StartupVerseLogo className="h-8" />
             <div className="text-sm text-muted-foreground">
               © 2025 StartupVerse. All rights reserved.
             </div>

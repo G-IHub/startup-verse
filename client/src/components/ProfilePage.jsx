@@ -71,6 +71,7 @@ import {
   settingsBtnPrimary,
   settingsBtnOutline,
 } from "./settings/SettingsPrimitives.jsx";
+import ResumeImportPanel from "./talent/ResumeImportPanel";
 
 const SP_LABEL =
   "font-body text-[13px] font-medium uppercase tracking-[0.06em] text-text-muted";
@@ -134,6 +135,10 @@ export default function ProfilePage({
     interests: user.interests || [],
     professionalGoals: user.professionalGoals || "",
     industryPreferences: user.industryPreferences || [],
+    resumeUrl: user.resumeUrl || "",
+    resumeKey: user.resumeKey || "",
+    resumeFileName: user.resumeFileName || "",
+    resumeParsedAt: user.resumeParsedAt || null,
     // Founder fields (aligned with onboarding via getFounderEditableFields)
     ...(user.role === "founder"
       ? getFounderEditableFields(user)
@@ -177,6 +182,10 @@ export default function ProfilePage({
               preferredRoles: profile.preferredRoles?.length ? profile.preferredRoles : prev.preferredRoles,
               industryPreferences: profile.industryPreferences?.length ? profile.industryPreferences : prev.industryPreferences,
               interests: profile.interests?.length ? profile.interests : prev.interests,
+              resumeUrl: profile.resumeUrl || prev.resumeUrl,
+              resumeKey: profile.resumeKey || prev.resumeKey,
+              resumeFileName: profile.resumeFileName || prev.resumeFileName,
+              resumeParsedAt: profile.resumeParsedAt || prev.resumeParsedAt,
             }));
           }
         })
@@ -861,6 +870,12 @@ export default function ProfilePage({
             </div>
           </CardContent>
         </Card>
+        {isEditing ? (
+          <ResumeImportPanel
+            editedProfile={editedProfile}
+            onApply={(next) => setEditedProfile(next)}
+          />
+        ) : null}
         <Card className={SP_CARD}>
           <CardHeader>
             <div className="flex items-center justify-between">

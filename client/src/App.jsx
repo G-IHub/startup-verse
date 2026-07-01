@@ -20,6 +20,7 @@ import { AuthProvider } from "./contexts/AuthContext";
 import { useAuth } from "./contexts/AuthContext";
 import { NotificationProvider } from "./contexts/NotificationContext";
 import * as founderApi from "./utils/api/founderApi";
+import { buildFounderProfilePayload } from "./domains/founder/founderProfilePayload";
 import * as teamMemberApi from "./utils/api/teamMemberApi";
 import * as talentApi from "./utils/api/talentApi";
 import { authApi } from "./api/authApi";
@@ -441,13 +442,7 @@ function AppContent() {
     if (role === "founder") {
       if (updatedUser.startupId) {
         founderApi
-          .saveFounderProfile({
-            userId: String(updatedUser._id ?? updatedUser.id),
-            startupId: updatedUser.startupId,
-            bio: updatedUser.bio || updatedUser.profile?.bio || "",
-            background: "",
-            links: {},
-          })
+          .saveFounderProfile(buildFounderProfilePayload(updatedUser))
           .catch(() => {});
       }
     } else if (role === "team-member") {

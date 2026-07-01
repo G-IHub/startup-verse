@@ -41,6 +41,11 @@ const offerSchema = new mongoose.Schema(
       default: "",
       maxlength: [10, "currency cannot exceed 10 characters"],
     },
+    compensationCountry: {
+      type: String,
+      default: "",
+      maxlength: [3, "compensationCountry cannot exceed 3 characters"],
+    },
     notes: {
       type: String,
       default: "",
@@ -180,6 +185,30 @@ const startupPostSchema = new mongoose.Schema(
       default: "",
       trim: true,
       maxlength: [1000, "Pitch deck URL cannot exceed 1000 characters"],
+    },
+    logoUrl: {
+      type: String,
+      default: "",
+      trim: true,
+      maxlength: [1000, "Logo URL cannot exceed 1000 characters"],
+    },
+    tagline: {
+      type: String,
+      default: "",
+      trim: true,
+      maxlength: [160, "Tagline cannot exceed 160 characters"],
+    },
+    brandColor: {
+      type: String,
+      default: "",
+      trim: true,
+      maxlength: [7, "Brand color must be a hex value"],
+    },
+    twitterUrl: {
+      type: String,
+      default: "",
+      trim: true,
+      maxlength: [1000, "Twitter URL cannot exceed 1000 characters"],
     },
 
     // Legacy / fallback plain-text or JSON blob

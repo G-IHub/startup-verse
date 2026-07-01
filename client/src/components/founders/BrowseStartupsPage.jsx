@@ -1,10 +1,18 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { Badge } from "../ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "../ui/card";
 import { toast } from "sonner";
 import * as founderApi from "../../utils/api/founderApi";
+import { StartupAvatar } from "./StartupBrandingFields";
+import EmptyStateBlock from "../organizations/_primitives/EmptyStateBlock";
+import { authFieldClass } from "../auth/AuthPrimitives";
+import {
+  SETTINGS_CARD,
+  settingsBtnOutline,
+} from "../settings/SettingsPrimitives";
+import { cn } from "../ui/utils";
 import {
   Search,
   MapPin,
@@ -15,7 +23,8 @@ import {
   Filter,
   ChevronDown,
   Heart,
-  Sparkles,
+  Building2,
+  DollarSign,
 } from "lucide-react";
 
 const INDUSTRIES = [
@@ -39,6 +48,13 @@ const STAGES = [
 ];
 
 const COMMITMENTS = ["All", "Full-time", "Part-time", "Contract", "Flexible"];
+
+function getCompensationLabel(philosophy) {
+  if (philosophy === "equity-focused") return "Equity-focused";
+  if (philosophy === "balanced") return "Balanced package";
+  if (philosophy === "cash-focused") return "Salary-focused";
+  return "Compensation details available";
+}
 
 export function BrowseStartupsPage({ user, onNavigate, onViewStartup }) {
   const [startups, setStartups] = useState([]);
@@ -103,6 +119,22 @@ export function BrowseStartupsPage({ user, onNavigate, onViewStartup }) {
     return matchesSearch && matchesIndustry && matchesStage && matchesCommitment;
   });
 
+  const hasActiveFilters = useMemo(
+    () =>
+      Boolean(searchQuery.trim()) ||
+      selectedIndustry !== "All" ||
+      selectedStage !== "All" ||
+      selectedCommitment !== "All",
+    [searchQuery, selectedIndustry, selectedStage, selectedCommitment],
+  );
+
+  const clearFilters = () => {
+    setSearchQuery("");
+    setSelectedIndustry("All");
+    setSelectedStage("All");
+    setSelectedCommitment("All");
+  };
+
   const formatDate = (date) => {
     if (!date) return "Recently";
     const d = new Date(date);
@@ -150,101 +182,111 @@ export function BrowseStartupsPage({ user, onNavigate, onViewStartup }) {
 
   return (
     <div className="min-h-full bg-surface-page p-2 font-body md:p-3 lg:p-4">
-      <div className="mx-auto max-w-7xl">
-        <div className="mb-5 rounded-card border border-surface-border bg-surface-card p-4 shadow-soft">
-          <p className="text-sm font-semibold text-text-heading">Find startup opportunities</p>
-          <p className="mt-1 text-sm text-text-muted">
-            Discover active startup posts, review role requirements, and open details to apply.
-          </p>
+      <div className="mx-auto max-w-7xl space-y-5">
+        <div className={cn("flex items-start gap-3 p-4", SETTINGS_CARD)}>
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary-tint">
+            <Briefcase className="h-5 w-5 text-primary" />
+          </div>
+          <div>
+            <h1 className="font-heading text-base font-bold text-text-heading">
+              Browse startups
+            </h1>
+            <p className="mt-1 font-body text-sm text-text-muted max-w-2xl">
+              Open roles from active founder posts. Review requirements and express
+              interest from the detail page.
+            </p>
+          </div>
         </div>
 
-        {/* Search and Filters */}
-        <div className="mb-6 space-y-4">
-          <div className="flex flex-col gap-3 sm:flex-row">
-            <div className="relative flex-1 max-w-2xl">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-text-muted" />
+        <div className={cn("space-y-4 p-4", SETTINGS_CARD)}>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-muted" />
               <Input
-                placeholder="Search startups by name, description, founder, or role..."
+                placeholder="Search by name, description, founder, or role..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="h-12 rounded-input border-surface-border bg-surface-card pl-10 text-sm"
+                className={cn(authFieldClass, "h-10 bg-surface-page pl-9")}
               />
             </div>
             <Button
+              type="button"
               variant="outline"
               onClick={() => setShowFilters(!showFilters)}
-              className="h-12 rounded-input px-4"
+              className={cn("h-10 shrink-0", settingsBtnOutline)}
             >
-              <Filter className="w-4 h-4 mr-2" />
+              <Filter className="h-4 w-4 mr-2" />
               Filters
               <ChevronDown
-                className={`w-4 h-4 ml-2 transition-transform ${showFilters ? "rotate-180" : ""}`}
+                className={cn(
+                  "h-4 w-4 ml-2 transition-transform",
+                  showFilters && "rotate-180",
+                )}
               />
             </Button>
           </div>
 
           {showFilters && (
-            <Card className="rounded-card border-surface-border bg-surface-card shadow-soft">
-              <CardContent className="p-4">
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                  <div>
-                    <label className="text-sm font-medium text-text-heading mb-2 block">
-                      Industry
-                    </label>
-                    <select
-                      value={selectedIndustry}
-                      onChange={(e) => setSelectedIndustry(e.target.value)}
-                      className="h-10 w-full rounded-input border border-surface-border bg-surface-page px-3 text-sm focus:border-primary focus:outline-none"
-                    >
-                      {INDUSTRIES.map((ind) => (
-                        <option key={ind} value={ind}>
-                          {ind}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="text-sm font-medium text-text-heading mb-2 block">
-                      Stage
-                    </label>
-                    <select
-                      value={selectedStage}
-                      onChange={(e) => setSelectedStage(e.target.value)}
-                      className="h-10 w-full rounded-input border border-surface-border bg-surface-page px-3 text-sm focus:border-primary focus:outline-none"
-                    >
-                      {STAGES.map((stage) => (
-                        <option key={stage} value={stage}>
-                          {stage}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="text-sm font-medium text-text-heading mb-2 block">
-                      Commitment
-                    </label>
-                    <select
-                      value={selectedCommitment}
-                      onChange={(e) => setSelectedCommitment(e.target.value)}
-                      className="h-10 w-full rounded-input border border-surface-border bg-surface-page px-3 text-sm focus:border-primary focus:outline-none"
-                    >
-                      {COMMITMENTS.map((c) => (
-                        <option key={c} value={c}>
-                          {c}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+            <div className="grid grid-cols-1 gap-4 border-t border-surface-border pt-4 sm:grid-cols-3">
+              <div>
+                <label className="mb-2 block font-body text-sm text-text-heading">
+                  Industry
+                </label>
+                <select
+                  value={selectedIndustry}
+                  onChange={(e) => setSelectedIndustry(e.target.value)}
+                  className="h-10 w-full rounded-input border border-surface-border bg-surface-page px-3 font-body text-sm focus:border-primary focus:outline-none"
+                >
+                  {INDUSTRIES.map((ind) => (
+                    <option key={ind} value={ind}>
+                      {ind}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="mb-2 block font-body text-sm text-text-heading">
+                  Stage
+                </label>
+                <select
+                  value={selectedStage}
+                  onChange={(e) => setSelectedStage(e.target.value)}
+                  className="h-10 w-full rounded-input border border-surface-border bg-surface-page px-3 font-body text-sm focus:border-primary focus:outline-none"
+                >
+                  {STAGES.map((stage) => (
+                    <option key={stage} value={stage}>
+                      {stage}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="mb-2 block font-body text-sm text-text-heading">
+                  Commitment
+                </label>
+                <select
+                  value={selectedCommitment}
+                  onChange={(e) => setSelectedCommitment(e.target.value)}
+                  className="h-10 w-full rounded-input border border-surface-border bg-surface-page px-3 font-body text-sm focus:border-primary focus:outline-none"
+                >
+                  {COMMITMENTS.map((c) => (
+                    <option key={c} value={c}>
+                      {c}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
           )}
         </div>
 
-        {/* Results Count */}
-        <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
-          <p className="text-sm text-text-muted">
-            Showing <span className="font-semibold text-text-heading">{filteredStartups.length}</span> startups
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <p className="font-body text-sm text-text-muted">
+            Showing{" "}
+            <span className="font-semibold text-text-heading tabular-nums">
+              {filteredStartups.length}
+            </span>{" "}
+            {filteredStartups.length === 1 ? "result" : "results"}
           </p>
           {favorites.size > 0 && (
             <p className="text-sm font-medium text-primary">
@@ -254,31 +296,32 @@ export function BrowseStartupsPage({ user, onNavigate, onViewStartup }) {
           )}
         </div>
 
-        {/* Startup Grid */}
         {filteredStartups.length === 0 ? (
-          <Card className="surface-card border-surface-border">
-            <CardContent className="p-12 text-center">
-              <div className="w-16 h-16 rounded-full bg-surface-page flex items-center justify-center mx-auto mb-4">
-                <Search className="w-8 h-8 text-text-muted" />
-              </div>
-              <h3 className="text-lg font-semibold text-text-heading mb-2">No startups found</h3>
-              <p className="text-text-muted max-w-md mx-auto">
-                Try adjusting your search filters or check back later for new opportunities.
-              </p>
-              <Button
-                variant="outline"
-                onClick={() => {
-                  setSearchQuery("");
-                  setSelectedIndustry("All");
-                  setSelectedStage("All");
-                  setSelectedCommitment("All");
-                }}
-                className="mt-4"
-              >
-                Clear Filters
-              </Button>
-            </CardContent>
-          </Card>
+          <div className={cn("overflow-hidden", SETTINGS_CARD)}>
+            <EmptyStateBlock
+              icon={Building2}
+              tone="info"
+              title="No startups match your search"
+              description={
+                hasActiveFilters
+                  ? "Try clearing filters or broadening your search."
+                  : "No founder posts are live yet. Check back soon."
+              }
+              className="min-h-[220px] rounded-none bg-transparent"
+              action={
+                hasActiveFilters ? (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={clearFilters}
+                    className={settingsBtnOutline}
+                  >
+                    Clear filters
+                  </Button>
+                ) : null
+              }
+            />
+          </div>
         ) : (
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
             {filteredStartups.map((startup) => {
@@ -286,19 +329,30 @@ export function BrowseStartupsPage({ user, onNavigate, onViewStartup }) {
               return (
               <Card
                 key={startup.id}
-                className="group flex h-full cursor-pointer flex-col rounded-card border border-surface-border bg-surface-card shadow-soft transition-all hover:-translate-y-0.5 hover:border-primary/45 hover:shadow-md"
+                className={cn(
+                  "group flex h-full cursor-pointer flex-col transition-shadow hover:border-primary/30 hover:shadow-[0_4px_16px_rgba(0,0,0,0.06)]",
+                  SETTINGS_CARD,
+                )}
                 onClick={() => onViewStartup?.(startup)}
               >
                 <CardHeader className="pb-3">
                   <div className="flex items-start justify-between">
                     <div className="flex items-center gap-3">
-                      <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-primary/10 text-base font-bold text-primary">
-                        {startup.title?.charAt(0).toUpperCase() || "S"}
-                      </div>
+                      <StartupAvatar
+                        title={startup.title}
+                        logoUrl={startup.logoUrl || startup.logo}
+                        brandColor={startup.brandColor}
+                        size="sm"
+                      />
                       <div className="min-w-0">
                         <CardTitle className="line-clamp-1 text-lg font-semibold text-text-heading">
                           {startup.title}
                         </CardTitle>
+                        {startup.tagline ? (
+                          <p className="line-clamp-1 text-xs font-medium text-primary">
+                            {startup.tagline}
+                          </p>
+                        ) : null}
                         <p className="line-clamp-1 text-sm text-text-muted">by {meta.founderName}</p>
                       </div>
                     </div>
@@ -352,16 +406,12 @@ export function BrowseStartupsPage({ user, onNavigate, onViewStartup }) {
                     </div>
                   </div>
 
-                  {startup.offer && (
-                    <div className="mb-4 rounded-lg bg-primary/5 p-3">
+                  {startup.offer?.compensationPhilosophy && (
+                    <div className="mb-4 rounded-input border border-surface-border bg-surface-page px-3 py-2">
                       <div className="flex items-center gap-2 text-sm">
-                        <Sparkles className="w-4 h-4 text-primary" />
-                        <span className="text-text-heading font-medium">
-                          {startup.offer.compensationPhilosophy === "equity-focused"
-                            ? "High Equity Opportunity"
-                            : startup.offer.compensationPhilosophy === "balanced"
-                            ? "Equity + Salary"
-                            : "Competitive Salary"}
+                        <DollarSign className="h-4 w-4 shrink-0 text-text-muted" />
+                        <span className="font-body font-medium text-text-heading">
+                          {getCompensationLabel(startup.offer.compensationPhilosophy)}
                         </span>
                       </div>
                     </div>

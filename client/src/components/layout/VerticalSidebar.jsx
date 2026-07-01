@@ -1,15 +1,17 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { cn } from "../ui/utils";
+import StartupVerseLogo from "../brand/StartupVerseLogo";
+import * as founderApi from "../../utils/api/founderApi";
 import {
   Building,
   Users,
   Home,
-  Sparkles,
   Settings,
   Inbox,
   BarChart3,
   X,
   MessageCircle,
+  Rocket,
 } from "lucide-react";
 
 function formatCount(count) {
@@ -41,6 +43,36 @@ export default function VerticalSidebar({
   onClose,
 }) {
   const inboxBadgeCount = unreadCount > 0 ? unreadCount : 0;
+  const [founderHasStartupPost, setFounderHasStartupPost] = useState(null);
+
+  useEffect(() => {
+    if (user.role !== "founder") {
+      setFounderHasStartupPost(null);
+      return;
+    }
+
+    const founderId = String(user._id ?? user.id ?? "");
+    if (!founderId) {
+      setFounderHasStartupPost(false);
+      return;
+    }
+
+    let cancelled = false;
+    founderApi
+      .getFounderPosts(founderId)
+      .then((posts) => {
+        if (cancelled) return;
+        const list = Array.isArray(posts) ? posts : [];
+        setFounderHasStartupPost(list.length > 0);
+      })
+      .catch(() => {
+        if (!cancelled) setFounderHasStartupPost(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [user.role, user._id, user.id, currentPage]);
 
   const allNavItems = [
     {
@@ -66,6 +98,15 @@ export default function VerticalSidebar({
       view: user.role === "talent" ? undefined : "matching",
       roles: ["founder", "talent"],
     },
+    ...(user.role === "founder" && founderHasStartupPost === false
+      ? [{
+          id: "launch-startup",
+          icon: Rocket,
+          label: "Launch Startup",
+          page: "post-startup",
+          roles: ["founder"],
+        }]
+      : []),
     ...(user.role === "talent"
       ? [{
           id: "talent-chat",
@@ -118,6 +159,9 @@ export default function VerticalSidebar({
   );
 
   const isActive = (item) => {
+    if (item.id === "launch-startup") {
+      return currentPage === "post-startup";
+    }
     if (user.role === "talent" && item.id === "browse") {
       return currentPage === "browse-startups";
     }
@@ -198,15 +242,10 @@ export default function VerticalSidebar({
         )}
         aria-label="Main navigation"
       >
-        <div className="flex shrink-0 items-center gap-2.5 px-4 pb-2 pt-5">
-          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-input bg-primary text-white shadow-[0_4px_16px_rgba(58,90,254,0.25)]">
-            <Sparkles className="h-[17px] w-[17px]" strokeWidth={1.75} aria-hidden />
-          </div>
+        <div className="flex shrink-0 items-start gap-2.5 px-4 pb-2 pt-5">
           <div className="min-w-0 flex-1">
-            <p className="truncate font-heading text-sm font-bold text-text-heading">
-              StartupVerse
-            </p>
-            <p className="truncate font-body text-[11px] text-text-muted capitalize">
+            <StartupVerseLogo className="h-8 max-w-full object-left" />
+            <p className="mt-1 truncate font-body text-[11px] text-text-muted capitalize">
               {user.role?.replace(/-/g, " ") || "Member"}
             </p>
           </div>

@@ -51,16 +51,30 @@ export async function saveFounderProfile({
   bio = "",
   background = "",
   links = {},
+  targetAudience,
+  rolesNeeded,
+  teamSize,
+  hasValidatedIdea,
+  hasMVP,
+  hasCustomers,
 }) {
+  const body = {
+    userId,
+    startupId,
+    bio,
+    background,
+    links,
+  };
+  if (targetAudience !== undefined) body.targetAudience = targetAudience;
+  if (rolesNeeded !== undefined) body.rolesNeeded = rolesNeeded;
+  if (teamSize !== undefined) body.teamSize = teamSize;
+  if (hasValidatedIdea !== undefined) body.hasValidatedIdea = hasValidatedIdea;
+  if (hasMVP !== undefined) body.hasMVP = hasMVP;
+  if (hasCustomers !== undefined) body.hasCustomers = hasCustomers;
+
   return apiCall("/founders/profile", {
     method: "POST",
-    body: JSON.stringify({
-      userId,
-      startupId,
-      bio,
-      background,
-      links,
-    }),
+    body: JSON.stringify(body),
   });
 }
 

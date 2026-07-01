@@ -55,11 +55,11 @@ export function AuthSplitLayout({
     marketingBreakpoint === "lg" ? "lg:w-[58%]" : "md:w-[58%]";
 
   return (
-    <AuthPageShell className={flexDir}>
+    <AuthPageShell className={cn(flexDir, "items-stretch")}>
       <AuthMarketingPanel breakpoint={marketingBreakpoint} />
       <div
         className={cn(
-          "flex w-full items-center justify-center p-4 md:p-8",
+          "flex w-full min-w-0 min-h-[100dvh] items-center justify-center overflow-y-auto p-4 md:p-8",
           formWidth,
           formClassName,
         )}
@@ -72,11 +72,11 @@ export function AuthSplitLayout({
 
 export function AuthSplitLayoutInline({ marketing, children, formClassName }) {
   return (
-    <AuthPageShell className="lg:flex">
+    <AuthPageShell className="lg:flex lg:items-stretch">
       {marketing}
       <div
         className={cn(
-          "flex w-full items-center justify-center p-4 md:p-8 lg:w-[58%]",
+          "flex w-full min-w-0 min-h-[100dvh] items-center justify-center overflow-y-auto p-4 md:p-8 lg:w-[58%]",
           formClassName,
         )}
       >
@@ -230,7 +230,8 @@ export function getOnboardingRoleContent(role) {
   }
   if (role === "talent") {
     return {
-      description: "Complete your profile to get matched with great startups",
+      description:
+        "Tell us who you are and what you do — you can add the rest from your profile later.",
       ...meta,
     };
   }
@@ -256,10 +257,15 @@ export function AuthRoleIcon({ role, className }) {
   );
 }
 
-export function AuthCenteredShell({ children, maxWidth = "max-w-md" }) {
+export function AuthCenteredShell({ children, maxWidth = "max-w-md", className }) {
   return (
-    <AuthPageShell className="flex items-center justify-center p-4 md:p-8">
-      <div className={cn("w-full", maxWidth)}>{children}</div>
+    <AuthPageShell
+      className={cn(
+        "flex min-h-[100dvh] justify-center overflow-y-auto p-4 md:p-8",
+        className,
+      )}
+    >
+      <div className={cn("my-auto w-full py-6", maxWidth)}>{children}</div>
     </AuthPageShell>
   );
 }

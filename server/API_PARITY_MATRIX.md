@@ -60,15 +60,11 @@ Envelope standard:
 | `/portfolio/*` | Not mounted | — | — | — | **Removed** |
 | `/kv/get` | Not mounted | — | — | — | **Removed** |
 | `/debug/startups/:startupId` | Canonical | Yes | none | startup debug summary | [`debug.routes.js`](./src/routes/debug.routes.js) |
-| `/admin/stats` | Canonical | Yes + admin | none | aggregate counts + extended stats object | [`admin.routes.js`](./src/routes/admin.routes.js) |
 | `/admin/reminder-delivery-metrics` | Canonical | Yes + admin | none | reminder job queue counts | [`admin.routes.js`](./src/routes/admin.routes.js) |
 | `/admin/analytics/snapshot` | Canonical | Yes + admin | none | Mongo-backed counts + user list for admin UI | [`admin.routes.js`](./src/routes/admin.routes.js) |
-| `/admin/clear-all-data` | Canonical | Yes + admin | none | deterministic 501 with `COMPAT_NOT_IMPLEMENTED` | Implemented |
-| `/admin/nuclear-reset` | Canonical | Yes + admin | none | deterministic 501 with `COMPAT_NOT_IMPLEMENTED` | Implemented |
-| `/admin/mega-nuclear-reset` | Canonical | Yes + admin | none | deterministic 501 with `COMPAT_NOT_IMPLEMENTED` | Implemented |
 | `/google/*` (status, oauth, meet, disconnect) | Canonical | Yes (mixed) | OAuth / Meet payloads | **Off by default** (`GOOGLE_INTEGRATION_ENABLED`); `503`/`501` when disabled or not wired | [`google.routes.js`](./src/routes/google.routes.js) |
 | `/emails/*` | Canonical | Yes | email payloads | placeholder send ack | [`emails.routes.js`](./src/routes/emails.routes.js) |
-| `/migrate/*` + `/migrations/*` | Canonical | Yes + admin | migration payloads | Idempotent admin migrations (org-invitation split, etc.); destructive admin nukes remain `501` elsewhere | [`migrations.routes.js`](./src/routes/migrations.routes.js) |
+| `/migrate/*` + `/migrations/*` | Canonical | Yes + admin | migration payloads | Idempotent admin migrations (org-invitation split, etc.) | [`migrations.routes.js`](./src/routes/migrations.routes.js) |
 
 ## Compatibility router removal (2026-04-11)
 
@@ -82,4 +78,4 @@ Client paths such as `/founder/:id/events`, `/events/upcoming`, `/mentors/*`, an
 
 ## Notes
 
-- Destructive admin endpoints remain deterministic `501` with `COMPAT_NOT_IMPLEMENTED`.
+- Destructive admin database wipe endpoints were removed (2026-06).

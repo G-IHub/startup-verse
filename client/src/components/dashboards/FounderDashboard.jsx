@@ -642,6 +642,39 @@ export default function FounderDashboard({
     return String(raw);
   }, [user?._id, user?.id]);
 
+  const [founderLaunchStatus, setFounderLaunchStatus] = useState("loading");
+  useEffect(() => {
+    if (!founderId) {
+      setFounderLaunchStatus("not-launched");
+      return;
+    }
+    let cancelled = false;
+    founderApi
+      .getFounderPosts(founderId)
+      .then((posts) => {
+        if (cancelled) return;
+        const list = Array.isArray(posts) ? posts : [];
+        setFounderLaunchStatus(list.length > 0 ? "launched" : "not-launched");
+      })
+      .catch(() => {
+        if (!cancelled) setFounderLaunchStatus("not-launched");
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [founderId]);
+
+  const founderNeedsLaunch = founderLaunchStatus === "not-launched";
+  const founderLaunchLoading = founderLaunchStatus === "loading";
+
+  const requestWeeklyOutcome = () => {
+    if (founderNeedsLaunch) {
+      onNavigate?.("post-startup");
+      return;
+    }
+    setShowOutcomeModal(true);
+  };
+
   const teamMembers = useTeamStore((s) => s.members);
 
   const deliverables = useDeliverablesStore((s) => s.deliverables);
@@ -1050,6 +1083,17 @@ export default function FounderDashboard({
       };
     }
 
+    // No active outcome - require launched startup before setting weekly goals
+    if (founderNeedsLaunch) {
+      return {
+        message:
+          "Launch your startup before setting weekly goals. Publish your post so your execution plan syncs to your company profile and your team can align with you.",
+        action: "launch-startup",
+        actionLabel: "Launch Startup",
+        variant: "info",
+      };
+    }
+
     // No active outcome - First week stories & execution mindset
     const noOutcomeStories = [
       `Airbnb's first weekly goal was hilariously simple: "Get 1 booking." They were broke, desperate, and in the "${currentStage.name}" stage just like you. That one goal became 3 bookings, then 100, then millions. You have ${activeTeamCount} team member${activeTeamCount > 1 ? "s" : ""} ready${totalCompletedWeeks > 0 ? ` and ${totalCompletedWeeks} completed week${totalCompletedWeeks !== 1 ? "s" : ""} of momentum` : ""}${streakCount > 0 ? ` with a ${streakCount}-week streak` : ""}. Set Week ${weekNumber}'s outcome—make it simple, concrete, and finishable. Every unicorn started with Week 1.`,
@@ -1164,6 +1208,14 @@ export default function FounderDashboard({
     customDescription,
     customMilestones,
   ) => {
+    if (founderNeedsLaunch) {
+      toast.info("Launch your startup first", {
+        description:
+          "Publish your startup post before setting weekly goals.",
+      });
+      onNavigate?.("post-startup");
+      throw new Error("Startup not launched");
+    }
     if (!founderId) {
       toast.error("Could not identify your account", {
         description: "Please sign in again, then set your weekly goal.",
@@ -1478,6 +1530,14 @@ export default function FounderDashboard({
     customTitle,
     customDescription,
   ) => {
+    if (founderNeedsLaunch) {
+      toast.info("Launch your startup first", {
+        description:
+          "Publish your startup post before setting weekly goals.",
+      });
+      onNavigate?.("post-startup");
+      throw new Error("Startup not launched");
+    }
     if (!founderId) {
       toast.error("Could not identify your account", {
         description: "Please sign in again, then set your weekly goal.",
@@ -1740,9 +1800,9 @@ export default function FounderDashboard({
               type="button"
               size="sm"
               variant="secondary"
-              onClick={() => onNavigate("settings")}
+              onClick={() => onNavigate("post-startup")}
             >
-              Open settings
+              Launch startup
             </Button>
           )}
         </div>
@@ -2376,21 +2436,51 @@ export default function FounderDashboard({
                       </div>
                       ) : (
                         <div className="flex min-h-[120px] flex-col items-center justify-center px-2 py-4 text-center md:px-3 md:py-5">
-                          <Target className="mb-1.5 h-8 w-8 text-surface-border md:mb-2 md:h-9 md:w-9" />
-                          <h3 className="mb-1 font-heading text-xs font-semibold text-text-heading md:text-sm">
-                            No weekly outcome set yet
-                          </h3>
-                          <p className="mb-2 max-w-md font-body text-[9px] text-text-body md:mb-3 md:text-[10px]">
-                            Set a clear, achievable goal for this week to drive your
-                            startup forward
-                          </p>
-                          <Button
-                            onClick={() => setShowOutcomeModal(true)}
-                            className="h-6 gap-1.5 rounded-input bg-primary font-body text-[9px] font-semibold text-white shadow-[0_4px_16px_rgba(58,90,254,0.25)] transition-all duration-200 ease-in-out hover:bg-primary-hover md:h-7 md:text-[10px]"
-                          >
-                            <PlayCircle className="w-2.5 h-2.5" />
-                            Set This Week's Goal
-                          </Button>
+                          {founderLaunchLoading ? (
+                            <>
+                              <Loader2 className="mb-2 h-8 w-8 animate-spin text-primary" />
+                              <p className="font-body text-[10px] text-text-muted md:text-xs">
+                                Checking your startup profile…
+                              </p>
+                            </>
+                          ) : founderNeedsLaunch ? (
+                            <>
+                              <Rocket className="mb-1.5 h-8 w-8 text-surface-border md:mb-2 md:h-9 md:w-9" />
+                              <h3 className="mb-1 font-heading text-xs font-semibold text-text-heading md:text-sm">
+                                Launch your startup first
+                              </h3>
+                              <p className="mb-2 max-w-md font-body text-[9px] text-text-body md:mb-3 md:text-[10px]">
+                                Publish your startup post before setting weekly
+                                goals. Your onboarding details are ready to
+                                review.
+                              </p>
+                              <Button
+                                onClick={() => onNavigate?.("post-startup")}
+                                className="h-6 gap-1.5 rounded-input bg-primary font-body text-[9px] font-semibold text-white shadow-[0_4px_16px_rgba(58,90,254,0.25)] transition-all duration-200 ease-in-out hover:bg-primary-hover md:h-7 md:text-[10px]"
+                              >
+                                <Rocket className="h-2.5 w-2.5" />
+                                Launch Startup
+                              </Button>
+                            </>
+                          ) : (
+                            <>
+                              <Target className="mb-1.5 h-8 w-8 text-surface-border md:mb-2 md:h-9 md:w-9" />
+                              <h3 className="mb-1 font-heading text-xs font-semibold text-text-heading md:text-sm">
+                                No weekly outcome set yet
+                              </h3>
+                              <p className="mb-2 max-w-md font-body text-[9px] text-text-body md:mb-3 md:text-[10px]">
+                                Set a clear, achievable goal for this week to drive your
+                                startup forward
+                              </p>
+                              <Button
+                                onClick={requestWeeklyOutcome}
+                                className="h-6 gap-1.5 rounded-input bg-primary font-body text-[9px] font-semibold text-white shadow-[0_4px_16px_rgba(58,90,254,0.25)] transition-all duration-200 ease-in-out hover:bg-primary-hover md:h-7 md:text-[10px]"
+                              >
+                                <PlayCircle className="w-2.5 h-2.5" />
+                                Set This Week&apos;s Goal
+                              </Button>
+                            </>
+                          )}
                         </div>
                       )}
                     </TooltipProvider>
@@ -2421,8 +2511,10 @@ export default function FounderDashboard({
                       variant="outline"
                       className="h-8 rounded-input border border-surface-border bg-white px-4 font-body text-[10px] font-semibold text-primary transition-all duration-200 ease-in-out hover:bg-primary-tint md:text-[11px]"
                       onClick={() => {
-                        if (smartInsight.action === "set-outcome") {
-                          setShowOutcomeModal(true);
+                        if (smartInsight.action === "launch-startup") {
+                          onNavigate?.("post-startup");
+                        } else if (smartInsight.action === "set-outcome") {
+                          requestWeeklyOutcome();
                         } else if (
                           smartInsight.action === "milestone-detail"
                         ) {

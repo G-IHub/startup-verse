@@ -9,12 +9,23 @@ import { Checkbox } from "../ui/checkbox";
 import { Separator } from "../ui/separator";
 import { toast } from "sonner";
 import * as founderApi from "../../utils/api/founderApi";
+import { uploadFile } from "../../utils/api/uploadApi";
 import StartupDetailPage from "./StartupDetailPage";
+import { StartupBrandingFields } from "./StartupBrandingFields";
+import { CompensationCountrySelect } from "./CompensationCountrySelect";
+import { buildStartupPostPayload } from "../../domains/founder/buildStartupPostPayload";
+import { resolveCompensationCountryFromOffer } from "../../config/compensationCountries";
+import { getSalaryFieldLabel } from "../../utils/formatMoney";
+import {
+  buildStartupPostFormDefaults,
+  hasStartupPostOnboardingDefaults,
+  mergePostFormDefaults,
+} from "../../domains/founder/founderPostDefaults";
 import {
   ArrowLeft,
   Rocket,
   Eye,
-  DollarSign,
+  Coins,
   Building2,
   Globe,
   Linkedin,
@@ -81,9 +92,14 @@ export function PostStartupPage({ user, onNavigate }) {
   const [showPreview, setShowPreview] = useState(false);
   const [existingPost, setExistingPost] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [prefilledFromOnboarding, setPrefilledFromOnboarding] = useState(false);
+  const [uploadingLogo, setUploadingLogo] = useState(false);
 
   const [formData, setFormData] = useState({
     title: "",
+    tagline: "",
+    brandColor: "",
+    logoUrl: "",
     description: "",
     industry: "",
     stage: "",
@@ -103,6 +119,8 @@ export function PostStartupPage({ user, onNavigate }) {
     salaryApproach: "",
     salaryMin: "",
     salaryMax: "",
+    compensationCountry: "",
+    currency: "",
     benefits: [],
     whyJoinUs: ["", "", ""],
     customPerks: "",
@@ -120,14 +138,22 @@ export function PostStartupPage({ user, onNavigate }) {
     }
 
     try {
-      const response = await founderApi.getAllPosts();
-      if (response.success && response.posts) {
-        const userPost = response.posts.find((post) => post.founderId === userId);
-        if (userPost) {
-          setExistingPost(userPost);
-          setIsEditing(true);
-          populateForm(userPost);
-        }
+      const [posts, startup] = await Promise.all([
+        founderApi.getFounderPosts(userId),
+        founderApi.getFounderStartupSafe(userId),
+      ]);
+
+      const postList = Array.isArray(posts) ? posts : [];
+      const userPost = postList[0] || null;
+
+      if (userPost) {
+        setExistingPost(userPost);
+        setIsEditing(true);
+        populateForm(userPost);
+      } else {
+        const defaults = buildStartupPostFormDefaults({ user, startup });
+        setFormData((prev) => mergePostFormDefaults(prev, defaults));
+        setPrefilledFromOnboarding(hasStartupPostOnboardingDefaults(defaults));
       }
     } catch (error) {
       console.warn("Could not check existing posts:", error);
@@ -136,8 +162,12 @@ export function PostStartupPage({ user, onNavigate }) {
   };
 
   const populateForm = (post) => {
+    const { compensationCountry, currency } = resolveCompensationCountryFromOffer(post.offer);
     setFormData({
       title: post.title || "",
+      tagline: post.tagline || "",
+      brandColor: post.brandColor || "",
+      logoUrl: post.logoUrl || post.logo || "",
       description: post.description || "",
       industry: post.industry || "",
       stage: post.stage || "",
@@ -157,6 +187,8 @@ export function PostStartupPage({ user, onNavigate }) {
       salaryApproach: post.offer?.salaryApproach || "",
       salaryMin: post.offer?.salaryMin || "",
       salaryMax: post.offer?.salaryMax || "",
+      compensationCountry,
+      currency,
       benefits: post.offer?.benefits || [],
       whyJoinUs: post.offer?.whyJoinUs?.length ? post.offer.whyJoinUs : ["", "", ""],
       customPerks: post.offer?.customPerks || "",
@@ -165,6 +197,39 @@ export function PostStartupPage({ user, onNavigate }) {
 
   const handleInputChange = (field, value) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const handleCompensationCountryChange = ({ compensationCountry, currency }) => {
+    setFormData((prev) => ({
+      ...prev,
+      compensationCountry,
+      currency,
+    }));
+  };
+
+  const handleLogoUpload = async (file) => {
+    if (!file.type.startsWith("image/")) {
+      toast.error("Please upload an image file");
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error("Logo must be less than 5MB");
+      return;
+    }
+    setUploadingLogo(true);
+    try {
+      const uploaded = await uploadFile(file, "general");
+      if (!uploaded?.url) {
+        throw new Error("Upload did not return a URL");
+      }
+      handleInputChange("logoUrl", uploaded.url);
+      toast.success("Logo uploaded");
+    } catch (error) {
+      console.error("Logo upload failed:", error);
+      toast.error(error?.message || "Failed to upload logo");
+    } finally {
+      setUploadingLogo(false);
+    }
   };
 
   const handleBenefitToggle = (benefit, checked) => {
@@ -186,7 +251,7 @@ export function PostStartupPage({ user, onNavigate }) {
 
   const validateForm = () => {
     const missing = [];
-    if (!formData.title?.trim()) missing.push("Startup Title");
+    if (!formData.title?.trim()) missing.push("Startup name");
     if (!formData.description?.trim()) missing.push("Description");
     if (!formData.industry) missing.push("Industry");
     if (!formData.stage) missing.push("Stage");
@@ -212,54 +277,10 @@ export function PostStartupPage({ user, onNavigate }) {
     }
   };
 
-  const buildOfferFromForm = () => {
-    if (!formData.compensationPhilosophy) return undefined;
-    return {
-      compensationPhilosophy: formData.compensationPhilosophy,
-      equityMin: formData.equityMin,
-      equityMax: formData.equityMax,
-      salaryApproach: formData.salaryApproach,
-      salaryMin: formData.salaryMin,
-      salaryMax: formData.salaryMax,
-      benefits: formData.benefits,
-      whyJoinUs: formData.whyJoinUs.filter((r) => r.trim()),
-      customPerks: formData.customPerks,
-    };
-  };
-
-  const previewStartup = useMemo(() => {
-    const userId = String(user?._id ?? user?.id ?? "");
-    const offer = buildOfferFromForm();
-    return {
-      id: existingPost?.id || "preview-draft",
-      title: formData.title,
-      description: formData.description,
-      founder: user?.name || "You",
-      founderId: userId,
-      founderAvatar: user?.profile?.avatar,
-      industry: formData.industry,
-      stage: formData.stage,
-      lookingFor: formData.lookingFor
-        .split(",")
-        .map((r) => r.trim())
-        .filter(Boolean),
-      location: formData.location || "Remote",
-      commitment: formData.commitment,
-      postedDate: existingPost?.postedDate || new Date(),
-      interested: existingPost?.interested ?? 0,
-      tags: formData.tags
-        .split(",")
-        .map((t) => t.trim())
-        .filter(Boolean),
-      offer,
-      website: formData.website,
-      linkedinUrl: formData.linkedinUrl,
-      twitterUrl: formData.twitterUrl,
-      githubUrl: formData.githubUrl,
-      contactEmail: formData.contactEmail,
-      pitchDeckUrl: formData.pitchDeckUrl,
-    };
-  }, [formData, user, existingPost]);
+  const previewStartup = useMemo(
+    () => buildStartupPostPayload({ formData, user, existingPost }),
+    [formData, user, existingPost],
+  );
 
   const handleSubmit = async () => {
     const userId = String(user?._id ?? user?.id ?? "");
@@ -268,30 +289,9 @@ export function PostStartupPage({ user, onNavigate }) {
       return;
     }
 
-    const offer = buildOfferFromForm();
-
     const postData = {
+      ...buildStartupPostPayload({ formData, user, existingPost }),
       id: existingPost?.id || Date.now().toString(),
-      title: formData.title,
-      description: formData.description,
-      founder: user.name,
-      founderId: userId,
-      founderAvatar: user.profile?.avatar,
-      industry: formData.industry,
-      stage: formData.stage,
-      lookingFor: formData.lookingFor.split(",").map((r) => r.trim()).filter(Boolean),
-      location: formData.location || "Remote",
-      commitment: formData.commitment,
-      postedDate: existingPost?.postedDate || new Date(),
-      interested: existingPost?.interested || 0,
-      tags: formData.tags.split(",").map((t) => t.trim()).filter(Boolean),
-      offer,
-      website: formData.website,
-      linkedinUrl: formData.linkedinUrl,
-      twitterUrl: formData.twitterUrl,
-      githubUrl: formData.githubUrl,
-      contactEmail: formData.contactEmail,
-      pitchDeckUrl: formData.pitchDeckUrl,
     };
 
     try {
@@ -371,7 +371,9 @@ export function PostStartupPage({ user, onNavigate }) {
               <p className="text-text-muted mt-1">
                 {isEditing
                   ? "Update your startup post to keep talent informed"
-                  : "Share your startup vision and attract talented co-founders and early team members"}
+                  : prefilledFromOnboarding
+                    ? "We've filled in details from your onboarding — add your logo and branding, then publish."
+                    : "Share your startup vision, brand identity, and attract talented co-founders"}
               </p>
             </div>
           </div>
@@ -381,6 +383,35 @@ export function PostStartupPage({ user, onNavigate }) {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Main Form */}
           <div className="lg:col-span-2 space-y-6">
+            <Card className="overflow-hidden border-surface-border bg-surface-card shadow-soft">
+              <CardHeader className="border-b border-surface-border/80 bg-gradient-to-r from-primary/[0.06] via-transparent to-transparent px-6 py-5">
+                <div className="flex items-start gap-3">
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary shadow-sm">
+                    <Sparkles className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <CardTitle className="font-heading text-lg font-bold text-text-heading">
+                      Branding
+                    </CardTitle>
+                    <p className="mt-1 font-body text-sm text-text-muted">
+                      How talent will recognize your startup across listings and detail pages.
+                    </p>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent className="p-6 md:p-8">
+                <StartupBrandingFields
+                  title={formData.title}
+                  tagline={formData.tagline}
+                  brandColor={formData.brandColor}
+                  logoUrl={formData.logoUrl}
+                  onChange={handleInputChange}
+                  onLogoUpload={handleLogoUpload}
+                  uploadingLogo={uploadingLogo}
+                />
+              </CardContent>
+            </Card>
+
             <Card className="surface-card border-surface-border">
               <CardHeader className="border-b border-surface-border">
                 <CardTitle className="text-lg font-semibold text-text-heading flex items-center gap-2">
@@ -389,19 +420,6 @@ export function PostStartupPage({ user, onNavigate }) {
                 </CardTitle>
               </CardHeader>
               <CardContent className="p-6 space-y-5">
-                <div>
-                  <Label htmlFor="title" className="text-text-heading">
-                    Startup Title <span className="text-red-500">*</span>
-                  </Label>
-                  <Input
-                    id="title"
-                    placeholder="e.g., AI-Powered Healthcare Platform"
-                    value={formData.title}
-                    onChange={(e) => handleInputChange("title", e.target.value)}
-                    className="mt-2 bg-surface-page border-surface-border focus:border-primary"
-                  />
-                </div>
-
                 <div>
                   <Label htmlFor="description" className="text-text-heading">
                     Description <span className="text-red-500">*</span>
@@ -627,7 +645,7 @@ export function PostStartupPage({ user, onNavigate }) {
             <Card className="surface-card border-surface-border">
               <CardHeader className="border-b border-surface-border">
                 <CardTitle className="text-lg font-semibold text-text-heading flex items-center gap-2">
-                  <DollarSign className="w-5 h-5 text-primary" />
+                  <Coins className="w-5 h-5 text-primary" />
                   Compensation
                   <span className="text-text-muted font-normal text-sm">(optional)</span>
                 </CardTitle>
@@ -705,34 +723,42 @@ export function PostStartupPage({ user, onNavigate }) {
                     </div>
 
                     {formData.salaryApproach !== "deferred" && (
-                      <div className="grid grid-cols-2 gap-3">
-                        <div>
-                          <Label htmlFor="salaryMin" className="text-text-heading text-sm">
-                            Salary Min ($)
-                          </Label>
-                          <Input
-                            id="salaryMin"
-                            type="number"
-                            placeholder="80000"
-                            value={formData.salaryMin}
-                            onChange={(e) => handleInputChange("salaryMin", e.target.value)}
-                            className="mt-2 bg-surface-page border-surface-border focus:border-primary"
-                          />
+                      <>
+                        <CompensationCountrySelect
+                          value={formData.compensationCountry}
+                          currency={formData.currency}
+                          onChange={handleCompensationCountryChange}
+                        />
+
+                        <div className="grid grid-cols-2 gap-3">
+                          <div>
+                            <Label htmlFor="salaryMin" className="text-text-heading text-sm">
+                              {getSalaryFieldLabel("Salary Min", formData.currency)}
+                            </Label>
+                            <Input
+                              id="salaryMin"
+                              type="number"
+                              placeholder="80000"
+                              value={formData.salaryMin}
+                              onChange={(e) => handleInputChange("salaryMin", e.target.value)}
+                              className="mt-2 bg-surface-page border-surface-border focus:border-primary"
+                            />
+                          </div>
+                          <div>
+                            <Label htmlFor="salaryMax" className="text-text-heading text-sm">
+                              {getSalaryFieldLabel("Salary Max", formData.currency)}
+                            </Label>
+                            <Input
+                              id="salaryMax"
+                              type="number"
+                              placeholder="120000"
+                              value={formData.salaryMax}
+                              onChange={(e) => handleInputChange("salaryMax", e.target.value)}
+                              className="mt-2 bg-surface-page border-surface-border focus:border-primary"
+                            />
+                          </div>
                         </div>
-                        <div>
-                          <Label htmlFor="salaryMax" className="text-text-heading text-sm">
-                            Salary Max ($)
-                          </Label>
-                          <Input
-                            id="salaryMax"
-                            type="number"
-                            placeholder="120000"
-                            value={formData.salaryMax}
-                            onChange={(e) => handleInputChange("salaryMax", e.target.value)}
-                            className="mt-2 bg-surface-page border-surface-border focus:border-primary"
-                          />
-                        </div>
-                      </div>
+                      </>
                     )}
 
                     <Separator className="border-surface-border" />
@@ -798,11 +824,11 @@ export function PostStartupPage({ user, onNavigate }) {
                   <div>
                     <h4 className="font-semibold text-text-heading text-sm">Tips for a Great Post</h4>
                     <ul className="mt-2 space-y-1.5 text-xs text-text-body">
+                      <li>• Add a clear logo and tagline so talent recognizes you</li>
                       <li>• Be specific about the problem you&apos;re solving</li>
                       <li>• Mention your traction or validation so far</li>
                       <li>• Clearly define the roles you need</li>
                       <li>• Be transparent about compensation</li>
-                      <li>• Share your vision and why it matters</li>
                     </ul>
                   </div>
                 </div>

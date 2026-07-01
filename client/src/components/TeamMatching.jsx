@@ -46,6 +46,10 @@ import * as founderApi from "../utils/api/founderApi";
 import * as inboxApi from "../utils/api/inboxApi";
 import * as compensationApi from "../utils/api/compensationApi";
 import { buildFounderProfile } from "../app/session.js";
+import {
+  buildStartupPostFormDefaults,
+  mergePostFormDefaults,
+} from "../domains/founder/founderPostDefaults";
 import { broadcastMessageUpdate } from "../utils/realtimeSubscriptions";
 import OfferDisplay from "./OfferDisplay";
 import {
@@ -57,6 +61,7 @@ import { augmentTalentBrowseFields } from "../utils/talentBrowseNormalize";
 import { getTalentBrowseProfileCompletionPercent } from "../utils/talentProfileCompletion.js";
 import TeamOnboardingManager from "./compensation/TeamOnboardingManager";
 import CompensationSetupWizard from "./compensation/CompensationSetupWizard";
+import EmptyStateBlock from "./organizations/_primitives/EmptyStateBlock";
 import {
   Users,
   Search,
@@ -161,6 +166,29 @@ export default function TeamMatching({ user, onNavigate }) {
     whyJoinUs: ["", "", ""],
     customPerks: "",
   });
+
+  React.useEffect(() => {
+    if (!isPostIdeaOpen || isEditingExisting || user.role !== "founder") return;
+
+    let cancelled = false;
+    (async () => {
+      const founderUserId = String(user._id ?? user.id ?? "");
+      if (!founderUserId) return;
+
+      try {
+        const startup = await founderApi.getFounderStartupSafe(founderUserId);
+        if (cancelled) return;
+        const defaults = buildStartupPostFormDefaults({ user, startup });
+        setPostFormData((prev) => mergePostFormDefaults(prev, defaults));
+      } catch (error) {
+        console.warn("[TeamMatching] Could not pre-fill post form:", error);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isPostIdeaOpen, isEditingExisting, user]);
 
   React.useEffect(() => {
     loadStartupIdeas();
@@ -821,9 +849,20 @@ export default function TeamMatching({ user, onNavigate }) {
     user.role === "founder" && founderPostsStatus === "loading";
   const founderCanBrowseTalent =
     user.role !== "founder" || founderPostsStatus === "has-post";
+  const founderNeedsLaunch =
+    user.role === "founder" && !founderPostsLoading && !founderCanBrowseTalent;
+
   return (
-    <div className="min-h-full bg-surface-page p-2 font-body md:p-3 lg:p-4 space-y-3 md:space-y-4">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 mb-4 md:mb-6">
+    <div
+      className={`min-h-full bg-surface-page font-body ${
+        founderNeedsLaunch ? "p-4 md:p-6" : "space-y-3 p-2 md:space-y-4 md:p-3 lg:p-4"
+      }`}
+    >
+      <div
+        className={`flex flex-col gap-3 ${
+          founderNeedsLaunch ? "mb-6" : "mb-4 justify-between md:mb-6 md:flex-row md:items-center"
+        }`}
+      >
         <div>
           <h2 className="mb-1 font-heading text-xl font-extrabold text-text-heading md:text-2xl">
             {user.role === "founder"
@@ -904,59 +943,42 @@ export default function TeamMatching({ user, onNavigate }) {
         </Card>
       )}
       {user.role === "founder" && founderPostsLoading && (
-        <Card className="rounded-card border border-surface-border bg-surface-card shadow-soft">
-          <CardContent className="flex items-center gap-4 p-6 md:p-8">
+        <Card className="mx-auto w-full max-w-lg rounded-card border border-surface-border bg-surface-card shadow-soft">
+          <CardContent className="flex min-h-[280px] flex-col items-center justify-center gap-3 p-8">
             <div
-              className="h-10 w-10 flex-shrink-0 animate-spin rounded-full border-[3px] border-primary border-t-transparent"
+              className="h-10 w-10 animate-spin rounded-full border-[3px] border-primary border-t-transparent"
               aria-hidden
             />
-            <div>
-              <p className="font-heading text-sm font-semibold text-text-heading">
-                Checking your startup profile
-              </p>
-              <p className="mt-1 font-body text-xs text-text-muted md:text-sm">
-                Hang tight while we confirm whether you can browse talent.
-              </p>
-            </div>
+            <p className="font-body text-sm text-text-muted">
+              Checking your startup profile…
+            </p>
           </CardContent>
         </Card>
       )}
-      {user.role === "founder" &&
-        !founderPostsLoading &&
-        !founderCanBrowseTalent && (
-          <Card className="overflow-hidden rounded-card border border-surface-border bg-surface-card shadow-soft">
-            <CardContent className="p-0">
-              <div className="border-b border-primary/15 bg-primary-tint px-4 py-3 md:px-6 md:py-4">
-                <div className="flex items-start gap-3">
-                  <div className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-card bg-primary text-white shadow-soft">
-                    <Rocket className="h-5 w-5" />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <h3 className="font-heading text-base font-extrabold text-text-heading md:text-lg">
-                      Launch your startup to browse talent
-                    </h3>
-                    <p className="mt-1 font-body text-xs leading-relaxed text-text-body md:text-sm">
-                      Publish your startup post first. Once it is live, you can
-                      discover talent and send invitations from this tab.
-                    </p>
-                  </div>
-                </div>
-              </div>
-              <div className="flex flex-col gap-3 px-4 py-4 sm:flex-row sm:items-center sm:justify-between md:px-6 md:py-5">
-                <p className="font-body text-xs text-text-muted md:text-sm">
-                  Your post helps talent understand your vision before you reach out.
-                </p>
-                <Button
-                  onClick={() => onNavigate?.("post-startup")}
-                  className="w-full shrink-0 rounded-input bg-primary font-body text-sm font-semibold text-white hover:bg-primary-hover sm:w-auto"
-                >
-                  <Plus className="mr-1.5 h-4 w-4" />
-                  Launch Startup
-                </Button>
-              </div>
+      {founderNeedsLaunch && (
+        <div className="flex flex-1 items-center justify-center py-6 md:py-10">
+          <Card className="w-full max-w-lg rounded-card border border-surface-border bg-surface-card shadow-soft">
+            <CardContent className="p-2 md:p-4">
+              <EmptyStateBlock
+                icon={Rocket}
+                tone="info"
+                title="Publish your startup to browse talent"
+                description="Your onboarding details are ready to review. Add commitment, publish your post, and talent matching unlocks on this page."
+                action={
+                  <Button
+                    onClick={() => onNavigate?.("post-startup")}
+                    className="rounded-input bg-primary px-6 font-body text-sm font-semibold text-white shadow-[0_4px_16px_rgba(58,90,254,0.20)] transition-colors duration-200 ease-in-out hover:bg-primary-hover"
+                  >
+                    <Rocket className="mr-2 h-4 w-4" />
+                    Launch Startup
+                  </Button>
+                }
+                className="min-h-[280px] rounded-card bg-surface-card py-8"
+              />
             </CardContent>
           </Card>
-        )}
+        </div>
+      )}
       {(user.role === "talent" || (user.role === "founder" && founderCanBrowseTalent)) && (
         <>
           <div className="flex flex-col sm:flex-row gap-2 mb-4">

@@ -8,6 +8,7 @@ import { Input } from "../components/ui/input";
 import { UserPlus, Mail, ArrowRight, CheckCircle } from "lucide-react";
 import { toast } from "sonner";
 import MentorPortal from "../components/mentor/MentorPortal";
+import StartupVerseLogo from "../components/brand/StartupVerseLogo";
 import { unwrapData } from "../utils/apiEnvelope";
 import {
   AUTH_CARD,
@@ -143,9 +144,7 @@ export default function MentorLogin() {
   return (
     <AuthCenteredShell maxWidth="max-w-md">
       <div className="mb-8 text-center">
-        <h1 className="mb-2 font-heading text-2xl font-extrabold text-primary">
-          StartupVerse
-        </h1>
+        <StartupVerseLogo className="mx-auto mb-4 h-10" />
         <p className="font-body text-sm text-text-muted">Mentor Portal</p>
       </div>
       {verifying ? (

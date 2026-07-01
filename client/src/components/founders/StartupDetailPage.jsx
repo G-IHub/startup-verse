@@ -7,6 +7,17 @@ import { toast } from "sonner";
 import * as founderApi from "../../utils/api/founderApi";
 import * as inboxApi from "../../utils/api/inboxApi";
 import { broadcastMessageUpdate } from "../../utils/realtimeSubscriptions";
+import { StartupAvatar } from "./StartupBrandingFields";
+import {
+  formatEquityRange,
+  formatSalaryRange,
+  getCompensationCurrencyLabel,
+  hasCompensationDetails,
+  hasStartupLinks,
+  normalizeLookingFor,
+  normalizeTags,
+  resolveBrandAccent,
+} from "../../domains/founder/startupPostDisplay";
 import {
   ArrowLeft,
   Building2,
@@ -27,7 +38,53 @@ import {
   Sparkles,
   MessageSquare,
   Rocket,
+  Tag,
+  Palette,
 } from "lucide-react";
+
+function LinkRow({ href, icon: Icon, label, sublabel, external = true }) {
+  const className =
+    "flex items-center gap-3 rounded-xl border border-surface-border/80 bg-surface-page p-3 transition-colors hover:border-primary/30 hover:bg-primary/[0.04] group";
+  const content = (
+    <>
+      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white ring-1 ring-surface-border">
+        <Icon className="h-4 w-4 text-text-muted group-hover:text-primary" />
+      </div>
+      <div className="min-w-0 flex-1">
+        <p className="font-body text-sm font-medium text-text-heading">{label}</p>
+        {sublabel ? (
+          <p className="truncate font-body text-xs text-text-muted">{sublabel}</p>
+        ) : null}
+      </div>
+      {external ? (
+        <ExternalLink className="h-4 w-4 shrink-0 text-text-muted" />
+      ) : null}
+    </>
+  );
+
+  if (href) {
+    return (
+      <a
+        href={href}
+        target={external ? "_blank" : undefined}
+        rel={external ? "noopener noreferrer" : undefined}
+        className={className}
+      >
+        {content}
+      </a>
+    );
+  }
+
+  return <div className={className}>{content}</div>;
+}
+
+function TwitterIcon({ className }) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} fill="currentColor" aria-hidden>
+      <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
+    </svg>
+  );
+}
 
 const COMPENSATION_PHILOSOPHIES = {
   "equity-focused": "Equity-Focused (High equity, lower cash)",
@@ -194,6 +251,17 @@ export function StartupDetailPage({
     (user?.id === startup.founderId || user?._id === startup.founderId);
   const isTalent = user?.role === "talent";
   const showInterestChrome = previewMode || (!isOwnStartup && isTalent);
+  const brandAccent = resolveBrandAccent(startup.brandColor);
+  const lookingForRoles = normalizeLookingFor(startup.lookingFor);
+  const tagList = normalizeTags(startup.tags);
+  const whyJoinReasons = (startup.offer?.whyJoinUs || [])
+    .map((r) => String(r).trim())
+    .filter(Boolean);
+  const showCompensation = hasCompensationDetails(startup.offer);
+  const showLinks = hasStartupLinks(startup);
+  const equityRange = formatEquityRange(startup.offer);
+  const salaryRange = formatSalaryRange(startup.offer);
+  const compensationCurrencyLabel = getCompensationCurrencyLabel(startup.offer);
 
   const handleBack = () => {
     if (previewMode && onPreviewBack) {
@@ -227,24 +295,43 @@ export function StartupDetailPage({
           </div>
         )}
         {/* Header Card */}
-        <Card className="surface-card border-surface-border mb-6">
+        <Card className="surface-card mb-6 overflow-hidden border-surface-border">
           <CardContent className="p-6">
             <div className="flex flex-col md:flex-row md:items-start gap-6">
               {/* Startup Avatar */}
-              <div className="w-20 h-20 rounded-2xl bg-primary/10 flex items-center justify-center text-3xl font-bold text-primary shrink-0">
-                {startup.title?.charAt(0).toUpperCase() || "S"}
-              </div>
+              <StartupAvatar
+                title={startup.title}
+                logoUrl={startup.logoUrl || startup.logo}
+                brandColor={startup.brandColor}
+                size="md"
+              />
 
               {/* Main Info */}
               <div className="flex-1 min-w-0">
                 <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
                   <div>
                     <h1 className="text-3xl font-bold text-text-heading mb-2">{startup.title}</h1>
+                    {startup.tagline ? (
+                      <p className="mb-2 text-base font-medium text-primary">
+                        {startup.tagline}
+                      </p>
+                    ) : null}
                     <p className="text-text-muted">
                       Posted by{" "}
                       <span className="font-medium text-text-heading">{startup.founder}</span>
                       {" "}• {formatDate(startup.postedDate)}
                     </p>
+                    {brandAccent ? (
+                      <div className="mt-3 inline-flex items-center gap-2 rounded-full bg-surface-page px-3 py-1 text-xs text-text-muted ring-1 ring-surface-border">
+                        <Palette className="h-3.5 w-3.5" style={{ color: brandAccent }} />
+                        <span>Brand color</span>
+                        <span
+                          className="h-3 w-3 rounded-full ring-1 ring-black/10"
+                          style={{ backgroundColor: brandAccent }}
+                        />
+                        <span className="font-mono text-[11px]">{brandAccent}</span>
+                      </div>
+                    ) : null}
                   </div>
                   <div className="flex items-center gap-2">
                     <Button
@@ -318,25 +405,36 @@ export function StartupDetailPage({
               </CardHeader>
               <CardContent>
                 <div className="flex flex-wrap gap-2">
-                  {startup.lookingFor?.map((role, index) => (
-                    <Badge key={index} variant="secondary" className="text-sm py-2 px-4">
-                      {role}
-                    </Badge>
-                  ))}
+                  {lookingForRoles.length > 0 ? (
+                    lookingForRoles.map((role) => (
+                      <Badge
+                        key={role}
+                        variant="secondary"
+                        className="rounded-full px-4 py-2 text-sm font-medium"
+                      >
+                        {role}
+                      </Badge>
+                    ))
+                  ) : (
+                    <p className="text-sm text-text-muted">No roles listed yet.</p>
+                  )}
                 </div>
               </CardContent>
             </Card>
 
             {/* Tags */}
-            {startup.tags && startup.tags.length > 0 && (
+            {tagList.length > 0 && (
               <Card className="surface-card border-surface-border">
                 <CardHeader>
-                  <CardTitle className="text-lg font-semibold text-text-heading">Tags</CardTitle>
+                  <CardTitle className="text-lg font-semibold text-text-heading flex items-center gap-2">
+                    <Tag className="w-5 h-5 text-primary" />
+                    Tags
+                  </CardTitle>
                 </CardHeader>
                 <CardContent>
                   <div className="flex flex-wrap gap-2">
-                    {startup.tags.map((tag, index) => (
-                      <Badge key={index} variant="outline" className="text-sm">
+                    {tagList.map((tag) => (
+                      <Badge key={tag} variant="outline" className="rounded-full text-sm">
                         {tag}
                       </Badge>
                     ))}
@@ -345,8 +443,7 @@ export function StartupDetailPage({
               </Card>
             )}
 
-            {/* Why Join Us */}
-            {startup.offer?.whyJoinUs && startup.offer.whyJoinUs.length > 0 && (
+            {whyJoinReasons.length > 0 && (
               <Card className="surface-card border-surface-border">
                 <CardHeader>
                   <CardTitle className="text-lg font-semibold text-text-heading flex items-center gap-2">
@@ -356,8 +453,8 @@ export function StartupDetailPage({
                 </CardHeader>
                 <CardContent>
                   <ul className="space-y-3">
-                    {startup.offer.whyJoinUs.map((reason, index) => (
-                      <li key={index} className="flex items-start gap-3">
+                    {whyJoinReasons.map((reason) => (
+                      <li key={reason} className="flex items-start gap-3">
                         <CheckCircle2 className="w-5 h-5 text-primary mt-0.5 shrink-0" />
                         <span className="text-text-body">{reason}</span>
                       </li>
@@ -445,7 +542,7 @@ export function StartupDetailPage({
             )}
 
             {/* Compensation Offer */}
-            {startup.offer && startup.offer.compensationPhilosophy && (
+            {showCompensation && (
               <Card className="surface-card border-surface-border">
                 <CardHeader>
                   <CardTitle className="text-lg font-semibold text-text-heading flex items-center gap-2">
@@ -454,136 +551,124 @@ export function StartupDetailPage({
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  <div className="bg-surface-page rounded-lg p-3">
-                    <p className="text-sm text-text-muted mb-1">Philosophy</p>
-                    <p className="font-medium text-text-heading">
-                      {COMPENSATION_PHILOSOPHIES[startup.offer.compensationPhilosophy]}
-                    </p>
-                  </div>
-
-                  {startup.offer.equityMin && startup.offer.equityMax && (
-                    <div className="bg-surface-page rounded-lg p-3">
-                      <p className="text-sm text-text-muted mb-1">Equity Range</p>
+                  {startup.offer.compensationPhilosophy ? (
+                    <div className="rounded-xl border border-surface-border/80 bg-surface-page p-3">
+                      <p className="text-sm text-text-muted mb-1">Philosophy</p>
                       <p className="font-medium text-text-heading">
-                        {startup.offer.equityMin}% - {startup.offer.equityMax}%
+                        {COMPENSATION_PHILOSOPHIES[startup.offer.compensationPhilosophy]}
                       </p>
                     </div>
-                  )}
+                  ) : null}
 
-                  {startup.offer.salaryApproach && (
-                    <div className="bg-surface-page rounded-lg p-3">
-                      <p className="text-sm text-text-muted mb-1">Salary Approach</p>
+                  {equityRange ? (
+                    <div className="rounded-xl border border-surface-border/80 bg-surface-page p-3">
+                      <p className="text-sm text-text-muted mb-1">Equity range</p>
+                      <p className="font-medium text-text-heading">{equityRange}</p>
+                    </div>
+                  ) : null}
+
+                  {startup.offer.salaryApproach ? (
+                    <div className="rounded-xl border border-surface-border/80 bg-surface-page p-3">
+                      <p className="text-sm text-text-muted mb-1">Salary approach</p>
                       <p className="font-medium text-text-heading">
                         {SALARY_APPROACHES[startup.offer.salaryApproach]}
                       </p>
                     </div>
-                  )}
+                  ) : null}
 
-                  {startup.offer.salaryMin && startup.offer.salaryMax && (
-                    <div className="bg-surface-page rounded-lg p-3">
-                      <p className="text-sm text-text-muted mb-1">Salary Range</p>
-                      <p className="font-medium text-text-heading">
-                        ${parseInt(startup.offer.salaryMin).toLocaleString()} - ${
-                          parseInt(startup.offer.salaryMax).toLocaleString()
-                        }
-                      </p>
+                  {compensationCurrencyLabel ? (
+                    <div className="rounded-xl border border-surface-border/80 bg-surface-page p-3">
+                      <p className="text-sm text-text-muted mb-1">Currency</p>
+                      <p className="font-medium text-text-heading">{compensationCurrencyLabel}</p>
                     </div>
-                  )}
+                  ) : null}
 
-                  {startup.offer.benefits && startup.offer.benefits.length > 0 && (
+                  {salaryRange ? (
+                    <div className="rounded-xl border border-surface-border/80 bg-surface-page p-3">
+                      <p className="text-sm text-text-muted mb-1">Salary range</p>
+                      <p className="font-medium text-text-heading">{salaryRange}</p>
+                    </div>
+                  ) : null}
+
+                  {startup.offer.benefits?.length > 0 ? (
                     <>
                       <Separator className="border-surface-border" />
                       <div>
-                        <p className="text-sm text-text-muted mb-2">Benefits & Perks</p>
+                        <p className="text-sm text-text-muted mb-2">Benefits & perks</p>
                         <div className="flex flex-wrap gap-2">
-                          {startup.offer.benefits.map((benefit, index) => (
-                            <Badge key={index} variant="outline" className="text-xs">
+                          {startup.offer.benefits.map((benefit) => (
+                            <Badge key={benefit} variant="outline" className="rounded-full text-xs">
                               {benefit}
                             </Badge>
                           ))}
                         </div>
                       </div>
                     </>
-                  )}
+                  ) : null}
 
-                  {startup.offer.customPerks && (
+                  {startup.offer.customPerks ? (
                     <>
                       <Separator className="border-surface-border" />
                       <div>
-                        <p className="text-sm text-text-muted mb-1">Additional Perks</p>
-                        <p className="text-sm text-text-body">{startup.offer.customPerks}</p>
+                        <p className="text-sm text-text-muted mb-1">Additional perks</p>
+                        <p className="text-sm text-text-body whitespace-pre-wrap">
+                          {startup.offer.customPerks}
+                        </p>
                       </div>
                     </>
-                  )}
+                  ) : null}
                 </CardContent>
               </Card>
             )}
 
-            {/* Links */}
-            <Card className="surface-card border-surface-border">
-              <CardHeader>
-                <CardTitle className="text-lg font-semibold text-text-heading">Links</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                {startup.website && (
-                  <a
-                    href={startup.website}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center gap-3 p-3 bg-surface-page rounded-lg hover:bg-primary/5 transition-colors group"
-                  >
-                    <Globe className="w-5 h-5 text-text-muted group-hover:text-primary" />
-                    <span className="flex-1 text-text-body">Website</span>
-                    <ExternalLink className="w-4 h-4 text-text-muted" />
-                  </a>
-                )}
-                {startup.linkedinUrl && (
-                  <a
-                    href={startup.linkedinUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center gap-3 p-3 bg-surface-page rounded-lg hover:bg-primary/5 transition-colors group"
-                  >
-                    <Linkedin className="w-5 h-5 text-text-muted group-hover:text-primary" />
-                    <span className="flex-1 text-text-body">LinkedIn</span>
-                    <ExternalLink className="w-4 h-4 text-text-muted" />
-                  </a>
-                )}
-                {startup.githubUrl && (
-                  <a
-                    href={startup.githubUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center gap-3 p-3 bg-surface-page rounded-lg hover:bg-primary/5 transition-colors group"
-                  >
-                    <Github className="w-5 h-5 text-text-muted group-hover:text-primary" />
-                    <span className="flex-1 text-text-body">GitHub</span>
-                    <ExternalLink className="w-4 h-4 text-text-muted" />
-                  </a>
-                )}
-                {startup.pitchDeckUrl && (
-                  <a
-                    href={startup.pitchDeckUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center gap-3 p-3 bg-surface-page rounded-lg hover:bg-primary/5 transition-colors group"
-                  >
-                    <FileText className="w-5 h-5 text-text-muted group-hover:text-primary" />
-                    <span className="flex-1 text-text-body">Pitch Deck</span>
-                    <ExternalLink className="w-4 h-4 text-text-muted" />
-                  </a>
-                )}
-                {startup.contactEmail && (
-                  <a
-                    href={`mailto:${startup.contactEmail}`}
-                    className="flex items-center gap-3 p-3 bg-surface-page rounded-lg hover:bg-primary/5 transition-colors group"
-                  >
-                    <Mail className="w-5 h-5 text-text-muted group-hover:text-primary" />
-                    <span className="flex-1 text-text-body">{startup.contactEmail}</span>
-                  </a>
-                )}
-              </CardContent>
-            </Card>
+            {showLinks && (
+              <Card className="surface-card border-surface-border">
+                <CardHeader>
+                  <CardTitle className="text-lg font-semibold text-text-heading">Links</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  {startup.website ? (
+                    <LinkRow href={startup.website} icon={Globe} label="Website" sublabel={startup.website} />
+                  ) : null}
+                  {startup.linkedinUrl ? (
+                    <LinkRow
+                      href={startup.linkedinUrl}
+                      icon={Linkedin}
+                      label="LinkedIn"
+                      sublabel={startup.linkedinUrl}
+                    />
+                  ) : null}
+                  {startup.twitterUrl ? (
+                    <LinkRow
+                      href={startup.twitterUrl}
+                      icon={TwitterIcon}
+                      label="Twitter / X"
+                      sublabel={startup.twitterUrl}
+                    />
+                  ) : null}
+                  {startup.githubUrl ? (
+                    <LinkRow href={startup.githubUrl} icon={Github} label="GitHub" sublabel={startup.githubUrl} />
+                  ) : null}
+                  {startup.pitchDeckUrl ? (
+                    <LinkRow
+                      href={startup.pitchDeckUrl}
+                      icon={FileText}
+                      label="Pitch deck"
+                      sublabel={startup.pitchDeckUrl}
+                    />
+                  ) : null}
+                  {startup.contactEmail ? (
+                    <LinkRow
+                      href={`mailto:${startup.contactEmail}`}
+                      icon={Mail}
+                      label="Contact email"
+                      sublabel={startup.contactEmail}
+                      external={false}
+                    />
+                  ) : null}
+                </CardContent>
+              </Card>
+            )}
 
             {/* Posted Info */}
             <Card className="surface-card border-surface-border">

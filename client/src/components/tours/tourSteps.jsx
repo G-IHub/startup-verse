@@ -126,16 +126,7 @@ export const homepageTourSteps = [
             marginBottom: "8px",
           }}
         >
-          Access your profile, settings, and data backup options here.
-        </p>
-        <p
-          style={{
-            fontSize: "13px",
-            opacity: 0.8,
-          }}
-        >
-          <strong>Important:</strong>
-          {" Your data is saved in your browser only. Export regularly!"}
+          Access your profile and account settings here.
         </p>
       </div>
     ),
@@ -336,38 +327,6 @@ export const virtualOfficeTourSteps = [
           Manage your tasks and team assignments. Create, assign, and track
           progress all in one place.
         </p>
-      </div>
-    ),
-    placement: "bottom",
-  },
-  {
-    target: '[data-tour="office-settings"]',
-    content: (
-      <div>
-        <h3
-          style={{
-            marginBottom: "8px",
-          }}
-        >
-          Office Settings ⚙️
-        </h3>
-        <p
-          style={{
-            marginBottom: "8px",
-          }}
-        >
-          Customize your Virtual Office experience:
-        </p>
-        <ul
-          style={{
-            marginLeft: "20px",
-            fontSize: "13px",
-          }}
-        >
-          <li>Toggle ambient sounds</li>
-          <li>Adjust audio volume</li>
-          <li>Configure preferences</li>
-        </ul>
       </div>
     ),
     placement: "bottom",

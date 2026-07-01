@@ -258,10 +258,10 @@ export default function OnboardingModal({ onClose, onLoadSampleData }) {
                   5
                 </div>
                 <div className="min-w-0">
-                  <h4 className="text-xs mb-1">Export Your Data Regularly</h4>
+                  <h4 className="text-xs mb-1">Keep Your Profile Updated</h4>
                   <p className="text-xs text-muted-foreground">
-                    Go to Settings to backup your progress - it's saved in your
-                    browser only
+                    Go to Settings anytime to update your profile and account
+                    preferences
                   </p>
                 </div>
               </div>

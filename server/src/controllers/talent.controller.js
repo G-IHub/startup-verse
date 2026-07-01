@@ -8,6 +8,13 @@ import { error as apiError, success as apiSuccess } from "../utils/apiResponse.j
 import { filterTalentProfilesForBrowse } from "../domain/talentBrowseCompletion.js";
 import { attachMatchScores } from "../utils/talentMatching.js";
 import { filterTalentProfilesForFounderBrowse } from "../utils/founderTeamTalentExclusions.js";
+import { uploadBuffer } from "../services/uploadService.js";
+import { extractResumeText } from "../services/resumeTextExtractor.js";
+import { parseResumeText, isResumeParseConfigured } from "../services/resumeParseService.js";
+import { loadResumeBuffer } from "../services/resumeFileLoader.js";
+import { isAllowedResumeMime } from "../utils/resumeAttachments.js";
+import { checkResumeParseRateLimit } from "../utils/resumeParseRateLimit.js";
+import { logger } from "../config/logger.js";
 
 export const createOrUpdateProfile = async (req, res) => {
   const requestedUserId = String(req.body?.userId || "").trim();
@@ -43,6 +50,10 @@ export const createOrUpdateProfile = async (req, res) => {
     ...(Array.isArray(b.educationList) ? { educationList: b.educationList } : {}),
     ...(Array.isArray(b.certifications) ? { certifications: b.certifications } : {}),
     ...(Array.isArray(b.portfolioItems) ? { portfolioItems: b.portfolioItems } : {}),
+    ...(b.resumeUrl != null ? { resumeUrl: String(b.resumeUrl).slice(0, 1000) } : {}),
+    ...(b.resumeKey != null ? { resumeKey: String(b.resumeKey).slice(0, 500) } : {}),
+    ...(b.resumeFileName != null ? { resumeFileName: String(b.resumeFileName).slice(0, 255) } : {}),
+    ...(b.resumeParsedAt != null ? { resumeParsedAt: b.resumeParsedAt ? new Date(b.resumeParsedAt) : null } : {}),
   };
 
   const profile = await TalentProfile.findOneAndUpdate(
@@ -51,6 +62,100 @@ export const createOrUpdateProfile = async (req, res) => {
     { upsert: true, new: true, runValidators: true },
   );
   return apiSuccess(res, profile, 201);
+};
+
+export const getResumeParseStatus = async (req, res) => {
+  return apiSuccess(res, { configured: isResumeParseConfigured() });
+};
+
+export const parseResume = async (req, res) => {
+  if (!isResumeParseConfigured()) {
+    return apiError(res, "Resume import is not configured.", 503);
+  }
+
+  const rate = checkResumeParseRateLimit(req.user.id);
+  if (!rate.allowed) {
+    return apiError(res, rate.message, 429);
+  }
+
+  let buffer;
+  let mimeType;
+  let fileName = "";
+  let resumeMeta = null;
+
+  try {
+    if (req.file) {
+      mimeType = req.file.mimetype;
+      if (!isAllowedResumeMime(mimeType)) {
+        return apiError(res, "Resume must be a PDF or DOCX file (max 5MB).", 400);
+      }
+      buffer = req.file.buffer;
+      fileName = req.file.originalname || "resume";
+      resumeMeta = await uploadBuffer({
+        buffer,
+        mimeType,
+        originalName: fileName,
+        scope: "resumes",
+      });
+    } else {
+      const key = String(req.body?.key || "").trim();
+      const url = String(req.body?.url || "").trim();
+      mimeType = String(req.body?.mimeType || "").trim();
+      fileName = String(req.body?.fileName || "").trim();
+
+      if (!key && !url) {
+        return apiError(res, "Upload a file or provide key/url.", 400);
+      }
+
+      buffer = await loadResumeBuffer({ key, url });
+      if (!mimeType) {
+        const lower = (key || url).toLowerCase();
+        if (lower.endsWith(".pdf")) mimeType = "application/pdf";
+        else if (lower.endsWith(".docx")) {
+          mimeType =
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+        }
+      }
+      if (!isAllowedResumeMime(mimeType)) {
+        return apiError(res, "Resume must be a PDF or DOCX file.", 400);
+      }
+      resumeMeta = {
+        url: url || (key ? `/uploads/${key.replace(/^\/uploads\//, "")}` : ""),
+        key: key || "",
+        mimeType,
+        size: buffer.length,
+      };
+    }
+
+    const text = await extractResumeText(buffer, mimeType);
+    const draft = await parseResumeText(text);
+    const parsedAt = new Date().toISOString();
+
+    logger.info("resume.parse.success", {
+      userId: String(req.user.id),
+      key: resumeMeta?.key || null,
+      size: resumeMeta?.size || buffer.length,
+    });
+
+    return apiSuccess(res, {
+      draft,
+      resume: {
+        url: resumeMeta.url,
+        key: resumeMeta.key,
+        mimeType: resumeMeta.mimeType || mimeType,
+        size: resumeMeta.size || buffer.length,
+        fileName: fileName || resumeMeta.fileName || "",
+      },
+      parsedAt,
+    });
+  } catch (err) {
+    logger.warn("resume.parse.failed", {
+      userId: String(req.user.id),
+      message: err?.message,
+    });
+    const status = err?.status || 400;
+    return apiError(res, err?.message || "Failed to parse resume.", status);
+  }
 };
 
 export const getProfile = async (req, res) => {

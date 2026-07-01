@@ -4,6 +4,7 @@ import { Button } from "../ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "../ui/avatar";
 import { Badge } from "../ui/badge";
 import { toast } from "sonner";
+import StartupVerseLogo from "../brand/StartupVerseLogo";
 import {
   Bell,
   Settings,
@@ -12,7 +13,6 @@ import {
   MessageSquare,
   Users,
   Rocket,
-  Briefcase,
   UsersRound,
   UserCheck,
   Map,
@@ -171,28 +171,13 @@ export default function AppLayout({
     ];
   };
   const navigationTools = getNavigationTools(user.role);
-  const getRoleIcon = (role) => {
-    const icons = {
-      founder: Rocket,
-      "team-member": Users,
-      talent: UsersRound,
-      mentor: Users,
-      investor: Users,
-      freelancer: Briefcase,
-    };
-    return icons[role];
-  };
-  const RoleIcon = getRoleIcon(user.role);
   return (
     <div className="flex flex-col h-screen bg-background">
       <header className="bg-background/95 backdrop-blur-sm border-b border-border px-4 py-3 sticky top-0 z-50">
         <div className="flex items-center gap-4">
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-primary flex items-center justify-center shadow-lg shadow-primary/20">
-              <RoleIcon className="w-5 h-5 text-white" />
-            </div>
+            <StartupVerseLogo className="h-9" />
             <div className="hidden sm:block">
-              <h1 className="text-base text-foreground">StartupVerse</h1>
               <p className="text-xs text-muted-foreground capitalize">
                 {user.role.replace("-", " ")}
               </p>

@@ -3,6 +3,7 @@ import { Button } from "./ui/button";
 import { Card, CardContent } from "./ui/card";
 import { Separator } from "./ui/separator";
 import { Rocket, Star, CheckCircle } from "lucide-react";
+import StartupVerseLogo from "./brand/StartupVerseLogo";
 import SignupModal from "./SignupModal";
 export default function SeamlessLandingPage({ onRoleSelect }) {
   const [showSignupModal, setShowSignupModal] = useState(false);
@@ -176,10 +177,7 @@ export default function SeamlessLandingPage({ onRoleSelect }) {
     <div className="min-h-screen bg-background pb-8">
       <div className="border-b">
         <div className="container mx-auto px-3 md:px-4 py-3 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Building className="w-5 h-5 text-muted-foreground" />
-            <span className="text-base font-semibold">StartupVerse</span>
-          </div>
+          <StartupVerseLogo className="h-8" />
         </div>
       </div>
       <div className="container mx-auto px-3 md:px-4 py-8 md:py-12 flex items-center justify-center">

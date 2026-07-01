@@ -10,7 +10,7 @@ import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Textarea } from "./ui/textarea";
 import { ArrowLeft, ChevronDown, Rocket, Building, Users } from "lucide-react";
-import TalentProfileForm from "./TalentProfileForm";
+import TalentOnboardingForm from "./onboarding/TalentOnboardingForm";
 import {
   determineInitialStage,
   getStageName,
@@ -30,12 +30,14 @@ import {
   ORG_ADMIN_PROGRAM_STAGE_OPTIONS,
   resolveIndustryForPersistence,
   validateFounderStartupFields,
+  getFounderEditableFields,
 } from "../domains/founder/founderProfileConfig";
+import { buildFounderProfilePayload } from "../domains/founder/founderProfilePayload";
 import { persistedTalentToFormInitialData } from "../utils/talentProfileCompletion";
 import {
   AuthFormCard,
   AuthField,
-  AuthSplitLayout,
+  AuthCenteredShell,
   authBtnOutline,
   authBtnPrimary,
   authFieldClass,
@@ -472,13 +474,48 @@ export default function ProfileCompletionForm({
       isMountedRef.current = false;
     };
   }, []);
+
+  useEffect(() => {
+    if (role !== "founder" || !user) return;
+
+    const fields = getFounderEditableFields(user);
+    if (fields.startupName) setStartupName(fields.startupName);
+    if (fields.startupDescription) setStartupDescription(fields.startupDescription);
+    if (fields.industryFocus) setIndustryFocus(fields.industryFocus);
+    if (fields.otherIndustry) setOtherIndustry(fields.otherIndustry);
+    if (Array.isArray(fields.targetAudience) && fields.targetAudience.length > 0) {
+      setTargetAudience(fields.targetAudience);
+    }
+    if (Array.isArray(fields.rolesNeeded) && fields.rolesNeeded.length > 0) {
+      const knownRoles = fields.rolesNeeded.filter((r) =>
+        FOUNDER_ROLES_NEEDED_OPTIONS.includes(r),
+      );
+      const customRoles = fields.rolesNeeded.filter(
+        (r) => !FOUNDER_ROLES_NEEDED_OPTIONS.includes(r) && r !== fields.otherRole,
+      );
+      if (fields.otherRole || customRoles.length > 0) {
+        setRolesNeeded([...knownRoles.filter((r) => r !== "Others"), "Others"]);
+        setOtherRole(fields.otherRole || customRoles[0] || "");
+      } else {
+        setRolesNeeded(knownRoles);
+      }
+    }
+    if (fields.otherRole && !fields.rolesNeeded?.length) {
+      setOtherRole(fields.otherRole);
+    }
+    if (fields.teamSize) setTeamSize(fields.teamSize);
+    if (fields.bio) setBio(fields.bio);
+    if (fields.hasValidatedIdea) setHasValidatedIdea(fields.hasValidatedIdea);
+    if (fields.hasMVP) setHasMVP(fields.hasMVP);
+    if (fields.hasCustomers) setHasCustomers(fields.hasCustomers);
+  }, [role, user]);
   const handleSubmit = async (e) => {
     if (e) {
       e.preventDefault();
     }
     if (!isMountedRef.current) return;
 
-    // For talent, trigger the TalentProfileForm's submit
+    // For talent, trigger the TalentOnboardingForm's submit
     if (role === "talent" && talentFormRef.current) {
       talentFormRef.current.triggerSubmit();
       return;
@@ -557,13 +594,22 @@ export default function ProfileCompletionForm({
         });
         startupIdForUser = String(startup._id || startup.id);
 
-        await founderApi.saveFounderProfile({
-          userId: String(user._id ?? user.id),
-          startupId: startupIdForUser,
-          bio: bio || "",
-          background: "",
-          links: {},
-        });
+        await founderApi.saveFounderProfile(
+          buildFounderProfilePayload(
+            { ...user, startupId: startupIdForUser },
+            {
+              bio: bio || "",
+              targetAudience,
+              rolesNeeded: rolesNeeded.includes("Others")
+                ? [...rolesNeeded.filter((r) => r !== "Others"), otherRole].filter(Boolean)
+                : rolesNeeded,
+              teamSize,
+              hasValidatedIdea,
+              hasMVP,
+              hasCustomers,
+            },
+          ),
+        );
 
         const journeyForServer = {
           currentStage: algorithmicStageId,
@@ -734,62 +780,28 @@ export default function ProfileCompletionForm({
         className={isPage ? "max-w-none" : undefined}
       >
           {role === "talent" ? (
-            <TalentProfileForm
+            <TalentOnboardingForm
               loading={loading}
               ref={talentFormRef}
               initialData={persistedTalentToFormInitialData(user)}
               onSubmit={(data) => {
-                console.log(
-                  "📝 [ProfileCompletion] TalentProfileForm submitted with data:",
-                  data,
-                );
                 if (onUpdateUser && user) {
                   const updatedUser = {
                     ...user,
                     name: data.fullName || user.name,
                     professionalTitle: data.professionalTitle,
-                    location: data.location,
-                    bio: data.bio,
                     skills: data.skills || [],
-                    linkedin: data.linkedinUrl,
-                    github: data.githubUrl,
-                    website: data.portfolioWebsite,
-                    workExperience: data.workExperiences || [],
-                    education: data.educationList || [],
-                    certifications: data.certifications || [],
-                    portfolioItems: data.portfolioItems || [],
-                    availabilityStatus: data.availabilityStatus,
-                    preferredCommitment: data.preferredCommitment,
-                    yearsOfExperience: data.yearsOfExperience,
-                    professionalGoals: data.professionalGoals,
-                    industryPreferences: data.industryPreferences || [],
-                    experience: data.experience,
-                    availability: data.availability,
-                    interests: data.interests || [],
                     profile: {
                       ...user.profile,
-                      ...data,
+                      fullName: data.fullName,
+                      professionalTitle: data.professionalTitle,
+                      skills: data.skills || [],
                     },
                     onboardingComplete: true,
                   };
-                  console.log(
-                    "🔄 [ProfileCompletion] Calling onUpdateUser with flattened data:",
-                    {
-                      userId: updatedUser.id,
-                      onboardingComplete: updatedUser.onboardingComplete,
-                      hasProfile: !!updatedUser.profile,
-                      hasProfessionalTitle: !!updatedUser.professionalTitle,
-                      hasSkills: updatedUser.skills?.length > 0,
-                      hasWorkExperience: updatedUser.workExperience?.length > 0,
-                    },
-                  );
                   onUpdateUser(updatedUser);
                 }
-                console.log("✅ [ProfileCompletion] Calling onComplete...");
                 onComplete(data);
-                console.log(
-                  "✅ [ProfileCompletion] Talent profile submission complete",
-                );
               }}
             />
           ) : (
@@ -1054,12 +1066,9 @@ export default function ProfileCompletionForm({
 
   if (isPage) {
     return (
-      <AuthSplitLayout
-        marketingBreakpoint="lg"
-        formClassName="items-start overflow-y-auto py-8 md:py-10"
-      >
-        <div className="w-full max-w-lg">{formContent}</div>
-      </AuthSplitLayout>
+      <AuthCenteredShell maxWidth={role === "talent" ? "max-w-xl" : "max-w-lg"}>
+        {formContent}
+      </AuthCenteredShell>
     );
   }
 
