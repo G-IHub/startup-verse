@@ -14,13 +14,49 @@ export function dedupeParticipants(participants) {
   const byIdentity = new Map();
 
   (participants || []).forEach((participant) => {
-    const key = getParticipantKey(participant);
-    if (!key || byIdentity.has(key)) return;
+    const key = participant?.identity || participant?.sid || "";
+    if (!key) return;
+    // Keep the latest participant object per identity (reconnects get a new sid).
     byIdentity.set(key, participant);
   });
 
-  return Array.from(byIdentity.values());
+  return Array.from(byIdentity.values()).sort((a, b) =>
+    getParticipantName(a).localeCompare(getParticipantName(b)),
+  );
 }
+
+function trackPublicationSid(trackRef) {
+  return (
+    trackRef?.publication?.trackSid ||
+    trackRef?.publication?.track?.sid ||
+    ""
+  );
+}
+
+export function findParticipantTrackRef(trackRefs, participant, source) {
+  if (!participant || !Array.isArray(trackRefs)) return null;
+  const sid = participant.sid;
+  const identity = participant.identity;
+
+  return (
+    trackRefs.find(
+      (ref) =>
+        ref?.publication &&
+        ref.publication.source === source &&
+        ref.participant?.sid === sid,
+    ) ||
+    trackRefs.find(
+      (ref) =>
+        ref?.publication &&
+        ref.publication.source === source &&
+        identity &&
+        ref.participant?.identity === identity,
+    ) ||
+    null
+  );
+}
+
+export { trackPublicationSid };
 
 export function isCameraEnabled(participant) {
   return Boolean(participant?.isCameraEnabled);

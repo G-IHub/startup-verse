@@ -133,35 +133,50 @@ export function CallCoordinatorProvider({ user, children }) {
     user?.name,
   ]);
 
+  const syncActiveCallsFromServer = useCallback(async () => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/calls/active`, {
+        credentials: "include",
+      });
+      if (!response.ok) return;
+      const payload = await response.json().catch(() => null);
+      const calls = Array.isArray(payload?.calls) ? payload.calls : [];
+      const liveRooms = calls.filter(
+        (row) => row?.roomName && Number(row?.participantCount) > 0,
+      );
+
+      setTeamLiveCall((prev) => {
+        if (prev?.roomName) {
+          const stillLive = liveRooms.some(
+            (row) => String(row.roomName) === prev.roomName,
+          );
+          return stillLive ? prev : null;
+        }
+
+        const live = liveRooms[0];
+        if (!live?.roomName) return null;
+
+        return {
+          roomName: String(live.roomName),
+          callType: "video",
+          initiatorId: "",
+          initiatorName: "Your team",
+          invited: false,
+        };
+      });
+    } catch {
+      // Best-effort recovery when socket events were missed.
+    }
+  }, []);
+
   useEffect(() => {
     if (!currentUserId || activeCall) return undefined;
 
     let cancelled = false;
 
     const syncActiveCalls = async () => {
-      try {
-        const response = await fetch(`${API_BASE_URL}/calls/active`, {
-          credentials: "include",
-        });
-        if (!response.ok || cancelled) return;
-        const payload = await response.json().catch(() => null);
-        const calls = Array.isArray(payload?.calls) ? payload.calls : [];
-        const live = calls.find((row) => Number(row?.participantCount) > 0);
-        if (!live?.roomName || cancelled) return;
-        setTeamLiveCall((prev) =>
-          prev?.roomName
-            ? prev
-            : {
-                roomName: String(live.roomName),
-                callType: "video",
-                initiatorId: "",
-                initiatorName: "Your team",
-                invited: false,
-              },
-        );
-      } catch {
-        // Best-effort recovery when socket events were missed.
-      }
+      if (cancelled) return;
+      await syncActiveCallsFromServer();
     };
 
     void syncActiveCalls();
@@ -171,7 +186,7 @@ export function CallCoordinatorProvider({ user, children }) {
       cancelled = true;
       window.clearInterval(intervalId);
     };
-  }, [activeCall, currentUserId]);
+  }, [activeCall, currentUserId, syncActiveCallsFromServer]);
 
   const buildActiveCall = useCallback(
     (result, extras = {}) => ({
@@ -326,18 +341,46 @@ export function CallCoordinatorProvider({ user, children }) {
     clearStoredActiveCall();
     clearCallUrl();
 
-    if (
-      call?.roomName &&
-      currentUserId &&
-      String(call.initiatorId) === currentUserId
-    ) {
-      void endCall(call.roomName).catch(() => {});
+    if (call?.roomName) {
+      setTeamLiveCall((prev) =>
+        prev?.roomName === call.roomName ? null : prev,
+      );
+      setBannerDismissedRoom((prev) =>
+        prev === call.roomName ? "" : prev,
+      );
     }
+
+    const endRoom = async () => {
+      if (!call?.roomName || !currentUserId) return;
+      const isInitiator = String(call.initiatorId) === currentUserId;
+      if (isInitiator) {
+        await endCall(call.roomName).catch(() => {});
+        return;
+      }
+      try {
+        const response = await fetch(`${API_BASE_URL}/calls/active`, {
+          credentials: "include",
+        });
+        if (!response.ok) return;
+        const payload = await response.json().catch(() => null);
+        const calls = Array.isArray(payload?.calls) ? payload.calls : [];
+        const row = calls.find((entry) => entry?.roomName === call.roomName);
+        const remaining = Number(row?.participantCount ?? 0);
+        if (!row || remaining <= 0) {
+          await endCall(call.roomName).catch(() => {});
+        }
+      } catch {
+        // Local state already cleared; server cleanup is best-effort.
+      }
+    };
+
+    void endRoom();
+    void syncActiveCallsFromServer();
 
     window.setTimeout(() => {
       leaveInFlightRef.current = false;
     }, 0);
-  }, [activeCall, clearCallUrl, currentUserId, endCall]);
+  }, [activeCall, clearCallUrl, currentUserId, endCall, syncActiveCallsFromServer]);
 
   const registerTeamRoster = useCallback((roster) => {
     setTeamRoster(Array.isArray(roster) ? roster : []);

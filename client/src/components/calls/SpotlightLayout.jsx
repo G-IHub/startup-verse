@@ -24,6 +24,7 @@ export default function SpotlightLayout({
     >
       <div className={spotlightMainClass({ screenShare: isScreenSharing })}>
         <ParticipantTile
+          key={`${mainKey}-${mainParticipant.sid || "main"}`}
           participant={mainParticipant}
           isSpeaking={speakingSet.has(mainKey)}
           isMain
@@ -41,7 +42,7 @@ export default function SpotlightLayout({
 
             return (
               <ParticipantTile
-                key={key}
+                key={`${key}-${participant.sid || index}`}
                 participant={participant}
                 isSpeaking={speakingSet.has(key)}
                 compact={compact}

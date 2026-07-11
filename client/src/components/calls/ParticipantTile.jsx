@@ -17,6 +17,8 @@ import {
   getParticipantInitial,
   getParticipantKey,
   getParticipantName,
+  findParticipantTrackRef,
+  trackPublicationSid,
   isCameraEnabled,
   isMicrophoneEnabled,
   isScreenShareEnabled,
@@ -38,24 +40,36 @@ export default function ParticipantTile({
   const muted = !isMicrophoneEnabled(participant);
   const name = getParticipantName(participant);
   const participantKey = getParticipantKey(participant);
+  const trackIdentity = participant?.identity || participantKey;
   const liveSpeaking = useIsSpeaking(participant);
   const showSpeakingRing = isSpeaking || liveSpeaking;
 
   const screenTracks = useParticipantTracks(
     [Track.Source.ScreenShare],
-    participantKey,
+    trackIdentity,
   );
-  const screenTrack = screenTracks.find(
-    (ref) => ref.participant?.identity === participantKey && ref.publication,
+  const screenTrack = findParticipantTrackRef(
+    screenTracks,
+    participant,
+    Track.Source.ScreenShare,
   );
 
   const cameraTracks = useParticipantTracks(
     [Track.Source.Camera],
-    participantKey,
+    trackIdentity,
   );
-  const cameraTrack = cameraTracks.find(
-    (ref) => ref.participant?.identity === participantKey && ref.publication,
+  const cameraTrack = findParticipantTrackRef(
+    cameraTracks,
+    participant,
+    Track.Source.Camera,
   );
+
+  const screenTrackKey = screenTrack
+    ? `${participantKey}-screen-${trackPublicationSid(screenTrack)}`
+    : `${participantKey}-screen-off`;
+  const cameraTrackKey = cameraTrack
+    ? `${participantKey}-camera-${trackPublicationSid(cameraTrack)}`
+    : `${participantKey}-camera-off`;
 
   const tileWrapperClass = compact
     ? cn(filmstripTileClass({ screenShare: screenShareLayout }), className)
@@ -78,11 +92,13 @@ export default function ParticipantTile({
     <div className={tileWrapperClass} aria-label={tileAriaLabel}>
       {screenOn && screenTrack ? (
         <VideoTrack
+          key={screenTrackKey}
           trackRef={screenTrack}
           className={cn("h-full w-full bg-slate-950", videoObjectFit)}
         />
       ) : cameraOn && cameraTrack ? (
         <VideoTrack
+          key={cameraTrackKey}
           trackRef={cameraTrack}
           className={cn("h-full w-full bg-slate-950", videoObjectFit)}
         />

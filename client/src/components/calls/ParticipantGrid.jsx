@@ -57,7 +57,7 @@ export default function ParticipantGrid({ participants, speakingSet }) {
 
         return (
           <div
-            key={key}
+            key={`${key}-${participant.sid || index}`}
             style={{
               ...spanStyle,
               maxWidth,

@@ -59,6 +59,7 @@ export default function CallRoom({
       video={isVideoCall}
       className="h-full min-h-0 w-full"
       data-lk-theme="default"
+      onDisconnected={handleLeave}
     >
       <RoomAudioRenderer />
       <CallSessionProvider
