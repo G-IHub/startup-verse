@@ -209,6 +209,10 @@ export function getTalentBrowseProfileCompletionPercent(profile) {
  * - Availability + goals: 25%
  */
 export function computeTalentProfileCompletionFromFlat(flat) {
+  return getTalentProfileCompletionBreakdownFromFlat(flat).total;
+}
+
+export function getTalentProfileCompletionBreakdownFromFlat(flat) {
   const f = flat || getEmptyTalentFlat();
 
   const reqCore = [
@@ -221,7 +225,7 @@ export function computeTalentProfileCompletionFromFlat(flat) {
   const coreReqRatio =
     reqCore.map((x) => (x.length > 0 ? 1 : 0)).reduce((a, b) => a + b, 0) / 5;
   const locationPts = str(f.location).length > 0 ? 1 : 0;
-  let total = coreReqRatio * 35 + locationPts * 5;
+  const coreScore = coreReqRatio * 35 + locationPts * 5;
 
   const skillsRatio = nonEmptyArray(f.skills) ? 1 : 0;
 
@@ -265,7 +269,7 @@ export function computeTalentProfileCompletionFromFlat(flat) {
     portfolioRatio,
   ];
   const step2Avg = step2Parts.reduce((a, b) => a + b, 0) / step2Parts.length;
-  total += step2Avg * 35;
+  const profileDepthScore = step2Avg * 35;
 
   const interestsRatio = nonEmptyArray(f.interests) ? 1 : 0;
   const industryRatio = nonEmptyArray(f.industryPreferences) ? 1 : 0;
@@ -281,9 +285,39 @@ export function computeTalentProfileCompletionFromFlat(flat) {
   ];
   const step3Ratio =
     step3Checks.reduce((a, b) => a + b, 0) / step3Checks.length;
-  total += step3Ratio * 25;
+  const availabilityScore = step3Ratio * 25;
 
-  return Math.min(100, Math.round(total));
+  const total = Math.min(
+    100,
+    Math.round(coreScore + profileDepthScore + availabilityScore),
+  );
+
+  return {
+    total,
+    groups: [
+      {
+        key: "basics",
+        label: "Basics",
+        percent: Math.round((coreScore / 40) * 100),
+        points: Math.round(coreScore),
+        maxPoints: 40,
+      },
+      {
+        key: "depth",
+        label: "Profile depth",
+        percent: Math.round(step2Avg * 100),
+        points: Math.round(profileDepthScore),
+        maxPoints: 35,
+      },
+      {
+        key: "availability",
+        label: "Availability",
+        percent: Math.round(step3Ratio * 100),
+        points: Math.round(availabilityScore),
+        maxPoints: 25,
+      },
+    ],
+  };
 }
 
 export function getTalentProfileCompletionPercent(user) {
@@ -296,6 +330,11 @@ export function getTalentProfileCompletionPercent(user) {
 export function getTalentProfileFormCompletionPercent(formSnapshot) {
   const flat = talentFormSnapshotToFlat(formSnapshot);
   return computeTalentProfileCompletionFromFlat(flat);
+}
+
+export function getTalentProfileFormCompletionBreakdown(formSnapshot) {
+  const flat = talentFormSnapshotToFlat(formSnapshot);
+  return getTalentProfileCompletionBreakdownFromFlat(flat);
 }
 
 /**

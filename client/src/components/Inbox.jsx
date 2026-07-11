@@ -2563,8 +2563,8 @@ export default function Inbox({ user, onBack, initialTab = "received", onNavigat
         />
       )}
       {renderConversationDialog()}
-      <div className="mb-3 flex items-center gap-4 md:mb-4">
       {onBack && (
+        <div className="mb-3 flex items-center gap-4 md:mb-4">
           <Button
             variant="ghost"
             size="icon"
@@ -2573,14 +2573,8 @@ export default function Inbox({ user, onBack, initialTab = "received", onNavigat
           >
             <ArrowLeft className="h-5 w-5" />
           </Button>
-        )}
-        <div>
-          <h1 className="font-heading text-2xl font-bold text-text-heading">Inbox</h1>
-          <p className="font-body text-sm font-normal text-text-muted">
-            Invitations, interests, and responses
-          </p>
         </div>
-      </div>
+      )}
       {isFounderInboxUser && founderCohorts.length > 0 && (
         <Card className="mb-4 rounded-card border border-surface-border bg-surface-card shadow-soft">
           <CardContent className="flex items-center justify-between p-4">

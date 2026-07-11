@@ -1,19 +1,16 @@
-import React, { useState, useEffect } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { Button } from "./ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "./ui/card";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
 import { Textarea } from "./ui/textarea";
 import { Badge } from "./ui/badge";
 import { Progress } from "./ui/progress";
 import { toast } from "sonner";
-import { getTalentProfileCompletionPercent } from "../utils/talentProfileCompletion";
+import { getTalentProfileFormCompletionPercent } from "../utils/talentProfileCompletion";
+import {
+  TALENT_ACTIONS_MIN_COMPLETION,
+  TALENT_BROWSE_MIN_COMPLETION,
+} from "../constants/talentProfile";
 import * as founderApi from "../utils/api/founderApi";
 import * as talentApi from "../utils/api/talentApi";
 import {
@@ -37,109 +34,110 @@ import {
   SelectValue,
 } from "./ui/select";
 import {
-  UserCircle,
-  Briefcase,
-  MapPin,
-  Mail,
-  Globe,
-  Linkedin,
-  Github,
-  Code,
   Award,
-  FileText,
-  Plus,
-  X,
-  Edit,
-  Save,
-  Building,
-  Users,
-  Target,
-  Eye,
-  CheckCircle,
-  GraduationCap,
+  Briefcase,
   Calendar,
+  Code,
+  Edit,
   ExternalLink,
+  FileText,
+  Github,
+  Globe,
+  GraduationCap,
+  Linkedin,
+  Mail,
+  MapPin,
+  Plus,
+  Save,
+  Target,
   Trash2,
+  UserCircle,
+  Users,
+  X,
+  Eye,
+  Building,
 } from "lucide-react";
 import { cn } from "./ui/utils";
 import { Checkbox } from "./ui/checkbox";
 import {
-  SettingsPanelCard,
-  SettingsGroup,
-  SettingsField,
-  SettingsFieldGrid,
+  SETTINGS_CARD,
   settingsBtnPrimary,
   settingsBtnOutline,
+  settingsBtnDangerOutline,
 } from "./settings/SettingsPrimitives.jsx";
 import ResumeImportPanel from "./talent/ResumeImportPanel";
 
-const SP_LABEL =
-  "font-body text-[13px] font-medium uppercase tracking-[0.06em] text-text-muted";
-const SP_SUBLABEL =
-  "font-body text-[13px] font-medium normal-case tracking-normal text-text-body";
-const SP_INPUT =
-  "rounded-input border-[1.5px] border-surface-border bg-surface-card font-body text-sm text-text-heading placeholder:text-text-muted transition-all duration-200 ease-in-out focus-visible:border-primary focus-visible:outline-none focus-visible:shadow-focus";
-const SP_TEXTAREA =
-  "min-h-16 resize-none rounded-input border-[1.5px] border-surface-border bg-surface-card font-body text-sm text-text-heading placeholder:text-text-muted transition-all duration-200 ease-in-out focus-visible:border-primary focus-visible:outline-none focus-visible:shadow-focus";
-const SP_SELECT_TRIGGER =
-  "w-full rounded-input border-[1.5px] border-surface-border bg-surface-card font-body text-sm text-text-heading transition-all duration-200 ease-in-out focus-visible:border-primary focus-visible:outline-none focus-visible:shadow-focus [&_svg]:text-text-body";
-const SP_VALUE = "font-body text-sm font-normal text-text-heading";
-const SP_EMPTY = "font-body text-sm italic text-text-muted";
-const SP_CARD = "rounded-card border border-surface-border bg-surface-card shadow-soft";
-const SP_CARD_TITLE =
-  "flex items-center gap-2 font-heading text-base font-semibold text-text-heading [&_svg]:text-primary";
-const SP_PRIMARY_BTN =
-  "rounded-input bg-primary font-body font-semibold text-white shadow-[0_4px_16px_rgba(58,90,254,0.20)] transition-colors duration-200 ease-in-out hover:bg-primary-hover [&_svg]:text-white";
-const SP_CANCEL_BTN =
-  "rounded-input border border-surface-border bg-surface-card font-body font-semibold text-text-body transition-colors duration-200 ease-in-out hover:border-status-error hover:text-status-error";
-const SP_PREVIEW_BTN =
-  "rounded-input border border-surface-border bg-surface-card font-body font-semibold text-text-body shadow-none transition-colors duration-200 ease-in-out hover:border-primary hover:text-primary [&_svg]:text-text-body hover:[&_svg]:text-primary";
-const SP_CHECK_WRAP =
-  "flex flex-wrap gap-2 rounded-input border-0 bg-surface-page p-3";
-const SP_CHECK_BOX =
-  "border-[1.5px] border-surface-border bg-surface-card data-[state=checked]:border-primary data-[state=checked]:bg-primary data-[state=checked]:text-white";
-const SP_CHECK_LABEL_BASE =
-  "flex cursor-pointer items-center gap-2 font-body text-sm text-text-heading";
-const SP_CHECK_LABEL_ON = "font-medium text-primary";
+const FIELD_LABEL =
+  "font-body text-[11px] font-semibold uppercase tracking-wide text-text-muted";
+const FIELD_VALUE = "font-body text-sm font-medium text-text-heading";
+const FIELD_EMPTY = "font-body text-sm italic text-text-muted";
+const INPUT_CLASS =
+  "h-10 rounded-input border-[1.5px] border-surface-border bg-surface-card font-body text-sm text-text-heading placeholder:text-text-muted transition-all focus-visible:border-primary focus-visible:outline-none focus-visible:shadow-focus";
+const TEXTAREA_CLASS =
+  "min-h-24 resize-none rounded-input border-[1.5px] border-surface-border bg-surface-card font-body text-sm text-text-heading placeholder:text-text-muted transition-all focus-visible:border-primary focus-visible:outline-none focus-visible:shadow-focus";
+const SELECT_TRIGGER_CLASS =
+  "h-10 w-full rounded-input border-[1.5px] border-surface-border bg-surface-card font-body text-sm text-text-heading focus-visible:border-primary focus-visible:outline-none focus-visible:shadow-focus";
+const SECTION_CLASS =
+  "rounded-card border border-surface-border bg-surface-card shadow-soft";
+const AUTOSAVE_DELAY_MS = 900;
+const EMPTY_SELECT_VALUE = "__empty";
+const MONTH_OPTIONS = [
+  ["01", "Jan"],
+  ["02", "Feb"],
+  ["03", "Mar"],
+  ["04", "Apr"],
+  ["05", "May"],
+  ["06", "Jun"],
+  ["07", "Jul"],
+  ["08", "Aug"],
+  ["09", "Sep"],
+  ["10", "Oct"],
+  ["11", "Nov"],
+  ["12", "Dec"],
+];
+const CURRENT_YEAR = new Date().getFullYear();
+const YEAR_OPTIONS = Array.from({ length: 70 }, (_, index) =>
+  String(CURRENT_YEAR + 5 - index),
+);
 
-export default function ProfilePage({
-  user,
-  onUpdateUser,
-  initialEditing = false,
-  embeddedInSettings = false,
-}) {
-  const [isEditing, setIsEditing] = useState(initialEditing);
-  const [showPreview, setShowPreview] = useState(false);
+function ensureIds(items) {
+  return Array.isArray(items)
+    ? items.map((item, index) => ({
+        id: item?.id || item?._id || `${Date.now()}-${index}`,
+        ...item,
+      }))
+    : [];
+}
 
-  // Initialize all fields from user
-  const [editedProfile, setEditedProfile] = useState({
-    name: user.name,
-    email: user.email,
+function buildInitialProfile(user) {
+  return {
+    name: user.name || "",
+    email: user.email || "",
     professionalTitle: user.professionalTitle || "",
     location: user.location || "",
     yearsOfExperience: user.yearsOfExperience || "",
     bio: user.bio || "",
-    skills: user.skills || [],
+    skills: Array.isArray(user.skills) ? user.skills : [],
     linkedin: user.linkedin || "",
     github: user.github || "",
     website: user.website || "",
-    workExperience: user.workExperience || [],
-    education: user.education || [],
-    certifications: user.certifications || [],
-    portfolioItems: user.portfolioItems || [],
+    workExperience: ensureIds(user.workExperience),
+    education: ensureIds(user.education),
+    certifications: ensureIds(user.certifications),
+    portfolioItems: ensureIds(user.portfolioItems),
     availabilityStatus: user.availabilityStatus || "",
     preferredCommitment: user.preferredCommitment || "",
-    // ✅ NEW: Add missing fields from TalentProfileForm
     experience: user.experience || "",
     availability: user.availability || "",
-    interests: user.interests || [],
+    interests: Array.isArray(user.interests) ? user.interests : [],
     professionalGoals: user.professionalGoals || "",
-    industryPreferences: user.industryPreferences || [],
+    industryPreferences: Array.isArray(user.industryPreferences)
+      ? user.industryPreferences
+      : [],
     resumeUrl: user.resumeUrl || "",
     resumeKey: user.resumeKey || "",
     resumeFileName: user.resumeFileName || "",
     resumeParsedAt: user.resumeParsedAt || null,
-    // Founder fields (aligned with onboarding via getFounderEditableFields)
     ...(user.role === "founder"
       ? getFounderEditableFields(user)
       : {
@@ -148,22 +146,393 @@ export default function ProfilePage({
           industry: user.industry || "",
           teamSize: user.teamSize || 1,
         }),
-  });
-  const [newSkill, setNewSkill] = useState("");
+  };
+}
 
-  // Fetch talent profile from backend on mount to ensure data is current
+function initialsFor(name) {
+  return String(name || "??").slice(0, 2).toUpperCase();
+}
+
+function displayValue(value, fallback = "Not specified") {
+  if (Array.isArray(value)) return value.length ? value.join(", ") : fallback;
+  return value || fallback;
+}
+
+function parseProfileMonth(value) {
+  const raw = String(value || "").trim();
+  if (!raw) return { month: "", year: "" };
+
+  const isoMatch = raw.match(/^(\d{4})(?:-(\d{2}))?/);
+  if (isoMatch) {
+    return { year: isoMatch[1], month: isoMatch[2] || "" };
+  }
+
+  const yearMatch = raw.match(/\b(19|20)\d{2}\b/);
+  const month = MONTH_OPTIONS.find(([, label]) =>
+    raw.toLowerCase().includes(label.toLowerCase()),
+  )?.[0];
+  return { year: yearMatch?.[0] || raw, month: month || "" };
+}
+
+function formatProfileMonth(value, fallback = "Not specified") {
+  const { month, year } = parseProfileMonth(value);
+  if (!year) return fallback;
+  const monthLabel = MONTH_OPTIONS.find(([id]) => id === month)?.[1];
+  return [monthLabel, year].filter(Boolean).join(" ");
+}
+
+function buildProfileMonth(month, year) {
+  if (!year) return "";
+  return month ? `${year}-${month}` : year;
+}
+
+function FieldShell({ label, children, fullWidth, help }) {
+  return (
+    <div
+      className={cn(
+        "rounded-input border border-surface-border bg-surface-page px-4 py-3",
+        fullWidth && "md:col-span-2",
+      )}
+    >
+      <Label className={FIELD_LABEL}>{label}</Label>
+      <div className="mt-2">{children}</div>
+      {help ? <p className="mt-2 font-body text-xs text-text-muted">{help}</p> : null}
+    </div>
+  );
+}
+
+function ReadValue({ value, icon: Icon, emptyLabel = "Not specified", link }) {
+  const isEmpty = !value || (Array.isArray(value) && value.length === 0);
+  if (link && value) {
+    return (
+      <a
+        href={value}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="inline-flex items-center gap-2 font-body text-sm font-semibold text-primary hover:underline"
+      >
+        {Icon ? <Icon className="h-4 w-4" /> : null}
+        Open link
+        <ExternalLink className="h-3.5 w-3.5" />
+      </a>
+    );
+  }
+  return (
+    <p className={cn(isEmpty ? FIELD_EMPTY : FIELD_VALUE, "flex items-center gap-2")}>
+      {Icon ? <Icon className="h-4 w-4 shrink-0 text-text-muted" /> : null}
+      {displayValue(value, emptyLabel)}
+    </p>
+  );
+}
+
+function TextField({
+  label,
+  value,
+  onChange,
+  isEditing,
+  placeholder,
+  icon,
+  fullWidth,
+  textarea,
+  help,
+  type,
+  link,
+}) {
+  return (
+    <FieldShell label={label} fullWidth={fullWidth} help={help}>
+      {isEditing ? (
+        textarea ? (
+          <Textarea
+            className={TEXTAREA_CLASS}
+            value={value || ""}
+            onChange={(e) => onChange(e.target.value)}
+            placeholder={placeholder}
+            rows={4}
+          />
+        ) : (
+          <Input
+            className={INPUT_CLASS}
+            type={type || "text"}
+            value={value || ""}
+            onChange={(e) => onChange(e.target.value)}
+            placeholder={placeholder}
+          />
+        )
+      ) : (
+        <ReadValue value={value} icon={icon} link={link} />
+      )}
+    </FieldShell>
+  );
+}
+
+function SelectField({
+  label,
+  value,
+  onChange,
+  isEditing,
+  options,
+  placeholder = "Select option",
+  fullWidth,
+  help,
+}) {
+  return (
+    <FieldShell label={label} fullWidth={fullWidth} help={help}>
+      {isEditing ? (
+        <Select value={value || ""} onValueChange={onChange}>
+          <SelectTrigger className={SELECT_TRIGGER_CLASS}>
+            <SelectValue placeholder={placeholder} />
+          </SelectTrigger>
+          <SelectContent>
+            {options.map((option) => (
+              <SelectItem key={option} value={String(option)}>
+                {option}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      ) : (
+        <ReadValue value={value} />
+      )}
+    </FieldShell>
+  );
+}
+
+function MonthYearField({
+  label,
+  value,
+  onChange,
+  disabled,
+  allowMonth = true,
+  help,
+}) {
+  const parsed = parseProfileMonth(value);
+  const monthValue = parsed.month || EMPTY_SELECT_VALUE;
+  const yearValue = parsed.year || EMPTY_SELECT_VALUE;
+
+  return (
+    <div
+      className={cn(
+        "rounded-input border border-surface-border bg-surface-card px-3 py-2.5 transition-all",
+        disabled && "bg-surface-page opacity-70",
+      )}
+    >
+      <Label className={FIELD_LABEL}>{label}</Label>
+      <div
+        className={cn(
+          "mt-2 grid gap-2",
+          allowMonth ? "grid-cols-[minmax(0,0.9fr)_minmax(0,1fr)]" : "grid-cols-1",
+        )}
+      >
+        {allowMonth ? (
+          <Select
+            disabled={disabled}
+            value={monthValue}
+            onValueChange={(nextMonth) =>
+              onChange(
+                buildProfileMonth(
+                  nextMonth === EMPTY_SELECT_VALUE ? "" : nextMonth,
+                  parsed.year,
+                ),
+              )
+            }
+          >
+            <SelectTrigger className={cn(SELECT_TRIGGER_CLASS, "h-9 bg-white text-xs")}>
+              <SelectValue placeholder="Month" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={EMPTY_SELECT_VALUE}>Month</SelectItem>
+              {MONTH_OPTIONS.map(([id, labelText]) => (
+                <SelectItem key={id} value={id}>
+                  {labelText}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        ) : null}
+        <Select
+          disabled={disabled}
+          value={yearValue}
+          onValueChange={(nextYear) =>
+            onChange(
+              buildProfileMonth(
+                allowMonth ? parsed.month : "",
+                nextYear === EMPTY_SELECT_VALUE ? "" : nextYear,
+              ),
+            )
+          }
+        >
+          <SelectTrigger className={cn(SELECT_TRIGGER_CLASS, "h-9 bg-white text-xs")}>
+            <SelectValue placeholder="Year" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value={EMPTY_SELECT_VALUE}>Year</SelectItem>
+            {YEAR_OPTIONS.map((year) => (
+              <SelectItem key={year} value={year}>
+                {year}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+      {help ? <p className="mt-2 font-body text-xs text-text-muted">{help}</p> : null}
+    </div>
+  );
+}
+
+function SectionCard({ id, icon: Icon, title, description, actions, children }) {
+  return (
+    <section id={id} className={SECTION_CLASS}>
+      <div className="flex flex-wrap items-start justify-between gap-3 border-b border-surface-border/70 px-4 py-4 md:px-5">
+        <div className="flex min-w-0 items-start gap-3">
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary-tint text-primary">
+            <Icon className="h-4 w-4" />
+          </div>
+          <div className="min-w-0">
+            <h2 className="font-heading text-base font-extrabold text-text-heading">
+              {title}
+            </h2>
+            {description ? (
+              <p className="mt-0.5 font-body text-sm text-text-muted">{description}</p>
+            ) : null}
+          </div>
+        </div>
+        {actions ? <div className="flex shrink-0 flex-wrap gap-2">{actions}</div> : null}
+      </div>
+      <div className="space-y-4 px-4 py-4 md:px-5 md:py-5">{children}</div>
+    </section>
+  );
+}
+
+function EmptyState({ icon: Icon, text }) {
+  return (
+    <div className="rounded-input border border-dashed border-surface-border bg-surface-page px-4 py-8 text-center">
+      {Icon ? <Icon className="mx-auto mb-3 h-7 w-7 text-text-muted" /> : null}
+      <p className="font-body text-sm text-text-muted">{text}</p>
+    </div>
+  );
+}
+
+function ArrayEditorCard({ title, onRemove, children }) {
+  return (
+    <div className="rounded-input border border-surface-border bg-surface-page p-4">
+      <div className="mb-3 flex items-center justify-between gap-3">
+        <h3 className="font-heading text-sm font-bold text-text-heading">{title}</h3>
+        <Button
+          type="button"
+          size="sm"
+          variant="ghost"
+          className="h-8 w-8 p-0 text-status-error hover:bg-status-error/8 hover:text-status-error"
+          onClick={onRemove}
+        >
+          <Trash2 className="h-4 w-4" />
+        </Button>
+      </div>
+      {children}
+    </div>
+  );
+}
+
+function TagInput({ value, onChange, placeholder }) {
+  const [draft, setDraft] = useState("");
+  const add = () => {
+    const next = draft.trim();
+    if (!next || value.includes(next)) return;
+    onChange([...value, next]);
+    setDraft("");
+  };
+  return (
+    <div className="space-y-3">
+      <div className="flex flex-wrap gap-2">
+        {value.length ? (
+          value.map((item) => (
+            <Badge key={item} className="gap-1 rounded-full bg-primary-tint text-primary">
+              {item}
+              <button type="button" onClick={() => onChange(value.filter((x) => x !== item))}>
+                <X className="h-3 w-3" />
+              </button>
+            </Badge>
+          ))
+        ) : (
+          <p className={FIELD_EMPTY}>No items added yet</p>
+        )}
+      </div>
+      <div className="flex gap-2">
+        <Input
+          className={INPUT_CLASS}
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              add();
+            }
+          }}
+          placeholder={placeholder}
+        />
+        <Button type="button" className={settingsBtnOutline} onClick={add}>
+          <Plus className="h-4 w-4" />
+          Add
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+const talentSections = [
+  ["basics", UserCircle, "Basics"],
+  ["skills", Code, "Skills"],
+  ["links", Globe, "Links"],
+  ["experience", Briefcase, "Experience"],
+  ["education", GraduationCap, "Education"],
+  ["credentials", Award, "Credentials"],
+  ["portfolio", FileText, "Portfolio"],
+  ["availability", Calendar, "Availability"],
+  ["goals", Target, "Goals"],
+];
+
+const founderSections = [
+  ["basics", UserCircle, "Basics"],
+  ["startup", Building, "Startup"],
+  ["links", Globe, "Links"],
+];
+
+const memberSections = [
+  ["basics", UserCircle, "Basics"],
+  ["links", Globe, "Links"],
+];
+
+export default function ProfilePage({ user, onUpdateUser, initialEditing = false }) {
+  const [isEditing, setIsEditing] = useState(initialEditing);
+  const [showPreview, setShowPreview] = useState(false);
+  const [editedProfile, setEditedProfile] = useState(() => buildInitialProfile(user));
+  const [autosaveStatus, setAutosaveStatus] = useState("idle");
+  const autosaveSnapshotRef = useRef(JSON.stringify(buildInitialProfile(user)));
+  const autosaveTimerRef = useRef(null);
+
   useEffect(() => {
-    if (user?.role === "talent" && user?._id) {
-      const userId = String(user._id ?? user.id);
-      talentApi.getTalentProfile(userId)
-        .then((response) => {
-          if (response?.success && response?.data) {
-            const profile = response.data;
-            setEditedProfile((prev) => ({
+    setIsEditing(initialEditing);
+  }, [initialEditing]);
+
+  useEffect(() => {
+    const initialProfile = buildInitialProfile(user);
+    setEditedProfile(initialProfile);
+    autosaveSnapshotRef.current = JSON.stringify(initialProfile);
+    setAutosaveStatus("idle");
+  }, [user]);
+
+  useEffect(() => {
+    if (user?.role !== "talent" || !(user?._id || user?.id)) return;
+    const userId = String(user._id ?? user.id);
+    talentApi
+      .getTalentProfile(userId)
+      .then((response) => {
+        if (response?.success && response?.data) {
+          const profile = response.data;
+          setEditedProfile((prev) => {
+            const next = {
               ...prev,
-              fullName: profile.fullName || profile.name || prev.name,
+              name: profile.fullName || profile.name || prev.name,
               professionalTitle: profile.professionalTitle || prev.professionalTitle,
-              headline: profile.headline || prev.headline,
               location: profile.location || prev.location,
               bio: profile.bio || prev.bio,
               professionalGoals: profile.professionalGoals || prev.professionalGoals,
@@ -171,73 +540,129 @@ export default function ProfilePage({
               yearsOfExperience: profile.yearsOfExperience || prev.yearsOfExperience,
               availability: profile.availability || prev.availability,
               availabilityStatus: profile.availabilityStatus || prev.availabilityStatus,
-              preferredCommitment: profile.preferredCommitment || prev.preferredCommitment,
+              preferredCommitment:
+                profile.preferredCommitment || prev.preferredCommitment,
               linkedin: profile.linkedinUrl || profile.linkedin || prev.linkedin,
               github: profile.githubUrl || profile.github || prev.github,
-              website: profile.websiteUrl || profile.website || profile.portfolioWebsite || prev.website,
-              workExperience: profile.workExperiences?.length ? profile.workExperiences : profile.workExperience || prev.workExperience,
-              education: profile.educationList?.length ? profile.educationList : profile.education || prev.education,
-              certifications: profile.certifications?.length ? profile.certifications : prev.certifications,
-              portfolioItems: profile.portfolioItems?.length ? profile.portfolioItems : prev.portfolioItems,
-              preferredRoles: profile.preferredRoles?.length ? profile.preferredRoles : prev.preferredRoles,
-              industryPreferences: profile.industryPreferences?.length ? profile.industryPreferences : prev.industryPreferences,
+              website:
+                profile.websiteUrl ||
+                profile.website ||
+                profile.portfolioWebsite ||
+                prev.website,
+              workExperience: profile.workExperiences?.length
+                ? ensureIds(profile.workExperiences)
+                : profile.workExperience?.length
+                  ? ensureIds(profile.workExperience)
+                  : prev.workExperience,
+              education: profile.educationList?.length
+                ? ensureIds(profile.educationList)
+                : profile.education?.length
+                  ? ensureIds(profile.education)
+                  : prev.education,
+              certifications: profile.certifications?.length
+                ? ensureIds(profile.certifications)
+                : prev.certifications,
+              portfolioItems: profile.portfolioItems?.length
+                ? ensureIds(profile.portfolioItems)
+                : prev.portfolioItems,
+              industryPreferences: profile.industryPreferences?.length
+                ? profile.industryPreferences
+                : prev.industryPreferences,
               interests: profile.interests?.length ? profile.interests : prev.interests,
               resumeUrl: profile.resumeUrl || prev.resumeUrl,
               resumeKey: profile.resumeKey || prev.resumeKey,
               resumeFileName: profile.resumeFileName || prev.resumeFileName,
               resumeParsedAt: profile.resumeParsedAt || prev.resumeParsedAt,
-            }));
-          }
-        })
-        .catch((err) => {
-          console.warn("Failed to load talent profile:", err);
-        });
-    }
+            };
+            autosaveSnapshotRef.current = JSON.stringify(next);
+            return next;
+          });
+        }
+      })
+      .catch((err) => console.warn("Failed to load talent profile:", err));
   }, [user?._id, user?.id, user?.role]);
 
-  const calculateProfileCompletion = () => {
-    if (user.role !== "talent") return 100;
-    return getTalentProfileCompletionPercent(user);
-  };
-  const profileCompletion = calculateProfileCompletion();
-  const profileShellClass = embeddedInSettings
-    ? "w-full space-y-4"
-    : "min-h-full space-y-3 bg-transparent p-2 font-body md:space-y-4 md:p-3 lg:p-4";
+  const profileCompletion =
+    user.role === "talent"
+      ? getTalentProfileFormCompletionPercent(editedProfile)
+      : 100;
+  const completionLabel =
+    profileCompletion >= 90
+      ? "Profile looks strong"
+      : profileCompletion >= TALENT_BROWSE_MIN_COMPLETION
+        ? "Almost there"
+        : profileCompletion >= 40
+          ? "Good start"
+          : "Needs more detail";
+  const completionHint =
+    profileCompletion < TALENT_BROWSE_MIN_COMPLETION
+      ? `Reach ${TALENT_BROWSE_MIN_COMPLETION}% to appear in founder browse`
+      : profileCompletion < TALENT_ACTIONS_MIN_COMPLETION
+        ? `Reach ${TALENT_ACTIONS_MIN_COMPLETION}% to unlock applications`
+        : completionLabel;
+  const autosaveLabel =
+    autosaveStatus === "saving"
+      ? "Saving changes..."
+      : autosaveStatus === "saved"
+        ? "All changes saved"
+        : autosaveStatus === "error"
+          ? "Autosave failed"
+          : "Autosaves while you edit";
+  const sections =
+    user.role === "talent"
+      ? talentSections
+      : user.role === "founder"
+        ? founderSections
+        : memberSections;
+  const readOnly = !isEditing || showPreview;
 
-  const renderProfileEditActions = () => {
-    if (!isEditing) {
-      return (
-        <Button className={settingsBtnPrimary} onClick={() => setIsEditing(true)}>
-          <Edit className="mr-2 h-4 w-4" />
-          Edit profile
-        </Button>
-      );
+  const setField = (field, value) => {
+    setEditedProfile((prev) => ({ ...prev, [field]: value }));
+  };
+
+  useEffect(() => {
+    if (autosaveTimerRef.current) {
+      clearTimeout(autosaveTimerRef.current);
+      autosaveTimerRef.current = null;
     }
-    return (
-      <>
-        <Button
-          variant="outline"
-          className={settingsBtnOutline}
-          onClick={() => setIsEditing(false)}
-        >
-          Cancel
-        </Button>
-        <Button className={settingsBtnPrimary} onClick={handleSave}>
-          <Save className="mr-2 h-4 w-4" />
-          Save changes
-        </Button>
-      </>
-    );
-  };
 
-  const getCompletionMessage = (percentage) => {
-    if (percentage === 100) return "Your profile is complete! 🎉";
-    if (percentage >= 80)
-      return "Almost there! Complete your profile to stand out.";
-    if (percentage >= 50)
-      return "Good progress! Add more details to attract founders.";
-    return "Start building your profile to get discovered by startups.";
-  };
+    if (
+      user.role !== "talent" ||
+      !isEditing ||
+      showPreview ||
+      !onUpdateUser ||
+      !(user?._id || user?.id)
+    ) {
+      return undefined;
+    }
+
+    const serialized = JSON.stringify(editedProfile);
+    if (serialized === autosaveSnapshotRef.current) {
+      return undefined;
+    }
+
+    setAutosaveStatus("saving");
+    autosaveTimerRef.current = setTimeout(async () => {
+      const userId = String(user._id ?? user.id);
+      try {
+        await talentApi.saveTalentProfile(userId, editedProfile);
+        autosaveSnapshotRef.current = JSON.stringify(editedProfile);
+        onUpdateUser({ ...user, ...editedProfile });
+        setAutosaveStatus("saved");
+      } catch (err) {
+        console.warn("Failed to autosave talent profile:", err);
+        setAutosaveStatus("error");
+      }
+    }, AUTOSAVE_DELAY_MS);
+
+    return () => {
+      if (autosaveTimerRef.current) {
+        clearTimeout(autosaveTimerRef.current);
+        autosaveTimerRef.current = null;
+      }
+    };
+  }, [editedProfile, isEditing, onUpdateUser, showPreview, user]);
+
   const handleSave = async () => {
     if (!onUpdateUser) return;
 
@@ -318,14 +743,10 @@ export default function ProfilePage({
         return;
       }
     } else {
-      // Talent profile: save to backend API
       const userId = String(user._id ?? user.id);
       try {
         await talentApi.saveTalentProfile(userId, editedProfile);
-        onUpdateUser({
-          ...user,
-          ...editedProfile,
-        });
+        onUpdateUser({ ...user, ...editedProfile });
       } catch (err) {
         toast.error(err?.message || "Failed to save talent profile");
         return;
@@ -333,1843 +754,981 @@ export default function ProfilePage({
     }
 
     setIsEditing(false);
+    setShowPreview(false);
     toast.success("Profile updated successfully!");
   };
-  const handleAddSkill = () => {
-    if (newSkill.trim() && !editedProfile.skills.includes(newSkill.trim())) {
-      setEditedProfile({
-        ...editedProfile,
-        skills: [...editedProfile.skills, newSkill.trim()],
-      });
-      setNewSkill("");
-    }
-  };
-  const handleRemoveSkill = (skill) => {
-    setEditedProfile({
-      ...editedProfile,
-      skills: editedProfile.skills.filter((s) => s !== skill),
-    });
+
+  const cancelEditing = () => {
+    setEditedProfile(buildInitialProfile(user));
+    setIsEditing(false);
+    setShowPreview(false);
   };
 
-  // Work Experience handlers
-  const addWorkExperience = () => {
-    setEditedProfile({
-      ...editedProfile,
-      workExperience: [
-        ...editedProfile.workExperience,
-        {
-          id: Date.now().toString(),
-          company: "",
-          position: "",
-          startDate: "",
-          endDate: "",
-          current: false,
-          description: "",
-        },
-      ],
-    });
-  };
-  const updateWorkExperience = (id, field, value) => {
-    setEditedProfile({
-      ...editedProfile,
-      workExperience: editedProfile.workExperience.map((exp) =>
-        exp.id === id
-          ? {
-              ...exp,
-              [field]: value,
-            }
-          : exp,
-      ),
-    });
-  };
-  const removeWorkExperience = (id) => {
-    setEditedProfile({
-      ...editedProfile,
-      workExperience: editedProfile.workExperience.filter(
-        (exp) => exp.id !== id,
-      ),
-    });
+  const addItem = (field, item) => {
+    setField(field, [...editedProfile[field], { id: Date.now().toString(), ...item }]);
   };
 
-  // Education handlers
-  const addEducation = () => {
-    setEditedProfile({
-      ...editedProfile,
-      education: [
-        ...editedProfile.education,
-        {
-          id: Date.now().toString(),
-          institution: "",
-          degree: "",
-          field: "",
-          graduationYear: "",
-        },
-      ],
-    });
-  };
-  const updateEducation = (id, field, value) => {
-    setEditedProfile({
-      ...editedProfile,
-      education: editedProfile.education.map((edu) =>
-        edu.id === id
-          ? {
-              ...edu,
-              [field]: value,
-            }
-          : edu,
+  const updateItem = (field, id, key, value) => {
+    setField(
+      field,
+      editedProfile[field].map((item) =>
+        item.id === id ? { ...item, [key]: value } : item,
       ),
-    });
-  };
-  const removeEducation = (id) => {
-    setEditedProfile({
-      ...editedProfile,
-      education: editedProfile.education.filter((edu) => edu.id !== id),
-    });
+    );
   };
 
-  // Certification handlers
-  const addCertification = () => {
-    setEditedProfile({
-      ...editedProfile,
-      certifications: [
-        ...editedProfile.certifications,
-        {
-          id: Date.now().toString(),
-          name: "",
-          issuer: "",
-          issueYear: "",
-          credentialId: "",
-          credentialUrl: "",
-          certificateImage: "",
-        },
-      ],
-    });
+  const removeItem = (field, id) => {
+    setField(field, editedProfile[field].filter((item) => item.id !== id));
   };
+
   const updateCertificationImage = (id, file) => {
     if (!file) return;
     const reader = new FileReader();
     reader.onload = () => {
-      updateCertification(id, "certificateImage", reader.result || "");
+      updateItem("certifications", id, "certificateImage", reader.result || "");
     };
     reader.readAsDataURL(file);
   };
-  const updateCertification = (id, field, value) => {
-    setEditedProfile({
-      ...editedProfile,
-      certifications: editedProfile.certifications.map((cert) =>
-        cert.id === id
-          ? {
-              ...cert,
-              [field]: value,
-            }
-          : cert,
-      ),
-    });
-  };
-  const removeCertification = (id) => {
-    setEditedProfile({
-      ...editedProfile,
-      certifications: editedProfile.certifications.filter(
-        (cert) => cert.id !== id,
-      ),
-    });
-  };
 
-  // Portfolio handlers
-  const addPortfolioItem = () => {
-    setEditedProfile({
-      ...editedProfile,
-      portfolioItems: [
-        ...editedProfile.portfolioItems,
-        {
-          id: Date.now().toString(),
-          title: "",
-          description: "",
-          url: "",
-          type: "",
-        },
-      ],
-    });
-  };
-  const updatePortfolioItem = (id, field, value) => {
-    setEditedProfile({
-      ...editedProfile,
-      portfolioItems: editedProfile.portfolioItems.map((item) =>
-        item.id === id
-          ? {
-              ...item,
-              [field]: value,
-            }
-          : item,
-      ),
-    });
-  };
-  const removePortfolioItem = (id) => {
-    setEditedProfile({
-      ...editedProfile,
-      portfolioItems: editedProfile.portfolioItems.filter(
-        (item) => item.id !== id,
-      ),
-    });
-  };
-
-  // Render Talent Profile
-  if (user.role === "talent") {
-    return (
-      <div className={profileShellClass}>
-        {!embeddedInSettings ? (
-          <div className="flex flex-wrap items-center justify-between gap-4">
-            <div>
-              <h1 className="mb-2 font-heading text-3xl font-bold text-text-heading">
-                Professional Profile
-              </h1>
-              <p className="font-body text-text-body">
-                This is what founders see when browsing talent
-              </p>
-            </div>
-            <div className="flex gap-2">
-              {!isEditing && (
-                <Button
-                  variant="outline"
-                  className={SP_PREVIEW_BTN}
-                  onClick={() => setShowPreview(!showPreview)}
-                >
-                  <Eye className="mr-2 h-4 w-4" />
-                  {showPreview ? "Edit View" : "Preview"}
-                </Button>
-              )}
-              {renderProfileEditActions()}
-            </div>
-          </div>
-        ) : (
-          <div className="flex flex-wrap items-center justify-end gap-2 rounded-card border border-surface-border bg-surface-card px-4 py-3 shadow-soft md:px-5">
-            {!isEditing && (
-              <Button
-                variant="outline"
-                className={settingsBtnOutline}
-                onClick={() => setShowPreview(!showPreview)}
-              >
-                <Eye className="mr-2 h-4 w-4" />
-                {showPreview ? "Edit view" : "Preview"}
-              </Button>
-            )}
-            {renderProfileEditActions()}
-          </div>
-        )}
-        {!showPreview && profileCompletion < 100 && (
-          <Card className={cn(SP_CARD, "ring-1 ring-primary/25")}>
-            <CardContent className="pt-6 space-y-4">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <CheckCircle
-                    className={`w-5 h-5 ${profileCompletion === 100 ? "text-green-600" : "text-muted-foreground"}`}
-                  />
-                  <h3 className="font-semibold">Profile Completion</h3>
-                </div>
-                <span
-                  className={`text-sm font-semibold ${profileCompletion >= 80 ? "text-green-600" : profileCompletion >= 50 ? "text-yellow-600" : "text-red-600"}`}
-                >
-                  {profileCompletion}%
+  return (
+    <div className="min-h-full bg-surface-page p-2 font-body md:p-3 lg:p-4">
+      <div className="mx-auto max-w-7xl space-y-4">
+        <section className={cn(SECTION_CLASS, "overflow-hidden")}>
+          <div className="flex flex-col gap-5 p-4 md:flex-row md:items-center md:justify-between md:p-5">
+            <div className="flex min-w-0 items-center gap-4">
+              <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-primary text-white shadow-[0_8px_24px_rgba(58,90,254,0.25)]">
+                <span className="font-heading text-lg font-extrabold">
+                  {initialsFor(editedProfile.name)}
                 </span>
               </div>
-              <Progress value={profileCompletion} className="h-3" />
-              <p className="font-body text-sm text-text-muted">
-                {getCompletionMessage(profileCompletion)}
-              </p>
-            </CardContent>
-          </Card>
-        )}
-        <Card className={SP_CARD}>
-          <CardHeader>
-            <CardTitle className={SP_CARD_TITLE}>
-              <UserCircle className="w-5 h-5" />
-              Professional Profile
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label className={SP_LABEL} htmlFor="name">Full Name *</Label>
-                {isEditing ? (
-                  <Input className={cn(SP_INPUT)}
-                    id="name"
-                    value={editedProfile.name}
-                    onChange={(e) =>
-                      setEditedProfile({
-                        ...editedProfile,
-                        name: e.target.value,
-                      })
-                    }
-                  />
-                ) : (
-                  <p className={SP_VALUE}>{user.name}</p>
-                )}
-              </div>
-              <div className="space-y-2">
-                <Label className={SP_LABEL} htmlFor="professionalTitle">Professional Title *</Label>
-                {isEditing ? (
-                  <Input className={cn(SP_INPUT)}
-                    id="professionalTitle"
-                    value={editedProfile.professionalTitle}
-                    onChange={(e) =>
-                      setEditedProfile({
-                        ...editedProfile,
-                        professionalTitle: e.target.value,
-                      })
-                    }
-                    placeholder="e.g., Senior Full-Stack Developer"
-                  />
-                ) : (
-                  <p className={SP_VALUE}>
-                    {user.professionalTitle || "Not specified"}
-                  </p>
-                )}
-              </div>
-              <div className="space-y-2">
-                <Label className={SP_LABEL} htmlFor="location">Location *</Label>
-                {isEditing ? (
-                  <Input className={cn(SP_INPUT)}
-                    id="location"
-                    value={editedProfile.location}
-                    onChange={(e) =>
-                      setEditedProfile({
-                        ...editedProfile,
-                        location: e.target.value,
-                      })
-                    }
-                    placeholder="e.g., San Francisco, CA"
-                  />
-                ) : (
-                  <p className={cn(SP_VALUE, "flex items-center gap-2")}>
-                    <MapPin className="h-4 w-4 shrink-0 text-text-muted" />
-                    {user.location || "Not specified"}
-                  </p>
-                )}
-              </div>
-              <div className="space-y-2">
-                <Label className={SP_LABEL} htmlFor="yearsOfExperience">Years of Experience *</Label>
-                {isEditing ? (
-                  <Input className={cn(SP_INPUT)}
-                    id="yearsOfExperience"
-                    value={editedProfile.yearsOfExperience}
-                    onChange={(e) =>
-                      setEditedProfile({
-                        ...editedProfile,
-                        yearsOfExperience: e.target.value,
-                      })
-                    }
-                    placeholder="e.g., 5"
-                  />
-                ) : (
-                  <p className={SP_VALUE}>
-                    {user.yearsOfExperience || "Not specified"}
-                  </p>
-                )}
+              <div className="min-w-0">
+                <div className="flex flex-wrap items-center gap-2">
+                  <h1 className="truncate font-heading text-xl font-extrabold text-text-heading">
+                    {editedProfile.name || "Unnamed profile"}
+                  </h1>
+                  <Badge className="rounded-full bg-primary-tint px-2.5 py-0.5 font-body text-[11px] font-semibold text-primary capitalize">
+                    {user.role?.replace(/-/g, " ") || "Member"}
+                  </Badge>
+                </div>
+                <p className="mt-1 font-body text-sm text-text-body">
+                  {editedProfile.professionalTitle ||
+                    editedProfile.startupName ||
+                    "Add a title to make your profile easier to scan"}
+                </p>
               </div>
             </div>
-            <div className="space-y-2">
-              <Label className={SP_LABEL} htmlFor="bio">Professional Bio *</Label>
-              {isEditing ? (
-                <Textarea className={cn(SP_TEXTAREA)}
-                  id="bio"
-                  value={editedProfile.bio}
-                  onChange={(e) =>
-                    setEditedProfile({
-                      ...editedProfile,
-                      bio: e.target.value,
-                    })
-                  }
-                  placeholder="Tell founders about your professional background, expertise, and what drives you..."
-                  rows={5}
-                />
-              ) : (
-                <p
-                  className={cn(
-                    SP_VALUE,
-                    "whitespace-pre-wrap",
-                    !user.bio && SP_EMPTY,
-                  )}
-                >
-                  {user.bio || "No bio added yet"}
-                </p>
-              )}
-              {isEditing && (
-                <p className="text-xs text-muted-foreground">
-                  A compelling bio helps founders understand your value
-                </p>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-        <Card className={SP_CARD}>
-          <CardHeader>
-            <CardTitle className={SP_CARD_TITLE}>
-              <Code className="w-5 h-5" />
-              Skills & Expertise *
-            </CardTitle>
-            <CardDescription className="font-body text-text-body">
-              Add your key skills so founders can find you
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex flex-wrap gap-2">
-              {editedProfile.skills.map((skill) => (
-                <Badge
-                  key={skill}
-                  variant="secondary"
-                  className="flex items-center gap-1"
-                >
-                  {skill}
-                  {isEditing && (
-                    <button
-                      onClick={() => handleRemoveSkill(skill)}
-                      className="ml-1 hover:text-destructive"
-                    >
-                      <X className="w-3 h-3" />
-                    </button>
-                  )}
-                </Badge>
-              ))}
-              {editedProfile.skills.length === 0 && (
-                <p className="text-sm text-muted-foreground">
-                  No skills added yet
-                </p>
-              )}
-            </div>
-            {isEditing && (
-              <div className="flex gap-2">
-                <Input className={cn(SP_INPUT)}
-                  value={newSkill}
-                  onChange={(e) => setNewSkill(e.target.value)}
-                  onKeyPress={(e) => {
-                    if (e.key === "Enter") {
-                      e.preventDefault();
-                      handleAddSkill();
-                    }
+            <div className="flex flex-wrap items-center gap-2 md:justify-end">
+              {user.role === "talent" ? (
+                <ResumeImportPanel
+                  variant="button"
+                  editedProfile={editedProfile}
+                  onApply={(next) => {
+                    setEditedProfile(next);
+                    setIsEditing(true);
+                    setShowPreview(false);
                   }}
-                  placeholder="e.g., React, Node.js, TypeScript"
+                  buttonClassName="h-10"
+                  buttonLabel="Upload CV"
                 />
-                <Button onClick={handleAddSkill} size="sm">
-                  <Plus className="w-4 h-4" />
-                </Button>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-        <Card className={SP_CARD}>
-          <CardHeader>
-            <CardTitle className={SP_CARD_TITLE}>
-              <Globe className="w-5 h-5" />
-              Professional Links
-            </CardTitle>
-            <CardDescription className="font-body text-text-body">
-              These links help validate your professional background
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label className={SP_LABEL} htmlFor="linkedin">LinkedIn *</Label>
-                {isEditing ? (
-                  <Input className={cn(SP_INPUT)}
-                    id="linkedin"
-                    value={editedProfile.linkedin}
-                    onChange={(e) =>
-                      setEditedProfile({
-                        ...editedProfile,
-                        linkedin: e.target.value,
-                      })
-                    }
-                    placeholder="https://linkedin.com/in/yourprofile"
-                  />
-                ) : (
-                  <p className={cn(SP_VALUE, "flex items-center gap-2")}>
-                    <Linkedin className="h-4 w-4 shrink-0 text-text-muted" />
-                    {user.linkedin ? (
-                      <a
-                        href={user.linkedin}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-primary hover:underline flex items-center gap-1"
-                      >
-                        View Profile
-                        <ExternalLink className="w-3 h-3" />
-                      </a>
-                    ) : (
-                      "Not specified"
-                    )}
-                  </p>
-                )}
-              </div>
-              <div className="space-y-2">
-                <Label className={SP_LABEL} htmlFor="github">GitHub</Label>
-                {isEditing ? (
-                  <Input className={cn(SP_INPUT)}
-                    id="github"
-                    value={editedProfile.github}
-                    onChange={(e) =>
-                      setEditedProfile({
-                        ...editedProfile,
-                        github: e.target.value,
-                      })
-                    }
-                    placeholder="https://github.com/yourusername"
-                  />
-                ) : (
-                  <p className={cn(SP_VALUE, "flex items-center gap-2")}>
-                    <Github className="h-4 w-4 shrink-0 text-text-muted" />
-                    {user.github ? (
-                      <a
-                        href={user.github}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-primary hover:underline flex items-center gap-1"
-                      >
-                        View Profile
-                        <ExternalLink className="w-3 h-3" />
-                      </a>
-                    ) : (
-                      "Not specified"
-                    )}
-                  </p>
-                )}
-              </div>
-              <div className="space-y-2 md:col-span-2">
-                <Label className={SP_LABEL} htmlFor="website">Portfolio Website</Label>
-                {isEditing ? (
-                  <Input className={cn(SP_INPUT)}
-                    id="website"
-                    value={editedProfile.website}
-                    onChange={(e) =>
-                      setEditedProfile({
-                        ...editedProfile,
-                        website: e.target.value,
-                      })
-                    }
-                    placeholder="https://yourportfolio.com"
-                  />
-                ) : (
-                  <p className={cn(SP_VALUE, "flex items-center gap-2")}>
-                    <Globe className="h-4 w-4 shrink-0 text-text-muted" />
-                    {user.website ? (
-                      <a
-                        href={user.website}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-primary hover:underline flex items-center gap-1"
-                      >
-                        Visit Website
-                        <ExternalLink className="w-3 h-3" />
-                      </a>
-                    ) : (
-                      "Not specified"
-                    )}
-                  </p>
-                )}
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        {isEditing ? (
-          <ResumeImportPanel
-            editedProfile={editedProfile}
-            onApply={(next) => setEditedProfile(next)}
-          />
-        ) : null}
-        <Card className={SP_CARD}>
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <div>
-                <CardTitle className={SP_CARD_TITLE}>
-                  <Briefcase className="w-5 h-5" />
-                  Work Experience *
-                </CardTitle>
-                <CardDescription className="font-body text-text-body">
-                  Add your professional work history to validate your experience
-                </CardDescription>
-              </div>
-              {isEditing && (
-                <Button onClick={addWorkExperience} size="sm" variant="outline">
-                  <Plus className="w-4 h-4 mr-2" />
-                  Add Experience
-                </Button>
-              )}
-            </div>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {editedProfile.workExperience.length === 0 ? (
-              <div className="rounded-input bg-surface-page py-8 text-center">
-                <Briefcase className="w-12 h-12 mx-auto text-muted-foreground mb-3" />
-                <p className="text-sm text-muted-foreground mb-2">
-                  No work experience added yet
-                </p>
-                {isEditing && (
-                  <p className="text-xs text-muted-foreground">
-                    Click "Add Experience" to showcase your professional
-                    background
-                  </p>
-                )}
-              </div>
-            ) : (
-              editedProfile.workExperience.map((exp, index) => (
-                <div key={exp.id} className="space-y-3 rounded-input border-0 bg-surface-page p-4">
-                  {isEditing ? (
-                    <>
-                      <div className="flex justify-between items-start">
-                        <h4 className="font-semibold">
-                          {"Experience "}
-                          {index + 1}
-                        </h4>
-                        <Button
-                          onClick={() => removeWorkExperience(exp.id)}
-                          size="sm"
-                          variant="ghost"
-                        >
-                          <Trash2 className="w-4 h-4 text-destructive" />
-                        </Button>
-                      </div>
-                      <div className="grid md:grid-cols-2 gap-3">
-                        <Input className={cn(SP_INPUT)}
-                          placeholder="Company"
-                          value={exp.company}
-                          onChange={(e) =>
-                            updateWorkExperience(
-                              exp.id,
-                              "company",
-                              e.target.value,
-                            )
-                          }
-                        />
-                        <Input className={cn(SP_INPUT)}
-                          placeholder="Position"
-                          value={exp.position}
-                          onChange={(e) =>
-                            updateWorkExperience(
-                              exp.id,
-                              "position",
-                              e.target.value,
-                            )
-                          }
-                        />
-                        <Input className={cn(SP_INPUT)}
-                          type="month"
-                          placeholder="Start Date"
-                          value={exp.startDate}
-                          onChange={(e) =>
-                            updateWorkExperience(
-                              exp.id,
-                              "startDate",
-                              e.target.value,
-                            )
-                          }
-                        />
-                        <Input className={cn(SP_INPUT)}
-                          type="month"
-                          placeholder="End Date"
-                          value={exp.endDate}
-                          onChange={(e) =>
-                            updateWorkExperience(
-                              exp.id,
-                              "endDate",
-                              e.target.value,
-                            )
-                          }
-                          disabled={exp.current}
-                        />
-                        <div className="md:col-span-2 flex items-center gap-2">
-                          <input
-                            type="checkbox"
-                            id={`current-${exp.id}`}
-                            checked={exp.current}
-                            onChange={(e) =>
-                              updateWorkExperience(
-                                exp.id,
-                                "current",
-                                e.target.checked,
-                              )
-                            }
-                            className="w-4 h-4"
-                          />
-                          <Label
-                            className={cn(SP_LABEL, "normal-case tracking-normal")}
-                            htmlFor={`current-${exp.id}`}
-                          >
-                            Currently working here
-                          </Label>
-                        </div>
-                        <div className="md:col-span-2">
-                          <Textarea className={cn(SP_TEXTAREA)}
-                            placeholder="Description"
-                            value={exp.description}
-                            onChange={(e) =>
-                              updateWorkExperience(
-                                exp.id,
-                                "description",
-                                e.target.value,
-                              )
-                            }
-                            rows={3}
-                          />
-                        </div>
-                      </div>
-                    </>
-                  ) : (
-                    <>
-                      <div>
-                        <h4 className="font-semibold">{exp.position}</h4>
-                        <p className="text-sm text-muted-foreground">
-                          {exp.company}
-                        </p>
-                      </div>
-                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                        <Calendar className="w-4 h-4" />
-                        <span>
-                          {exp.startDate}
-                          {" - "}
-                          {exp.current ? "Present" : exp.endDate}
-                        </span>
-                      </div>
-                      {exp.description && (
-                        <p className="text-sm whitespace-pre-wrap">
-                          {exp.description}
-                        </p>
-                      )}
-                    </>
-                  )}
-                </div>
-              ))
-            )}
-          </CardContent>
-        </Card>
-        <Card className={SP_CARD}>
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <div>
-                <CardTitle className={SP_CARD_TITLE}>
-                  <GraduationCap className="w-5 h-5" />
-                  Education
-                </CardTitle>
-              </div>
-              {isEditing && (
-                <Button onClick={addEducation} size="sm" variant="outline">
-                  <Plus className="w-4 h-4 mr-2" />
-                  Add Education
-                </Button>
-              )}
-            </div>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {editedProfile.education.length === 0 ? (
-              <div className="rounded-input bg-surface-page py-6 text-center">
-                <p className="text-sm text-muted-foreground">
-                  No education added yet
-                </p>
-              </div>
-            ) : (
-              editedProfile.education.map((edu, index) => (
-                <div key={edu.id} className="space-y-3 rounded-input border-0 bg-surface-page p-4">
-                  {isEditing ? (
-                    <>
-                      <div className="flex justify-between items-start">
-                        <h4 className="font-semibold">
-                          {"Education "}
-                          {index + 1}
-                        </h4>
-                        <Button
-                          onClick={() => removeEducation(edu.id)}
-                          size="sm"
-                          variant="ghost"
-                        >
-                          <Trash2 className="w-4 h-4 text-destructive" />
-                        </Button>
-                      </div>
-                      <div className="grid md:grid-cols-2 gap-3">
-                        <Input className={cn(SP_INPUT)}
-                          placeholder="Institution"
-                          value={edu.institution}
-                          onChange={(e) =>
-                            updateEducation(
-                              edu.id,
-                              "institution",
-                              e.target.value,
-                            )
-                          }
-                        />
-                        <Input className={cn(SP_INPUT)}
-                          placeholder="Degree"
-                          value={edu.degree}
-                          onChange={(e) =>
-                            updateEducation(edu.id, "degree", e.target.value)
-                          }
-                        />
-                        <Input className={cn(SP_INPUT)}
-                          placeholder="Field of Study"
-                          value={edu.field}
-                          onChange={(e) =>
-                            updateEducation(edu.id, "field", e.target.value)
-                          }
-                        />
-                        <Input className={cn(SP_INPUT)}
-                          placeholder="Graduation Year"
-                          value={edu.graduationYear}
-                          onChange={(e) =>
-                            updateEducation(
-                              edu.id,
-                              "graduationYear",
-                              e.target.value,
-                            )
-                          }
-                        />
-                      </div>
-                    </>
-                  ) : (
-                    <>
-                      <div>
-                        <h4 className="font-semibold">
-                          {edu.degree}
-                          {" in "}
-                          {edu.field}
-                        </h4>
-                        <p className="text-sm text-muted-foreground">
-                          {edu.institution}
-                        </p>
-                      </div>
-                      <p className="text-sm text-muted-foreground">
-                        {"Graduated: "}
-                        {edu.graduationYear}
-                      </p>
-                    </>
-                  )}
-                </div>
-              ))
-            )}
-          </CardContent>
-        </Card>
-        <Card className={SP_CARD}>
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <div>
-                <CardTitle className={SP_CARD_TITLE}>
-                  <Award className="w-5 h-5" />
-                  Certifications & Credentials
-                </CardTitle>
-                <CardDescription className="font-body text-text-body">
-                  Professional certifications help validate your expertise
-                </CardDescription>
-              </div>
-              {isEditing && (
-                <Button onClick={addCertification} size="sm" variant="outline">
-                  <Plus className="w-4 h-4 mr-2" />
-                  Add Certification
-                </Button>
-              )}
-            </div>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {editedProfile.certifications.length === 0 ? (
-              <div className="rounded-input bg-surface-page py-6 text-center">
-                <p className="text-sm text-muted-foreground">
-                  No certifications added yet
-                </p>
-              </div>
-            ) : (
-              editedProfile.certifications.map((cert, index) => (
-                <div key={cert.id} className="space-y-3 rounded-input border-0 bg-surface-page p-4">
-                  {isEditing ? (
-                    <>
-                      <div className="flex justify-between items-start">
-                        <h4 className="font-semibold">
-                          {"Certification "}
-                          {index + 1}
-                        </h4>
-                        <Button
-                          onClick={() => removeCertification(cert.id)}
-                          size="sm"
-                          variant="ghost"
-                        >
-                          <Trash2 className="w-4 h-4 text-destructive" />
-                        </Button>
-                      </div>
-                      <div className="grid md:grid-cols-2 gap-3">
-                        <Input className={cn(SP_INPUT)}
-                          placeholder="Certification Name"
-                          value={cert.name}
-                          onChange={(e) =>
-                            updateCertification(cert.id, "name", e.target.value)
-                          }
-                        />
-                        <Input className={cn(SP_INPUT)}
-                          placeholder="Issuing Organization"
-                          value={cert.issuer}
-                          onChange={(e) =>
-                            updateCertification(
-                              cert.id,
-                              "issuer",
-                              e.target.value,
-                            )
-                          }
-                        />
-                        <Input className={cn(SP_INPUT)}
-                          placeholder="Issue Year"
-                          value={cert.issueYear}
-                          onChange={(e) =>
-                            updateCertification(
-                              cert.id,
-                              "issueYear",
-                              e.target.value,
-                            )
-                          }
-                        />
-                        <Input className={cn(SP_INPUT)}
-                          placeholder="Credential ID (Optional)"
-                          value={cert.credentialId || ""}
-                          onChange={(e) =>
-                            updateCertification(
-                              cert.id,
-                              "credentialId",
-                              e.target.value,
-                            )
-                          }
-                        />
-                        <div className="md:col-span-2">
-                          <Input className={cn(SP_INPUT)}
-                            placeholder="Credential URL (Optional)"
-                            value={cert.credentialUrl || ""}
-                            onChange={(e) =>
-                              updateCertification(
-                                cert.id,
-                                "credentialUrl",
-                                e.target.value,
-                              )
-                            }
-                          />
-                        </div>
-                        <div className="md:col-span-2 space-y-2">
-                          <Label className={SP_LABEL}>Certificate Image</Label>
-                          <Input className={cn(SP_INPUT)}
-                            type="file"
-                            accept="image/*"
-                            onChange={(e) =>
-                              updateCertificationImage(
-                                cert.id,
-                                e.target.files?.[0],
-                              )
-                            }
-                          />
-                          {cert.certificateImage && (
-                            <div className="flex items-center gap-3">
-                              <img
-                                src={cert.certificateImage}
-                                alt={cert.name || "Certificate"}
-                                className="h-20 w-28 rounded-md border object-cover"
-                              />
-                              <Button
-                                type="button"
-                                size="sm"
-                                variant="outline"
-                                onClick={() =>
-                                  updateCertification(
-                                    cert.id,
-                                    "certificateImage",
-                                    "",
-                                  )
-                                }
-                              >
-                                Remove Image
-                              </Button>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    </>
-                  ) : (
-                    <>
-                      <div>
-                        <h4 className="font-semibold">{cert.name}</h4>
-                        <p className="text-sm text-muted-foreground">
-                          {cert.issuer}
-                          {" • "}
-                          {cert.issueYear}
-                        </p>
-                      </div>
-                      {cert.credentialUrl && (
-                        <a
-                          href={cert.credentialUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-sm text-primary hover:underline flex items-center gap-1"
-                        >
-                          View Credential
-                          <ExternalLink className="w-3 h-3" />
-                        </a>
-                      )}
-                    </>
-                  )}
-                </div>
-              ))
-            )}
-          </CardContent>
-        </Card>
-        <Card className={SP_CARD}>
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <div>
-                <CardTitle className={SP_CARD_TITLE}>
-                  <FileText className="w-5 h-5" />
-                  Portfolio & Projects
-                </CardTitle>
-                <CardDescription className="font-body text-text-body">
-                  Showcase your best work to stand out to founders
-                </CardDescription>
-              </div>
-              {isEditing && (
-                <Button onClick={addPortfolioItem} size="sm" variant="outline">
-                  <Plus className="w-4 h-4 mr-2" />
-                  Add Project
-                </Button>
-              )}
-            </div>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {editedProfile.portfolioItems.length === 0 ? (
-              <div className="rounded-input bg-surface-page py-6 text-center">
-                <p className="text-sm text-muted-foreground">
-                  No portfolio items added yet
-                </p>
-              </div>
-            ) : (
-              editedProfile.portfolioItems.map((item, index) => (
-                <div key={item.id} className="space-y-3 rounded-input border-0 bg-surface-page p-4">
-                  {isEditing ? (
-                    <>
-                      <div className="flex justify-between items-start">
-                        <h4 className="font-semibold">
-                          {"Project "}
-                          {index + 1}
-                        </h4>
-                        <Button
-                          onClick={() => removePortfolioItem(item.id)}
-                          size="sm"
-                          variant="ghost"
-                        >
-                          <Trash2 className="w-4 h-4 text-destructive" />
-                        </Button>
-                      </div>
-                      <div className="space-y-3">
-                        <Input className={cn(SP_INPUT)}
-                          placeholder="Project Title"
-                          value={item.title}
-                          onChange={(e) =>
-                            updatePortfolioItem(
-                              item.id,
-                              "title",
-                              e.target.value,
-                            )
-                          }
-                        />
-                        <Input className={cn(SP_INPUT)}
-                          placeholder="Project Type (e.g., Web App, Mobile App)"
-                          value={item.type}
-                          onChange={(e) =>
-                            updatePortfolioItem(item.id, "type", e.target.value)
-                          }
-                        />
-                        <Textarea className={cn(SP_TEXTAREA)}
-                          placeholder="Description"
-                          value={item.description}
-                          onChange={(e) =>
-                            updatePortfolioItem(
-                              item.id,
-                              "description",
-                              e.target.value,
-                            )
-                          }
-                          rows={3}
-                        />
-                        <Input className={cn(SP_INPUT)}
-                          placeholder="Project URL"
-                          value={item.url}
-                          onChange={(e) =>
-                            updatePortfolioItem(item.id, "url", e.target.value)
-                          }
-                        />
-                      </div>
-                    </>
-                  ) : (
-                    <>
-                      <div>
-                        <h4 className="font-semibold">{item.title}</h4>
-                        <Badge variant="secondary" className="mt-1">
-                          {item.type}
-                        </Badge>
-                      </div>
-                      <p className="text-sm whitespace-pre-wrap">
-                        {item.description}
-                      </p>
-                      {item.url && (
-                        <a
-                          href={item.url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-sm text-primary hover:underline flex items-center gap-1"
-                        >
-                          View Project
-                          <ExternalLink className="w-3 h-3" />
-                        </a>
-                      )}
-                    </>
-                  )}
-                </div>
-              ))
-            )}
-          </CardContent>
-        </Card>
-        <Card className={SP_CARD}>
-          <CardHeader>
-            <CardTitle className={SP_CARD_TITLE}>
-              <Calendar className="w-5 h-5" />
-              Availability & Preferences
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label className={SP_LABEL} htmlFor="experience">
-                  Years of Experience (For Display) *
-                </Label>
-                {isEditing ? (
-                  <select
-                    id="experience"
-                    value={editedProfile.experience}
-                    onChange={(e) =>
-                      setEditedProfile({
-                        ...editedProfile,
-                        experience: e.target.value,
-                      })
-                    }
-                    className="w-full p-2 border rounded-md"
-                  >
-                    <option value="">Select experience level...</option>
-                    <option value="0-1 years">0-1 years</option>
-                    <option value="1-3 years">1-3 years</option>
-                    <option value="3-5 years">3-5 years</option>
-                    <option value="5-10 years">5-10 years</option>
-                    <option value="10+ years">10+ years</option>
-                  </select>
-                ) : (
-                  <p className={SP_VALUE}>
-                    {user.experience || "Not specified"}
-                  </p>
-                )}
-                <p className="text-xs text-muted-foreground">
-                  Displayed on your profile card
-                </p>
-              </div>
-              <div className="space-y-2">
-                <Label className={SP_LABEL} htmlFor="availability">When Can You Start? *</Label>
-                {isEditing ? (
-                  <select
-                    id="availability"
-                    value={editedProfile.availability}
-                    onChange={(e) =>
-                      setEditedProfile({
-                        ...editedProfile,
-                        availability: e.target.value,
-                      })
-                    }
-                    className="w-full p-2 border rounded-md"
-                  >
-                    <option value="">Select availability...</option>
-                    <option value="Immediately">Immediately</option>
-                    <option value="In 1 week">In 1 week</option>
-                    <option value="In 2 weeks">In 2 weeks</option>
-                    <option value="In 1 month">In 1 month</option>
-                    <option value="Flexible">Flexible</option>
-                  </select>
-                ) : (
-                  <p className={SP_VALUE}>
-                    {user.availability || "Not specified"}
-                  </p>
-                )}
-                <p className="text-xs text-muted-foreground">
-                  Displayed on your profile card
-                </p>
-              </div>
-            </div>
-            <div className="grid md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label className={SP_LABEL} htmlFor="availabilityStatus">Current Status *</Label>
-                {isEditing ? (
-                  <select
-                    id="availabilityStatus"
-                    value={editedProfile.availabilityStatus}
-                    onChange={(e) =>
-                      setEditedProfile({
-                        ...editedProfile,
-                        availabilityStatus: e.target.value,
-                      })
-                    }
-                    className="w-full p-2 border rounded-md"
-                  >
-                    <option value="">Select status...</option>
-                    <option value="actively-looking">Actively Looking</option>
-                    <option value="open-to-offers">Open to Offers</option>
-                    <option value="casually-browsing">Casually Browsing</option>
-                    <option value="not-looking">
-                      Not Looking (Just Networking)
-                    </option>
-                  </select>
-                ) : (
-                  <p className={SP_VALUE}>
-                    {user.availabilityStatus || "Not specified"}
-                  </p>
-                )}
-              </div>
-              <div className="space-y-2">
-                <Label className={SP_LABEL} htmlFor="preferredCommitment">
-                  Preferred Commitment *
-                </Label>
-                {isEditing ? (
-                  <select
-                    id="preferredCommitment"
-                    value={editedProfile.preferredCommitment}
-                    onChange={(e) =>
-                      setEditedProfile({
-                        ...editedProfile,
-                        preferredCommitment: e.target.value,
-                      })
-                    }
-                    className="w-full p-2 border rounded-md"
-                  >
-                    <option value="">Select commitment...</option>
-                    <option value="full-time">Full-Time</option>
-                    <option value="part-time">Part-Time</option>
-                    <option value="contract">Contract/Freelance</option>
-                    <option value="flexible">Flexible</option>
-                  </select>
-                ) : (
-                  <p className={SP_VALUE}>
-                    {user.preferredCommitment || "Not specified"}
-                  </p>
-                )}
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        <Card className={SP_CARD}>
-          <CardHeader>
-            <CardTitle className={SP_CARD_TITLE}>
-              <Target className="w-5 h-5" />
-              Career Goals & Industry Preferences
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <Label className={SP_LABEL} htmlFor="professionalGoals">Professional Goals</Label>
+              ) : null}
               {isEditing ? (
-                <Textarea className={cn(SP_TEXTAREA)}
-                  id="professionalGoals"
-                  value={editedProfile.professionalGoals}
-                  onChange={(e) =>
-                    setEditedProfile({
-                      ...editedProfile,
-                      professionalGoals: e.target.value,
-                    })
-                  }
-                  placeholder="Describe your career goals, aspirations, and what you're looking for in your next role..."
-                  rows={3}
-                />
+                <>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className={settingsBtnOutline}
+                    onClick={() => setShowPreview((value) => !value)}
+                  >
+                    <Eye className="mr-2 h-4 w-4" />
+                    {showPreview ? "Edit view" : "Preview"}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className={settingsBtnOutline}
+                    onClick={cancelEditing}
+                  >
+                    Cancel
+                  </Button>
+                  <Button type="button" className={settingsBtnPrimary} onClick={handleSave}>
+                    <Save className="mr-2 h-4 w-4" />
+                    Save changes
+                  </Button>
+                </>
               ) : (
-                <p
-                  className={cn(
-                    SP_VALUE,
-                    "whitespace-pre-wrap",
-                    !user.professionalGoals && SP_EMPTY,
-                  )}
+                <Button
+                  type="button"
+                  className={settingsBtnPrimary}
+                  onClick={() => setIsEditing(true)}
                 >
-                  {user.professionalGoals || "Not specified"}
-                </p>
+                  <Edit className="mr-2 h-4 w-4" />
+                  Edit profile
+                </Button>
               )}
             </div>
-            <div className="space-y-2">
-              <Label className={SP_LABEL} htmlFor="interests">
-                Industry Interests (Displayed on Profile Card) *
-              </Label>
-              {isEditing ? (
-                <>
-                  <Input className={cn(SP_INPUT)}
-                    id="interests"
-                    value={
-                      Array.isArray(editedProfile.interests)
-                        ? editedProfile.interests.join(", ")
-                        : ""
-                    }
-                    onChange={(e) =>
-                      setEditedProfile({
-                        ...editedProfile,
-                        interests: e.target.value
-                          .split(",")
-                          .map((s) => s.trim())
-                          .filter(Boolean),
-                      })
-                    }
-                    placeholder="e.g., FinTech, HealthTech, AI/ML, SaaS"
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    Separate industries with commas. These will be shown on your
-                    profile card.
-                  </p>
-                </>
-              ) : (
-                <p className={SP_VALUE}>
-                  {Array.isArray(user.interests) && user.interests.length > 0
-                    ? user.interests.join(", ")
-                    : "Not specified"}
-                </p>
-              )}
-            </div>
-            <div className="space-y-2">
-              <Label className={SP_LABEL} htmlFor="industryPreferences">
-                Other Industry Preferences (Optional)
-              </Label>
-              {isEditing ? (
-                <>
-                  <Input className={cn(SP_INPUT)}
-                    id="industryPreferences"
-                    value={
-                      Array.isArray(editedProfile.industryPreferences)
-                        ? editedProfile.industryPreferences.join(", ")
-                        : ""
-                    }
-                    onChange={(e) =>
-                      setEditedProfile({
-                        ...editedProfile,
-                        industryPreferences: e.target.value
-                          .split(",")
-                          .map((s) => s.trim())
-                          .filter(Boolean),
-                      })
-                    }
-                    placeholder="e.g., Technology, Healthcare, Finance"
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    Additional industries you're interested in beyond your
-                    primary interests.
-                  </p>
-                </>
-              ) : (
-                <p className={SP_VALUE}>
-                  {Array.isArray(user.industryPreferences) &&
-                  user.industryPreferences.length > 0
-                    ? user.industryPreferences.join(", ")
-                    : "Not specified"}
-                </p>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
-
-  // Render Founder/Team Member Profile
-  return (
-    <div className={profileShellClass}>
-      {!embeddedInSettings ? (
-        <div className="flex flex-wrap items-center justify-between gap-4">
-          <div>
-            <h1 className="mb-2 font-heading text-3xl font-bold text-text-heading">
-              Founder Profile
-            </h1>
-            <p className="font-body text-text-body">
-              Manage your personal and startup information
-            </p>
           </div>
-          {renderProfileEditActions()}
+          {user.role === "talent" ? (
+            <div className="border-t border-surface-border/70 bg-surface-page/60 px-4 py-4 md:px-5">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex min-w-0 flex-wrap items-center gap-2">
+                  <p className="font-heading text-sm font-bold text-text-heading">
+                    Profile completion
+                  </p>
+                  <Badge className="rounded-full bg-primary-tint px-2.5 py-0.5 font-body text-[11px] font-semibold text-primary">
+                    {completionLabel}
+                  </Badge>
+                </div>
+                <div className="flex items-center gap-3">
+                  <span
+                    className={cn(
+                      "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 font-body text-xs font-semibold",
+                      autosaveStatus === "error"
+                        ? "border-status-error/25 bg-status-error/8 text-status-error"
+                        : "border-surface-border bg-surface-card text-text-muted",
+                    )}
+                  >
+                    <span
+                      className={cn(
+                        "h-2 w-2 rounded-full",
+                        autosaveStatus === "saving"
+                          ? "animate-pulse bg-primary"
+                          : autosaveStatus === "error"
+                            ? "bg-status-error"
+                            : "bg-status-success",
+                      )}
+                    />
+                    {autosaveLabel}
+                  </span>
+                  <span className="font-body text-sm font-semibold tabular-nums text-primary">
+                    {profileCompletion}%
+                  </span>
+                </div>
+              </div>
+              <Progress
+                value={profileCompletion}
+                className="mt-3 h-2 border-0 bg-surface-border/60"
+              />
+              <p className="mt-2 font-body text-xs text-text-muted">{completionHint}</p>
+            </div>
+          ) : null}
+        </section>
+
+        <div className="grid gap-4 lg:grid-cols-[240px_minmax(0,1fr)]">
+          <aside className={cn(SECTION_CLASS, "h-fit p-2 lg:sticky lg:top-4")}>
+            <nav className="space-y-1" aria-label="Profile sections">
+              {sections.map(([id, Icon, label]) => (
+                <a
+                  key={id}
+                  href={`#${id}`}
+                  className="flex items-center gap-2.5 rounded-input px-3 py-2.5 font-body text-sm font-semibold text-text-body transition-colors hover:bg-primary-tint hover:text-primary"
+                >
+                  <Icon className="h-4 w-4" />
+                  {label}
+                </a>
+              ))}
+            </nav>
+          </aside>
+
+          <div className="space-y-4">
+            {user.role === "talent" ? (
+              <>
+                <SectionCard
+                  id="basics"
+                  icon={UserCircle}
+                  title="Basics"
+                  description="Core information founders use to understand your fit"
+                >
+                  <div className="grid gap-3 md:grid-cols-2">
+                    <TextField
+                      label="Full name"
+                      value={editedProfile.name}
+                      onChange={(value) => setField("name", value)}
+                      isEditing={!readOnly}
+                      placeholder="Your full name"
+                    />
+                    <TextField
+                      label="Professional title"
+                      value={editedProfile.professionalTitle}
+                      onChange={(value) => setField("professionalTitle", value)}
+                      isEditing={!readOnly}
+                      placeholder="e.g., Senior Full-Stack Developer"
+                    />
+                    <TextField
+                      label="Location"
+                      value={editedProfile.location}
+                      onChange={(value) => setField("location", value)}
+                      isEditing={!readOnly}
+                      placeholder="e.g., Lagos, Nigeria"
+                      icon={MapPin}
+                    />
+                    <TextField
+                      label="Years of experience"
+                      value={editedProfile.yearsOfExperience}
+                      onChange={(value) => setField("yearsOfExperience", value)}
+                      isEditing={!readOnly}
+                      placeholder="e.g., 5"
+                    />
+                    <TextField
+                      label="Professional bio"
+                      value={editedProfile.bio}
+                      onChange={(value) => setField("bio", value)}
+                      isEditing={!readOnly}
+                      placeholder="Summarize your background, strengths, and what you want to build."
+                      textarea
+                      fullWidth
+                    />
+                  </div>
+                </SectionCard>
+
+                <SectionCard
+                  id="skills"
+                  icon={Code}
+                  title="Skills"
+                  description="A focused set of skills helps founders search and compare talent"
+                >
+                  {!readOnly ? (
+                    <TagInput
+                      value={editedProfile.skills}
+                      onChange={(value) => setField("skills", value)}
+                      placeholder="Add a skill"
+                    />
+                  ) : (
+                    <div className="flex flex-wrap gap-2">
+                      {editedProfile.skills.length ? (
+                        editedProfile.skills.map((skill) => (
+                          <Badge key={skill} className="rounded-full bg-primary-tint px-3 py-1 text-primary">
+                            {skill}
+                          </Badge>
+                        ))
+                      ) : (
+                        <EmptyState icon={Code} text="No skills added yet" />
+                      )}
+                    </div>
+                  )}
+                </SectionCard>
+
+                <SectionCard
+                  id="links"
+                  icon={Globe}
+                  title="Professional links"
+                  description="Links that validate your work and professional background"
+                >
+                  <div className="grid gap-3 md:grid-cols-2">
+                    <TextField
+                      label="LinkedIn"
+                      value={editedProfile.linkedin}
+                      onChange={(value) => setField("linkedin", value)}
+                      isEditing={!readOnly}
+                      placeholder="https://linkedin.com/in/yourprofile"
+                      icon={Linkedin}
+                      link
+                    />
+                    <TextField
+                      label="GitHub"
+                      value={editedProfile.github}
+                      onChange={(value) => setField("github", value)}
+                      isEditing={!readOnly}
+                      placeholder="https://github.com/yourusername"
+                      icon={Github}
+                      link
+                    />
+                    <TextField
+                      label="Portfolio website"
+                      value={editedProfile.website}
+                      onChange={(value) => setField("website", value)}
+                      isEditing={!readOnly}
+                      placeholder="https://yourportfolio.com"
+                      icon={Globe}
+                      link
+                      fullWidth
+                    />
+                  </div>
+                </SectionCard>
+
+                <SectionCard
+                  id="experience"
+                  icon={Briefcase}
+                  title="Work experience"
+                  description="Show the roles and outcomes behind your expertise"
+                  actions={
+                    !readOnly ? (
+                      <Button
+                        type="button"
+                        className={settingsBtnOutline}
+                        onClick={() =>
+                          addItem("workExperience", {
+                            company: "",
+                            position: "",
+                            startDate: "",
+                            endDate: "",
+                            current: false,
+                            description: "",
+                          })
+                        }
+                      >
+                        <Plus className="h-4 w-4" />
+                        Add experience
+                      </Button>
+                    ) : null
+                  }
+                >
+                  {editedProfile.workExperience.length ? (
+                    <div className="space-y-3">
+                      {editedProfile.workExperience.map((exp, index) =>
+                        !readOnly ? (
+                          <ArrayEditorCard
+                            key={exp.id}
+                            title={`Experience ${index + 1}`}
+                            onRemove={() => removeItem("workExperience", exp.id)}
+                          >
+                            <div className="grid gap-3 md:grid-cols-2">
+                              {["company", "position"].map((field) => (
+                                <Input
+                                  key={field}
+                                  className={INPUT_CLASS}
+                                  placeholder={field === "company" ? "Company" : "Position"}
+                                  value={exp[field] || ""}
+                                  onChange={(e) =>
+                                    updateItem("workExperience", exp.id, field, e.target.value)
+                                  }
+                                />
+                              ))}
+                              <MonthYearField
+                                label="Start date"
+                                value={exp.startDate || ""}
+                                onChange={(value) =>
+                                  updateItem("workExperience", exp.id, "startDate", value)
+                                }
+                                help="Month and year are enough for profile history."
+                              />
+                              <MonthYearField
+                                label="End date"
+                                value={exp.endDate || ""}
+                                disabled={exp.current}
+                                onChange={(value) =>
+                                  updateItem("workExperience", exp.id, "endDate", value)
+                                }
+                                help={exp.current ? "Current role uses Present." : ""}
+                              />
+                              <label className="flex items-center gap-2 font-body text-sm text-text-body md:col-span-2">
+                                <Checkbox
+                                  checked={Boolean(exp.current)}
+                                  onCheckedChange={(checked) =>
+                                    updateItem("workExperience", exp.id, "current", Boolean(checked))
+                                  }
+                                />
+                                Currently working here
+                              </label>
+                              <Textarea
+                                className={cn(TEXTAREA_CLASS, "md:col-span-2")}
+                                placeholder="Responsibilities, outcomes, and context"
+                                value={exp.description || ""}
+                                onChange={(e) =>
+                                  updateItem("workExperience", exp.id, "description", e.target.value)
+                                }
+                              />
+                            </div>
+                          </ArrayEditorCard>
+                        ) : (
+                          <div key={exp.id} className="rounded-input border border-surface-border bg-surface-page p-4">
+                            <h3 className="font-heading text-sm font-bold text-text-heading">
+                              {exp.position || "Untitled role"}
+                            </h3>
+                            <p className="mt-1 font-body text-sm text-text-muted">
+                              {exp.company || "Company not specified"}
+                            </p>
+                            <p className="mt-2 font-body text-xs text-text-muted">
+                              {formatProfileMonth(exp.startDate, "Start")} -{" "}
+                              {exp.current
+                                ? "Present"
+                                : formatProfileMonth(exp.endDate, "End")}
+                            </p>
+                            {exp.description ? (
+                              <p className="mt-3 whitespace-pre-wrap font-body text-sm text-text-body">
+                                {exp.description}
+                              </p>
+                            ) : null}
+                          </div>
+                        ),
+                      )}
+                    </div>
+                  ) : (
+                    <EmptyState icon={Briefcase} text="No work experience added yet" />
+                  )}
+                </SectionCard>
+
+                <SectionCard
+                  id="education"
+                  icon={GraduationCap}
+                  title="Education"
+                  actions={
+                    !readOnly ? (
+                      <Button
+                        type="button"
+                        className={settingsBtnOutline}
+                        onClick={() =>
+                          addItem("education", {
+                            institution: "",
+                            degree: "",
+                            field: "",
+                            graduationYear: "",
+                          })
+                        }
+                      >
+                        <Plus className="h-4 w-4" />
+                        Add education
+                      </Button>
+                    ) : null
+                  }
+                >
+                  {editedProfile.education.length ? (
+                    <div className="space-y-3">
+                      {editedProfile.education.map((edu, index) =>
+                        !readOnly ? (
+                          <ArrayEditorCard
+                            key={edu.id}
+                            title={`Education ${index + 1}`}
+                            onRemove={() => removeItem("education", edu.id)}
+                          >
+                            <div className="grid gap-3 md:grid-cols-2">
+                              {["institution", "degree", "field"].map((field) => (
+                                <Input
+                                  key={field}
+                                  className={INPUT_CLASS}
+                                  placeholder={field.charAt(0).toUpperCase() + field.slice(1)}
+                                  value={edu[field] || ""}
+                                  onChange={(e) =>
+                                    updateItem("education", edu.id, field, e.target.value)
+                                  }
+                                />
+                              ))}
+                              <MonthYearField
+                                label="Graduation year"
+                                value={edu.graduationYear || ""}
+                                allowMonth={false}
+                                onChange={(value) =>
+                                  updateItem("education", edu.id, "graduationYear", value)
+                                }
+                              />
+                            </div>
+                          </ArrayEditorCard>
+                        ) : (
+                          <div key={edu.id} className="rounded-input border border-surface-border bg-surface-page p-4">
+                            <h3 className="font-heading text-sm font-bold text-text-heading">
+                              {[edu.degree, edu.field].filter(Boolean).join(" in ") || "Education"}
+                            </h3>
+                            <p className="mt-1 font-body text-sm text-text-muted">
+                              {edu.institution || "Institution not specified"}
+                            </p>
+                            {edu.graduationYear ? (
+                              <p className="mt-2 font-body text-xs text-text-muted">
+                                Graduated {formatProfileMonth(edu.graduationYear)}
+                              </p>
+                            ) : null}
+                          </div>
+                        ),
+                      )}
+                    </div>
+                  ) : (
+                    <EmptyState icon={GraduationCap} text="No education added yet" />
+                  )}
+                </SectionCard>
+
+                <SectionCard
+                  id="credentials"
+                  icon={Award}
+                  title="Credentials"
+                  description="Certificates and credentials that support your expertise"
+                  actions={
+                    !readOnly ? (
+                      <Button
+                        type="button"
+                        className={settingsBtnOutline}
+                        onClick={() =>
+                          addItem("certifications", {
+                            name: "",
+                            issuer: "",
+                            issueYear: "",
+                            credentialId: "",
+                            credentialUrl: "",
+                            certificateImage: "",
+                          })
+                        }
+                      >
+                        <Plus className="h-4 w-4" />
+                        Add credential
+                      </Button>
+                    ) : null
+                  }
+                >
+                  {editedProfile.certifications.length ? (
+                    <div className="space-y-3">
+                      {editedProfile.certifications.map((cert, index) =>
+                        !readOnly ? (
+                          <ArrayEditorCard
+                            key={cert.id}
+                            title={`Credential ${index + 1}`}
+                            onRemove={() => removeItem("certifications", cert.id)}
+                          >
+                            <div className="grid gap-3 md:grid-cols-2">
+                              <Input
+                                className={INPUT_CLASS}
+                                placeholder="Certification name"
+                                value={cert.name || ""}
+                                onChange={(e) =>
+                                  updateItem("certifications", cert.id, "name", e.target.value)
+                                }
+                              />
+                              <Input
+                                className={INPUT_CLASS}
+                                placeholder="Issuing organization"
+                                value={cert.issuer || ""}
+                                onChange={(e) =>
+                                  updateItem("certifications", cert.id, "issuer", e.target.value)
+                                }
+                              />
+                              <MonthYearField
+                                label="Issue year"
+                                value={cert.issueYear || cert.year || ""}
+                                allowMonth={false}
+                                onChange={(value) =>
+                                  updateItem("certifications", cert.id, "issueYear", value)
+                                }
+                              />
+                              <Input
+                                className={INPUT_CLASS}
+                                placeholder="Credential ID"
+                                value={cert.credentialId || ""}
+                                onChange={(e) =>
+                                  updateItem("certifications", cert.id, "credentialId", e.target.value)
+                                }
+                              />
+                              <Input
+                                className={cn(INPUT_CLASS, "md:col-span-2")}
+                                placeholder="Credential URL"
+                                value={cert.credentialUrl || ""}
+                                onChange={(e) =>
+                                  updateItem("certifications", cert.id, "credentialUrl", e.target.value)
+                                }
+                              />
+                              <div className="space-y-2 md:col-span-2">
+                                <Label className={FIELD_LABEL}>Certificate image</Label>
+                                <Input
+                                  className={INPUT_CLASS}
+                                  type="file"
+                                  accept="image/*"
+                                  onChange={(e) =>
+                                    updateCertificationImage(cert.id, e.target.files?.[0])
+                                  }
+                                />
+                              </div>
+                            </div>
+                          </ArrayEditorCard>
+                        ) : (
+                          <div key={cert.id} className="rounded-input border border-surface-border bg-surface-page p-4">
+                            <h3 className="font-heading text-sm font-bold text-text-heading">
+                              {cert.name || "Unnamed credential"}
+                            </h3>
+                            <p className="mt-1 font-body text-sm text-text-muted">
+                              {[cert.issuer, cert.issueYear].filter(Boolean).join(" • ") ||
+                                "Issuer not specified"}
+                            </p>
+                            {cert.credentialUrl ? (
+                              <a
+                                href={cert.credentialUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="mt-3 inline-flex items-center gap-1 font-body text-sm font-semibold text-primary hover:underline"
+                              >
+                                View credential
+                                <ExternalLink className="h-3.5 w-3.5" />
+                              </a>
+                            ) : null}
+                          </div>
+                        ),
+                      )}
+                    </div>
+                  ) : (
+                    <EmptyState icon={Award} text="No credentials added yet" />
+                  )}
+                </SectionCard>
+
+                <SectionCard
+                  id="portfolio"
+                  icon={FileText}
+                  title="Portfolio"
+                  description="Projects that demonstrate your taste and execution"
+                  actions={
+                    !readOnly ? (
+                      <Button
+                        type="button"
+                        className={settingsBtnOutline}
+                        onClick={() =>
+                          addItem("portfolioItems", {
+                            title: "",
+                            description: "",
+                            url: "",
+                            type: "",
+                          })
+                        }
+                      >
+                        <Plus className="h-4 w-4" />
+                        Add project
+                      </Button>
+                    ) : null
+                  }
+                >
+                  {editedProfile.portfolioItems.length ? (
+                    <div className="space-y-3">
+                      {editedProfile.portfolioItems.map((item, index) =>
+                        !readOnly ? (
+                          <ArrayEditorCard
+                            key={item.id}
+                            title={`Project ${index + 1}`}
+                            onRemove={() => removeItem("portfolioItems", item.id)}
+                          >
+                            <div className="grid gap-3">
+                              <Input
+                                className={INPUT_CLASS}
+                                placeholder="Project title"
+                                value={item.title || ""}
+                                onChange={(e) =>
+                                  updateItem("portfolioItems", item.id, "title", e.target.value)
+                                }
+                              />
+                              <Input
+                                className={INPUT_CLASS}
+                                placeholder="Project type"
+                                value={item.type || ""}
+                                onChange={(e) =>
+                                  updateItem("portfolioItems", item.id, "type", e.target.value)
+                                }
+                              />
+                              <Textarea
+                                className={TEXTAREA_CLASS}
+                                placeholder="Description"
+                                value={item.description || ""}
+                                onChange={(e) =>
+                                  updateItem("portfolioItems", item.id, "description", e.target.value)
+                                }
+                              />
+                              <Input
+                                className={INPUT_CLASS}
+                                placeholder="Project URL"
+                                value={item.url || ""}
+                                onChange={(e) =>
+                                  updateItem("portfolioItems", item.id, "url", e.target.value)
+                                }
+                              />
+                            </div>
+                          </ArrayEditorCard>
+                        ) : (
+                          <div key={item.id} className="rounded-input border border-surface-border bg-surface-page p-4">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <h3 className="font-heading text-sm font-bold text-text-heading">
+                                {item.title || "Untitled project"}
+                              </h3>
+                              {item.type ? (
+                                <Badge className="rounded-full bg-primary-tint text-primary">
+                                  {item.type}
+                                </Badge>
+                              ) : null}
+                            </div>
+                            {item.description ? (
+                              <p className="mt-3 whitespace-pre-wrap font-body text-sm text-text-body">
+                                {item.description}
+                              </p>
+                            ) : null}
+                            {item.url ? (
+                              <a
+                                href={item.url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="mt-3 inline-flex items-center gap-1 font-body text-sm font-semibold text-primary hover:underline"
+                              >
+                                View project
+                                <ExternalLink className="h-3.5 w-3.5" />
+                              </a>
+                            ) : null}
+                          </div>
+                        ),
+                      )}
+                    </div>
+                  ) : (
+                    <EmptyState icon={FileText} text="No portfolio projects added yet" />
+                  )}
+                </SectionCard>
+
+                <SectionCard
+                  id="availability"
+                  icon={Calendar}
+                  title="Availability"
+                  description="Set expectations for when and how you can work"
+                >
+                  <div className="grid gap-3 md:grid-cols-2">
+                    <SelectField
+                      label="Experience level"
+                      value={editedProfile.experience}
+                      onChange={(value) => setField("experience", value)}
+                      isEditing={!readOnly}
+                      options={["0-1 years", "1-3 years", "3-5 years", "5-10 years", "10+ years"]}
+                    />
+                    <SelectField
+                      label="When can you start?"
+                      value={editedProfile.availability}
+                      onChange={(value) => setField("availability", value)}
+                      isEditing={!readOnly}
+                      options={["Immediately", "In 1 week", "In 2 weeks", "In 1 month", "Flexible"]}
+                    />
+                    <SelectField
+                      label="Current status"
+                      value={editedProfile.availabilityStatus}
+                      onChange={(value) => setField("availabilityStatus", value)}
+                      isEditing={!readOnly}
+                      options={[
+                        "actively-looking",
+                        "open-to-offers",
+                        "casually-browsing",
+                        "not-looking",
+                      ]}
+                    />
+                    <SelectField
+                      label="Preferred commitment"
+                      value={editedProfile.preferredCommitment}
+                      onChange={(value) => setField("preferredCommitment", value)}
+                      isEditing={!readOnly}
+                      options={["full-time", "part-time", "contract", "flexible"]}
+                    />
+                  </div>
+                </SectionCard>
+
+                <SectionCard
+                  id="goals"
+                  icon={Target}
+                  title="Goals & preferences"
+                  description="Help founders understand where you want to contribute"
+                >
+                  <div className="grid gap-3">
+                    <TextField
+                      label="Professional goals"
+                      value={editedProfile.professionalGoals}
+                      onChange={(value) => setField("professionalGoals", value)}
+                      isEditing={!readOnly}
+                      placeholder="What are you looking for next?"
+                      textarea
+                      fullWidth
+                    />
+                    <FieldShell label="Industry interests">
+                      {!readOnly ? (
+                        <TagInput
+                          value={editedProfile.interests}
+                          onChange={(value) => setField("interests", value)}
+                          placeholder="Add an industry"
+                        />
+                      ) : (
+                        <ReadValue value={editedProfile.interests} />
+                      )}
+                    </FieldShell>
+                    <FieldShell label="Other industry preferences">
+                      {!readOnly ? (
+                        <TagInput
+                          value={editedProfile.industryPreferences}
+                          onChange={(value) => setField("industryPreferences", value)}
+                          placeholder="Add a preference"
+                        />
+                      ) : (
+                        <ReadValue value={editedProfile.industryPreferences} />
+                      )}
+                    </FieldShell>
+                  </div>
+                </SectionCard>
+              </>
+            ) : (
+              <>
+                <SectionCard
+                  id="basics"
+                  icon={UserCircle}
+                  title="Personal information"
+                  description="Your profile identity and founder bio"
+                >
+                  <div className="grid gap-3 md:grid-cols-2">
+                    <TextField
+                      label="Full name"
+                      value={editedProfile.name}
+                      onChange={(value) => setField("name", value)}
+                      isEditing={!readOnly}
+                      placeholder="Your full name"
+                    />
+                    <TextField
+                      label="Email"
+                      value={editedProfile.email}
+                      onChange={(value) => setField("email", value)}
+                      isEditing={!readOnly}
+                      placeholder="you@example.com"
+                      icon={Mail}
+                    />
+                    <TextField
+                      label="Bio"
+                      value={editedProfile.bio}
+                      onChange={(value) => setField("bio", value)}
+                      isEditing={!readOnly}
+                      placeholder="Tell people about your background and what you are building."
+                      textarea
+                      fullWidth
+                    />
+                  </div>
+                </SectionCard>
+
+                {user.role === "founder" ? (
+                  <SectionCard
+                    id="startup"
+                    icon={Building}
+                    title="Startup profile"
+                    description="Company details, stage, audience, and hiring needs"
+                  >
+                    <div className="grid gap-3 md:grid-cols-2">
+                      <TextField
+                        label="Startup name"
+                        value={editedProfile.startupName}
+                        onChange={(value) => setField("startupName", value)}
+                        isEditing={!readOnly}
+                        placeholder="Your startup name"
+                        fullWidth
+                      />
+                      <TextField
+                        label="Startup description"
+                        value={editedProfile.startupDescription}
+                        onChange={(value) => setField("startupDescription", value)}
+                        isEditing={!readOnly}
+                        placeholder="What you do and the problem you solve"
+                        textarea
+                        fullWidth
+                      />
+                      <SelectField
+                        label="Industry"
+                        value={editedProfile.industryFocus}
+                        onChange={(value) => setField("industryFocus", value)}
+                        isEditing={!readOnly}
+                        options={FOUNDER_INDUSTRY_OPTIONS}
+                      />
+                      <SelectField
+                        label="Team size"
+                        value={editedProfile.teamSize}
+                        onChange={(value) => setField("teamSize", value)}
+                        isEditing={!readOnly}
+                        options={FOUNDER_TEAM_SIZE_OPTIONS}
+                      />
+                      <SelectField
+                        label="Execution stage"
+                        value={editedProfile.startupStage}
+                        onChange={(value) => setField("startupStage", value)}
+                        isEditing={!readOnly}
+                        options={FOUNDER_STAGE_OPTIONS}
+                      />
+                      <SelectField
+                        label="Validated idea"
+                        value={editedProfile.hasValidatedIdea}
+                        onChange={(value) => setField("hasValidatedIdea", value)}
+                        isEditing={!readOnly}
+                        options={FOUNDER_VALIDATED_IDEA_OPTIONS}
+                      />
+                      <SelectField
+                        label="MVP or prototype"
+                        value={editedProfile.hasMVP}
+                        onChange={(value) => setField("hasMVP", value)}
+                        isEditing={!readOnly}
+                        options={FOUNDER_MVP_OPTIONS}
+                      />
+                      <SelectField
+                        label="Customers or users"
+                        value={editedProfile.hasCustomers}
+                        onChange={(value) => setField("hasCustomers", value)}
+                        isEditing={!readOnly}
+                        options={FOUNDER_CUSTOMERS_OPTIONS}
+                      />
+                      <FieldShell label="Target audience" fullWidth>
+                        {!readOnly ? (
+                          <TagInput
+                            value={editedProfile.targetAudience || []}
+                            onChange={(value) => setField("targetAudience", value)}
+                            placeholder="Add an audience"
+                          />
+                        ) : (
+                          <ReadValue value={editedProfile.targetAudience} />
+                        )}
+                      </FieldShell>
+                      <FieldShell label="Roles needed" fullWidth>
+                        {!readOnly ? (
+                          <div className="flex flex-wrap gap-2">
+                            {FOUNDER_ROLES_NEEDED_OPTIONS.map((role) => {
+                              const checked = editedProfile.rolesNeeded?.includes?.(role);
+                              return (
+                                <label
+                                  key={role}
+                                  className={cn(
+                                    "flex cursor-pointer items-center gap-2 rounded-full border px-3 py-2 font-body text-xs font-semibold",
+                                    checked
+                                      ? "border-primary bg-primary-tint text-primary"
+                                      : "border-surface-border bg-surface-card text-text-body",
+                                  )}
+                                >
+                                  <Checkbox
+                                    checked={checked}
+                                    onCheckedChange={() => {
+                                      const current = editedProfile.rolesNeeded || [];
+                                      setField(
+                                        "rolesNeeded",
+                                        current.includes(role)
+                                          ? current.filter((item) => item !== role)
+                                          : [...current, role],
+                                      );
+                                    }}
+                                  />
+                                  {role}
+                                </label>
+                              );
+                            })}
+                          </div>
+                        ) : (
+                          <ReadValue value={editedProfile.rolesNeeded} />
+                        )}
+                      </FieldShell>
+                    </div>
+                  </SectionCard>
+                ) : null}
+
+                <SectionCard
+                  id="links"
+                  icon={Globe}
+                  title="Contact & links"
+                  description="Public URLs connected to your profile"
+                >
+                  <div className="grid gap-3 md:grid-cols-2">
+                    <TextField
+                      label="Website"
+                      value={editedProfile.website}
+                      onChange={(value) => setField("website", value)}
+                      isEditing={!readOnly}
+                      placeholder="https://yourstartup.com"
+                      icon={Globe}
+                      link
+                    />
+                    <TextField
+                      label="LinkedIn"
+                      value={editedProfile.linkedin}
+                      onChange={(value) => setField("linkedin", value)}
+                      isEditing={!readOnly}
+                      placeholder="https://linkedin.com/in/yourname"
+                      icon={Linkedin}
+                      link
+                    />
+                  </div>
+                </SectionCard>
+              </>
+            )}
+          </div>
         </div>
-      ) : null}
-      <SettingsPanelCard
-        icon={UserCircle}
-        title="Personal information"
-        description="Your name, email, and founder bio"
-        actions={embeddedInSettings ? renderProfileEditActions() : null}
-      >
-        <SettingsFieldGrid>
-          <SettingsField label="Full name" htmlFor="name">
-            {isEditing ? (
-              <Input
-                className={cn(SP_INPUT, "mt-0")}
-                id="name"
-                value={editedProfile.name}
-                onChange={(e) =>
-                  setEditedProfile({ ...editedProfile, name: e.target.value })
-                }
-              />
-            ) : (
-              <p className={SP_VALUE}>{user.name}</p>
-            )}
-          </SettingsField>
-          <SettingsField label="Email" htmlFor="email">
-            {isEditing ? (
-              <Input
-                className={cn(SP_INPUT, "mt-0")}
-                id="email"
-                type="email"
-                value={editedProfile.email}
-                onChange={(e) =>
-                  setEditedProfile({ ...editedProfile, email: e.target.value })
-                }
-              />
-            ) : (
-              <p className={cn(SP_VALUE, "flex items-center gap-2")}>
-                <Mail className="h-4 w-4 shrink-0 text-text-muted" />
-                {user.email}
-              </p>
-            )}
-          </SettingsField>
-          <SettingsField label="Bio" htmlFor="bio" fullWidth>
-            {isEditing ? (
-              <Textarea
-                className={cn(SP_TEXTAREA, "mt-0")}
-                id="bio"
-                value={editedProfile.bio}
-                onChange={(e) =>
-                  setEditedProfile({ ...editedProfile, bio: e.target.value })
-                }
-                placeholder="Tell us about yourself as a founder..."
-                rows={4}
-              />
-            ) : (
-              <p
-                className={cn(
-                  SP_VALUE,
-                  "whitespace-pre-wrap",
-                  !user.bio && SP_EMPTY,
-                )}
-              >
-                {user.bio || "No bio added yet"}
-              </p>
-            )}
-          </SettingsField>
-        </SettingsFieldGrid>
-      </SettingsPanelCard>
-      {user.role === "founder" && (
-        <SettingsPanelCard
-          icon={Building}
-          title="Startup information"
-          description="Company details and execution stage"
-          actions={null}
-        >
-            <SettingsFieldGrid>
-              <SettingsField label="Startup name" htmlFor="startupName" fullWidth>
-                {isEditing ? (
-                  <Input
-                    className={cn(SP_INPUT, "mt-0")}
-                    id="startupName"
-                    value={editedProfile.startupName}
-                    onChange={(e) =>
-                      setEditedProfile({
-                        ...editedProfile,
-                        startupName: e.target.value,
-                      })
-                    }
-                    placeholder="Your startup name"
-                  />
-                ) : (
-                  <p className={SP_VALUE}>
-                    {user.startupName ||
-                      user.profile?.startupName ||
-                      "Not specified"}
-                  </p>
-                )}
-              </SettingsField>
-              <SettingsField label="Startup description" htmlFor="startupDescription" fullWidth>
-                {isEditing ? (
-                  <Textarea
-                    className={cn(SP_TEXTAREA, "mt-0")}
-                    id="startupDescription"
-                    value={editedProfile.startupDescription || ""}
-                    onChange={(e) =>
-                      setEditedProfile({
-                        ...editedProfile,
-                        startupDescription: e.target.value,
-                      })
-                    }
-                    rows={4}
-                    placeholder="What you do and the problem you solve"
-                  />
-                ) : (
-                  <p className={cn(SP_VALUE, "whitespace-pre-wrap")}>
-                    {user.profile?.startupDescription ||
-                      user.startupDescription ||
-                      "Not specified"}
-                  </p>
-                )}
-              </SettingsField>
-              <SettingsField label="Startup type (industry)" fullWidth>
-                {isEditing ? (
-                  <>
-                    <Select
-                      value={editedProfile.industryFocus || ""}
-                      onValueChange={(v) =>
-                        setEditedProfile({
-                          ...editedProfile,
-                          industryFocus: v,
-                        })
-                      }
-                    >
-                      <SelectTrigger className={cn(SP_SELECT_TRIGGER)}>
-                        <SelectValue placeholder="Select industry" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {FOUNDER_INDUSTRY_OPTIONS.map((opt) => (
-                          <SelectItem key={opt} value={opt}>
-                            {opt}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    {editedProfile.industryFocus === "Others" && (
-                      <Input
-                        className={cn(SP_INPUT, "mt-2")}
-                        value={editedProfile.otherIndustry || ""}
-                        onChange={(e) =>
-                          setEditedProfile({
-                            ...editedProfile,
-                            otherIndustry: e.target.value,
-                          })
-                        }
-                        placeholder="Specify your industry"
-                      />
-                    )}
-                  </>
-                ) : (
-                  <p className={SP_VALUE}>
-                    {user.industry ||
-                      user.profile?.industry ||
-                      user.profile?.industryFocus ||
-                      "Not specified"}
-                  </p>
-                )}
-              </SettingsField>
-              <SettingsField label="Target audience" fullWidth>
-                {isEditing ? (
-                  <div className={SP_CHECK_WRAP}>
-                    {FOUNDER_TARGET_AUDIENCE_OPTIONS.map((opt) => {
-                      const checked =
-                        editedProfile.targetAudience?.includes?.(opt);
-                      return (
-                        <label
-                          key={opt}
-                          className={cn(
-                            SP_CHECK_LABEL_BASE,
-                            checked && SP_CHECK_LABEL_ON,
-                          )}
-                        >
-                          <Checkbox
-                            className={SP_CHECK_BOX}
-                            checked={checked}
-                            onCheckedChange={() => {
-                              const cur = editedProfile.targetAudience || [];
-                              setEditedProfile({
-                                ...editedProfile,
-                                targetAudience: cur.includes(opt)
-                                  ? cur.filter((x) => x !== opt)
-                                  : [...cur, opt],
-                              });
-                            }}
-                          />
-                          {opt}
-                        </label>
-                      );
-                    })}
-                  </div>
-                ) : (
-                  <p className={SP_VALUE}>
-                    {Array.isArray(user.profile?.targetAudience)
-                      ? user.profile.targetAudience.join(", ")
-                      : Array.isArray(user.targetAudience)
-                        ? user.targetAudience.join(", ")
-                        : "Not specified"}
-                  </p>
-                )}
-              </SettingsField>
-              <SettingsField label="Roles needed" fullWidth>
-                {isEditing ? (
-                  <div className={cn(SP_CHECK_WRAP, "max-h-48 overflow-y-auto")}>
-                    {FOUNDER_ROLES_NEEDED_OPTIONS.map((opt) => {
-                      const checked = editedProfile.rolesNeeded?.includes?.(opt);
-                      return (
-                        <label
-                          key={opt}
-                          className={cn(
-                            SP_CHECK_LABEL_BASE,
-                            "text-xs",
-                            checked && SP_CHECK_LABEL_ON,
-                          )}
-                        >
-                          <Checkbox
-                            className={SP_CHECK_BOX}
-                            checked={checked}
-                            onCheckedChange={() => {
-                              const cur = editedProfile.rolesNeeded || [];
-                              setEditedProfile({
-                                ...editedProfile,
-                                rolesNeeded: cur.includes(opt)
-                                  ? cur.filter((x) => x !== opt)
-                                  : [...cur, opt],
-                              });
-                            }}
-                          />
-                          {opt}
-                        </label>
-                      );
-                    })}
-                    {editedProfile.rolesNeeded?.includes?.("Others") && (
-                      <Input
-                        className={cn(SP_INPUT, "mt-2 w-full")}
-                        placeholder="Specify role"
-                        value={editedProfile.otherRole || ""}
-                        onChange={(e) =>
-                          setEditedProfile({
-                            ...editedProfile,
-                            otherRole: e.target.value,
-                          })
-                        }
-                      />
-                    )}
-                  </div>
-                ) : (
-                  <p className={SP_VALUE}>
-                    {Array.isArray(user.profile?.rolesNeeded)
-                      ? user.profile.rolesNeeded.join(", ")
-                      : Array.isArray(user.rolesNeeded)
-                        ? user.rolesNeeded.join(", ")
-                        : "Not specified"}
-                  </p>
-                )}
-              </SettingsField>
-              <SettingsField label="Team size">
-                {isEditing ? (
-                  <Select
-                    value={editedProfile.teamSize || ""}
-                    onValueChange={(v) =>
-                      setEditedProfile({ ...editedProfile, teamSize: v })
-                    }
-                  >
-                    <SelectTrigger className={cn(SP_SELECT_TRIGGER)}>
-                      <SelectValue placeholder="Team size" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {FOUNDER_TEAM_SIZE_OPTIONS.map((opt) => (
-                        <SelectItem key={opt} value={opt}>
-                          {opt}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                ) : (
-                  <p
-                    className={cn(
-                      SP_VALUE,
-                      "flex items-center gap-2",
-                      !(user.profile?.teamSize || user.teamSize) && SP_EMPTY,
-                    )}
-                  >
-                    <Users className="h-4 w-4 shrink-0 text-text-muted" />
-                    {user.profile?.teamSize || user.teamSize || "Not specified"}
-                  </p>
-                )}
-              </SettingsField>
-              <SettingsField label="Execution stage">
-                {isEditing ? (
-                  <Select
-                    value={editedProfile.startupStage || ""}
-                    onValueChange={(v) =>
-                      setEditedProfile({ ...editedProfile, startupStage: v })
-                    }
-                  >
-                    <SelectTrigger className={cn(SP_SELECT_TRIGGER)}>
-                      <SelectValue placeholder="Stage" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {FOUNDER_STAGE_OPTIONS.map((opt) => (
-                        <SelectItem key={opt} value={opt}>
-                          {opt}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                ) : (
-                  <p
-                    className={cn(
-                      SP_VALUE,
-                      "flex items-center gap-2",
-                      !(user.startupStage || user.profile?.startupStage) &&
-                        SP_EMPTY,
-                    )}
-                  >
-                    <Target className="h-4 w-4 shrink-0 text-text-muted" />
-                    {user.startupStage ||
-                      user.profile?.startupStage ||
-                      "Not specified"}
-                  </p>
-                )}
-              </SettingsField>
-            </SettingsFieldGrid>
-            <SettingsGroup title="Where you are today" icon={Target}>
-              <SettingsFieldGrid cols={1}>
-              <SettingsField label="Validated problem / idea">
-                {isEditing ? (
-                  <Select
-                    value={editedProfile.hasValidatedIdea || ""}
-                    onValueChange={(v) =>
-                      setEditedProfile({
-                        ...editedProfile,
-                        hasValidatedIdea: v,
-                      })
-                    }
-                  >
-                    <SelectTrigger className={cn(SP_SELECT_TRIGGER)}>
-                      <SelectValue placeholder="Select" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {FOUNDER_VALIDATED_IDEA_OPTIONS.map((opt) => (
-                        <SelectItem key={opt} value={opt}>
-                          {opt}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                ) : (
-                  <p className={SP_VALUE}>
-                    {user.profile?.hasValidatedIdea ||
-                      user.hasValidatedIdea ||
-                      "Not specified"}
-                  </p>
-                )}
-              </SettingsField>
-              <SettingsField label="MVP or prototype">
-                {isEditing ? (
-                  <Select
-                    value={editedProfile.hasMVP || ""}
-                    onValueChange={(v) =>
-                      setEditedProfile({ ...editedProfile, hasMVP: v })
-                    }
-                  >
-                    <SelectTrigger className={cn(SP_SELECT_TRIGGER)}>
-                      <SelectValue placeholder="Select" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {FOUNDER_MVP_OPTIONS.map((opt) => (
-                        <SelectItem key={opt} value={opt}>
-                          {opt}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                ) : (
-                  <p className={SP_VALUE}>
-                    {user.profile?.hasMVP || user.hasMVP || "Not specified"}
-                  </p>
-                )}
-              </SettingsField>
-              <SettingsField label="Customers or users">
-                {isEditing ? (
-                  <Select
-                    value={editedProfile.hasCustomers || ""}
-                    onValueChange={(v) =>
-                      setEditedProfile({
-                        ...editedProfile,
-                        hasCustomers: v,
-                      })
-                    }
-                  >
-                    <SelectTrigger className={cn(SP_SELECT_TRIGGER)}>
-                      <SelectValue placeholder="Select" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {FOUNDER_CUSTOMERS_OPTIONS.map((opt) => (
-                        <SelectItem key={opt} value={opt}>
-                          {opt}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                ) : (
-                  <p className={SP_VALUE}>
-                    {user.profile?.hasCustomers ||
-                      user.hasCustomers ||
-                      "Not specified"}
-                  </p>
-                )}
-              </SettingsField>
-              </SettingsFieldGrid>
-            </SettingsGroup>
-        </SettingsPanelCard>
-      )}
-      <SettingsPanelCard
-        icon={Globe}
-        title="Contact & links"
-        description="Public URLs for your startup and profile"
-      >
-        <SettingsFieldGrid>
-          <SettingsField label="Website" htmlFor="website">
-            {isEditing ? (
-              <Input
-                className={cn(SP_INPUT, "mt-0")}
-                id="website"
-                value={editedProfile.website}
-                onChange={(e) =>
-                  setEditedProfile({
-                    ...editedProfile,
-                    website: e.target.value,
-                  })
-                }
-                placeholder="https://yourstartup.com"
-              />
-            ) : (
-              <p
-                className={cn(
-                  SP_VALUE,
-                  "flex items-center gap-2",
-                  !user.website && SP_EMPTY,
-                )}
-              >
-                <Globe className="h-4 w-4 shrink-0 text-text-muted" />
-                {user.website || "Not specified"}
-              </p>
-            )}
-          </SettingsField>
-          <SettingsField label="LinkedIn" htmlFor="linkedin">
-            {isEditing ? (
-              <Input
-                className={cn(SP_INPUT, "mt-0")}
-                id="linkedin"
-                value={editedProfile.linkedin}
-                onChange={(e) =>
-                  setEditedProfile({
-                    ...editedProfile,
-                    linkedin: e.target.value,
-                  })
-                }
-                placeholder="https://linkedin.com/in/yourname"
-              />
-            ) : (
-              <p
-                className={cn(
-                  SP_VALUE,
-                  "flex items-center gap-2",
-                  !user.linkedin && SP_EMPTY,
-                )}
-              >
-                <Linkedin className="h-4 w-4 shrink-0 text-text-muted" />
-                {user.linkedin || "Not specified"}
-              </p>
-            )}
-          </SettingsField>
-        </SettingsFieldGrid>
-      </SettingsPanelCard>
+      </div>
     </div>
   );
 }

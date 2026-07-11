@@ -27,6 +27,9 @@ function formatParsedDate(value) {
 export default function ResumeImportPanel({
   editedProfile,
   onApply,
+  variant = "card",
+  buttonClassName,
+  buttonLabel = "Upload CV",
 }) {
   const inputRef = useRef(null);
   const [configured, setConfigured] = useState(null);
@@ -89,6 +92,48 @@ export default function ResumeImportPanel({
     onApply(merged);
     toast.success("Imported — review your profile and click Save.");
   };
+
+  if (variant === "button") {
+    return (
+      <>
+        <input
+          ref={inputRef}
+          type="file"
+          accept={ACCEPT}
+          className="hidden"
+          disabled={parsing || configured !== true}
+          onChange={(e) => handleFile(e.target.files?.[0])}
+        />
+        <Button
+          type="button"
+          variant="outline"
+          className={cn(settingsBtnOutline, buttonClassName)}
+          disabled={parsing || configured !== true}
+          onClick={() => inputRef.current?.click()}
+        >
+          {parsing ? (
+            <>
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              Reading CV...
+            </>
+          ) : (
+            <>
+              <Upload className="mr-2 h-4 w-4" />
+              {configured === false ? "CV unavailable" : buttonLabel}
+            </>
+          )}
+        </Button>
+        <ResumeImportReview
+          open={reviewOpen}
+          onOpenChange={setReviewOpen}
+          draft={draft}
+          resumeMeta={resumeMeta}
+          editedProfile={editedProfile}
+          onApply={handleApply}
+        />
+      </>
+    );
+  }
 
   return (
     <>

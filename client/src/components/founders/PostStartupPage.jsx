@@ -14,6 +14,7 @@ import StartupDetailPage from "./StartupDetailPage";
 import { StartupBrandingFields } from "./StartupBrandingFields";
 import { CompensationCountrySelect } from "./CompensationCountrySelect";
 import { buildStartupPostPayload } from "../../domains/founder/buildStartupPostPayload";
+import { hydrateStartupPostForDisplay } from "../../domains/founder/startupPostDisplay";
 import { resolveCompensationCountryFromOffer } from "../../config/compensationCountries";
 import { getSalaryFieldLabel } from "../../utils/formatMoney";
 import {
@@ -147,9 +148,10 @@ export function PostStartupPage({ user, onNavigate }) {
       const userPost = postList[0] || null;
 
       if (userPost) {
-        setExistingPost(userPost);
+        const hydrated = hydrateStartupPostForDisplay(userPost);
+        setExistingPost(hydrated);
         setIsEditing(true);
-        populateForm(userPost);
+        populateForm(hydrated);
       } else {
         const defaults = buildStartupPostFormDefaults({ user, startup });
         setFormData((prev) => mergePostFormDefaults(prev, defaults));
@@ -257,6 +259,21 @@ export function PostStartupPage({ user, onNavigate }) {
     if (!formData.stage) missing.push("Stage");
     if (!formData.lookingFor?.trim()) missing.push("Looking For (roles)");
     if (!formData.commitment) missing.push("Commitment");
+    if (!formData.compensationPhilosophy) {
+      missing.push("Compensation philosophy");
+    } else {
+      if (!formData.salaryApproach) missing.push("Salary approach");
+      if (!String(formData.equityMin || "").trim()) missing.push("Equity min %");
+      if (!String(formData.equityMax || "").trim()) missing.push("Equity max %");
+
+      if (formData.salaryApproach && formData.salaryApproach !== "deferred") {
+        if (!formData.compensationCountry || !formData.currency) {
+          missing.push("Compensation country / currency");
+        }
+        if (!String(formData.salaryMin || "").trim()) missing.push("Salary min");
+        if (!String(formData.salaryMax || "").trim()) missing.push("Salary max");
+      }
+    }
 
     if (missing.length > 0) {
       toast.error(`Please fill in: ${missing.join(", ")}`);
@@ -266,6 +283,34 @@ export function PostStartupPage({ user, onNavigate }) {
     if (formData.description.trim().length < 50) {
       toast.error("Description must be at least 50 characters");
       return false;
+    }
+
+    const equityMin = Number(formData.equityMin);
+    const equityMax = Number(formData.equityMax);
+    if (
+      !Number.isFinite(equityMin) ||
+      !Number.isFinite(equityMax) ||
+      equityMin < 0 ||
+      equityMax < 0 ||
+      equityMin > equityMax
+    ) {
+      toast.error("Equity max must be greater than or equal to equity min");
+      return false;
+    }
+
+    if (formData.salaryApproach !== "deferred") {
+      const salaryMin = Number(formData.salaryMin);
+      const salaryMax = Number(formData.salaryMax);
+      if (
+        !Number.isFinite(salaryMin) ||
+        !Number.isFinite(salaryMax) ||
+        salaryMin < 0 ||
+        salaryMax < 0 ||
+        salaryMin > salaryMax
+      ) {
+        toast.error("Salary max must be greater than or equal to salary min");
+        return false;
+      }
     }
 
     return true;
@@ -283,6 +328,8 @@ export function PostStartupPage({ user, onNavigate }) {
   );
 
   const handleSubmit = async () => {
+    if (!validateForm()) return;
+
     const userId = String(user?._id ?? user?.id ?? "");
     if (!userId) {
       toast.error("Session error. Please log in again.");
@@ -647,19 +694,24 @@ export function PostStartupPage({ user, onNavigate }) {
                 <CardTitle className="text-lg font-semibold text-text-heading flex items-center gap-2">
                   <Coins className="w-5 h-5 text-primary" />
                   Compensation
-                  <span className="text-text-muted font-normal text-sm">(optional)</span>
+                  <span className="text-sm font-normal text-status-error">*</span>
                 </CardTitle>
               </CardHeader>
               <CardContent className="p-6 space-y-5">
+                <p className="font-body text-xs text-text-muted">
+                  Required before you can preview or publish. Talent needs clear
+                  equity and salary expectations.
+                </p>
                 <div>
                   <Label htmlFor="compensationPhilosophy" className="text-text-heading">
-                    Compensation Philosophy
+                    Compensation Philosophy <span className="text-status-error">*</span>
                   </Label>
                   <select
                     id="compensationPhilosophy"
                     value={formData.compensationPhilosophy}
                     onChange={(e) => handleInputChange("compensationPhilosophy", e.target.value)}
                     className="mt-2 w-full h-10 rounded-md border border-surface-border bg-surface-page px-3 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                    required
                   >
                     {COMPENSATION_PHILOSOPHIES.map((p) => (
                       <option key={p.value} value={p.value}>
@@ -676,7 +728,7 @@ export function PostStartupPage({ user, onNavigate }) {
                     <div className="grid grid-cols-2 gap-3">
                       <div>
                         <Label htmlFor="equityMin" className="text-text-heading text-sm">
-                          Equity Min %
+                          Equity Min % <span className="text-status-error">*</span>
                         </Label>
                         <Input
                           id="equityMin"
@@ -686,11 +738,12 @@ export function PostStartupPage({ user, onNavigate }) {
                           value={formData.equityMin}
                           onChange={(e) => handleInputChange("equityMin", e.target.value)}
                           className="mt-2 bg-surface-page border-surface-border focus:border-primary"
+                          required
                         />
                       </div>
                       <div>
                         <Label htmlFor="equityMax" className="text-text-heading text-sm">
-                          Equity Max %
+                          Equity Max % <span className="text-status-error">*</span>
                         </Label>
                         <Input
                           id="equityMax"
@@ -700,19 +753,21 @@ export function PostStartupPage({ user, onNavigate }) {
                           value={formData.equityMax}
                           onChange={(e) => handleInputChange("equityMax", e.target.value)}
                           className="mt-2 bg-surface-page border-surface-border focus:border-primary"
+                          required
                         />
                       </div>
                     </div>
 
                     <div>
                       <Label htmlFor="salaryApproach" className="text-text-heading">
-                        Salary Approach
+                        Salary Approach <span className="text-status-error">*</span>
                       </Label>
                       <select
                         id="salaryApproach"
                         value={formData.salaryApproach}
                         onChange={(e) => handleInputChange("salaryApproach", e.target.value)}
                         className="mt-2 w-full h-10 rounded-md border border-surface-border bg-surface-page px-3 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                        required
                       >
                         {SALARY_APPROACHES.map((s) => (
                           <option key={s.value} value={s.value}>
@@ -728,12 +783,14 @@ export function PostStartupPage({ user, onNavigate }) {
                           value={formData.compensationCountry}
                           currency={formData.currency}
                           onChange={handleCompensationCountryChange}
+                          required
                         />
 
                         <div className="grid grid-cols-2 gap-3">
                           <div>
                             <Label htmlFor="salaryMin" className="text-text-heading text-sm">
-                              {getSalaryFieldLabel("Salary Min", formData.currency)}
+                              {getSalaryFieldLabel("Salary Min", formData.currency)}{" "}
+                              <span className="text-status-error">*</span>
                             </Label>
                             <Input
                               id="salaryMin"
@@ -742,11 +799,13 @@ export function PostStartupPage({ user, onNavigate }) {
                               value={formData.salaryMin}
                               onChange={(e) => handleInputChange("salaryMin", e.target.value)}
                               className="mt-2 bg-surface-page border-surface-border focus:border-primary"
+                              required
                             />
                           </div>
                           <div>
                             <Label htmlFor="salaryMax" className="text-text-heading text-sm">
-                              {getSalaryFieldLabel("Salary Max", formData.currency)}
+                              {getSalaryFieldLabel("Salary Max", formData.currency)}{" "}
+                              <span className="text-status-error">*</span>
                             </Label>
                             <Input
                               id="salaryMax"
@@ -755,6 +814,7 @@ export function PostStartupPage({ user, onNavigate }) {
                               value={formData.salaryMax}
                               onChange={(e) => handleInputChange("salaryMax", e.target.value)}
                               className="mt-2 bg-surface-page border-surface-border focus:border-primary"
+                              required
                             />
                           </div>
                         </div>
@@ -828,7 +888,7 @@ export function PostStartupPage({ user, onNavigate }) {
                       <li>• Be specific about the problem you&apos;re solving</li>
                       <li>• Mention your traction or validation so far</li>
                       <li>• Clearly define the roles you need</li>
-                      <li>• Be transparent about compensation</li>
+                      <li>• Be transparent about compensation (required to publish)</li>
                     </ul>
                   </div>
                 </div>

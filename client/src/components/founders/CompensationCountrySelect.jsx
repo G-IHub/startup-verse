@@ -12,6 +12,7 @@ export function CompensationCountrySelect({
   currency,
   onChange,
   id = "compensationCountry",
+  required = false,
 }) {
   const [search, setSearch] = useState("");
 
@@ -40,6 +41,7 @@ export function CompensationCountrySelect({
     <div className="space-y-2">
       <Label htmlFor={id} className="text-text-heading">
         Salary country
+        {required ? <span className="text-status-error"> *</span> : null}
       </Label>
       <p className="text-xs text-text-muted">Sets the currency for salary fields below.</p>
 
@@ -57,6 +59,7 @@ export function CompensationCountrySelect({
         value={value || ""}
         onChange={(e) => handleCountryChange(e.target.value)}
         className="w-full h-10 rounded-md border border-surface-border bg-surface-page px-3 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+        required={required}
       >
         <option value="">Select country</option>
         {filteredCountries.map((country) => (

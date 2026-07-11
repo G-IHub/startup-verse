@@ -86,12 +86,6 @@ export default function DocumentsPage({ user, onNavigate }) {
   ];
   return (
     <div className="p-8 max-w-7xl mx-auto space-y-8">
-      <div className="space-y-2">
-        <h1 className="mb-1">Documents & Templates</h1>
-        <p className="text-muted-foreground">
-          Professional documents to help you build and grow your startup
-        </p>
-      </div>
       <Card
         className={`border-2 ${documents[0].borderColor} bg-gradient-to-br ${documents[0].bgColor} overflow-hidden relative`}
       >

@@ -18,6 +18,7 @@ const PATH_TO_PAGE = Object.freeze({
   "/browse-talent": "team-matching",
   "/analytics": "analytics",
   "/settings": "settings",
+  "/settings/profile": "profile",
   "/performance": "my-performance",
   "/documents": "documents",
   "/pitch-deck": "pitch-deck",
@@ -120,7 +121,15 @@ export function pathToDashboardState(pathname, search, role) {
     const edit =
       q.get("editProfile") === "1" || q.get("editProfile") === "true";
     return {
-      currentPage: "settings",
+      currentPage: edit ? "profile" : "settings",
+      initialProfileEditing: Boolean(edit),
+    };
+  }
+
+  if (path === "/settings/profile") {
+    const edit = q.get("edit") === "1" || q.get("edit") === "true";
+    return {
+      currentPage: "profile",
       initialProfileEditing: Boolean(edit),
     };
   }
@@ -263,9 +272,9 @@ export function dashboardStateToPath(state) {
     case "analytics":
       return "/analytics";
     case "settings":
-      return initialProfileEditing ? "/settings?editProfile=1" : "/settings";
+      return "/settings";
     case "profile":
-      return "/settings?editProfile=1";
+      return initialProfileEditing ? "/settings/profile?edit=1" : "/settings/profile";
     case "my-performance":
       return "/performance";
     case "documents":
@@ -317,6 +326,7 @@ export const DASHBOARD_ROUTE_PATHS = Object.freeze([
   "/chat",
   "/analytics",
   "/settings",
+  "/settings/profile",
   "/performance",
   "/documents",
   "/pitch-deck",

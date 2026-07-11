@@ -26,6 +26,11 @@ const offerSchema = new mongoose.Schema(
       default: "",
       maxlength: [10, "equityMax cannot exceed 10 characters"],
     },
+    salaryApproach: {
+      type: String,
+      default: "",
+      maxlength: [40, "salaryApproach cannot exceed 40 characters"],
+    },
     salaryMin: {
       type: String,
       default: "",
@@ -45,6 +50,33 @@ const offerSchema = new mongoose.Schema(
       type: String,
       default: "",
       maxlength: [3, "compensationCountry cannot exceed 3 characters"],
+    },
+    benefits: {
+      type: [String],
+      default: [],
+      validate: {
+        validator: (arr) =>
+          Array.isArray(arr) &&
+          arr.length <= 30 &&
+          arr.every((v) => typeof v === "string" && v.length <= 80),
+        message: "Maximum 30 benefits, each up to 80 characters",
+      },
+    },
+    whyJoinUs: {
+      type: [String],
+      default: [],
+      validate: {
+        validator: (arr) =>
+          Array.isArray(arr) &&
+          arr.length <= 5 &&
+          arr.every((v) => typeof v === "string" && v.length <= 300),
+        message: "Maximum 5 whyJoinUs reasons, each up to 300 characters",
+      },
+    },
+    customPerks: {
+      type: String,
+      default: "",
+      maxlength: [1000, "customPerks cannot exceed 1000 characters"],
     },
     notes: {
       type: String,

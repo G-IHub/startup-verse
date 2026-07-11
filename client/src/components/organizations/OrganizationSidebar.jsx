@@ -132,7 +132,7 @@ export default function OrganizationSidebar({
         )}
         aria-label="Organization navigation"
       >
-        <div className="flex shrink-0 items-center gap-2.5 px-4 pb-2 pt-5">
+        <div className="flex min-h-[82px] shrink-0 items-center gap-2.5 px-4 py-4">
           <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-input bg-primary text-white shadow-[0_4px_16px_rgba(58,90,254,0.25)]">
             <Sparkles className="h-[17px] w-[17px]" strokeWidth={1.75} aria-hidden />
           </div>

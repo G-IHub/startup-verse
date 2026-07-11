@@ -324,6 +324,22 @@ export default function CohortDashboardWithSidebar({
     };
     return titles[currentPage];
   };
+  const getPageDescription = () => {
+    const descriptions = {
+      home: cohort.description || `${cohort.stats?.totalStartups || 0} startups`,
+      portfolio: "Track startup health and cohort progress",
+      analytics: "Review cohort execution trends and insights",
+      milestones: "Manage program milestones and founder progress",
+      deliverables: "Review required submissions and startup work",
+      events: "Coordinate cohort events and meetings",
+      communication: "Send announcements and messages",
+      mentors: "Manage mentors and founder assignments",
+      resources: "Curate learning materials and program resources",
+      members: "Review founders and startups in this cohort",
+      settings: "Configure cohort and organization controls",
+    };
+    return descriptions[currentPage] || cohort.name;
+  };
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -358,7 +374,7 @@ export default function CohortDashboardWithSidebar({
         onClose={() => setIsMobileSidebarOpen(false)}
       />
       <div className="flex-1 flex flex-col overflow-hidden">
-        <div className="border-b border-surface-border bg-surface-card shadow-[0_1px_8px_rgba(0,0,0,0.05)] px-4 md:px-6 py-3 flex items-center justify-between gap-4 flex-shrink-0">
+        <div className="flex min-h-[82px] flex-shrink-0 items-center justify-between gap-4 border-b border-surface-border bg-surface-card px-4 py-4 shadow-[0_1px_8px_rgba(0,0,0,0.05)] md:px-6">
           <div className="flex items-center gap-3 flex-1 min-w-0">
             <Button
               variant="ghost"
@@ -369,12 +385,11 @@ export default function CohortDashboardWithSidebar({
               <Menu className="w-5 h-5" />
             </Button>
             <div className="min-w-0 flex-1">
-              <h2 className="font-heading text-base md:text-lg font-bold text-text-heading truncate">
-                {cohort.name}
+              <h2 className="truncate font-heading text-lg font-extrabold leading-tight text-text-heading sm:text-xl">
+                {getPageTitle()}
               </h2>
-              <p className="font-body text-[12px] md:text-sm text-text-body truncate">
-                {cohort.description ||
-                  `${cohort.stats?.totalStartups || 0} startups`}
+              <p className="hidden truncate font-body text-xs leading-snug text-text-body sm:block">
+                {getPageDescription()}
               </p>
             </div>
           </div>

@@ -1417,17 +1417,86 @@ export const createPost = async (req, res) => {
 
   const buildOffer = (src) => {
     if (!src || typeof src !== "object") return undefined;
+    const benefits = Array.isArray(src.benefits)
+      ? src.benefits.map(String).map((v) => v.trim()).filter(Boolean).slice(0, 30)
+      : [];
+    const whyJoinUs = Array.isArray(src.whyJoinUs)
+      ? src.whyJoinUs.map(String).map((v) => v.trim()).filter(Boolean).slice(0, 5)
+      : [];
     return {
       compensationPhilosophy: src.compensationPhilosophy || "",
       equityMin: src.equityMin != null ? String(src.equityMin) : "",
       equityMax: src.equityMax != null ? String(src.equityMax) : "",
+      salaryApproach: src.salaryApproach ? String(src.salaryApproach).slice(0, 40) : "",
       salaryMin: src.salaryMin != null ? String(src.salaryMin) : "",
       salaryMax: src.salaryMax != null ? String(src.salaryMax) : "",
       currency: src.currency || "",
       compensationCountry: src.compensationCountry || "",
+      benefits,
+      whyJoinUs,
+      customPerks: src.customPerks ? String(src.customPerks).slice(0, 1000) : "",
       notes: src.notes || "",
     };
   };
+
+  const offerSource = p.offer && typeof p.offer === "object" ? p.offer : {};
+  const salaryApproach = String(offerSource.salaryApproach || "").trim();
+  const equityMin = Number(offerSource.equityMin);
+  const equityMax = Number(offerSource.equityMax);
+  if (
+    !String(offerSource.compensationPhilosophy || "").trim() ||
+    !salaryApproach ||
+    !String(offerSource.equityMin ?? "").trim() ||
+    !String(offerSource.equityMax ?? "").trim()
+  ) {
+    return apiError(
+      res,
+      "Compensation is required: philosophy, equity range, and salary approach.",
+      400,
+    );
+  }
+  if (
+    !Number.isFinite(equityMin) ||
+    !Number.isFinite(equityMax) ||
+    equityMin < 0 ||
+    equityMax < 0 ||
+    equityMin > equityMax
+  ) {
+    return apiError(
+      res,
+      "Equity max must be greater than or equal to equity min.",
+      400,
+    );
+  }
+  if (salaryApproach !== "deferred") {
+    const salaryMin = Number(offerSource.salaryMin);
+    const salaryMax = Number(offerSource.salaryMax);
+    if (
+      !String(offerSource.compensationCountry || "").trim() ||
+      !String(offerSource.currency || "").trim() ||
+      !String(offerSource.salaryMin ?? "").trim() ||
+      !String(offerSource.salaryMax ?? "").trim()
+    ) {
+      return apiError(
+        res,
+        "Salary country, currency, and salary range are required unless salary is deferred.",
+        400,
+      );
+    }
+    if (
+      !Number.isFinite(salaryMin) ||
+      !Number.isFinite(salaryMax) ||
+      salaryMin < 0 ||
+      salaryMax < 0 ||
+      salaryMin > salaryMax
+    ) {
+      return apiError(
+        res,
+        "Salary max must be greater than or equal to salary min.",
+        400,
+      );
+    }
+  }
 
   const fields = {
     founderId,

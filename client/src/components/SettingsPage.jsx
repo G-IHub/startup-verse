@@ -17,11 +17,12 @@ import {
   LogOut,
   Building2,
   Loader2,
+  Shield,
+  UserCircle,
 } from "lucide-react";
 import { toast } from "sonner";
 import * as authApi from "../utils/api/authApi";
 import { leaveStartup } from "../utils/api/teamMemberApi";
-import ProfilePage from "./ProfilePage";
 import {
   SettingsPanelCard,
   SettingsGroup,
@@ -35,7 +36,7 @@ import {
 export default function SettingsPage({
   user,
   onUpdateUser,
-  initialProfileEditing = false,
+  onNavigate,
 }) {
   const [showConfirmDeleteAccount, setShowConfirmDeleteAccount] =
     useState(false);
@@ -99,32 +100,79 @@ export default function SettingsPage({
 
   return (
     <div className="min-h-full space-y-4 bg-surface-page p-2 font-body md:space-y-5 md:p-3 lg:p-4">
-      <div className="w-full">
-        <h1 className="mb-1 font-heading text-xl font-extrabold text-text-heading md:text-2xl">
-          Settings
-        </h1>
-        <p className="font-body text-xs text-text-body md:text-sm">
-          Profile and account controls
-        </p>
-      </div>
+      <div className="w-full space-y-4">
+        <SettingsPanelCard
+          icon={UserCircle}
+          title="Account identity"
+          description="Your signed-in account details"
+        >
+          {user ? (
+            <div className="grid gap-3 md:grid-cols-2">
+              <div className="rounded-input border border-surface-border bg-surface-page px-4 py-3">
+                <p className="font-body text-[11px] font-semibold uppercase tracking-wide text-text-muted">
+                  Name
+                </p>
+                <p className="mt-1 font-body text-sm font-semibold text-text-heading">
+                  {user.name || "Not specified"}
+                </p>
+              </div>
+              <div className="rounded-input border border-surface-border bg-surface-page px-4 py-3">
+                <p className="font-body text-[11px] font-semibold uppercase tracking-wide text-text-muted">
+                  Email
+                </p>
+                <p className="mt-1 truncate font-body text-sm font-semibold text-text-heading">
+                  {user.email || "Not specified"}
+                </p>
+              </div>
+              <div className="rounded-input border border-surface-border bg-surface-page px-4 py-3">
+                <p className="font-body text-[11px] font-semibold uppercase tracking-wide text-text-muted">
+                  Role
+                </p>
+                <p className="mt-1 font-body text-sm font-semibold capitalize text-text-heading">
+                  {user.role?.replace(/-/g, " ") || "Member"}
+                </p>
+              </div>
+              <div className="rounded-input border border-surface-border bg-surface-page px-4 py-3">
+                <p className="font-body text-[11px] font-semibold uppercase tracking-wide text-text-muted">
+                  Profile page
+                </p>
+                <p className="mt-1 font-body text-sm text-text-body">
+                  Use the Profile switcher above to edit public profile details.
+                </p>
+              </div>
+            </div>
+          ) : (
+            <Card className={SETTINGS_CARD}>
+              <CardContent className="py-8">
+                <p className="text-center font-body text-sm text-text-muted">
+                  Account settings not available
+                </p>
+              </CardContent>
+            </Card>
+          )}
+        </SettingsPanelCard>
 
-      <div className="mt-4 w-full space-y-4">
-        {user && onUpdateUser ? (
-          <ProfilePage
-            user={user}
-            onUpdateUser={onUpdateUser}
-            initialEditing={initialProfileEditing}
-            embeddedInSettings
-          />
-        ) : (
-          <Card className={SETTINGS_CARD}>
-            <CardContent className="py-8">
-              <p className="text-center font-body text-sm text-text-muted">
-                Profile settings not available
-              </p>
-            </CardContent>
-          </Card>
-        )}
+        <SettingsPanelCard
+          icon={Shield}
+          title="Security & preferences"
+          description="Manage account-level preferences and privacy controls"
+        >
+          <SettingsActionRow
+            icon={Shield}
+            iconTint="neutral"
+            title="Account preferences"
+            description="Public profile editing has moved to a dedicated page so account settings stay focused."
+          >
+            <Button
+              type="button"
+              size="sm"
+              className={settingsBtnOutline}
+              onClick={() => onNavigate?.("profile")}
+            >
+              Open profile
+            </Button>
+          </SettingsActionRow>
+        </SettingsPanelCard>
 
         {isTeamMember && (
           <SettingsPanelCard

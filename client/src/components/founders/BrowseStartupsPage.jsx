@@ -183,21 +183,6 @@ export function BrowseStartupsPage({ user, onNavigate, onViewStartup }) {
   return (
     <div className="min-h-full bg-surface-page p-2 font-body md:p-3 lg:p-4">
       <div className="mx-auto max-w-7xl space-y-5">
-        <div className={cn("flex items-start gap-3 p-4", SETTINGS_CARD)}>
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary-tint">
-            <Briefcase className="h-5 w-5 text-primary" />
-          </div>
-          <div>
-            <h1 className="font-heading text-base font-bold text-text-heading">
-              Browse startups
-            </h1>
-            <p className="mt-1 font-body text-sm text-text-muted max-w-2xl">
-              Open roles from active founder posts. Review requirements and express
-              interest from the detail page.
-            </p>
-          </div>
-        </div>
-
         <div className={cn("space-y-4 p-4", SETTINGS_CARD)}>
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
             <div className="relative flex-1">

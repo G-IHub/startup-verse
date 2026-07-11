@@ -14,6 +14,7 @@ import {
   getCompensationCurrencyLabel,
   hasCompensationDetails,
   hasStartupLinks,
+  hydrateStartupPostForDisplay,
   normalizeLookingFor,
   normalizeTags,
   resolveBrandAccent,
@@ -123,7 +124,7 @@ export function StartupDetailPage({
       setLoading(false);
     }
     if (startupProp) {
-      setStartup(startupProp);
+      setStartup(hydrateStartupPostForDisplay(startupProp));
     }
   }, [startupProp, startupId]);
 
@@ -131,9 +132,15 @@ export function StartupDetailPage({
     try {
       const response = await founderApi.getAllPosts();
       if (response.success && response.posts) {
-        const found = response.posts.find((p) => p.id === id);
+        const needle = String(id);
+        const found = response.posts.find((p) => {
+          const candidates = [p.id, p._id, p.startupId]
+            .filter(Boolean)
+            .map(String);
+          return candidates.includes(needle);
+        });
         if (found) {
-          setStartup(found);
+          setStartup(hydrateStartupPostForDisplay(found));
         } else {
           toast.error("Startup not found");
         }

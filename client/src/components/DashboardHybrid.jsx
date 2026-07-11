@@ -181,11 +181,6 @@ export default function DashboardHybrid({ user, onLogout, onUpdateUser }) {
       return;
     }
 
-    if (page === "profile") {
-      navigate("/settings?editProfile=1");
-      return;
-    }
-
     const officeViewForPath =
       page === "startup-office"
         ? options?.officeView ??
@@ -204,7 +199,7 @@ export default function DashboardHybrid({ user, onLogout, onUpdateUser }) {
         virtualOfficeView: officeViewForPath,
         talentDashboardMode: talentModeForPath,
         initialProfileEditing:
-          page === "settings"
+          page === "profile"
             ? Boolean(options?.editProfile)
             : false,
         messageUserId: options?.messageUserId,
@@ -315,17 +310,17 @@ export default function DashboardHybrid({ user, onLogout, onUpdateUser }) {
             <SettingsPage
               user={user}
               onUpdateUser={onUpdateUser}
-              initialProfileEditing={initialProfileEditing}
+              onNavigate={handleNavigate}
             />
           </Suspense>
         );
       case "profile":
         return (
           <Suspense fallback={<PageLoadingFallback />}>
-            <SettingsPage
+            <ProfilePage
               user={user}
               onUpdateUser={onUpdateUser}
-              initialProfileEditing={true}
+              initialEditing={initialProfileEditing}
             />
           </Suspense>
         );

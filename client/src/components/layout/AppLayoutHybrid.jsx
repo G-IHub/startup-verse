@@ -5,7 +5,7 @@ import { toast } from "sonner";
 import VerticalSidebar from "./VerticalSidebar";
 import NotificationCenter from "../notifications/NotificationCenter";
 import { MobileActionDock, PageViewport } from "../shell/PageScaffold";
-import { Menu } from "lucide-react";
+import { Menu, SlidersHorizontal, UserCircle } from "lucide-react";
 import HeaderProfileMenu from "./HeaderProfileMenu";
 import StartupVerseLogo from "../brand/StartupVerseLogo";
 import {
@@ -35,13 +35,61 @@ const PAGE_META = {
     title: "Inbox",
     description: "Invitations, interests, and responses",
   },
+  "inbox:received": {
+    title: "Inbox",
+    description: "Received invitations, interests, and responses",
+  },
+  "inbox:sent": {
+    title: "Inbox",
+    description: "Sent invitations and outreach history",
+  },
   analytics: {
     title: "Analytics",
     description: "Execution trends and diagnostics",
   },
   settings: {
     title: "Settings",
-    description: "Profile, preferences, and account controls",
+    description: "Account preferences and controls",
+  },
+  profile: {
+    title: "Profile",
+    description: "Edit your public profile and account details",
+  },
+  documents: {
+    title: "Documents & Templates",
+    description: "Professional documents to help you build and grow",
+  },
+  "pitch-deck": {
+    title: "Pitch Deck",
+    description: "Create and refine investor-ready materials",
+  },
+  journey: {
+    title: "Startup Journey",
+    description: "Navigate your startup roadmap",
+  },
+  ideation: {
+    title: "Ideation & Validation",
+    description: "Validate the problem, customer, and solution",
+  },
+  formation: {
+    title: "Company Formation",
+    description: "Set up your company foundations",
+  },
+  "team-building": {
+    title: "Team Building",
+    description: "Build and coordinate your founding team",
+  },
+  "product-dev": {
+    title: "Product Development",
+    description: "Shape and ship your product",
+  },
+  "go-to-market": {
+    title: "Go To Market",
+    description: "Plan launch, acquisition, and growth",
+  },
+  operations: {
+    title: "Operations",
+    description: "Run repeatable systems and execution rhythms",
   },
   "talent-chat": {
     title: "My Chats",
@@ -59,11 +107,24 @@ const PAGE_META = {
     title: "My Performance",
     description: "Tasks, progress, and delivery trends",
   },
+  "startup-detail": {
+    title: "Startup Detail",
+    description: "Review opportunity details and team context",
+  },
+  "talent-profile": {
+    title: "Talent Profile",
+    description: "Review skills, background, and invitation fit",
+  },
+  "compensation-demo": {
+    title: "Compensation Demo",
+    description: "Preview compensation setup workflows",
+  },
 };
 
 function resolvePageMeta(currentPage, userRole) {
-  const normalizedPage = String(currentPage || "dashboard").split(":")[0];
-  const base = PAGE_META[normalizedPage] || PAGE_META.dashboard;
+  const pageKey = String(currentPage || "dashboard");
+  const normalizedPage = pageKey.split(":")[0];
+  const base = PAGE_META[pageKey] || PAGE_META[normalizedPage] || PAGE_META.dashboard;
 
   if (normalizedPage === "dashboard") {
     if (userRole === "founder") {
@@ -119,6 +180,8 @@ export default function AppLayoutHybrid({
     currentPage === "startup-office" ||
     currentPage === "talent-chat" ||
     currentPage === "founder-chat";
+  const showSettingsSwitcher =
+    normalizedPage === "settings" || normalizedPage === "profile";
 
   usePresenceSession(user);
 
@@ -181,7 +244,7 @@ export default function AppLayoutHybrid({
           }
         >
           <PageViewport>
-            <div className="flex items-center gap-3 py-2">
+            <div className="flex min-h-[82px] items-center gap-3 py-4">
               {user.role === "organization-admin" ? (
                 <StartupVerseLogo className="h-8" />
               ) : (
@@ -194,11 +257,49 @@ export default function AppLayoutHybrid({
                   <Menu className="h-5 w-5" />
                 </Button>
               )}
-              {/* Page title/description are rendered inside page content.
-                  Keeping them out of the shell header avoids duplicated headings
-                  across Inbox, dashboards, chats, and other tabs. */}
-              <div className="flex-1" />
+              <div className="min-w-0 flex-1">
+                <h1 className="truncate font-heading text-lg font-extrabold leading-tight text-text-heading sm:text-xl">
+                  {pageMeta.title}
+                </h1>
+                {pageMeta.description ? (
+                  <p className="hidden truncate font-body text-xs leading-snug text-text-body sm:block">
+                    {pageMeta.description}
+                  </p>
+                ) : null}
+              </div>
               <div className="flex items-center gap-1.5 sm:gap-2">
+                {showSettingsSwitcher ? (
+                  <div className="flex items-center gap-1 rounded-input border border-surface-border bg-surface-page p-1">
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => onPageChange("profile")}
+                      className={`h-8 gap-2 rounded-input px-2 font-body text-xs font-semibold sm:px-3 ${
+                        normalizedPage === "profile"
+                          ? "bg-surface-card text-primary shadow-sm"
+                          : "text-text-body hover:bg-surface-card hover:text-text-heading"
+                      }`}
+                    >
+                      <UserCircle className="h-4 w-4" />
+                      <span className="hidden md:inline">Profile</span>
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => onPageChange("settings")}
+                      className={`h-8 gap-2 rounded-input px-2 font-body text-xs font-semibold sm:px-3 ${
+                        normalizedPage === "settings"
+                          ? "bg-surface-card text-primary shadow-sm"
+                          : "text-text-body hover:bg-surface-card hover:text-text-heading"
+                      }`}
+                    >
+                      <SlidersHorizontal className="h-4 w-4" />
+                      <span className="hidden md:inline">Settings</span>
+                    </Button>
+                  </div>
+                ) : null}
                 <NotificationCenter onNavigate={onPageChange} />
                 {user.role !== "organization-admin" ? (
                   <HeaderProfileMenu

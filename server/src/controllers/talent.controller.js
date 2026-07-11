@@ -12,7 +12,7 @@ import { uploadBuffer } from "../services/uploadService.js";
 import { extractResumeText } from "../services/resumeTextExtractor.js";
 import { parseResumeText, isResumeParseConfigured } from "../services/resumeParseService.js";
 import { loadResumeBuffer } from "../services/resumeFileLoader.js";
-import { isAllowedResumeMime } from "../utils/resumeAttachments.js";
+import { inferResumeMimeType, isAllowedResumeMime } from "../utils/resumeAttachments.js";
 import { checkResumeParseRateLimit } from "../utils/resumeParseRateLimit.js";
 import { logger } from "../config/logger.js";
 
@@ -85,12 +85,12 @@ export const parseResume = async (req, res) => {
 
   try {
     if (req.file) {
-      mimeType = req.file.mimetype;
+      fileName = req.file.originalname || "resume";
+      mimeType = inferResumeMimeType(req.file.mimetype, fileName);
       if (!isAllowedResumeMime(mimeType)) {
         return apiError(res, "Resume must be a PDF or DOCX file (max 5MB).", 400);
       }
       buffer = req.file.buffer;
-      fileName = req.file.originalname || "resume";
       resumeMeta = await uploadBuffer({
         buffer,
         mimeType,
@@ -217,8 +217,10 @@ export const getStartupPostsFeed = async (req, res) => {
       post.founderId?.name ||
       "";
     const lookingFor = Array.isArray(post.lookingFor) ? post.lookingFor : [];
+    const id = String(post._id ?? "");
     return {
       ...post,
+      id,
       founderId: post.founderId?._id ?? post.founderId,
       founderName: resolvedName,
       founder: resolvedName,

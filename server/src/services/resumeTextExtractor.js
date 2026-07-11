@@ -3,9 +3,19 @@ import { createRequire } from "module";
 import { isAllowedResumeMime } from "../utils/resumeAttachments.js";
 
 const require = createRequire(import.meta.url);
-const pdfParse = require("pdf-parse");
+const { PDFParse } = require("pdf-parse");
 
 const MAX_TEXT_CHARS = 12_000;
+
+async function extractPdfText(buffer) {
+  const parser = new PDFParse({ data: buffer });
+  try {
+    const parsed = await parser.getText();
+    return String(parsed?.text || "").trim();
+  } finally {
+    await parser.destroy?.();
+  }
+}
 
 export async function extractResumeText(buffer, mimeType) {
   if (!buffer || !Buffer.isBuffer(buffer)) {
@@ -18,8 +28,7 @@ export async function extractResumeText(buffer, mimeType) {
 
   let text = "";
   if (mt === "application/pdf") {
-    const parsed = await pdfParse(buffer);
-    text = String(parsed?.text || "").trim();
+    text = await extractPdfText(buffer);
   } else if (
     mt === "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
   ) {

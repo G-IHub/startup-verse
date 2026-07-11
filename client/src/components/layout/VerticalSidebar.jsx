@@ -242,10 +242,10 @@ export default function VerticalSidebar({
         )}
         aria-label="Main navigation"
       >
-        <div className="flex shrink-0 items-start gap-2.5 px-4 pb-2 pt-5">
-          <div className="min-w-0 flex-1">
-            <StartupVerseLogo className="h-8 max-w-full object-left" />
-            <p className="mt-1 truncate font-body text-[11px] text-text-muted capitalize">
+        <div className="flex min-h-[82px] shrink-0 items-center gap-2.5 px-4 py-4">
+          <div className="flex min-w-0 flex-1 items-center gap-2.5">
+            <StartupVerseLogo className="h-8 shrink-0 object-left" />
+            <p className="min-w-0 truncate font-body text-[12px] font-medium text-text-muted capitalize">
               {user.role?.replace(/-/g, " ") || "Member"}
             </p>
           </div>
