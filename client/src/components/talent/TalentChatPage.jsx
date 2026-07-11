@@ -103,6 +103,19 @@ export default function TalentChatPage({
               peerUserId ? { messageUserId: peerUserId } : {},
             );
           }}
+          onViewPeerProfile={(peerUserId) => {
+            if (!peerUserId) return;
+            const peer = roster.find((member) => member.id === peerUserId);
+            const startupId = String(peer?.startupId || "");
+            if (!startupId) return;
+            onNavigate?.("startup-detail", {
+              startupId,
+              returnToChat: true,
+              profileFromChat: true,
+              messageUserId: peerUserId,
+              founderUserId: peerUserId,
+            });
+          }}
           strictMode={false}
         />
       </div>

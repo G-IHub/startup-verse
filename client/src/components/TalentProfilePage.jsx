@@ -3,7 +3,6 @@ import { Button } from "./ui/button";
 import { Badge } from "./ui/badge";
 import { Avatar, AvatarFallback } from "./ui/avatar";
 import { Separator } from "./ui/separator";
-import { Textarea } from "./ui/textarea";
 import { Card, CardContent } from "./ui/card";
 import {
   MapPin,
@@ -29,19 +28,14 @@ import {
   CheckCircle2,
 } from "lucide-react";
 import * as talentApi from "../utils/api/talentApi";
-import { augmentTalentBrowseFields } from "../utils/talentBrowseNormalize";
-
-function hasExpandedTalentProfile(profile) {
-  if (!profile) return false;
-  return Boolean(
-    (Array.isArray(profile.workExperiences) && profile.workExperiences.length > 0) ||
-      (Array.isArray(profile.educationList) && profile.educationList.length > 0) ||
-      (Array.isArray(profile.certifications) && profile.certifications.length > 0) ||
-      (Array.isArray(profile.portfolioItems) && profile.portfolioItems.length > 0) ||
-      String(profile.bio || "").trim() ||
-      String(profile.professionalGoals || "").trim(),
-  );
-}
+import {
+  augmentTalentBrowseFields,
+  isTalentProfileReadyForDisplay,
+  normalizeTalentProfileRecord,
+} from "../utils/talentBrowseNormalize";
+import PeerActionCard from "./profile/PeerActionCard";
+import { usePeerRelationship } from "../hooks/usePeerRelationship";
+import { toast } from "sonner";
 
 function extractTalentUserIds(profile) {
   const ids = new Set();
@@ -51,6 +45,7 @@ function extractTalentUserIds(profile) {
     profile?.user?.id,
     profile?.id,
     profile?._id,
+    profile?.talentId,
   ];
   for (const value of candidates) {
     if (!value) continue;
@@ -73,104 +68,170 @@ function doesProfileMatchUserId(profile, userIdsSet) {
   return userIdsSet.has(profileUserId) || userIdsSet.has(profileId);
 }
 
+async function resolveTalentProfileRecord(talentId) {
+  const userIds = extractTalentUserIds({ id: talentId, userId: talentId });
+  if (!userIds.length) return null;
+
+  for (const userId of userIds) {
+    try {
+      const response = await talentApi.getTalentProfile(userId);
+      if (response && typeof response === "object") {
+        return normalizeTalentProfileRecord(response, { id: userId, userId });
+      }
+    } catch (error) {
+      console.warn("[TalentProfilePage] Profile lookup failed for", userId, error);
+    }
+  }
+
+  try {
+    const browseResponse = await talentApi.browseTalents();
+    const list = Array.isArray(browseResponse)
+      ? browseResponse
+      : Array.isArray(browseResponse?.data)
+        ? browseResponse.data
+        : [];
+    const userIdsSet = new Set(userIds.map(String));
+    const found = list.find((row) => doesProfileMatchUserId(row, userIdsSet));
+    if (found) {
+      return normalizeTalentProfileRecord(found, { id: userIds[0], userId: userIds[0] });
+    }
+  } catch (error) {
+    console.warn("[TalentProfilePage] Browse fallback failed:", error);
+  }
+
+  return null;
+}
+
+function TalentProfileSkeleton() {
+  return (
+    <div className="min-h-full bg-surface-page pb-12">
+      <div className="mx-auto max-w-5xl animate-pulse px-4 pt-4">
+        <div className="mb-6 flex items-center justify-between">
+          <div className="h-9 w-32 rounded-input bg-surface-border/60" />
+          <div className="h-9 w-24 rounded-input bg-surface-border/60" />
+        </div>
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+          <div className="space-y-6 lg:col-span-2">
+            <div className="rounded-card border border-surface-border bg-surface-card p-8">
+              <div className="flex gap-6">
+                <div className="h-28 w-28 shrink-0 rounded-card bg-surface-border/50" />
+                <div className="flex-1 space-y-3">
+                  <div className="h-8 w-2/3 rounded bg-surface-border/50" />
+                  <div className="h-5 w-1/2 rounded bg-surface-border/40" />
+                  <div className="h-4 w-1/3 rounded bg-surface-border/40" />
+                </div>
+              </div>
+            </div>
+            <div className="h-40 rounded-card border border-surface-border bg-surface-card" />
+            <div className="h-32 rounded-card border border-surface-border bg-surface-card" />
+          </div>
+          <div className="h-64 rounded-card border border-surface-border bg-surface-card" />
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function TalentProfilePage({
   talent: initialTalent,
+  talentId = null,
   currentUser,
   onBack,
   onSendInvitation,
+  returnToChat = false,
+  messageUserId = null,
+  onNavigate,
 }) {
-  const [talent, setTalent] = useState(initialTalent || null);
-  const [isHydratingProfile, setIsHydratingProfile] = useState(false);
+  const [talent, setTalent] = useState(
+    isTalentProfileReadyForDisplay(initialTalent)
+      ? normalizeTalentProfileRecord(initialTalent)
+      : null,
+  );
+  const [loading, setLoading] = useState(true);
   const [inviteMessage, setInviteMessage] = useState("");
-  const [showInviteForm, setShowInviteForm] = useState(false);
   const [invitationSent, setInvitationSent] = useState(false);
+  const [inviteBusy, setInviteBusy] = useState(false);
 
-  useEffect(() => {
-    setTalent(initialTalent || null);
-  }, [initialTalent]);
+  const peerUserId = String(
+    messageUserId ||
+      talentId ||
+      initialTalent?.userId?._id ||
+      initialTalent?.userId ||
+      initialTalent?._id ||
+      initialTalent?.id ||
+      talent?.userId?._id ||
+      talent?.userId ||
+      talent?._id ||
+      talent?.id ||
+      "",
+  );
+  const isFounderViewer = currentUser?.role === "founder";
+  const relationship = usePeerRelationship(currentUser, peerUserId, {
+    startupId: currentUser?.startupId,
+  });
 
   useEffect(() => {
     let cancelled = false;
-    const hydrateTalentProfile = async () => {
-      if (!initialTalent || hasExpandedTalentProfile(initialTalent)) return;
 
-      const userIds = extractTalentUserIds(initialTalent);
-      if (!userIds.length) return;
+    const loadTalent = async () => {
+      if (isTalentProfileReadyForDisplay(initialTalent)) {
+        if (!cancelled) {
+          setTalent(normalizeTalentProfileRecord(initialTalent));
+          setLoading(false);
+        }
+        return;
+      }
 
-      setIsHydratingProfile(true);
+      const resolvedId = String(
+        talentId ||
+          messageUserId ||
+          initialTalent?.userId?._id ||
+          initialTalent?.userId ||
+          initialTalent?._id ||
+          initialTalent?.id ||
+          "",
+      ).trim();
+
+      if (!resolvedId) {
+        if (!cancelled) setLoading(false);
+        return;
+      }
+
+      if (!cancelled) setLoading(true);
+
       try {
-        let resolved = null;
-
-        for (const userId of userIds) {
-          try {
-            const response = await talentApi.getTalentProfile(userId);
-            if (response?.success && response?.data) {
-              resolved = response.data;
-              break;
-            }
-          } catch (_) {
-            // Continue trying other candidate IDs
+        const resolved = await resolveTalentProfileRecord(resolvedId);
+        if (!cancelled) {
+          if (resolved) {
+            setTalent(resolved);
+          } else {
+            setTalent(null);
+            toast.error("Talent profile not found");
           }
         }
-
-        if (!resolved) {
-          const browseResponse = await talentApi.browseTalents();
-          const list = Array.isArray(browseResponse?.data) ? browseResponse.data : [];
-          const userIdsSet = new Set(userIds.map(String));
-          resolved =
-            list.find((row) => doesProfileMatchUserId(row, userIdsSet)) || null;
+      } catch (error) {
+        console.error("[TalentProfilePage] Failed to load profile:", error);
+        if (!cancelled) {
+          setTalent(null);
+          toast.error("Failed to load talent profile");
         }
-
-        if (!resolved || cancelled) return;
-
-        const normalized = augmentTalentBrowseFields(resolved) || resolved;
-        setTalent((prev) => ({
-          ...(prev || {}),
-          ...normalized,
-          id:
-            String(
-              normalized.userId?._id ||
-                normalized.userId ||
-                normalized._id ||
-                normalized.id ||
-                prev?._id ||
-                prev?.id ||
-                "",
-            ) || prev?.id,
-          _id:
-            String(
-              normalized._id ||
-                normalized.id ||
-                normalized.userId?._id ||
-                normalized.userId ||
-                prev?._id ||
-                prev?.id ||
-                "",
-            ) || prev?._id,
-          fullName:
-            normalized.fullName ||
-            normalized.name ||
-            prev?.fullName ||
-            prev?.name ||
-            "Talent",
-          professionalTitle:
-            normalized.professionalTitle ||
-            normalized.headline ||
-            normalized.role ||
-            prev?.professionalTitle ||
-            prev?.headline ||
-            prev?.role ||
-            "",
-        }));
       } finally {
-        if (!cancelled) setIsHydratingProfile(false);
+        if (!cancelled) setLoading(false);
       }
     };
-    void hydrateTalentProfile();
+
+    void loadTalent();
     return () => {
       cancelled = true;
     };
-  }, [initialTalent]);
+  }, [initialTalent, talentId, messageUserId]);
+
+  const pageReady =
+    !loading && (!isFounderViewer || !relationship.loading);
+
+  if (!pageReady) {
+    return <TalentProfileSkeleton />;
+  }
 
   if (!talent) {
     return (
@@ -190,19 +251,24 @@ export default function TalentProfilePage({
     );
   }
 
-  const handleSendInvite = () => {
+  const handleSendInvite = async () => {
     if (!inviteMessage.trim()) return;
-    
-    if (onSendInvitation) {
-      onSendInvitation(inviteMessage);
+    setInviteBusy(true);
+    try {
+      if (onSendInvitation) {
+        await onSendInvitation(inviteMessage, talent);
+      }
+      setInvitationSent(true);
+      await relationship.refetch();
+      setTimeout(() => {
+        setInvitationSent(false);
+        setInviteMessage("");
+      }, 2000);
+    } catch {
+      // Toast handled by caller
+    } finally {
+      setInviteBusy(false);
     }
-    
-    setInvitationSent(true);
-    setTimeout(() => {
-      setShowInviteForm(false);
-      setInvitationSent(false);
-      setInviteMessage("");
-    }, 2000);
   };
 
   const getMatchColor = (score) => {
@@ -219,29 +285,42 @@ export default function TalentProfilePage({
         <div className="max-w-5xl mx-auto flex items-center justify-between">
           <Button variant="ghost" size="sm" onClick={onBack} className="gap-2">
             <ArrowLeft className="w-4 h-4" />
-            Back to Browse
+            {returnToChat ? "Back to chat" : "Back to Browse"}
           </Button>
           
-          {talent.match && (
-            <div className="flex items-center gap-2">
-              <span className="text-sm text-muted-foreground">Match Score</span>
-              <Badge 
-                className={`bg-gradient-to-r ${getMatchColor(talent.match)} text-white border-0 font-semibold`}
+          <div className="flex items-center gap-2">
+            {returnToChat && onNavigate ? (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  const chatPage =
+                    currentUser?.role === "talent" ? "talent-chat" : "founder-chat";
+                  onNavigate(chatPage, {
+                    messageUserId: peerUserId || undefined,
+                  });
+                }}
               >
-                <Star className="w-3.5 h-3.5 mr-1 fill-white" />
-                {talent.match}%
-              </Badge>
-            </div>
-          )}
+                <Send className="w-3.5 h-3.5 mr-1.5" />
+                Message
+              </Button>
+            ) : null}
+            {talent.match && (
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-muted-foreground">Match Score</span>
+                <Badge 
+                  className={`bg-gradient-to-r ${getMatchColor(talent.match)} text-white border-0 font-semibold`}
+                >
+                  <Star className="w-3.5 h-3.5 mr-1 fill-white" />
+                  {talent.match}%
+                </Badge>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
       <div className="max-w-5xl mx-auto px-4 space-y-6">
-        {isHydratingProfile && (
-          <div className="rounded-lg border border-primary/20 bg-primary/5 px-3 py-2 text-xs text-primary">
-            Loading full talent profile details...
-          </div>
-        )}
         {/* Hero Profile Card */}
         <Card className="border-0 overflow-hidden bg-white">
           <div className="bg-slate-50/80 p-8">
@@ -524,69 +603,27 @@ export default function TalentProfilePage({
 
           {/* Sidebar - Right Column (1/3) */}
           <div className="space-y-6">
-            {/* Send Invitation Card */}
-            <Card className="border-0 bg-white sticky top-24">
-              <CardContent className="p-6">
-                <h3 className="font-semibold text-lg mb-4">Interested in {talent.fullName?.split(" ")[0]}?</h3>
-                
-                {!showInviteForm ? (
-                  <div className="space-y-3">
-                    <p className="text-sm text-slate-600">
-                      Send a personalized invitation to join your startup team.
-                    </p>
-                    <Button 
-                      className="w-full" 
-                      size="lg"
-                      onClick={() => setShowInviteForm(true)}
-                    >
-                      <Send className="w-4 h-4 mr-2" />
-                      Send Invitation
-                    </Button>
-                  </div>
-                ) : invitationSent ? (
-                  <div className="text-center py-4">
-                    <div className="w-12 h-12 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-3">
-                      <CheckCircle2 className="w-6 h-6 text-emerald-600" />
-                    </div>
-                    <p className="font-medium text-emerald-600">Invitation sent!</p>
-                  </div>
-                ) : (
-                  <div className="space-y-4">
-                    <div>
-                      <label className="text-sm font-medium mb-2 block">
-                        Your Message
-                      </label>
-                      <Textarea
-                        placeholder={`Hi ${talent.fullName?.split(" ")[0]}, I'm interested in having you join our team...`}
-                        value={inviteMessage}
-                        onChange={(e) => setInviteMessage(e.target.value)}
-                        rows={4}
-                        className="resize-none"
-                      />
-                    </div>
-                    <div className="flex gap-2">
-                      <Button 
-                        className="flex-1" 
-                        onClick={handleSendInvite}
-                        disabled={!inviteMessage.trim()}
-                      >
-                        <Send className="w-4 h-4 mr-2" />
-                        Send
-                      </Button>
-                      <Button 
-                        variant="outline" 
-                        onClick={() => {
-                          setShowInviteForm(false);
-                          setInviteMessage("");
-                        }}
-                      >
-                        Cancel
-                      </Button>
-                    </div>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
+            {isFounderViewer ? (
+              <PeerActionCard
+                peerName={talent.fullName || talent.name || "Talent"}
+                relationshipStatus={relationship.status}
+                relationshipLoading={relationship.loading}
+                viewerRole={currentUser?.role}
+                inviteMessage={inviteMessage}
+                onInviteMessageChange={setInviteMessage}
+                onSendInvitation={handleSendInvite}
+                invitationSent={invitationSent}
+                actionBusy={inviteBusy}
+                onMessage={
+                  returnToChat && onNavigate
+                    ? () =>
+                        onNavigate("founder-chat", {
+                          messageUserId: peerUserId || undefined,
+                        })
+                    : undefined
+                }
+              />
+            ) : null}
 
             {/* Industries of Interest */}
             {talent.interests && talent.interests.length > 0 && (

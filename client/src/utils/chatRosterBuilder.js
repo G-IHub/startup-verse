@@ -26,6 +26,7 @@ export function buildFounderChatRoster(founderId, receivedInterests, sentInvitat
         name: interest.talentName || interest.talentId?.name || "Talent",
         role: "talent",
         title: interest.preferredRole || interest.role || "Talent",
+        location: interest.talentLocation || interest.location || "",
         avatar: interest.talentId?.avatar || "",
         isOnline: false,
         status: "away",
@@ -54,6 +55,7 @@ export function buildFounderChatRoster(founderId, receivedInterests, sentInvitat
         name: invitation.talentName || invitation.talentId?.name || "Talent",
         role: "talent",
         title: invitation.role || "Talent",
+        location: invitation.talentLocation || invitation.location || "",
         avatar: invitation.talentId?.avatar || "",
         isOnline: false,
         status: "away",
@@ -78,13 +80,16 @@ export function buildFounderChatRoster(founderId, receivedInterests, sentInvitat
       existing.isOnline = member.isOnline || member.online || false;
       existing.status = member.status || (existing.isOnline ? "online" : "away");
       existing.title = member.title || member.role || existing.title;
+      existing.location = member.location || existing.location || "";
       existing.avatar = member.avatar || existing.avatar;
+      existing.source = "team";
     } else {
       byUserId.set(memberId, {
         id: memberId,
         name: member.name || "Team Member",
         role: member.role || "team-member",
         title: member.title || member.role || "Team Member",
+        location: member.location || "",
         avatar: member.avatar || "",
         isOnline: member.isOnline || member.online || false,
         status: member.status || "away",
@@ -124,6 +129,7 @@ export function buildTalentChatRoster(talentId, sentInterests, receivedInvitatio
         name: interest.founderName || interest.founderId?.name || "Founder",
         role: "founder",
         title: interest.startupTitle || "Startup Founder",
+        location: interest.startupLocation || interest.location || "",
         avatar: interest.founderId?.avatar || "",
         isOnline: false,
         status: "away",
@@ -151,6 +157,7 @@ export function buildTalentChatRoster(talentId, sentInterests, receivedInvitatio
         name: invitation.founderName || invitation.founderId?.name || "Founder",
         role: "founder",
         title: invitation.startupTitle || "Startup Founder",
+        location: invitation.startupLocation || invitation.location || "",
         avatar: invitation.founderId?.avatar || "",
         isOnline: false,
         status: "away",

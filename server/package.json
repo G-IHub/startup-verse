@@ -30,7 +30,8 @@
     "test:phase6-blueprint": "node scripts/phase6-blueprint-gap-smoke.mjs",
     "test:phase2-google-auth": "node scripts/phase2-google-auth-smoke.mjs",
     "test:phase8-security": "node scripts/phase8-security-alignment-smoke.mjs",
-    "test:phase9-remediation": "node scripts/phase9-remediation-readiness-smoke.mjs"
+    "test:phase9-remediation": "node scripts/phase9-remediation-readiness-smoke.mjs",
+    "test:founder-team-exclusions": "node src/utils/founderTeamTalentExclusions.test.js"
   },
   "keywords": [],
   "author": "",

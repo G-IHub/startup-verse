@@ -7,7 +7,7 @@ import { parseOfficeCallRoute } from "../utils/callRouteUtils.js";
 
 const DEFAULT_OFFICE_VIEW = "workspace";
 
-/** @typedef {{ currentPage: string, virtualOfficeView?: string, talentDashboardMode?: string, initialProfileEditing?: boolean, messageUserId?: string, taskId?: string, announcementId?: string, winId?: string, deliverableId?: string, officeTab?: string, startupId?: string, talentId?: string, invitationId?: string }} DashboardNavState */
+/** @typedef {{ currentPage: string, virtualOfficeView?: string, talentDashboardMode?: string, initialProfileEditing?: boolean, messageUserId?: string, returnToChat?: boolean, profileFromChat?: boolean, taskId?: string, announcementId?: string, winId?: string, deliverableId?: string, officeTab?: string, startupId?: string, talentId?: string, invitationId?: string }} DashboardNavState */
 
 const PATH_TO_PAGE = Object.freeze({
   "/home": "dashboard",
@@ -165,17 +165,25 @@ export function pathToDashboardState(pathname, search, role) {
 
   if (path === "/startup-detail") {
     const id = q.get("id") || undefined;
+    const fromChat = q.get("from") === "chat";
+    const withUser = q.get("with") || undefined;
     return {
       currentPage: "startup-detail",
       ...(id ? { startupId: id } : {}),
+      ...(fromChat ? { profileFromChat: true, returnToChat: true } : {}),
+      ...(withUser ? { messageUserId: withUser } : {}),
     };
   }
 
   if (path === "/talent-profile") {
     const id = q.get("id") || undefined;
+    const fromChat = q.get("from") === "chat";
+    const withUser = q.get("with") || undefined;
     return {
       currentPage: "talent-profile",
       ...(id ? { talentId: id } : {}),
+      ...(fromChat ? { profileFromChat: true, returnToChat: true } : {}),
+      ...(withUser ? { messageUserId: withUser } : {}),
     };
   }
 
@@ -226,6 +234,8 @@ export function dashboardStateToPath(state) {
     talentDashboardMode,
     initialProfileEditing,
     messageUserId,
+    returnToChat,
+    profileFromChat,
     taskId,
     announcementId,
     winId,
@@ -300,11 +310,21 @@ export function dashboardStateToPath(state) {
       return "/browse-startups";
     case "startup-detail":
       return startupId
-        ? appendEntityParams("/startup-detail", { id: startupId })
+        ? appendEntityParams("/startup-detail", {
+            id: startupId,
+            ...(profileFromChat || returnToChat
+              ? { from: "chat", ...(messageUserId ? { with: messageUserId } : {}) }
+              : {}),
+          })
         : "/startup-detail";
     case "talent-profile":
       return talentId
-        ? appendEntityParams("/talent-profile", { id: talentId })
+        ? appendEntityParams("/talent-profile", {
+            id: talentId,
+            ...(profileFromChat || returnToChat
+              ? { from: "chat", ...(messageUserId ? { with: messageUserId } : {}) }
+              : {}),
+          })
         : "/talent-profile";
     case "compensation-demo":
       return "/compensation-demo";

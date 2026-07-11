@@ -61,6 +61,7 @@ const StartupDetailPage = lazy(() => import("./founders/StartupDetailPage"));
 // API and realtime imports
 import * as inboxApi from "../utils/api/inboxApi";
 import * as founderApi from "../utils/api/founderApi";
+import { isTalentProfileReadyForDisplay } from "../utils/talentBrowseNormalize";
 import { broadcastMessageUpdate } from "../utils/realtimeSubscriptions";
 import { CallCoordinatorProvider } from "../contexts/CallCoordinatorContext";
 import { toast } from "sonner";
@@ -155,6 +156,8 @@ export default function DashboardHybrid({ user, onLogout, onUpdateUser }) {
     if (page === "talent-profile" && (options?.talent || options?.talentId)) {
       if (options?.talent) {
         setSelectedTalent(options.talent);
+      } else {
+        setSelectedTalent(null);
       }
       const talentId = String(
         options.talentId ||
@@ -168,6 +171,8 @@ export default function DashboardHybrid({ user, onLogout, onUpdateUser }) {
         dashboardStateToPath({
           currentPage: "talent-profile",
           ...(talentId ? { talentId } : {}),
+          ...(options?.returnToChat ? { returnToChat: true, profileFromChat: true } : {}),
+          ...(options?.messageUserId ? { messageUserId: options.messageUserId } : {}),
         }),
       );
       return;
@@ -177,15 +182,23 @@ export default function DashboardHybrid({ user, onLogout, onUpdateUser }) {
       page === "startup-detail" &&
       (options?.startup || options?.startupId)
     ) {
-      const startup = options?.startup || { id: options.startupId };
-      setSelectedStartup(startup);
+      if (options?.startup) {
+        setSelectedStartup(options.startup);
+      } else {
+        setSelectedStartup(null);
+      }
       const startupId = String(
-        options.startupId || startup.id || startup._id || "",
+        options.startupId ||
+          options.startup?.id ||
+          options.startup?._id ||
+          "",
       );
       navigate(
         dashboardStateToPath({
           currentPage: "startup-detail",
           ...(startupId ? { startupId } : {}),
+          ...(options?.returnToChat ? { returnToChat: true, profileFromChat: true } : {}),
+          ...(options?.messageUserId ? { messageUserId: options.messageUserId } : {}),
         }),
       );
       return;
@@ -265,12 +278,116 @@ export default function DashboardHybrid({ user, onLogout, onUpdateUser }) {
     talentDashboardMode = "overview",
     initialProfileEditing = false,
     messageUserId,
+    returnToChat = false,
+    profileFromChat = false,
     taskId,
     announcementId,
     winId,
     startupId: urlStartupId,
     talentId: urlTalentId,
   } = derivedNav;
+
+  const activeTalentProfile =
+    selectedTalent && isTalentProfileReadyForDisplay(selectedTalent)
+      ? selectedTalent
+      : null;
+
+  const resolveTalentId = (talent) =>
+    String(
+      talent?.userId?._id ??
+        talent?.userId ??
+        talent?.user?._id ??
+        talent?.user?.id ??
+        talent?._id ??
+        talent?.id ??
+        urlTalentId ??
+        "",
+    );
+
+  const sendTalentInvitation = async (message, talentOverride = null) => {
+    const talentRecord = talentOverride || activeTalentProfile;
+    if (!talentRecord || !user) return;
+
+    const founderId = String(user._id ?? user.id ?? "");
+    const talentId = resolveTalentId(talentRecord);
+    if (!talentId) {
+      toast.error("Unable to identify this talent profile. Please refresh and try again.");
+      return;
+    }
+
+    let founderStartup = null;
+    try {
+      const postsRes = await founderApi.getAllPosts();
+      if (postsRes?.success && Array.isArray(postsRes.posts)) {
+        founderStartup = postsRes.posts.find(
+          (post) => String(post.founderId ?? "") === founderId,
+        );
+      }
+    } catch (error) {
+      console.error("Failed to verify founder startup before invitation:", error);
+    }
+
+    if (!founderStartup) {
+      toast.error("Please launch your startup before browsing talent or sending invites.");
+      handleNavigate("post-startup");
+      return;
+    }
+
+    const startupId =
+      String(founderStartup._id ?? founderStartup.id ?? "") ||
+      String(user.startupId ?? user.companyId ?? "");
+    const startupTitle = String(
+      founderStartup.title ||
+        founderStartup.startupTitle ||
+        founderStartup.companyName ||
+        user.startupName ||
+        user.companyName ||
+        "",
+    ).trim();
+
+    if (!startupTitle) {
+      toast.error("Please complete your startup post title before sending invitations.");
+      handleNavigate("post-startup");
+      return;
+    }
+
+    const invitation = {
+      id: `inv_${Date.now()}_${founderId}`,
+      startupId,
+      startupTitle,
+      founderId,
+      founderName: user.name,
+      talentId,
+      talentName: talentRecord.fullName || talentRecord.name,
+      message,
+      role: talentRecord.professionalTitle || "Team Member",
+      sentAt: new Date().toISOString(),
+      status: "pending",
+    };
+
+    try {
+      await inboxApi.sendInvitation(invitation);
+      await broadcastMessageUpdate(null, "new_conversation", {
+        type: "invitation",
+        founderId,
+        founderName: user.name,
+        talentId,
+        startupId,
+        startupTitle,
+        message: `New invitation from ${user.name} at ${startupTitle}`,
+      });
+      toast.success(`Invitation sent to ${invitation.talentName}!`);
+    } catch (err) {
+      console.error("Failed to send invitation:", err);
+      const msg = String(err?.message || "");
+      if (msg.toLowerCase().includes("already sent")) {
+        toast.error(msg);
+      } else {
+        toast.error("Failed to send invitation. Please try again.");
+      }
+      throw err;
+    }
+  };
 
   const renderPageContent = () => {
     // Only render pages outside Virtual Office when explicitly navigated to
@@ -447,108 +564,25 @@ export default function DashboardHybrid({ user, onLogout, onUpdateUser }) {
         return (
           <Suspense fallback={<PageLoadingFallback />}>
             <TalentProfilePage
-              talent={
-                selectedTalent ||
-                (urlTalentId ? { id: urlTalentId, userId: urlTalentId } : null)
-              }
+              talent={activeTalentProfile}
+              talentId={urlTalentId || messageUserId || null}
               currentUser={user}
+              returnToChat={returnToChat || profileFromChat}
+              messageUserId={messageUserId || urlTalentId || null}
+              onNavigate={handleNavigate}
               onBack={() => {
                 setSelectedTalent(null);
+                if (returnToChat || profileFromChat) {
+                  const chatPage =
+                    user.role === "talent" ? "talent-chat" : "founder-chat";
+                  handleNavigate(chatPage, {
+                    messageUserId: messageUserId || urlTalentId || undefined,
+                  });
+                  return;
+                }
                 handleNavigate("team-matching");
               }}
-              onSendInvitation={async (message) => {
-                if (!selectedTalent || !user) return;
-
-                const founderId = String(user._id ?? user.id ?? "");
-                const talentId = String(
-                  selectedTalent.userId?._id ??
-                  selectedTalent.userId ??
-                  selectedTalent.user?._id ??
-                  selectedTalent.user?.id ??
-                  selectedTalent._id ??
-                  selectedTalent.id ??
-                  "",
-                );
-                if (!talentId) {
-                  toast.error("Unable to identify this talent profile. Please refresh and try again.");
-                  return;
-                }
-
-                let founderStartup = null;
-                try {
-                  const postsRes = await founderApi.getAllPosts();
-                  if (postsRes?.success && Array.isArray(postsRes.posts)) {
-                    founderStartup = postsRes.posts.find(
-                      (post) => String(post.founderId ?? "") === founderId,
-                    );
-                  }
-                } catch (error) {
-                  console.error("Failed to verify founder startup before invitation:", error);
-                }
-
-                if (!founderStartup) {
-                  toast.error("Please launch your startup before browsing talent or sending invites.");
-                  handleNavigate("post-startup");
-                  return;
-                }
-
-                const startupId =
-                  String(founderStartup._id ?? founderStartup.id ?? "") ||
-                  String(user.startupId ?? user.companyId ?? "");
-                const startupTitle = String(
-                  founderStartup.title ||
-                    founderStartup.startupTitle ||
-                    founderStartup.companyName ||
-                    user.startupName ||
-                    user.companyName ||
-                    "",
-                ).trim();
-
-                if (!startupTitle) {
-                  toast.error("Please complete your startup post title before sending invitations.");
-                  handleNavigate("post-startup");
-                  return;
-                }
-
-                const invitation = {
-                  id: `inv_${Date.now()}_${founderId}`,
-                  startupId,
-                  startupTitle,
-                  founderId,
-                  founderName: user.name,
-                  talentId,
-                  talentName: selectedTalent.fullName || selectedTalent.name,
-                  message,
-                  role: selectedTalent.professionalTitle || "Team Member",
-                  sentAt: new Date().toISOString(),
-                  status: "pending",
-                };
-
-                try {
-                  await inboxApi.sendInvitation(invitation);
-
-                  // 🔥 REALTIME: Broadcast to talent that new chat connection is available
-                  await broadcastMessageUpdate(null, "new_conversation", {
-                    type: "invitation",
-                    founderId,
-                    founderName: user.name,
-                    talentId,
-                    startupId,
-                    startupTitle,
-                    message: `New invitation from ${user.name} at ${startupTitle}`,
-                  });
-
-                  toast.success(`Invitation sent to ${invitation.talentName}!`);
-                } catch (err) {
-                  console.error("Failed to send invitation:", err);
-                  const msg = String(err?.message || "");
-                  if (msg.toLowerCase().includes("already sent")) {
-                    toast.error(msg);
-                  } else {
-                    toast.error("Failed to send invitation. Please try again.");
-                  }
-                }
-              }}
+              onSendInvitation={sendTalentInvitation}
             />
           </Suspense>
         );
@@ -613,7 +647,19 @@ export default function DashboardHybrid({ user, onLogout, onUpdateUser }) {
                 urlStartupId ||
                 ""
               }
+              returnToChat={returnToChat || profileFromChat}
+              messageUserId={messageUserId || null}
               onNavigate={handleNavigate}
+              onBack={() => {
+                setSelectedStartup(null);
+                if (returnToChat || profileFromChat) {
+                  handleNavigate("talent-chat", {
+                    messageUserId: messageUserId || undefined,
+                  });
+                  return;
+                }
+                handleNavigate(user.role === "talent" ? "browse-startups" : "team-matching");
+              }}
             />
           </Suspense>
         );

@@ -15,6 +15,7 @@ import {
   ArrowLeft,
   MessageSquare,
   Video,
+  ChevronRight,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -43,6 +44,59 @@ import {
   chatThreadPaneClass,
   sidebarRowClass,
 } from "../messaging/chatStyles";
+
+function getPeerHeaderSubtitle(member, { embedded, isOnline }) {
+  if (member?.location) return member.location;
+  if (embedded) return isOnline ? "Online" : "Offline";
+  return member?.title || member?.role || "Founder";
+}
+
+function ChatPeerHeaderButton({
+  member,
+  displayName,
+  peerUserId,
+  embedded = false,
+  isOnline = false,
+  onViewPeerProfile,
+  children,
+}) {
+  const subtitle = getPeerHeaderSubtitle(member, { embedded, isOnline });
+  const canViewProfile =
+    Boolean(onViewPeerProfile) &&
+    peerUserId &&
+    typeof onViewPeerProfile === "function";
+
+  const content = (
+    <>
+      {children}
+      <div className="min-w-0 flex-1 text-left">
+        <p className="truncate font-heading text-sm font-semibold text-text-heading">
+          {displayName}
+        </p>
+        <p className="truncate font-body text-xs text-text-muted">{subtitle}</p>
+      </div>
+      {canViewProfile ? (
+        <ChevronRight className="h-4 w-4 shrink-0 text-text-muted opacity-0 transition-opacity group-hover:opacity-100" />
+      ) : null}
+    </>
+  );
+
+  if (!canViewProfile) {
+    return <div className="flex min-w-0 flex-1 items-center gap-2.5">{content}</div>;
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={() => onViewPeerProfile(peerUserId)}
+      className="group -mx-1 flex min-w-0 flex-1 items-center gap-2.5 rounded-input px-1 py-0.5 text-left transition-colors hover:bg-surface-page/80"
+      aria-label={`View ${displayName}'s profile`}
+    >
+      {content}
+    </button>
+  );
+}
+
 export function SimpleTeamMessaging({
   onClose,
   onStartCall,
@@ -55,6 +109,7 @@ export function SimpleTeamMessaging({
   onActivity,
   initialSelectedUserId = null,
   onSelectedPeerChange,
+  onViewPeerProfile = null,
   embedded = false,
   fullPage = false,
   strictMode = false,
@@ -549,24 +604,23 @@ export function SimpleTeamMessaging({
                       <ArrowLeft className="h-4 w-4" />
                     </Button>
                   )}
-                  <Avatar className="h-8 w-8 shrink-0 rounded-card">
-                    <AvatarFallback className={avatarFallbackClass()}>
-                      {String(selectedMember?.name || selectedConversation || "?")
-                        .split(" ")
-                        .map((n) => n[0])
-                        .join("")
-                        .substring(0, 2)
-                        .toUpperCase()}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate font-heading text-sm font-semibold text-text-heading">
-                      {selectedDisplayName}
-                    </p>
-                    <p className="truncate font-body text-xs text-text-muted">
-                      {selectedMember?.title || "Founder"}
-                    </p>
-                  </div>
+                  <ChatPeerHeaderButton
+                    member={selectedMember}
+                    displayName={selectedDisplayName}
+                    peerUserId={selectedConversation}
+                    onViewPeerProfile={onViewPeerProfile}
+                  >
+                    <Avatar className="h-8 w-8 shrink-0 rounded-card">
+                      <AvatarFallback className={avatarFallbackClass()}>
+                        {String(selectedMember?.name || selectedConversation || "?")
+                          .split(" ")
+                          .map((n) => n[0])
+                          .join("")
+                          .substring(0, 2)
+                          .toUpperCase()}
+                      </AvatarFallback>
+                    </Avatar>
+                  </ChatPeerHeaderButton>
                   {onStartVideoCall &&
                     selectedConversation &&
                     selectedConversation !== currentUserId && (
@@ -779,45 +833,47 @@ export function SimpleTeamMessaging({
               />
             ) : (
               <div className="office-panel-header flex items-center justify-between px-3 py-3">
-                <div className="flex items-center gap-2 flex-1 min-w-0">
+                <div className="flex min-w-0 flex-1 items-center gap-2">
                   <Button
                     size="sm"
                     variant="ghost"
-                    className="h-8 w-8 p-0 flex-shrink-0"
+                    className="h-8 w-8 shrink-0 p-0"
                     onClick={() => selectConversation(null)}
                   >
                     <ArrowLeft className="w-4 h-4" />
                   </Button>
-                  <div className="relative flex-shrink-0">
-                    <Avatar className="w-8 h-8">
-                      <AvatarFallback className="text-[10px] font-medium bg-blue-600 text-white">
-                        {String(selectedConv?.userName || selectedConversation || "?")
-                          .split(" ")
-                          .map((n) => n[0])
-                          .join("")
-                          .substring(0, 2)
-                          .toUpperCase()}
-                      </AvatarFallback>
-                    </Avatar>
-                    {getOnlineStatus(selectedConversation) && (
-                      <div className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-green-500 rounded-full border-2 border-white" />
-                    )}
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <h3 className="text-xs font-semibold text-gray-900 truncate">
-                      {(() => {
-                        const name = selectedConv?.userName ||
-                          stableMembers.find((m) => m.id === selectedConversation)?.name ||
-                          "Unknown";
-                        return selectedConversation === currentUserId ? `${name} (You)` : name;
-                      })()}
-                    </h3>
-                    <p className="text-[10px] text-gray-500">
-                      {getOnlineStatus(selectedConversation)
-                        ? "Online"
-                        : "Offline"}
-                    </p>
-                  </div>
+                  <ChatPeerHeaderButton
+                    member={stableMembers.find((m) => m.id === selectedConversation)}
+                    displayName={(() => {
+                      const name =
+                        selectedConv?.userName ||
+                        stableMembers.find((m) => m.id === selectedConversation)?.name ||
+                        "Unknown";
+                      return selectedConversation === currentUserId ? `${name} (You)` : name;
+                    })()}
+                    peerUserId={
+                      selectedConversation === currentUserId ? null : selectedConversation
+                    }
+                    embedded={true}
+                    isOnline={getOnlineStatus(selectedConversation)}
+                    onViewPeerProfile={onViewPeerProfile}
+                  >
+                    <div className="relative shrink-0">
+                      <Avatar className="h-8 w-8">
+                        <AvatarFallback className="bg-primary text-[10px] font-medium text-white">
+                          {String(selectedConv?.userName || selectedConversation || "?")
+                            .split(" ")
+                            .map((n) => n[0])
+                            .join("")
+                            .substring(0, 2)
+                            .toUpperCase()}
+                        </AvatarFallback>
+                      </Avatar>
+                      {getOnlineStatus(selectedConversation) && (
+                        <div className="absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full border-2 border-white bg-status-success" />
+                      )}
+                    </div>
+                  </ChatPeerHeaderButton>
                 </div>
                 <Button
                   size="sm"

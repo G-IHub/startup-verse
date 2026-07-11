@@ -44,6 +44,7 @@ import { Checkbox } from "./ui/checkbox";
 import { toast } from "sonner";
 import * as founderApi from "../utils/api/founderApi";
 import * as inboxApi from "../utils/api/inboxApi";
+import * as teamMemberApi from "../utils/api/teamMemberApi";
 import * as compensationApi from "../utils/api/compensationApi";
 import { buildFounderProfile } from "../app/session.js";
 import {
@@ -209,6 +210,17 @@ export default function TeamMatching({ user, onNavigate }) {
     loadTalentProfiles();
   }, [user.role, user.id, founderPostsStatus]);
 
+  React.useEffect(() => {
+    if (user.role !== "founder") return;
+    if (founderPostsStatus !== "has-post") return;
+    const onFocus = () => {
+      loadTalentProfiles();
+      loadPendingOnboarding();
+    };
+    window.addEventListener("focus", onFocus);
+    return () => window.removeEventListener("focus", onFocus);
+  }, [user.role, user.id, founderPostsStatus]);
+
   // Generate smart recommendations for founders
   React.useEffect(() => {
     if (user.role === "founder" && user.profile && user.onboardingComplete) {
@@ -280,38 +292,63 @@ export default function TeamMatching({ user, onNavigate }) {
     return { ...fp, neededRoles };
   }
 
-  const loadTalentProfiles = () => {
+  const loadTalentProfiles = async () => {
     console.log("🔍 [TeamMatching] Loading talent profiles...");
     console.log("🌐 [TeamMatching] Fetching talent profiles from backend...");
-    fetch(`${API_BASE_URL}/talent/profiles`, defaultOptions)
-      .then((res) => res.json())
-      .then((data) => {
-        console.log("✅ [TeamMatching] Backend talent response:", data);
-        const rawProfiles = data.data || data.profiles || [];
-        if (!data.success || !Array.isArray(rawProfiles)) {
-          setAvailableTalent([]);
-          return;
-        }
-        const normalized = rawProfiles.map(normalizeTalentProfile).filter(Boolean);
-        const matchSource = founderProfileForTalentMatching(user);
-        if (user.role === "founder" && matchSource) {
-          const scoredProfiles = normalized.map((talent) => ({
-            ...talent,
-            matchScore: calculateTalentMatchScore(talent, matchSource),
-          }));
-          scoredProfiles.sort((a, b) => b.matchScore - a.matchScore);
-          setAvailableTalent(scoredProfiles);
-        } else {
-          setAvailableTalent(normalized);
-        }
-      })
-      .catch((error) => {
-        console.error(
-          "❌ [TeamMatching] Failed to fetch talent profiles from backend:",
-          error,
-        );
+    try {
+      const res = await fetch(`${API_BASE_URL}/talent/profiles`, defaultOptions);
+      const data = await res.json();
+      console.log("✅ [TeamMatching] Backend talent response:", data);
+      const rawProfiles = data.data || data.profiles || [];
+      if (!data.success || !Array.isArray(rawProfiles)) {
         setAvailableTalent([]);
-      });
+        return;
+      }
+      let normalized = rawProfiles.map(normalizeTalentProfile).filter(Boolean);
+
+      if (user.role === "founder") {
+        const founderKey = String(user._id ?? user.id ?? "");
+        const scopeId = String(user.startupId ?? founderKey);
+        try {
+          const teamMembers = await teamMemberApi.getStartupTeamMembers(scopeId);
+          const excludedIds = new Set(
+            (teamMembers || []).map((member) =>
+              String(member.id || member.userId || member._id || ""),
+            ),
+          );
+          normalized = normalized.filter((talent) => {
+            const talentUserId = String(
+              talent.userId?._id ||
+                talent.userId ||
+                talent.id ||
+                talent._id ||
+                "",
+            );
+            return talentUserId && !excludedIds.has(talentUserId);
+          });
+        } catch (error) {
+          console.warn("[TeamMatching] Could not filter team members client-side:", error);
+        }
+      }
+
+      const matchSource = founderProfileForTalentMatching(user);
+      if (user.role === "founder" && matchSource) {
+        const scoredProfiles = normalized.map((talent) => ({
+          ...talent,
+          matchScore: calculateTalentMatchScore(talent, matchSource),
+        }));
+        scoredProfiles.sort((a, b) => b.matchScore - a.matchScore);
+        setAvailableTalent(scoredProfiles);
+      } else {
+        setAvailableTalent(normalized);
+      }
+    } catch (error) {
+      console.error(
+        "❌ [TeamMatching] Failed to fetch talent profiles from backend:",
+        error,
+      );
+      setAvailableTalent([]);
+    }
   };
 
   const loadPendingOnboarding = async () => {

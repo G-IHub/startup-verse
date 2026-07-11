@@ -19,7 +19,6 @@ import {
 import { Button } from "../ui/button";
 import { ScrollArea } from "../ui/scroll-area";
 import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
-import { Separator } from "../ui/separator";
 import { useNotifications } from "../../contexts/NotificationContext";
 import { useAuth } from "../../contexts/AuthContext";
 import { parseDeepLink } from "../../app/deepLinks";
@@ -294,58 +293,65 @@ export default function NotificationCenter({ onNavigate }) {
           </Button>
         </PopoverTrigger>
         <PopoverContent
-          className="w-[min(100vw-2rem,28rem)] overflow-hidden rounded-card border border-surface-border bg-surface-card p-0 shadow-(--shadow-soft)"
+          className="flex w-[min(100vw-2rem,22rem)] flex-col overflow-hidden rounded-card border border-surface-border bg-surface-card p-0 shadow-card"
           align="end"
           sideOffset={8}
         >
-          <div className="flex items-center justify-between border-b border-surface-border/80 bg-surface-page/40 px-3 py-2.5">
-            <div>
-              <h3 className="font-heading text-sm font-bold text-text-heading">
-                Notifications
-              </h3>
-              <p className="font-body text-xs text-text-muted">
-                {unreadCount > 0 ? `${unreadCount} unread` : "All caught up!"}
-              </p>
+          <div className="flex shrink-0 items-center justify-between border-b border-surface-border/80 px-4 py-3">
+            <div className="flex items-center gap-2.5">
+              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-input bg-primary/10">
+                <Bell className="h-4 w-4 text-primary" strokeWidth={1.75} />
+              </div>
+              <div>
+                <h3 className="font-heading text-sm font-semibold leading-tight text-text-heading">
+                  Notifications
+                </h3>
+                <p className="font-body text-[11px] leading-tight text-text-muted">
+                  {unreadCount > 0 ? `${unreadCount} unread` : "All caught up"}
+                </p>
+              </div>
             </div>
             {notifications.length > 0 && (
-              <div className="flex gap-1">
+              <div className="flex gap-0.5">
                 {unreadCount > 0 && (
                   <Button
                     variant="ghost"
                     size="sm"
                     onClick={markAllAsRead}
-                    className="h-7 px-2.5 text-[11px]"
+                    className="h-7 px-2 text-[11px] font-normal text-text-body"
                   >
-                    <Check className="mr-1 h-3 w-3" />
-                    Mark all read
+                    <Check className="h-3 w-3" />
+                    Mark read
                   </Button>
                 )}
                 <Button
                   variant="ghost"
                   size="icon"
                   onClick={clearAll}
-                  className="h-7 w-7"
+                  className="h-7 w-7 text-text-muted"
+                  aria-label="Clear all notifications"
                 >
                   <Trash2 className="h-3.5 w-3.5" />
                 </Button>
               </div>
             )}
           </div>
-          <ScrollArea className="h-[360px]">
-            {notifications.length === 0 ? (
-              <div className="flex flex-col items-center justify-center px-4 py-10">
-                <div className="mb-2 flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
-                  <Bell className="h-6 w-6 text-primary" />
-                </div>
-                <p className="mb-1 font-body text-[13px] font-semibold text-text-heading">
-                  No notifications yet
-                </p>
-                <p className="text-center font-body text-[12px] text-text-muted">
-                  Invites, interests, messages, and team updates will show up here
-                </p>
+
+          {notifications.length === 0 ? (
+            <div className="flex flex-col items-center px-6 py-8 text-center">
+              <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-primary/12 to-accent/8 ring-1 ring-primary/10">
+                <Bell className="h-5 w-5 text-primary/80" strokeWidth={1.5} />
               </div>
-            ) : (
-              <div className="px-1.5 py-1.5">
+              <p className="mb-1 font-heading text-[13px] font-semibold text-text-heading">
+                No notifications yet
+              </p>
+              <p className="max-w-[16rem] font-body text-[12px] leading-relaxed text-text-muted">
+                Invites, interests, messages, and team updates will show up here
+              </p>
+            </div>
+          ) : (
+            <ScrollArea className="h-[min(360px,50vh)]">
+              <div className="px-2 py-2">
                 {notifications.map((notification) =>
                   isInviteNotificationType(notification.type) ? (
                     <NotificationInviteRow
@@ -419,36 +425,38 @@ export default function NotificationCenter({ onNavigate }) {
                   ),
                 )}
               </div>
-            )}
-          </ScrollArea>
-          <Separator />
-          <div className="flex flex-col gap-1 p-2">
-            {isFounder ? (
+            </ScrollArea>
+          )}
+
+          <div className="shrink-0 border-t border-surface-border/80 bg-surface-page/50 px-2 py-2">
+            <div className="flex flex-col gap-0.5">
+              {isFounder ? (
+                <Button
+                  variant="ghost"
+                  className="h-8 w-full justify-start gap-2 px-2.5 text-[11px] font-normal text-text-body hover:text-text-heading"
+                  size="sm"
+                  onClick={() => {
+                    setComposerOpen(true);
+                    setOpen(false);
+                  }}
+                >
+                  <Building2 className="h-3.5 w-3.5 shrink-0 text-text-muted" />
+                  Message organization
+                </Button>
+              ) : null}
               <Button
                 variant="ghost"
-                className="w-full justify-start text-xs"
+                className="h-8 w-full justify-start gap-2 px-2.5 text-[11px] font-normal text-text-body hover:text-text-heading"
                 size="sm"
                 onClick={() => {
-                  setComposerOpen(true);
                   setOpen(false);
+                  onNavigate?.("settings");
                 }}
               >
-                <Building2 className="mr-1 h-3 w-3" />
-                Message organization
+                <Settings className="h-3.5 w-3.5 shrink-0 text-text-muted" />
+                Notification settings
               </Button>
-            ) : null}
-            <Button
-              variant="ghost"
-              className="w-full text-xs"
-              size="sm"
-              onClick={() => {
-                setOpen(false);
-                onNavigate?.("settings");
-              }}
-            >
-              <Settings className="mr-1 h-3 w-3" />
-              Notification Settings
-            </Button>
+            </div>
           </div>
         </PopoverContent>
       </Popover>

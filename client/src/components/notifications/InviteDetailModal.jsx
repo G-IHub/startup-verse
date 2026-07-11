@@ -27,6 +27,7 @@ import { ChatComposer } from "../messaging/ChatComposer";
 import { MessageAttachmentBubble } from "../messaging/MessageAttachmentBubble";
 import { normalizeMessageAttachments } from "../../utils/messageAttachmentUtils";
 import CompensationSetupWizard from "../compensation/CompensationSetupWizard";
+import InvitationAcceptanceConfirmDialog from "./InvitationAcceptanceConfirmDialog";
 import { getStartupId } from "../../utils/startupId";
 import { useInboxActions, resolveInboxItem } from "../../hooks/useInboxActions";
 import { isOrgInboxMessage } from "../../utils/inboxItemKind";
@@ -99,7 +100,6 @@ export default function InviteDetailModal({
   const [item, setItem] = useState(initialItem ? normalizeInboxItem(initialItem) : null);
   const [loading, setLoading] = useState(false);
   const [pendingInvitationAcceptance, setPendingInvitationAcceptance] = useState(null);
-  const [acceptanceConfirmed, setAcceptanceConfirmed] = useState(false);
   const [showOnboardingWizard, setShowOnboardingWizard] = useState(false);
   const [onboardingTalent, setOnboardingTalent] = useState(null);
 
@@ -158,7 +158,6 @@ export default function InviteDetailModal({
 
   const close = () => {
     setPendingInvitationAcceptance(null);
-    setAcceptanceConfirmed(false);
     onOpenChange?.(false);
   };
 
@@ -180,7 +179,6 @@ export default function InviteDetailModal({
   const handleReviewStartupBeforeAccept = () => {
     if (!pendingInvitationAcceptance?.startupId || !onNavigate) return;
     setPendingInvitationAcceptance(null);
-    setAcceptanceConfirmed(false);
     close();
     onNavigate("startup-detail", {
       startupId: pendingInvitationAcceptance.startupId,
@@ -464,10 +462,7 @@ export default function InviteDetailModal({
                   {isInv ? (
                     <div className="flex gap-2">
                       <Button
-                        onClick={() => {
-                          setPendingInvitationAcceptance(selectedItem);
-                          setAcceptanceConfirmed(false);
-                        }}
+                        onClick={() => setPendingInvitationAcceptance(selectedItem)}
                         className={`flex-1 ${INBOX_PRIMARY_BTN}`}
                         disabled={isSending}
                       >
@@ -725,108 +720,18 @@ export default function InviteDetailModal({
         )}
       </Dialog>
 
-      <Dialog
+      <InvitationAcceptanceConfirmDialog
         open={Boolean(pendingInvitationAcceptance)}
         onOpenChange={(next) => {
-          if (!next) {
-            setPendingInvitationAcceptance(null);
-            setAcceptanceConfirmed(false);
-          }
+          if (!next) setPendingInvitationAcceptance(null);
         }}
-      >
-        <DialogContent className="max-w-xl rounded-card border border-surface-border bg-surface-card shadow-modal">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 font-heading text-text-heading">
-              <CheckCircle2 className="h-5 w-5 text-primary" />
-              Review invitation terms
-            </DialogTitle>
-            <DialogDescription className="font-body text-sm text-text-body">
-              Accepting this invitation means you confirm that you have reviewed the
-              startup information, compensation or equity expectations, and the
-              opportunity details shared by the startup.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div className={INBOX_CALLOUT}>
-              <div className="space-y-1">
-                <p className="font-heading text-base font-semibold text-text-heading">
-                  {pendingInvitationAcceptance?.companyName ||
-                    pendingInvitationAcceptance?.startupTitle ||
-                    "Startup invitation"}
-                </p>
-                <p className="font-body text-sm text-text-body">
-                  Invited by {pendingInvitationAcceptance?.founderName || "Founder"}
-                </p>
-              </div>
-            </div>
-            <button
-              type="button"
-              onClick={() => setAcceptanceConfirmed((prev) => !prev)}
-              className="flex w-full items-start gap-3 rounded-input border border-surface-border bg-surface-card p-4 text-left transition-colors duration-200 ease-in-out hover:border-primary hover:bg-primary-tint/40"
-            >
-              <span
-                className={`mt-0.5 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded border transition-colors duration-200 ${
-                  acceptanceConfirmed
-                    ? "border-primary bg-primary text-white"
-                    : "border-surface-border bg-surface-card text-transparent"
-                }`}
-              >
-                <CheckCircle2 className="h-3.5 w-3.5" />
-              </span>
-              <span>
-                <span className="block font-body text-sm font-semibold text-text-heading">
-                  I understand and agree to proceed based on the startup information
-                  provided
-                </span>
-              </span>
-            </button>
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <Button
-                type="button"
-                variant="outline"
-                className={INBOX_OUTLINE_BTN}
-                onClick={handleReviewStartupBeforeAccept}
-                disabled={!pendingInvitationAcceptance?.startupId}
-              >
-                <ExternalLink className="mr-2 h-4 w-4 text-primary" />
-                Review startup post
-              </Button>
-              <div className="flex items-center gap-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  className={INBOX_OUTLINE_BTN}
-                  onClick={() => {
-                    setPendingInvitationAcceptance(null);
-                    setAcceptanceConfirmed(false);
-                  }}
-                >
-                  Cancel
-                </Button>
-                <Button
-                  type="button"
-                  className={INBOX_PRIMARY_BTN}
-                  disabled={!acceptanceConfirmed || isSending}
-                  onClick={() => {
-                    if (!pendingInvitationAcceptance) return;
-                    void actions.respondToInvitation(
-                      pendingInvitationAcceptance,
-                      "accept",
-                    );
-                  }}
-                >
-                  {isSending ? (
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  ) : (
-                    <CheckCircle2 className="mr-2 h-4 w-4" />
-                  )}
-                  Confirm Acceptance
-                </Button>
-              </div>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
+        invitation={pendingInvitationAcceptance}
+        isSending={isSending}
+        onConfirm={(invitation) => {
+          void actions.respondToInvitation(invitation, "accept");
+        }}
+        onReviewStartup={handleReviewStartupBeforeAccept}
+      />
 
       {onboardingTalent ? (
         <CompensationSetupWizard

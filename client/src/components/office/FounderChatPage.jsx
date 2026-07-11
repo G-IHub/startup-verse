@@ -111,6 +111,15 @@ export default function FounderChatPage({
         }}
         onStartVideoCall={(peerUserId) => startDirectCall(peerUserId)}
         strictMode={true}
+        onViewPeerProfile={(peerUserId) => {
+          if (!peerUserId) return;
+          onNavigate?.("talent-profile", {
+            talentId: peerUserId,
+            returnToChat: true,
+            profileFromChat: true,
+            messageUserId: peerUserId,
+          });
+        }}
       />
     </div>
   );

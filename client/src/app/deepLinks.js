@@ -198,17 +198,29 @@ export function parseDeepLink(url, metadata = {}, role = "founder") {
 
   if (pathname === "/startup-detail" || pathname.startsWith("/startup-detail")) {
     const id = params.get("id") || meta.startupId || "";
+    const fromChat = params.get("from") === "chat";
+    const withUser = params.get("with") || meta.messageUserId || "";
     return {
       page: "startup-detail",
-      ...(id ? { options: { startupId: String(id) } } : {}),
+      options: {
+        ...(id ? { startupId: String(id) } : {}),
+        ...(fromChat ? { returnToChat: true, profileFromChat: true } : {}),
+        ...(withUser ? { messageUserId: String(withUser) } : {}),
+      },
     };
   }
 
   if (pathname === "/talent-profile" || pathname.startsWith("/talent-profile")) {
     const id = params.get("id") || meta.talentId || meta.userId || "";
+    const fromChat = params.get("from") === "chat";
+    const withUser = params.get("with") || meta.messageUserId || "";
     return {
       page: "talent-profile",
-      ...(id ? { options: { talentId: String(id) } } : {}),
+      options: {
+        ...(id ? { talentId: String(id) } : {}),
+        ...(fromChat ? { returnToChat: true, profileFromChat: true } : {}),
+        ...(withUser ? { messageUserId: String(withUser) } : {}),
+      },
     };
   }
 

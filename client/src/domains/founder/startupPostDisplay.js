@@ -116,6 +116,30 @@ export function hydrateStartupPostForDisplay(post) {
   };
 }
 
+/** True when the post object already has enough fields to render detail (not an id-only stub). */
+export function isStartupPostReadyForDisplay(post) {
+  if (!post || typeof post !== "object") return false;
+  const hydrated = hydrateStartupPostForDisplay(post);
+  return Boolean(
+    String(hydrated.title || "").trim() ||
+      String(hydrated.description || "").trim() ||
+      String(hydrated.tagline || "").trim(),
+  );
+}
+
+export function findStartupPostInList(posts, needle) {
+  const id = String(needle || "").trim();
+  if (!id || !Array.isArray(posts)) return null;
+  return (
+    posts.find((p) => {
+      const candidates = [p.id, p._id, p.startupId]
+        .filter(Boolean)
+        .map(String);
+      return candidates.includes(id);
+    }) || null
+  );
+}
+
 export function hasStartupLinks(startup) {
   if (!startup) return false;
   return Boolean(

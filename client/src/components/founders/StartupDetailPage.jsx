@@ -7,6 +7,11 @@ import { toast } from "sonner";
 import * as founderApi from "../../utils/api/founderApi";
 import * as inboxApi from "../../utils/api/inboxApi";
 import { broadcastMessageUpdate } from "../../utils/realtimeSubscriptions";
+import PeerActionCard from "../profile/PeerActionCard";
+import { usePeerRelationship } from "../../hooks/usePeerRelationship";
+import { useInboxActions } from "../../hooks/useInboxActions";
+import { normalizeInboxItem } from "../../utils/inboxNormalize";
+import InvitationAcceptanceConfirmDialog from "../notifications/InvitationAcceptanceConfirmDialog";
 import { StartupAvatar } from "./StartupBrandingFields";
 import {
   formatEquityRange,
@@ -15,6 +20,8 @@ import {
   hasCompensationDetails,
   hasStartupLinks,
   hydrateStartupPostForDisplay,
+  isStartupPostReadyForDisplay,
+  findStartupPostInList,
   normalizeLookingFor,
   normalizeTags,
   resolveBrandAccent,
@@ -99,59 +106,152 @@ const SALARY_APPROACHES = {
   competitive: "Competitive (Market rate)",
 };
 
+async function resolveStartupPostRecord(postId, founderUserId = "") {
+  const needle = String(postId || "").trim();
+  if (!needle) return null;
+
+  if (founderUserId) {
+    try {
+      const founderPosts = await founderApi.getFounderPosts(founderUserId);
+      const list = Array.isArray(founderPosts?.posts)
+        ? founderPosts.posts
+        : Array.isArray(founderPosts)
+          ? founderPosts
+          : [];
+      const fromFounder = findStartupPostInList(list, needle);
+      if (fromFounder) return fromFounder;
+    } catch (error) {
+      console.warn("[StartupDetailPage] Founder posts lookup failed:", error);
+    }
+  }
+
+  let page = 1;
+  const pageSize = 100;
+  while (page <= 10) {
+    const response = await founderApi.getAllPosts({ page, pageSize });
+    const list = response?.posts || [];
+    const found = findStartupPostInList(list, needle);
+    if (found) return found;
+    if (!response?.pagination?.hasNext || list.length < pageSize) break;
+    page += 1;
+  }
+
+  return null;
+}
+
+function StartupDetailSkeleton() {
+  return (
+    <div className="min-h-screen bg-surface-page">
+      <div className="mx-auto max-w-5xl animate-pulse px-6 py-8 pb-28">
+        <div className="mb-6 h-9 w-36 rounded-input bg-surface-border/60" />
+        <div className="mb-6 rounded-card border border-surface-border bg-surface-card p-6">
+          <div className="flex gap-4">
+            <div className="h-20 w-20 shrink-0 rounded-card bg-surface-border/50" />
+            <div className="flex-1 space-y-3">
+              <div className="h-7 w-2/3 rounded bg-surface-border/50" />
+              <div className="h-4 w-1/3 rounded bg-surface-border/40" />
+              <div className="h-4 w-1/2 rounded bg-surface-border/40" />
+            </div>
+          </div>
+        </div>
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+          <div className="space-y-6 lg:col-span-2">
+            <div className="h-48 rounded-card border border-surface-border bg-surface-card" />
+            <div className="h-36 rounded-card border border-surface-border bg-surface-card" />
+          </div>
+          <div className="h-64 rounded-card border border-surface-border bg-surface-card" />
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function StartupDetailPage({
   user,
   onNavigate,
+  onBack,
   startup: startupProp,
   startupId = "",
   previewMode = false,
   onPreviewBack,
+  returnToChat = false,
+  messageUserId = null,
 }) {
-  const [startup, setStartup] = useState(startupProp || null);
-  const [loading, setLoading] = useState(Boolean(!startupProp && startupId));
+  const [startup, setStartup] = useState(
+    isStartupPostReadyForDisplay(startupProp)
+      ? hydrateStartupPostForDisplay(startupProp)
+      : null,
+  );
+  const [loading, setLoading] = useState(true);
   const [isFavorite, setIsFavorite] = useState(false);
   const [showInterestForm, setShowInterestForm] = useState(false);
   const [interestMessage, setInterestMessage] = useState("");
   const [sendingInterest, setSendingInterest] = useState(false);
   const [interestSent, setInterestSent] = useState(false);
+  const [inviteActionBusy, setInviteActionBusy] = useState(false);
+  const [pendingInvitationAcceptance, setPendingInvitationAcceptance] = useState(null);
+
+  const founderPeerId = String(
+    messageUserId || startupProp?.founderId || startup?.founderId || "",
+  );
+  const relationship = usePeerRelationship(user, founderPeerId);
+  const inboxActions = useInboxActions({ user, onNavigate });
 
   useEffect(() => {
-    if (!startupProp && startupId) {
-      fetchStartup(startupId);
-      return;
-    }
-    if (!startupProp) {
-      setLoading(false);
-    }
-    if (startupProp) {
-      setStartup(hydrateStartupPostForDisplay(startupProp));
-    }
-  }, [startupProp, startupId]);
+    let cancelled = false;
 
-  const fetchStartup = async (id) => {
-    try {
-      const response = await founderApi.getAllPosts();
-      if (response.success && response.posts) {
-        const needle = String(id);
-        const found = response.posts.find((p) => {
-          const candidates = [p.id, p._id, p.startupId]
-            .filter(Boolean)
-            .map(String);
-          return candidates.includes(needle);
-        });
-        if (found) {
-          setStartup(hydrateStartupPostForDisplay(found));
-        } else {
-          toast.error("Startup not found");
+    const loadStartup = async () => {
+      const resolvedId = String(
+        startupId || startupProp?.id || startupProp?._id || "",
+      ).trim();
+
+      if (isStartupPostReadyForDisplay(startupProp)) {
+        if (!cancelled) {
+          setStartup(hydrateStartupPostForDisplay(startupProp));
+          setLoading(false);
         }
+        return;
       }
-    } catch (error) {
-      console.error("Error fetching startup:", error);
-      toast.error("Failed to load startup details");
-    } finally {
-      setLoading(false);
-    }
-  };
+
+      if (!resolvedId) {
+        if (!cancelled) setLoading(false);
+        return;
+      }
+
+      if (!cancelled) setLoading(true);
+
+      try {
+        const found = await resolveStartupPostRecord(
+          resolvedId,
+          messageUserId || startupProp?.founderId || "",
+        );
+        if (!cancelled) {
+          if (found) {
+            setStartup(hydrateStartupPostForDisplay(found));
+          } else {
+            setStartup(null);
+            toast.error("Startup not found");
+          }
+        }
+      } catch (error) {
+        console.error("Error fetching startup:", error);
+        if (!cancelled) {
+          setStartup(null);
+          toast.error("Failed to load startup details");
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    };
+
+    void loadStartup();
+    return () => {
+      cancelled = true;
+    };
+  }, [startupProp, startupId, messageUserId]);
+
+  const isTalent = user?.role === "talent";
+  const pageReady = !loading && (!isTalent || !relationship.loading);
 
   const handleSendInterest = async () => {
     if (!interestMessage.trim()) {
@@ -230,15 +330,8 @@ export function StartupDetailPage({
     });
   };
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-surface-page flex items-center justify-center">
-        <div className="text-center space-y-3">
-          <div className="w-10 h-10 border-3 border-primary border-t-transparent rounded-full animate-spin mx-auto" />
-          <p className="text-text-muted text-sm">Loading startup details...</p>
-        </div>
-      </div>
-    );
+  if (!pageReady) {
+    return <StartupDetailSkeleton />;
   }
 
   if (!startup) {
@@ -256,7 +349,6 @@ export function StartupDetailPage({
   const isOwnStartup =
     !previewMode &&
     (user?.id === startup.founderId || user?._id === startup.founderId);
-  const isTalent = user?.role === "talent";
   const showInterestChrome = previewMode || (!isOwnStartup && isTalent);
   const brandAccent = resolveBrandAccent(startup.brandColor);
   const lookingForRoles = normalizeLookingFor(startup.lookingFor);
@@ -271,11 +363,48 @@ export function StartupDetailPage({
   const compensationCurrencyLabel = getCompensationCurrencyLabel(startup.offer);
 
   const handleBack = () => {
+    if (onBack) {
+      onBack();
+      return;
+    }
     if (previewMode && onPreviewBack) {
       onPreviewBack();
       return;
     }
     onNavigate?.("browse-startups");
+  };
+
+  const handleRespondToInvitation = async (action, invitationItem = null) => {
+    const source = invitationItem || relationship.invitation;
+    if (!source) return;
+    setInviteActionBusy(true);
+    try {
+      const item = normalizeInboxItem({
+        ...source,
+        itemType: "invitation",
+      });
+      await inboxActions.respondToInvitation(item, action);
+      setPendingInvitationAcceptance(null);
+      await relationship.refetch();
+    } finally {
+      setInviteActionBusy(false);
+    }
+  };
+
+  const openInvitationAcceptanceConfirm = () => {
+    if (!relationship.invitation) return;
+    const item = normalizeInboxItem({
+      ...relationship.invitation,
+      itemType: "invitation",
+      startupTitle: startup?.title || relationship.invitation.startupTitle,
+      companyName: startup?.title || relationship.invitation.companyName,
+      founderName: startup?.founder || relationship.invitation.founderName,
+      startupId:
+        startup?.id ||
+        startup?._id ||
+        relationship.invitation.startupId,
+    });
+    setPendingInvitationAcceptance(item);
   };
 
   const previewToast = () => {
@@ -288,10 +417,29 @@ export function StartupDetailPage({
     <div className="min-h-screen bg-surface-page">
       <div className="max-w-5xl mx-auto px-6 py-8 pb-28">
         {/* Navigation */}
-        <Button variant="ghost" onClick={handleBack} className="mb-6">
-          <ArrowLeft className="w-4 h-4 mr-2" />
-          {previewMode ? "Back to Edit" : "Back to Startups"}
-        </Button>
+        <div className="mb-6 flex items-center justify-between gap-3">
+          <Button variant="ghost" onClick={handleBack}>
+            <ArrowLeft className="w-4 h-4 mr-2" />
+            {returnToChat
+              ? "Back to chat"
+              : previewMode
+                ? "Back to Edit"
+                : "Back to Startups"}
+          </Button>
+          {returnToChat && onNavigate ? (
+            <Button
+              variant="outline"
+              onClick={() =>
+                onNavigate("talent-chat", {
+                  messageUserId: founderPeerId || undefined,
+                })
+              }
+            >
+              <MessageSquare className="w-4 h-4 mr-2" />
+              Message
+            </Button>
+          ) : null}
+        </div>
 
         {previewMode && (
           <div className="mb-6 rounded-xl border border-dashed border-primary/40 bg-primary/5 px-4 py-3 text-sm text-text-body">
@@ -474,8 +622,28 @@ export function StartupDetailPage({
 
           {/* Right Column - Sidebar */}
           <div className="space-y-6">
+            {isTalent && relationship.status === "invitation-pending" ? (
+              <PeerActionCard
+                peerName={startup.founder}
+                relationshipStatus={relationship.status}
+                relationshipLoading={relationship.loading}
+                viewerRole={user?.role}
+                onAcceptInvitation={openInvitationAcceptanceConfirm}
+                onDeclineInvitation={() => handleRespondToInvitation("decline")}
+                actionBusy={inviteActionBusy || inboxActions.isSending}
+                onMessage={
+                  returnToChat && onNavigate
+                    ? () =>
+                        onNavigate("talent-chat", {
+                          messageUserId: founderPeerId || undefined,
+                        })
+                    : undefined
+                }
+              />
+            ) : null}
+
             {/* Action Card */}
-            {!isOwnStartup && showInterestChrome && !interestSent && (
+            {!isOwnStartup && showInterestChrome && !interestSent && relationship.status !== "invitation-pending" && (
               <Card className="surface-card border-surface-border bg-primary/5 border-primary/20">
                 <CardContent className="p-6">
                   <h3 className="font-semibold text-text-heading mb-2">Interested?</h3>
@@ -695,6 +863,17 @@ export function StartupDetailPage({
           </div>
         </div>
       </div>
+
+      <InvitationAcceptanceConfirmDialog
+        open={Boolean(pendingInvitationAcceptance)}
+        onOpenChange={(next) => {
+          if (!next) setPendingInvitationAcceptance(null);
+        }}
+        invitation={pendingInvitationAcceptance}
+        isSending={inviteActionBusy || inboxActions.isSending}
+        showReviewStartup={false}
+        onConfirm={(invitation) => handleRespondToInvitation("accept", invitation)}
+      />
     </div>
   );
 }
