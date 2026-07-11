@@ -7,30 +7,11 @@ import {
   Users,
   Home,
   Settings,
-  Inbox,
   BarChart3,
   X,
   MessageCircle,
   Rocket,
 } from "lucide-react";
-
-function formatCount(count) {
-  if (count > 99) return "99+";
-  return String(count);
-}
-
-/** High-contrast count pill — matches status/error tokens, not theme Badge */
-function NavCountBadge({ count }) {
-  if (!count || count <= 0) return null;
-  return (
-    <span
-      className="ml-auto flex h-[18px] min-w-[18px] shrink-0 items-center justify-center rounded-pill bg-status-error px-1.5 font-body text-[10px] font-semibold leading-none text-white shadow-[0_1px_4px_rgba(255,79,107,0.45)]"
-      aria-label={`${count} unread`}
-    >
-      {formatCount(count)}
-    </span>
-  );
-}
 
 export default function VerticalSidebar({
   user,
@@ -38,11 +19,9 @@ export default function VerticalSidebar({
   virtualOfficeView,
   onPageChange,
   onVirtualOfficeViewChange,
-  unreadCount = 0,
   isOpen = false,
   onClose,
 }) {
-  const inboxBadgeCount = unreadCount > 0 ? unreadCount : 0;
   const [founderHasStartupPost, setFounderHasStartupPost] = useState(null);
 
   useEffect(() => {
@@ -131,14 +110,6 @@ export default function VerticalSidebar({
 
   const allUtilityNavItems = [
     {
-      id: "inbox",
-      icon: Inbox,
-      label: "Inbox",
-      page: "inbox",
-      badge: inboxBadgeCount > 0 ? inboxBadgeCount : null,
-      roles: ["founder", "team-member", "team", "talent"],
-    },
-    {
       id: "analytics",
       icon: BarChart3,
       label: "Analytics",
@@ -219,7 +190,6 @@ export default function VerticalSidebar({
           <span className="min-w-0 flex-1 truncate text-[13px] font-medium leading-tight">
             {item.label}
           </span>
-          {item.badge ? <NavCountBadge count={item.badge} /> : null}
         </button>
       </li>
     );

@@ -33,9 +33,9 @@ export function officeDeepLink(params = {}) {
 }
 
 export function inboxDeepLink(params = {}) {
-  const tab = params.tab || "received";
-  const base =
-    tab === "sent" ? "/inbox/sent" : tab === "received" ? "/inbox/received" : "/inbox";
-  if (!params.invitationId) return base;
-  return appendQuery(base, { invitationId: params.invitationId });
+  return appendQuery("/home", {
+    openNotifications: "1",
+    invitationId: params.invitationId || undefined,
+    interestId: params.interestId || undefined,
+  });
 }

@@ -138,9 +138,9 @@ export default function TeamMemberDashboard({ user, onNavigate }) {
         onClick: () => onNavigate?.("startup-office"),
       },
       {
-        id: "inbox",
-        label: "Open Inbox",
-        onClick: () => onNavigate?.("inbox"),
+        id: "chat",
+        label: "Open Chat",
+        onClick: () => onNavigate?.("founder-chat"),
       },
       {
         id: "performance",

@@ -12,9 +12,6 @@ const DEFAULT_OFFICE_VIEW = "workspace";
 const PATH_TO_PAGE = Object.freeze({
   "/home": "dashboard",
   "/office": "startup-office",
-  "/inbox": "inbox",
-  "/inbox/received": "inbox:received",
-  "/inbox/sent": "inbox:sent",
   "/browse-talent": "team-matching",
   "/analytics": "analytics",
   "/settings": "settings",
@@ -111,9 +108,18 @@ export function pathToDashboardState(pathname, search, role) {
 
   if (path === "/home") {
     const mode = q.get("mode") || "overview";
+    const openNotifications =
+      q.get("openNotifications") === "1" || q.get("openNotifications") === "true";
+    const invitationId = q.get("invitationId") || undefined;
+    const interestId = q.get("interestId") || undefined;
     return {
       currentPage: "dashboard",
       talentDashboardMode: role === "talent" ? mode : undefined,
+      ...(openNotifications || invitationId || interestId
+        ? { openNotificationHub: true }
+        : {}),
+      ...(invitationId ? { invitationId } : {}),
+      ...(interestId ? { interestId } : {}),
     };
   }
 
@@ -175,15 +181,12 @@ export function pathToDashboardState(pathname, search, role) {
 
   if (path === "/inbox" || path === "/inbox/received" || path === "/inbox/sent") {
     const invitationId = q.get("invitationId") || undefined;
-    const page =
-      path === "/inbox/sent"
-        ? "inbox:sent"
-        : path === "/inbox/received"
-          ? "inbox:received"
-          : "inbox";
+    const interestId = q.get("interestId") || undefined;
     return {
-      currentPage: page,
+      currentPage: "dashboard",
+      openNotificationHub: true,
       ...(invitationId ? { invitationId } : {}),
+      ...(interestId ? { interestId } : {}),
     };
   }
 
@@ -253,15 +256,11 @@ export function dashboardStateToPath(state) {
       });
     }
     case "inbox":
-      return invitationId
-        ? appendEntityParams("/inbox", { invitationId })
-        : "/inbox";
     case "inbox:received":
-      return invitationId
-        ? appendEntityParams("/inbox/received", { invitationId })
-        : "/inbox/received";
     case "inbox:sent":
-      return "/inbox/sent";
+      return invitationId
+        ? appendEntityParams("/home", { invitationId, openNotifications: "1" })
+        : "/home?openNotifications=1";
     case "team-matching":
       return "/browse-talent";
     case "founder-chat":

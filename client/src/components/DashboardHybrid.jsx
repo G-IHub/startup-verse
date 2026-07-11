@@ -2,12 +2,13 @@
  * DashboardHybrid - Main dashboard router component
  * Handles routing between different views based on user role
  */
-import React, { useState, lazy, Suspense, useCallback, useMemo } from "react";
+import React, { useState, lazy, Suspense, useCallback, useMemo, useEffect } from "react";
 import { useLocation, useNavigate, Navigate } from "react-router-dom";
 import {
   pathToDashboardState,
   dashboardStateToPath,
 } from "../app/dashboardPaths";
+import { openNotificationHub } from "../utils/inboxNormalize";
 import AppLayoutHybrid from "./layout/AppLayoutHybrid";
 import AdaptiveVirtualOffice from "./office/AdaptiveVirtualOffice";
 // ⚡ LAZY LOAD HEAVY COMPONENTS - Only load when navigating to them
@@ -36,7 +37,6 @@ const Operations = lazy(() => import("./stages/Operations"));
 const DocumentsPage = lazy(() => import("./DocumentsPage"));
 const PitchDeck = lazy(() => import("./PitchDeck"));
 const TeamMatching = lazy(() => import("./TeamMatching"));
-const Inbox = lazy(() => import("./Inbox"));
 const MyPerformancePage = lazy(() => import("./team-member/MyPerformancePage"));
 const CompensationDemoPage = lazy(
   () => import("./compensation/CompensationDemoPage"),
@@ -88,9 +88,6 @@ export default function DashboardHybrid({ user, onLogout, onUpdateUser }) {
       new Set([
         "dashboard",
         "startup-office",
-        "inbox",
-        "inbox:received",
-        "inbox:sent",
         "analytics",
         "settings",
         "profile",
@@ -142,6 +139,19 @@ export default function DashboardHybrid({ user, onLogout, onUpdateUser }) {
   );
 
   const handleNavigate = (page, options = {}) => {
+    if (String(page || "").startsWith("inbox")) {
+      openNotificationHub({
+        invitationId: options?.invitationId || null,
+        interestId: options?.interestId || null,
+        messageId: options?.messageId || null,
+        open: true,
+      });
+      navigate(dashboardStateToPath({ currentPage: "dashboard" }), {
+        replace: true,
+      });
+      return;
+    }
+
     if (page === "talent-profile" && (options?.talent || options?.talentId)) {
       if (options?.talent) {
         setSelectedTalent(options.talent);
@@ -226,6 +236,24 @@ export default function DashboardHybrid({ user, onLogout, onUpdateUser }) {
     },
     [derivedNav, navigate],
   );
+
+  // Legacy /inbox* URLs → open notification hub and land on home
+  useEffect(() => {
+    if (!derivedNav?.openNotificationHub) return;
+    openNotificationHub({
+      open: true,
+      invitationId: derivedNav.invitationId || null,
+      interestId: derivedNav.interestId || null,
+    });
+    navigate(dashboardStateToPath({ currentPage: "dashboard" }), {
+      replace: true,
+    });
+  }, [
+    derivedNav?.openNotificationHub,
+    derivedNav?.invitationId,
+    derivedNav?.interestId,
+    navigate,
+  ]);
 
   if (!derivedNav || !validPages.has(derivedNav.currentPage)) {
     return <Navigate to="/home" replace />;
@@ -585,24 +613,6 @@ export default function DashboardHybrid({ user, onLogout, onUpdateUser }) {
                 urlStartupId ||
                 ""
               }
-              onNavigate={handleNavigate}
-            />
-          </Suspense>
-        );
-
-      // Inbox
-      case "inbox":
-      case "inbox:sent":
-      case "inbox:received":
-        const initialTab = currentPage.includes(":")
-          ? currentPage.split(":")[1]
-          : "received";
-        return (
-          <Suspense fallback={<PageLoadingFallback />}>
-            <Inbox
-              user={user}
-              onBack={() => handleNavigate("dashboard")}
-              initialTab={initialTab}
               onNavigate={handleNavigate}
             />
           </Suspense>

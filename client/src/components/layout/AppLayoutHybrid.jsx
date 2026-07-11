@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
 import { persistCurrentUser } from "../../app/session";
 import { Button } from "../ui/button";
 import { toast } from "sonner";
@@ -8,11 +8,7 @@ import { MobileActionDock, PageViewport } from "../shell/PageScaffold";
 import { Menu, SlidersHorizontal, UserCircle } from "lucide-react";
 import HeaderProfileMenu from "./HeaderProfileMenu";
 import StartupVerseLogo from "../brand/StartupVerseLogo";
-import {
-  getSentInterests
-} from "../../utils/api/inboxApi";
 import { usePresenceSession } from "../../domains/presence/usePresenceSession";
-import { useNotifications } from "../../contexts/NotificationContext";
 
 const PAGE_META = {
   dashboard: {
@@ -30,18 +26,6 @@ const PAGE_META = {
   "browse-startups": {
     title: "Browse Startups",
     description: "Discover startup opportunities that match your skills",
-  },
-  inbox: {
-    title: "Inbox",
-    description: "Invitations, interests, and responses",
-  },
-  "inbox:received": {
-    title: "Inbox",
-    description: "Received invitations, interests, and responses",
-  },
-  "inbox:sent": {
-    title: "Inbox",
-    description: "Sent invitations and outreach history",
   },
   analytics: {
     title: "Analytics",
@@ -168,11 +152,8 @@ export default function AppLayoutHybrid({
   mobileActions = null,
 }) {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const [hasSentInterest, setHasSentInterest] = useState(false);
-  const { unreadCount: notificationUnreadCount = 0 } = useNotifications();
   const pageMeta = resolvePageMeta(currentPage, user.role);
   const normalizedPage = String(currentPage || "dashboard").split(":")[0];
-  const isInboxPage = normalizedPage === "inbox";
   const isTeamDashboardPage =
     normalizedPage === "dashboard" &&
     (user.role === "team-member" || user.role === "team");
@@ -184,17 +165,6 @@ export default function AppLayoutHybrid({
     normalizedPage === "settings" || normalizedPage === "profile";
 
   usePresenceSession(user);
-
-  useEffect(() => {
-    if (user.role !== "talent") return;
-    const talentId = String(user._id ?? user.id ?? "");
-    if (!talentId) return;
-    getSentInterests(talentId)
-      .then((interests) => {
-        setHasSentInterest(Array.isArray(interests) && interests.length > 0);
-      })
-      .catch(() => {});
-  }, [user.id, user.role]);
 
   const switchRole = (newRole) => {
     if (!user) {
@@ -228,9 +198,6 @@ export default function AppLayoutHybrid({
           virtualOfficeView={virtualOfficeView}
           onPageChange={onPageChange}
           onVirtualOfficeViewChange={onVirtualOfficeViewChange}
-          unreadCount={notificationUnreadCount}
-          talentDashboardMode={talentDashboardMode}
-          hasSentInterest={hasSentInterest}
           isOpen={isMobileMenuOpen}
           onClose={() => setIsMobileMenuOpen(false)}
         />
@@ -238,7 +205,7 @@ export default function AppLayoutHybrid({
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden bg-surface-page">
         <header
           className={
-            isInboxPage || isTeamDashboardPage
+            isTeamDashboardPage
               ? "z-50 border-b border-[#e2e4f0] bg-white shadow-[0_1px_8px_rgba(0,0,0,0.05)] transition-shadow duration-200 ease-in-out"
               : "z-50 border-b border-surface-border bg-surface-card shadow-[0_1px_8px_rgba(0,0,0,0.05)] transition-shadow duration-200 ease-in-out"
           }

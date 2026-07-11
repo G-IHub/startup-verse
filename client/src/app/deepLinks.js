@@ -55,14 +55,15 @@ export function buildTalentProfilePath(talentId) {
 }
 
 /**
- * @param {{ tab?: "received"|"sent", invitationId?: string }} params
+ * Legacy inbox URLs redirect to the notification hub (bell).
+ * @param {{ tab?: "received"|"sent", invitationId?: string, interestId?: string }} params
  */
 export function buildInboxPath(params = {}) {
-  const tab = params.tab || "received";
-  const base =
-    tab === "sent" ? "/inbox/sent" : tab === "received" ? "/inbox/received" : "/inbox";
-  if (!params.invitationId) return base;
-  return appendQuery(base, { invitationId: params.invitationId });
+  return appendQuery("/home", {
+    openNotifications: "1",
+    invitationId: params.invitationId || undefined,
+    interestId: params.interestId || undefined,
+  });
 }
 
 /**
@@ -129,7 +130,7 @@ export function parseDeepLink(url, metadata = {}, role = "founder") {
         };
       }
       return {
-        page: "inbox:received",
+        page: "inbox",
         options: { invitationId: String(meta.invitationId || params.get("invitationId") || "") },
       };
     }
@@ -213,19 +214,32 @@ export function parseDeepLink(url, metadata = {}, role = "founder") {
 
   if (pathname === "/inbox" || pathname.startsWith("/inbox")) {
     const invitationId = params.get("invitationId") || meta.invitationId || "";
-    const page =
-      pathname === "/inbox/sent"
-        ? "inbox:sent"
-        : pathname === "/inbox/received"
-          ? "inbox:received"
-          : "inbox";
+    const interestId = params.get("interestId") || meta.interestId || "";
     return {
-      page,
-      ...(invitationId ? { options: { invitationId: String(invitationId) } } : {}),
+      page: "inbox",
+      options: {
+        ...(invitationId ? { invitationId: String(invitationId) } : {}),
+        ...(interestId ? { interestId: String(interestId) } : {}),
+      },
     };
   }
 
   if (pathname.includes("/dashboard") || pathname === "/home") {
+    const invitationId = params.get("invitationId") || meta.invitationId || "";
+    const interestId = params.get("interestId") || meta.interestId || "";
+    const openNotifications =
+      params.get("openNotifications") === "1" ||
+      params.get("openNotifications") === "true" ||
+      Boolean(invitationId || interestId);
+    if (openNotifications) {
+      return {
+        page: "inbox",
+        options: {
+          ...(invitationId ? { invitationId: String(invitationId) } : {}),
+          ...(interestId ? { interestId: String(interestId) } : {}),
+        },
+      };
+    }
     return { page: "dashboard" };
   }
 
@@ -270,7 +284,7 @@ function parseLegacyQueryUrl(search, meta, role) {
         };
       }
       return {
-        page: "inbox:received",
+        page: "inbox",
         options: { invitationId: String(invitationId) },
       };
     }

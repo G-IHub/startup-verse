@@ -92,7 +92,7 @@ export const homepageTourSteps = [
     placement: "right",
   },
   {
-    target: '[data-tour="inbox"]',
+    target: '[data-tour="notifications"]',
     content: (
       <div>
         <h3
@@ -100,15 +100,15 @@ export const homepageTourSteps = [
             marginBottom: "8px",
           }}
         >
-          Inbox 📬
+          Notifications
         </h3>
         <p>
-          Manage all your invitations, interests, and team communications in one
-          place.
+          Invites, interests, messages, and team updates all live in the
+          notification bell — review and respond without leaving your current page.
         </p>
       </div>
     ),
-    placement: "right",
+    placement: "bottom",
   },
   {
     target: '[data-tour="profile-menu"]',

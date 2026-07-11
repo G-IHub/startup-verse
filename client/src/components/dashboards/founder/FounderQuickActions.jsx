@@ -1,5 +1,5 @@
 import React from "react";
-import { Building2, Inbox, Map, Users } from "lucide-react";
+import { Building2, Map, MessageCircle, Users } from "lucide-react";
 import { cn } from "../../ui/utils";
 
 const ACTIONS = [
@@ -18,11 +18,11 @@ const ACTIONS = [
     page: "team-matching",
   },
   {
-    id: "inbox",
-    label: "Inbox",
-    description: "Invites & messages",
-    icon: Inbox,
-    page: "inbox",
+    id: "chat",
+    label: "Chat",
+    description: "Team conversations",
+    icon: MessageCircle,
+    page: "founder-chat",
   },
   {
     id: "journey",

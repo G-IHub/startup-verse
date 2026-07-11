@@ -19,7 +19,7 @@ import { error as apiError, success as apiSuccess } from "../utils/apiResponse.j
 import { sendTokenResponse } from "../utils/sendToken.js";
 import { emitRealtime } from "../services/realtime.service.js";
 import { createNotification, broadcastNotification } from "../services/notificationService.js";
-import { chatDeepLink, officeDeepLink } from "../utils/deepLinks.js";
+import { chatDeepLink, officeDeepLink, inboxDeepLink } from "../utils/deepLinks.js";
 import { SOCKET_EVENTS } from "../realtime/events.js";
 import { startupRoom, userRoom } from "../realtime/rooms.js";
 import { mapActivityToDto } from "../utils/activityDto.js";
@@ -780,7 +780,7 @@ export const sendFounderTalentInvitation = async (req, res) => {
       message: body.message
         ? String(body.message).slice(0, 200)
         : "You have a new invitation from a founder.",
-      actionUrl: chatDeepLink(founderId),
+      actionUrl: inboxDeepLink({ invitationId: String(invitation._id) }),
       metadata: {
         invitationId: String(invitation._id),
         founderId: String(founderId),
@@ -1093,7 +1093,7 @@ export const createInterest = async (req, res) => {
     type: "interest-received",
     title: "New talent interest",
     message: `${talentName} expressed interest in your startup.`,
-    actionUrl: chatDeepLink(talentId),
+    actionUrl: inboxDeepLink({ interestId: String(interest._id) }),
     metadata: {
       talentId: String(talentId),
       interestId: String(interest._id),

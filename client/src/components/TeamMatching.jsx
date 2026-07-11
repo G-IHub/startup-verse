@@ -637,21 +637,11 @@ export default function TeamMatching({ user, onNavigate }) {
       });
 
       toast.success(
-        `✉️ Your interest has been sent to ${selectedIdea.founder}! Redirecting to your inbox...`,
+        `Interest sent to ${selectedIdea.founder}! You'll get a notification when they respond.`,
       );
       setInterestMessage("");
       setSelectedIdea(null);
       setShowDetailsDialog(false);
-
-      // Navigate to Inbox SENT tab to view sent interest
-      if (onNavigate) {
-        console.log("🚀 [TeamMatching] Navigating to inbox:sent in 1000ms...");
-        // Add delay to ensure backend has processed and saved the interest
-        setTimeout(() => {
-          console.log('📍 [TeamMatching] Calling onNavigate("inbox:sent")');
-          onNavigate("inbox:sent");
-        }, 1000);
-      }
     } catch (error) {
       console.error("❌ Error sending interest:", error);
       const msg = String(error?.message || "");
