@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Bell,
   CheckCircle2,
@@ -28,6 +28,12 @@ import {
 } from "../../utils/inboxNormalize";
 import { isFounderInboxRole, isTalentInboxRole } from "../../utils/inboxItemKind";
 import { useInboxActions, resolveInboxItem } from "../../hooks/useInboxActions";
+import {
+  applySyntheticNotificationState,
+  fetchPendingOnboarding,
+  buildSyntheticPendingNotifications,
+} from "../../utils/pendingOnboarding";
+import { getStartupId } from "../../utils/startupId";
 import NotificationInviteRow from "./NotificationInviteRow";
 import InviteDetailModal from "./InviteDetailModal";
 import OrgMessageComposer from "./OrgMessageComposer";
@@ -94,6 +100,13 @@ function getInviteIdsFromNotification(notification) {
   };
 }
 
+function isSyntheticNotification(notification) {
+  return (
+    Boolean(notification?.metadata?.synthetic) ||
+    String(notification?.id || "").startsWith("pending-")
+  );
+}
+
 export default function NotificationCenter({ onNavigate }) {
   const { user } = useAuth();
   const {
@@ -103,6 +116,7 @@ export default function NotificationCenter({ onNavigate }) {
     markAllAsRead,
     deleteNotification,
     clearAll,
+    refreshNotifications,
   } = useNotifications();
   const [open, setOpen] = useState(false);
   const [detailOpen, setDetailOpen] = useState(false);
@@ -113,9 +127,80 @@ export default function NotificationCenter({ onNavigate }) {
   });
   const [composerOpen, setComposerOpen] = useState(false);
   const [actionBusy, setActionBusy] = useState(false);
+  const [syntheticNotifications, setSyntheticNotifications] = useState([]);
+  const [pendingRefreshKey, setPendingRefreshKey] = useState(0);
+  const syntheticReadIdsRef = useRef(new Set());
+  const syntheticDismissedIdsRef = useRef(new Set());
+  const pendingRequestIdRef = useRef(0);
+  const readPendingSyntheticRefreshRef = useRef(false);
+  const dismissPendingSyntheticRefreshRef = useRef(false);
 
   const isFounder = isFounderInboxRole(user?.role);
   const isTalent = isTalentInboxRole(user?.role);
+  const founderId = user?._id || user?.id;
+
+  useEffect(() => {
+    pendingRequestIdRef.current += 1;
+    syntheticReadIdsRef.current.clear();
+    syntheticDismissedIdsRef.current.clear();
+    readPendingSyntheticRefreshRef.current = false;
+    dismissPendingSyntheticRefreshRef.current = false;
+    setSyntheticNotifications([]);
+    return () => {
+      pendingRequestIdRef.current += 1;
+    };
+  }, [founderId]);
+
+  const refreshPendingNotifications = useCallback(async () => {
+    const requestId = pendingRequestIdRef.current + 1;
+    pendingRequestIdRef.current = requestId;
+    if (!isFounder || !founderId) {
+      setSyntheticNotifications([]);
+      return;
+    }
+    const pending = await fetchPendingOnboarding(founderId, getStartupId(user));
+    if (requestId !== pendingRequestIdRef.current) return;
+    const generated = buildSyntheticPendingNotifications(pending, notifications);
+    if (readPendingSyntheticRefreshRef.current) {
+      for (const notification of generated) {
+        syntheticReadIdsRef.current.add(notification.id);
+      }
+      readPendingSyntheticRefreshRef.current = false;
+    }
+    if (dismissPendingSyntheticRefreshRef.current) {
+      for (const notification of generated) {
+        syntheticDismissedIdsRef.current.add(notification.id);
+      }
+      dismissPendingSyntheticRefreshRef.current = false;
+    }
+    setSyntheticNotifications(
+      applySyntheticNotificationState(generated, {
+        readIds: syntheticReadIdsRef.current,
+        dismissedIds: syntheticDismissedIdsRef.current,
+      }),
+    );
+  }, [isFounder, founderId, user, notifications]);
+
+  useEffect(() => {
+    void refreshPendingNotifications();
+  }, [refreshPendingNotifications, pendingRefreshKey]);
+
+  useEffect(() => {
+    if (!open || !isFounder) return;
+    setPendingRefreshKey((key) => key + 1);
+  }, [open, isFounder]);
+
+  const displayNotifications = useMemo(() => {
+    const merged = [...notifications, ...syntheticNotifications];
+    return merged.sort((a, b) => {
+      const aTime = new Date(a.timestamp || a.createdAt || 0).getTime();
+      const bTime = new Date(b.timestamp || b.createdAt || 0).getTime();
+      return bTime - aTime;
+    });
+  }, [notifications, syntheticNotifications]);
+
+  const displayUnreadCount =
+    unreadCount + syntheticNotifications.filter((n) => !n.read).length;
 
   const inboxActions = useInboxActions({
     user,
@@ -145,21 +230,107 @@ export default function NotificationCenter({ onNavigate }) {
     return () => window.removeEventListener(NOTIFICATION_HUB_EVENT, onHubEvent);
   }, []);
 
-  const openInviteDetail = useCallback((notification) => {
-    markAsRead(notification.id);
-    const ids = getInviteIdsFromNotification(notification);
-    setDetailIds(ids);
-    setDetailOpen(true);
-    setOpen(false);
-  }, [markAsRead]);
+  const markNotificationRead = useCallback(
+    (notification) => {
+      if (isSyntheticNotification(notification)) {
+        syntheticReadIdsRef.current.add(notification.id);
+        setSyntheticNotifications((prev) =>
+          prev.map((row) =>
+            row.id === notification.id ? { ...row, read: true } : row,
+          ),
+        );
+        return;
+      }
+      void markAsRead(notification.id);
+    },
+    [markAsRead],
+  );
+
+  const handleMarkAllAsRead = useCallback(() => {
+    readPendingSyntheticRefreshRef.current = true;
+    setSyntheticNotifications((prev) =>
+      prev.map((notification) => {
+        syntheticReadIdsRef.current.add(notification.id);
+        return { ...notification, read: true };
+      }),
+    );
+    void markAllAsRead();
+  }, [markAllAsRead]);
+
+  const handleClearAll = useCallback(() => {
+    dismissPendingSyntheticRefreshRef.current = true;
+    for (const notification of syntheticNotifications) {
+      syntheticDismissedIdsRef.current.add(notification.id);
+    }
+    setSyntheticNotifications([]);
+    void clearAll();
+  }, [clearAll, syntheticNotifications]);
+
+  const openInviteDetail = useCallback(
+    (notification) => {
+      markNotificationRead(notification);
+      const ids = getInviteIdsFromNotification(notification);
+      setDetailIds(ids);
+      setDetailOpen(true);
+      setOpen(false);
+    },
+    [markNotificationRead],
+  );
+
+  const handleDeleteNotification = useCallback(
+    (notification) => {
+      if (isSyntheticNotification(notification)) {
+        syntheticDismissedIdsRef.current.add(notification.id);
+        setSyntheticNotifications((prev) =>
+          prev.filter((row) => row.id !== notification.id),
+        );
+        return;
+      }
+      deleteNotification(notification.id);
+    },
+    [deleteNotification],
+  );
+
+  const handleOnboardingComplete = useCallback(
+    async (completed) => {
+      const matchingServer = notifications.find((n) => {
+        const meta = n.metadata || {};
+        if (completed.invitationId) {
+          return String(meta.invitationId || meta.inviteId || "") === completed.invitationId;
+        }
+        if (completed.interestId) {
+          return String(meta.interestId || "") === completed.interestId;
+        }
+        return false;
+      });
+      if (matchingServer?.id) {
+        await deleteNotification(matchingServer.id);
+      }
+      setSyntheticNotifications((prev) =>
+        prev.filter((row) => {
+          const meta = row.metadata || {};
+          if (completed.invitationId) {
+            return String(meta.invitationId || "") !== completed.invitationId;
+          }
+          if (completed.interestId) {
+            return String(meta.interestId || "") !== completed.interestId;
+          }
+          return true;
+        }),
+      );
+      await refreshNotifications();
+      setPendingRefreshKey((key) => key + 1);
+    },
+    [notifications, deleteNotification, refreshNotifications],
+  );
 
   const handleAlertClick = (notification) => {
-    markAsRead(notification.id);
-
     if (isInviteNotificationType(notification.type)) {
       openInviteDetail(notification);
       return;
     }
+
+    markNotificationRead(notification);
 
     if (!notification.actionUrl || !onNavigate) return;
 
@@ -260,7 +431,7 @@ export default function NotificationCenter({ onNavigate }) {
   };
 
   const handleOpenChatFromNotification = (notification) => {
-    markAsRead(notification.id);
+    markNotificationRead(notification);
     const meta = notification.metadata || {};
     const peerId =
       meta.talentId || meta.founderId || meta.peerUserId || meta.with || null;
@@ -285,9 +456,9 @@ export default function NotificationCenter({ onNavigate }) {
             aria-label="Notifications"
           >
             <Bell className="h-[17px] w-[17px] text-text-body" strokeWidth={1.75} />
-            {unreadCount > 0 && (
+            {displayUnreadCount > 0 && (
               <span className="absolute -right-0.5 -top-0.5 flex h-[18px] min-w-[18px] items-center justify-center rounded-pill bg-status-error px-1 font-body text-[10px] font-semibold leading-none text-white shadow-[0_1px_4px_rgba(255,79,107,0.45)]">
-                {unreadCount > 9 ? "9+" : unreadCount}
+                {displayUnreadCount > 9 ? "9+" : displayUnreadCount}
               </span>
             )}
           </Button>
@@ -307,17 +478,17 @@ export default function NotificationCenter({ onNavigate }) {
                   Notifications
                 </h3>
                 <p className="font-body text-[11px] leading-tight text-text-muted">
-                  {unreadCount > 0 ? `${unreadCount} unread` : "All caught up"}
+                  {displayUnreadCount > 0 ? `${displayUnreadCount} unread` : "All caught up"}
                 </p>
               </div>
             </div>
-            {notifications.length > 0 && (
+            {displayNotifications.length > 0 && (
               <div className="flex gap-0.5">
-                {unreadCount > 0 && (
+                {displayUnreadCount > 0 && (
                   <Button
                     variant="ghost"
                     size="sm"
-                    onClick={markAllAsRead}
+                    onClick={handleMarkAllAsRead}
                     className="h-7 px-2 text-[11px] font-normal text-text-body"
                   >
                     <Check className="h-3 w-3" />
@@ -327,7 +498,7 @@ export default function NotificationCenter({ onNavigate }) {
                 <Button
                   variant="ghost"
                   size="icon"
-                  onClick={clearAll}
+                  onClick={handleClearAll}
                   className="h-7 w-7 text-text-muted"
                   aria-label="Clear all notifications"
                 >
@@ -337,7 +508,7 @@ export default function NotificationCenter({ onNavigate }) {
             )}
           </div>
 
-          {notifications.length === 0 ? (
+          {displayNotifications.length === 0 ? (
             <div className="flex flex-col items-center px-6 py-8 text-center">
               <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-primary/12 to-accent/8 ring-1 ring-primary/10">
                 <Bell className="h-5 w-5 text-primary/80" strokeWidth={1.5} />
@@ -351,8 +522,8 @@ export default function NotificationCenter({ onNavigate }) {
             </div>
           ) : (
             <ScrollArea className="h-[min(360px,50vh)]">
-              <div className="px-2 py-2">
-                {notifications.map((notification) =>
+              <div className="px-2.5 py-2.5">
+                {displayNotifications.map((notification) =>
                   isInviteNotificationType(notification.type) ? (
                     <NotificationInviteRow
                       key={notification.id}
@@ -360,13 +531,14 @@ export default function NotificationCenter({ onNavigate }) {
                       formatTime={formatTime}
                       disabled={actionBusy}
                       canQuickRespond={
-                        notification.type === "interest-received" ||
-                        notification.type === "talent-invitation-received" ||
-                        notification.type === "cohort-invitation" ||
-                        notification.type === "team-invitation"
+                        !isSyntheticNotification(notification) &&
+                        (notification.type === "interest-received" ||
+                          notification.type === "talent-invitation-received" ||
+                          notification.type === "cohort-invitation" ||
+                          notification.type === "team-invitation")
                       }
                       onOpen={openInviteDetail}
-                      onDelete={deleteNotification}
+                      onDelete={handleDeleteNotification}
                       onAccept={handleQuickAccept}
                       onDecline={handleQuickDecline}
                       onOpenChat={handleOpenChatFromNotification}
@@ -374,26 +546,33 @@ export default function NotificationCenter({ onNavigate }) {
                   ) : (
                     <div
                       key={notification.id}
-                      className={`group relative mb-1.5 cursor-pointer rounded-input border border-surface-border/70 px-2.5 py-2 transition-colors hover:bg-surface-page ${
+                      className={`group relative mb-2 cursor-pointer rounded-xl px-3 py-2.5 transition-all duration-200 ${
                         !notification.read
-                          ? "border-primary/30 bg-primary/5"
-                          : "bg-surface-card"
+                          ? "border border-primary/12 bg-surface-card shadow-[0_1px_3px_rgba(58,90,254,0.06)] hover:border-primary/20 hover:shadow-[0_2px_8px_rgba(58,90,254,0.08)]"
+                          : "border border-transparent bg-surface-page/50 hover:border-surface-border/60 hover:bg-surface-page"
                       }`}
                       onClick={() => handleAlertClick(notification)}
                     >
-                      <div
-                        className={`absolute left-0.5 top-2.5 h-[calc(100%-1.25rem)] w-[2px] rounded-full ${
-                          !notification.read ? "bg-primary/70" : "bg-transparent"
-                        }`}
-                      />
-                      <div className="ml-1 flex items-start gap-2.5">
-                        <div className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-surface-page">
+                      <div className="flex items-start gap-3">
+                        <div
+                          className={`relative mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${
+                            !notification.read
+                              ? "bg-primary/10 ring-1 ring-primary/15"
+                              : "bg-surface-page ring-1 ring-surface-border/80"
+                          }`}
+                        >
                           {getNotificationIcon(notification.type)}
+                          {!notification.read ? (
+                            <span
+                              className="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-primary ring-2 ring-surface-card"
+                              aria-hidden="true"
+                            />
+                          ) : null}
                         </div>
                         <div className="min-w-0 flex-1">
                           <div className="flex items-start justify-between gap-2">
                             <p
-                              className={`font-body text-[13px] leading-tight ${
+                              className={`font-body text-[13px] leading-snug ${
                                 !notification.read
                                   ? "font-semibold text-text-heading"
                                   : "font-medium text-text-body"
@@ -404,19 +583,19 @@ export default function NotificationCenter({ onNavigate }) {
                             <Button
                               variant="ghost"
                               size="icon"
-                              className="h-6 w-6 shrink-0 rounded-md opacity-60 transition-opacity hover:opacity-100 group-hover:opacity-100"
+                              className="h-7 w-7 shrink-0 rounded-lg text-text-muted opacity-0 transition-opacity hover:bg-surface-page hover:text-text-heading group-hover:opacity-100"
                               onClick={(e) => {
                                 e.stopPropagation();
-                                deleteNotification(notification.id);
+                                handleDeleteNotification(notification);
                               }}
                             >
-                              <X className="h-3 w-3" />
+                              <X className="h-3.5 w-3.5" />
                             </Button>
                           </div>
-                          <p className="mt-0.5 line-clamp-2 font-body text-[12px] text-text-muted">
+                          <p className="mt-1 line-clamp-2 font-body text-[12px] leading-relaxed text-text-muted">
                             {notification.message}
                           </p>
-                          <p className="mt-1 font-body text-[11px] text-text-muted">
+                          <p className="mt-2 font-body text-[11px] text-text-muted/80">
                             {formatTime(notification.timestamp)}
                           </p>
                         </div>
@@ -469,6 +648,7 @@ export default function NotificationCenter({ onNavigate }) {
         invitationId={detailIds.invitationId}
         interestId={detailIds.interestId}
         messageId={detailIds.messageId}
+        onOnboardingComplete={handleOnboardingComplete}
       />
 
       <OrgMessageComposer

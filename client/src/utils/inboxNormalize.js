@@ -115,6 +115,7 @@ export const INVITE_NOTIFICATION_TYPES = new Set([
   "talent-invitation-received",
   "cohort-invitation",
   "team-invitation",
+  "invitation-accepted",
   "team-member-onboarded",
   "cohort-invitation-expiring",
   "cohort-invitation-response",

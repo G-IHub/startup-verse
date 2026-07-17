@@ -1,8 +1,0 @@
-Run the Express API from `../server` and point the Vite client at it via `VITE_API_URL`.
-
-Example:
-  cd ../../server
-  npm install
-  npm run dev
-
-Then open the Vite app; confirm `VITE_API_URL` matches the listening port.

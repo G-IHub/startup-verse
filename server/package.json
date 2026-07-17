@@ -31,7 +31,8 @@
     "test:phase2-google-auth": "node scripts/phase2-google-auth-smoke.mjs",
     "test:phase8-security": "node scripts/phase8-security-alignment-smoke.mjs",
     "test:phase9-remediation": "node scripts/phase9-remediation-readiness-smoke.mjs",
-    "test:founder-team-exclusions": "node src/utils/founderTeamTalentExclusions.test.js"
+    "test:founder-team-exclusions": "node src/utils/founderTeamTalentExclusions.test.js",
+    "test:onboarding": "node --test src/controllers/invitations.controller.test.js"
   },
   "keywords": [],
   "author": "",

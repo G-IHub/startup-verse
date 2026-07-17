@@ -1,5 +1,0 @@
-StartupVerse API runs from the `server/` package.
-
-1. `cd server && npm install && npm run dev`
-2. Set client `VITE_API_URL` to your API base (e.g. `http://localhost:5000/api/v1`).
-3. Use `client/src/check-backend-status.html` (optional `?api=` query) to verify `/health`.

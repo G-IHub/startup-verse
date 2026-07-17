@@ -26,9 +26,11 @@ import {
 import { ChatComposer } from "../messaging/ChatComposer";
 import { MessageAttachmentBubble } from "../messaging/MessageAttachmentBubble";
 import { normalizeMessageAttachments } from "../../utils/messageAttachmentUtils";
+import { toast } from "sonner";
 import CompensationSetupWizard from "../compensation/CompensationSetupWizard";
 import InvitationAcceptanceConfirmDialog from "./InvitationAcceptanceConfirmDialog";
 import { getStartupId } from "../../utils/startupId";
+import { resolveOnboardingSource } from "../../utils/inboxOnboarding";
 import { useInboxActions, resolveInboxItem } from "../../hooks/useInboxActions";
 import { isOrgInboxMessage } from "../../utils/inboxItemKind";
 import {
@@ -82,6 +84,16 @@ function StatusBadge({ status }) {
   }
 }
 
+function getDetailRequestKey({ initialItem, invitationId, interestId, messageId }) {
+  if (initialItem) {
+    return `initial:${String(initialItem._id ?? initialItem.id ?? "")}`;
+  }
+  if (invitationId) return `invitation:${String(invitationId)}`;
+  if (interestId) return `interest:${String(interestId)}`;
+  if (messageId) return `message:${String(messageId)}`;
+  return "";
+}
+
 /**
  * Detail modal for interests, founder-talent invites, org cohort invites, and org messages.
  * Opened from the notification bell hub.
@@ -96,9 +108,19 @@ export default function InviteDetailModal({
   messageId,
   initialItem = null,
   direction = "received",
+  onOnboardingComplete,
 }) {
+  const requestKey = getDetailRequestKey({
+    initialItem,
+    invitationId,
+    interestId,
+    messageId,
+  });
   const [item, setItem] = useState(initialItem ? normalizeInboxItem(initialItem) : null);
   const [loading, setLoading] = useState(false);
+  const [resolvedRequestKey, setResolvedRequestKey] = useState(
+    initialItem ? requestKey : "",
+  );
   const [pendingInvitationAcceptance, setPendingInvitationAcceptance] = useState(null);
   const [showOnboardingWizard, setShowOnboardingWizard] = useState(false);
   const [onboardingTalent, setOnboardingTalent] = useState(null);
@@ -106,6 +128,7 @@ export default function InviteDetailModal({
   const actions = useInboxActions({
     user,
     onNavigate,
+    onClose: close,
     onItemUpdated: (next) => {
       if (next == null) {
         setItem(null);
@@ -133,6 +156,8 @@ export default function InviteDetailModal({
     if (!open) return;
     if (initialItem) {
       setItem(normalizeInboxItem(initialItem));
+      setResolvedRequestKey(requestKey);
+      setLoading(false);
       return;
     }
     let cancelled = false;
@@ -146,7 +171,16 @@ export default function InviteDetailModal({
           interestId,
           messageId,
         });
-        if (!cancelled) setItem(resolved);
+        if (!cancelled) {
+          setItem(resolved);
+          setResolvedRequestKey(requestKey);
+        }
+      } catch (error) {
+        console.error("[InviteDetailModal] failed to load item:", error);
+        if (!cancelled) {
+          setItem(null);
+          setResolvedRequestKey(requestKey);
+        }
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -154,23 +188,49 @@ export default function InviteDetailModal({
     return () => {
       cancelled = true;
     };
-  }, [open, initialItem, invitationId, interestId, messageId, userId, user?.role]);
+  }, [
+    open,
+    initialItem,
+    invitationId,
+    interestId,
+    messageId,
+    requestKey,
+    userId,
+    user?.role,
+  ]);
 
-  const close = () => {
+  useEffect(() => {
+    if (open) return undefined;
+    const timeoutId = window.setTimeout(() => {
+      setItem(null);
+      setResolvedRequestKey("");
+    }, 200);
+    return () => window.clearTimeout(timeoutId);
+  }, [open]);
+
+  function close() {
     setPendingInvitationAcceptance(null);
     onOpenChange?.(false);
-  };
+  }
 
   const handleOpenCompensationWizard = (sourceItem) => {
     const src = sourceItem || item;
     if (!src) return;
-    setOnboardingTalent({
-      talentId: src.talentId,
+    const isInv = isFounderTalentInvitation(src);
+    const nextOnboardingTalent = {
+      talentId: getTalentId(src),
       talentName: src.talentName,
       talentArea: src.talentArea,
       talentSkills: src.talentSkills,
-      interestId: src.id,
-    });
+      interestId: !isInv ? String(src.id) : null,
+      invitationId: isInv ? String(src.id) : null,
+      startupId: String(src.startupId || getStartupId(user) || ""),
+    };
+    if (!resolveOnboardingSource(nextOnboardingTalent)) {
+      toast.error("This onboarding request has no valid invitation or interest.");
+      return;
+    }
+    setOnboardingTalent(nextOnboardingTalent);
     setShowOnboardingWizard(true);
     setItem(null);
     onOpenChange?.(false);
@@ -651,8 +711,7 @@ export default function InviteDetailModal({
                 ) : null}
                 {selectedItem.status === "accepted" &&
                 isFounderInboxUser &&
-                direction === "received" &&
-                !isInv ? (
+                !selectedItem.onboarded ? (
                   <div className="mt-3 border-t border-status-success/20 pt-3">
                     <Button
                       onClick={() => handleOpenCompensationWizard(selectedItem)}
@@ -685,6 +744,9 @@ export default function InviteDetailModal({
     );
   };
 
+  const waitingForRequestedItem =
+    open && !initialItem && Boolean(requestKey) && resolvedRequestKey !== requestKey;
+
   return (
     <>
       <Dialog
@@ -693,7 +755,7 @@ export default function InviteDetailModal({
           if (!next) close();
         }}
       >
-        {loading ? (
+        {loading || waitingForRequestedItem ? (
           <DialogContent className="max-w-sm rounded-card border border-surface-border bg-surface-card shadow-modal">
             <div className="flex items-center justify-center gap-2 py-8 font-body text-sm text-text-muted">
               <Loader2 className="h-4 w-4 animate-spin text-primary" />
@@ -743,11 +805,41 @@ export default function InviteDetailModal({
           teamMemberName={onboardingTalent.talentName}
           teamMemberId={onboardingTalent.talentId}
           founderId={userId}
-          startupId={getStartupId(user)}
-          onComplete={async () => {
-            await actions.markInterestOnboarded(onboardingTalent.interestId);
-            setShowOnboardingWizard(false);
-            setOnboardingTalent(null);
+          startupId={onboardingTalent.startupId || getStartupId(user)}
+          onComplete={async (compensationConfig) => {
+            try {
+              const source = resolveOnboardingSource(onboardingTalent);
+              if (!source) {
+                toast.error("Onboarding could not start because its source is missing.");
+                return;
+              }
+              if (source.kind === "invitation") {
+                await actions.markInvitationOnboarded({
+                  invitationId: source.id,
+                  talentId: onboardingTalent.talentId,
+                  startupId: onboardingTalent.startupId,
+                  compensationConfig,
+                });
+              } else {
+                await actions.markInterestOnboarded(source.id, {
+                  talentId: onboardingTalent.talentId,
+                  startupId: onboardingTalent.startupId,
+                  compensationConfig,
+                });
+              }
+              toast.success(
+                `🎉 ${onboardingTalent.talentName} has been onboarded successfully!`,
+              );
+              setShowOnboardingWizard(false);
+              const completed = onboardingTalent;
+              setOnboardingTalent(null);
+              onOnboardingComplete?.(completed);
+            } catch (err) {
+              console.error("[InviteDetailModal] onboarding failed:", err);
+              toast.error(
+                err?.message || "Failed to complete onboarding. Please try again.",
+              );
+            }
           }}
         />
       ) : null}

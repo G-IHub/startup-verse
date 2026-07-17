@@ -1,3 +1,0 @@
-High level: build and run `server/` on your infrastructure, then configure the client `VITE_API_URL`.
-
-No separate edge-function deploy step — the API is the Express process in this repository.

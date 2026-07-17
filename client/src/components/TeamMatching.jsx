@@ -45,7 +45,6 @@ import { toast } from "sonner";
 import * as founderApi from "../utils/api/founderApi";
 import * as inboxApi from "../utils/api/inboxApi";
 import * as teamMemberApi from "../utils/api/teamMemberApi";
-import * as compensationApi from "../utils/api/compensationApi";
 import { buildFounderProfile } from "../app/session.js";
 import {
   buildStartupPostFormDefaults,
@@ -61,7 +60,6 @@ import { TALENT_BROWSE_MIN_COMPLETION } from "../constants/talentProfile.js";
 import { augmentTalentBrowseFields } from "../utils/talentBrowseNormalize";
 import { getTalentBrowseProfileCompletionPercent } from "../utils/talentProfileCompletion.js";
 import TeamOnboardingManager from "./compensation/TeamOnboardingManager";
-import CompensationSetupWizard from "./compensation/CompensationSetupWizard";
 import EmptyStateBlock from "./organizations/_primitives/EmptyStateBlock";
 import {
   Users,
@@ -88,7 +86,6 @@ import {
   Rocket,
   Mail,
   AlertCircle,
-  UserPlus,
   Edit,
 } from "lucide-react";
 function normalizeTalentProfile(profile) {
@@ -136,10 +133,6 @@ export default function TeamMatching({ user, onNavigate }) {
   const [teamRecommendations, setTeamRecommendations] = useState([]);
   const [recommendedTalent, setRecommendedTalent] = useState([]);
   const [showCompensationManager, setShowCompensationManager] = useState(false);
-  const [pendingOnboarding, setPendingOnboarding] = useState([]);
-  const [selectedOnboardingTalent, setSelectedOnboardingTalent] =
-    useState(null);
-  const [showCompensationWizard, setShowCompensationWizard] = useState(false);
   const [postFormData, setPostFormData] = useState({
     title: "",
     description: "",
@@ -193,10 +186,7 @@ export default function TeamMatching({ user, onNavigate }) {
 
   React.useEffect(() => {
     loadStartupIdeas();
-    if (user.role === "founder") {
-      loadPendingOnboarding();
-    } else {
-      setPendingOnboarding([]);
+    if (user.role !== "founder") {
       loadTalentProfiles();
     }
   }, [user.role, user.id]);
@@ -215,7 +205,6 @@ export default function TeamMatching({ user, onNavigate }) {
     if (founderPostsStatus !== "has-post") return;
     const onFocus = () => {
       loadTalentProfiles();
-      loadPendingOnboarding();
     };
     window.addEventListener("focus", onFocus);
     return () => window.removeEventListener("focus", onFocus);
@@ -348,58 +337,6 @@ export default function TeamMatching({ user, onNavigate }) {
         error,
       );
       setAvailableTalent([]);
-    }
-  };
-
-  const loadPendingOnboarding = async () => {
-    const founderKey = user.id ?? user._id;
-    if (!founderKey || user.role !== "founder") {
-      setPendingOnboarding([]);
-      return;
-    }
-    try {
-      const [receivedInterests, sentInvitations] = await Promise.all([
-        inboxApi.getReceivedInterests(founderKey),
-        inboxApi.getSentInvitations(founderKey),
-      ]);
-      const pending = [];
-
-      for (const i of receivedInterests) {
-        if (i.status === "accepted" && !i.onboarded) {
-          pending.push({
-            id: `interest-${i.id}`,
-            talentId: String(i.talentId),
-            talentName: i.talentName || "Talent",
-            respondedAt: i.respondedAt || i.updatedAt || i.sentAt,
-            response: i.response || i.responseMessage || "",
-            interestId: String(i.id),
-            startupId: String(i.startupId || user.startupId || founderKey),
-          });
-        }
-      }
-
-      const interestTalentIds = new Set(pending.map((p) => p.talentId));
-
-      for (const inv of sentInvitations) {
-        if (inv.status !== "accepted") continue;
-        if (inv.onboarded === true) continue;
-        const tid = String(inv.talentId || "");
-        if (!tid || interestTalentIds.has(tid)) continue;
-        pending.push({
-          id: `invitation-${inv.id}`,
-          talentId: tid,
-          talentName: inv.talentName || "Talent",
-          respondedAt: inv.updatedAt || inv.sentAt,
-          response: inv.response || "",
-          invitationId: String(inv.id),
-          startupId: String(inv.startupId || user.startupId || founderKey),
-        });
-      }
-
-      setPendingOnboarding(pending);
-    } catch (e) {
-      console.error("[TeamMatching] loadPendingOnboarding failed:", e);
-      setPendingOnboarding([]);
     }
   };
 
@@ -687,58 +624,6 @@ export default function TeamMatching({ user, onNavigate }) {
       } else {
         toast.error("Failed to send interest. Please try again.");
       }
-    }
-  };
-  const handleStartOnboarding = (talent) => {
-    setSelectedOnboardingTalent(talent);
-    setShowCompensationWizard(true);
-  };
-  const handleCompleteOnboarding = async (compensationConfig) => {
-    if (!selectedOnboardingTalent) return;
-
-    const founderId = user.id ?? user._id;
-    const startupId =
-      selectedOnboardingTalent.startupId ||
-      user.startupId ||
-      founderId;
-
-    try {
-      if (selectedOnboardingTalent.interestId) {
-        await compensationApi.convertTalentToTeamMember(
-          selectedOnboardingTalent.talentId,
-          founderId,
-          startupId,
-          compensationConfig,
-          selectedOnboardingTalent.interestId,
-        );
-      } else if (selectedOnboardingTalent.invitationId) {
-        await compensationApi.onboardInvitation(
-          selectedOnboardingTalent.invitationId,
-          {
-            talentId: selectedOnboardingTalent.talentId,
-            founderId,
-            startupId,
-            compensationConfig,
-          },
-        );
-      } else {
-        toast.error(
-          "Could not complete onboarding — refresh the page and try again.",
-        );
-        return;
-      }
-
-      toast.success(
-        `🎉 ${selectedOnboardingTalent.talentName} has been onboarded successfully!`,
-      );
-      setShowCompensationWizard(false);
-      setSelectedOnboardingTalent(null);
-      await loadPendingOnboarding();
-    } catch (err) {
-      console.error("[TeamMatching] handleCompleteOnboarding failed:", err);
-      toast.error(
-        err?.message || "Failed to complete onboarding. Please try again.",
-      );
     }
   };
   const viewTalentProfile = (member) => {
@@ -1034,83 +919,6 @@ export default function TeamMatching({ user, onNavigate }) {
           </div>
           {user.role === "founder" ? (
             <>
-              {pendingOnboarding.length > 0 && (
-                <div className="mb-6">
-                  <Card className="rounded-card border border-emerald-200 bg-white shadow-soft">
-                    <CardHeader className="pb-3">
-                      <div className="flex items-center justify-between gap-3">
-                        <div className="flex items-center gap-3">
-                          <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg bg-emerald-100">
-                            <UserPlus className="h-4 w-4 text-emerald-600" />
-                          </div>
-                          <div>
-                            <CardTitle className="font-heading text-base font-bold leading-tight text-text-heading">
-                              Pending Onboarding
-                            </CardTitle>
-                            <p className="mt-0.5 text-xs text-text-body">
-                              These talents accepted your invitation and are
-                              ready to be onboarded
-                            </p>
-                          </div>
-                        </div>
-                        <Badge
-                          variant="secondary"
-                          className="flex-shrink-0 rounded-pill border-emerald-200 bg-emerald-100 px-2.5 py-1 text-xs font-semibold text-emerald-700"
-                        >
-                          {pendingOnboarding.length}{" "}
-                          {pendingOnboarding.length === 1 ? "person" : "people"}
-                        </Badge>
-                      </div>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3">
-                        {pendingOnboarding.map((talent) => (
-                          <Card
-                            key={talent.id}
-                            className="rounded-card border border-surface-border bg-surface-card shadow-soft transition-shadow duration-200 hover:shadow-card"
-                          >
-                            <CardContent className="p-4">
-                              <div className="mb-3 flex items-start gap-3">
-                                <Avatar className="h-10 w-10 flex-shrink-0">
-                                  <AvatarFallback className="bg-emerald-100 font-semibold text-emerald-700">
-                                    {talent.talentName
-                                      ?.substring(0, 2)
-                                      ?.toUpperCase() || "??"}
-                                  </AvatarFallback>
-                                </Avatar>
-                                <div className="min-w-0 flex-1">
-                                  <h4 className="truncate text-sm font-semibold text-text-heading">
-                                    {talent.talentName}
-                                  </h4>
-                                  <p className="mt-0.5 text-xs text-text-muted">
-                                    Accepted{" "}
-                                    {new Date(
-                                      talent.respondedAt || talent.sentAt,
-                                    ).toLocaleDateString()}
-                                  </p>
-                                </div>
-                                <CheckCircle2 className="h-5 w-5 flex-shrink-0 text-emerald-500" />
-                              </div>
-                              {talent.response && (
-                                <p className="mb-3 line-clamp-2 text-xs italic text-text-body">
-                                  "{talent.response}"
-                                </p>
-                              )}
-                              <Button
-                                onClick={() => handleStartOnboarding(talent)}
-                                className="h-9 w-full rounded-lg bg-emerald-600 text-xs font-semibold text-white shadow-sm hover:bg-emerald-700"
-                              >
-                                <DollarSign className="mr-1.5 h-3.5 w-3.5" />
-                                Onboard Team
-                              </Button>
-                            </CardContent>
-                          </Card>
-                        ))}
-                      </div>
-                    </CardContent>
-                  </Card>
-                </div>
-              )}
               {teamRecommendations.length > 0 &&
                 recommendedTalent.length > 0 && (
                   <div className="mb-6">
@@ -2622,20 +2430,6 @@ export default function TeamMatching({ user, onNavigate }) {
             </div>
           </div>
         </div>
-      )}
-      {selectedOnboardingTalent && (
-        <CompensationSetupWizard
-          isOpen={showCompensationWizard}
-          onClose={() => {
-            setShowCompensationWizard(false);
-            setSelectedOnboardingTalent(null);
-          }}
-          teamMemberName={selectedOnboardingTalent.talentName}
-          teamMemberId={selectedOnboardingTalent.talentId}
-          founderId={user.id}
-          startupId={user.startupId || user.id}
-          onComplete={handleCompleteOnboarding}
-        />
       )}
     </div>
   );

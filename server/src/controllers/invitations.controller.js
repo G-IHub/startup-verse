@@ -14,6 +14,7 @@ import TalentProfile from "../models/TalentProfile.js";
 import TeamMemberProfile from "../models/TeamMemberProfile.js";
 import Presence from "../models/Presence.js";
 import Activity from "../models/Activity.js";
+import Notification from "../models/Notification.js";
 import Message from "../models/Message.js";
 import { error as apiError, success as apiSuccess } from "../utils/apiResponse.js";
 import { sendTokenResponse } from "../utils/sendToken.js";
@@ -45,6 +46,157 @@ const canAccessInterest = (req, interest) =>
   req.user?.id === String(interest?.talentId || "");
 const isFounderTalentKind = (invitation) =>
   String(invitation?.kind || "founder-talent") === "founder-talent";
+const COMPENSATION_TYPES = new Set([
+  "equity",
+  "fixed",
+  "hourly",
+  "equity-fixed",
+  "unpaid",
+]);
+
+function isRecord(value) {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+function hasOnlyKeys(value, allowedKeys) {
+  return isRecord(value) &&
+    Object.keys(value).every((key) => allowedKeys.has(key));
+}
+
+function isNumberInRange(value, minimum, maximum) {
+  const number = Number(value);
+  return Number.isFinite(number) && number >= minimum && number <= maximum;
+}
+
+function isIntegerInRange(value, minimum, maximum) {
+  const number = Number(value);
+  return Number.isInteger(number) && number >= minimum && number <= maximum;
+}
+
+function isValidScale(scale, percentageKey) {
+  if (!Array.isArray(scale) || scale.length > 20) return false;
+  return scale.every((entry) =>
+    hasOnlyKeys(
+      entry,
+      new Set(["minCompletion", "maxCompletion", percentageKey]),
+    ) &&
+    isNumberInRange(entry.minCompletion, 0, 100) &&
+    isNumberInRange(entry.maxCompletion, 0, 100) &&
+    Number(entry.minCompletion) <= Number(entry.maxCompletion) &&
+    isNumberInRange(entry[percentageKey], 0, 100),
+  );
+}
+
+function isValidEquityConfig(equity) {
+  const allowedKeys = new Set([
+    "totalEquity",
+    "vestingPeriod",
+    "cliffEnabled",
+    "cliffPeriod",
+    "vestingFrequency",
+    "performanceGated",
+    "threshold",
+    "partialVesting",
+    "partialScale",
+  ]);
+  if (!hasOnlyKeys(equity, allowedKeys)) return false;
+  if (!isNumberInRange(equity.totalEquity, 0.01, 100)) return false;
+  if (!isIntegerInRange(equity.vestingPeriod, 1, 120)) return false;
+  if (typeof equity.cliffEnabled !== "boolean") return false;
+  if (!isIntegerInRange(equity.cliffPeriod, 0, 120)) return false;
+  if (
+    equity.cliffEnabled &&
+    Number(equity.cliffPeriod) > Number(equity.vestingPeriod)
+  ) {
+    return false;
+  }
+  if (!["weekly", "monthly", "quarterly"].includes(equity.vestingFrequency)) {
+    return false;
+  }
+  if (typeof equity.performanceGated !== "boolean") return false;
+  if (!isNumberInRange(equity.threshold, 0, 100)) return false;
+  if (typeof equity.partialVesting !== "boolean") return false;
+  if (
+    equity.partialVesting &&
+    !isValidScale(equity.partialScale, "vestingPercentage")
+  ) {
+    return false;
+  }
+  return equity.partialVesting || equity.partialScale === null;
+}
+
+function isValidFixedConfig(fixed) {
+  const allowedKeys = new Set([
+    "paymentType",
+    "amount",
+    "performanceGated",
+    "threshold",
+    "partialPayments",
+    "partialScale",
+    "paymentDay",
+  ]);
+  if (!hasOnlyKeys(fixed, allowedKeys)) return false;
+  if (!["monthly", "one-time"].includes(fixed.paymentType)) return false;
+  if (!isNumberInRange(fixed.amount, 0.01, 1_000_000_000)) return false;
+  if (typeof fixed.performanceGated !== "boolean") return false;
+  if (!isNumberInRange(fixed.threshold, 0, 100)) return false;
+  if (typeof fixed.partialPayments !== "boolean") return false;
+  if (
+    fixed.partialPayments &&
+    !isValidScale(fixed.partialScale, "paymentPercentage")
+  ) {
+    return false;
+  }
+  if (!["last", "first", "15th"].includes(fixed.paymentDay)) return false;
+  return fixed.partialPayments || fixed.partialScale === null;
+}
+
+function isValidHourlyConfig(hourly) {
+  const allowedKeys = new Set([
+    "rate",
+    "tracking",
+    "performanceGated",
+    "threshold",
+    "hourCap",
+    "maxHoursPerWeek",
+    "paymentFrequency",
+  ]);
+  if (!hasOnlyKeys(hourly, allowedKeys)) return false;
+  if (!isNumberInRange(hourly.rate, 0.01, 1_000_000)) return false;
+  if (!["self-report", "manual-approval"].includes(hourly.tracking)) return false;
+  if (typeof hourly.performanceGated !== "boolean") return false;
+  if (!isNumberInRange(hourly.threshold, 0, 100)) return false;
+  if (typeof hourly.hourCap !== "boolean") return false;
+  if (!isNumberInRange(hourly.maxHoursPerWeek, 0.01, 168)) {
+    return false;
+  }
+  return ["weekly", "bi-weekly", "monthly"].includes(
+    hourly.paymentFrequency,
+  );
+}
+
+function isValidCompensationConfig(value) {
+  if (!isRecord(value) || !COMPENSATION_TYPES.has(value.type)) return false;
+  if (value.type === "equity") {
+    return hasOnlyKeys(value, new Set(["type", "equity"])) &&
+      isValidEquityConfig(value.equity);
+  }
+  if (value.type === "fixed") {
+    return hasOnlyKeys(value, new Set(["type", "fixed"])) &&
+      isValidFixedConfig(value.fixed);
+  }
+  if (value.type === "hourly") {
+    return hasOnlyKeys(value, new Set(["type", "hourly"])) &&
+      isValidHourlyConfig(value.hourly);
+  }
+  if (value.type === "equity-fixed") {
+    return hasOnlyKeys(value, new Set(["type", "equity", "fixed"])) &&
+      isValidEquityConfig(value.equity) &&
+      isValidFixedConfig(value.fixed);
+  }
+  return hasOnlyKeys(value, new Set(["type", "unpaid"])) &&
+    value.unpaid === true;
+}
 
 const toIdString = (value) => {
   if (!value) return "";
@@ -933,6 +1085,37 @@ export const updateFounderTalentInvitationStatus = async (req, res) => {
       console.error("[updateFounderTalentInvitationStatus] Onboarding failed:", onboardErr.message);
       // Continue - status was already updated
     }
+
+    if (!invitation.onboarded && invitation.founderId) {
+      const invitationIdStr = String(invitation._id);
+      const existing = await Notification.findOne({
+        userId: invitation.founderId,
+        type: "invitation-accepted",
+        readAt: null,
+        "metadata.invitationId": invitationIdStr,
+      }).lean();
+
+      if (!existing) {
+        const talent = invitation.talentId
+          ? await User.findById(invitation.talentId).select("name").lean()
+          : null;
+        const talentName =
+          invitation.metadata?.talentName || talent?.name || "A talent";
+
+        await createNotification({
+          userId: invitation.founderId,
+          type: "invitation-accepted",
+          title: `${talentName} accepted your invitation`,
+          message: "Ready to onboard — set compensation to add them to your team.",
+          actionUrl: inboxDeepLink({ invitationId: invitationIdStr }),
+          metadata: {
+            invitationId: invitationIdStr,
+            talentId: String(invitation.talentId || ""),
+            founderId: String(invitation.founderId),
+          },
+        }).catch(() => null);
+      }
+    }
   }
 
   // Emit real-time event to both parties for status update
@@ -1522,6 +1705,7 @@ export const onboardInterest = async (req, res) => {
   try {
     let responsePayload = null;
     let activityEvent = null;
+    const compensationConfig = req.body?.compensationConfig ?? null;
     await session.withTransaction(async () => {
       const interest = await Interest.findById(req.params.interestId).session(session);
       if (!interest) {
@@ -1531,6 +1715,31 @@ export const onboardInterest = async (req, res) => {
         const forbidden = new Error("Forbidden.");
         forbidden.statusCode = 403;
         throw forbidden;
+      }
+      const callerIsFounder =
+        String(req.user?.id || "") === String(interest.founderId || "");
+      const callerIsTalent =
+        String(req.user?.id || "") === String(interest.talentId || "");
+      if (
+        !callerIsFounder &&
+        !isAdmin(req) &&
+        (!callerIsTalent || interest.status !== "proposed-by-founder")
+      ) {
+        const forbidden = new Error(
+          "Only the founder can onboard this interest unless the talent is accepting a founder proposal.",
+        );
+        forbidden.statusCode = 403;
+        throw forbidden;
+      }
+      if (compensationConfig && !callerIsFounder && !isAdmin(req)) {
+        const forbidden = new Error("Only the founder can set compensation.");
+        forbidden.statusCode = 403;
+        throw forbidden;
+      }
+      if (compensationConfig && !isValidCompensationConfig(compensationConfig)) {
+        const invalid = new Error("The compensation configuration is invalid.");
+        invalid.statusCode = 422;
+        throw invalid;
       }
 
       const startupId = interest.founderId;
@@ -1556,6 +1765,7 @@ export const onboardInterest = async (req, res) => {
           userId: talent._id,
           founderId: interest.founderId,
           startupId,
+          ...(compensationConfig ? { compensation: compensationConfig } : {}),
         },
         { upsert: true, new: true, runValidators: true, session },
       );

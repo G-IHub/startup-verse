@@ -1,6 +1,0 @@
-Deploy the Node API from `../../server` using your host (Docker, PM2, Railway, etc.).
-
-Local smoke:
-  cd ../../server && npm install && npm run start
-
-Client: set production `VITE_API_URL` to your deployed API base URL.

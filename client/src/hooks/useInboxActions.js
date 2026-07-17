@@ -2,6 +2,7 @@ import { useCallback, useState } from "react";
 import { toast } from "sonner";
 import * as inboxApi from "../utils/api/inboxApi";
 import { API_BASE_URL } from "../config/apiBase.js";
+import * as compensationApi from "../utils/api/compensationApi";
 import { getStartupId } from "../utils/startupId";
 import { uploadMessageFile, sendMessage as sendDirectMessage } from "../utils/messaging";
 import { deleteMessageForMe } from "../utils/messageActionsApi";
@@ -16,6 +17,7 @@ import {
   isFounderTalentInvitation,
   isOrganizationInvitation,
 } from "../utils/inboxNormalize";
+import { navigateToInboxChat } from "../utils/inboxNavigation";
 
 const defaultFetchOptions = {
   credentials: "include",
@@ -111,7 +113,7 @@ export async function resolveInboxItem({
   return null;
 }
 
-export function useInboxActions({ user, onNavigate, onItemUpdated }) {
+export function useInboxActions({ user, onNavigate, onItemUpdated, onClose }) {
   const userId = user?._id || user?.id;
   const isTalentInboxUser = isTalentInboxRole(user?.role);
   const isFounderInboxUser = isFounderInboxRole(user?.role);
@@ -421,9 +423,34 @@ export function useInboxActions({ user, onNavigate, onItemUpdated }) {
     [onItemUpdated],
   );
 
-  const markInterestOnboarded = useCallback(async (interestId) => {
-    await inboxApi.markInterestAsOnboarded(interestId);
-  }, []);
+  const markInterestOnboarded = useCallback(
+    async (interestId, { talentId, startupId, compensationConfig } = {}) => {
+      if (compensationConfig) {
+        await compensationApi.convertTalentToTeamMember(
+          talentId,
+          userId,
+          startupId || getStartupId(user),
+          compensationConfig,
+          interestId,
+        );
+        return;
+      }
+      await inboxApi.markInterestAsOnboarded(interestId);
+    },
+    [user, userId],
+  );
+
+  const markInvitationOnboarded = useCallback(
+    async ({ invitationId, talentId, startupId, compensationConfig }) => {
+      await compensationApi.onboardInvitation(invitationId, {
+        talentId,
+        founderId: userId,
+        startupId: startupId || getStartupId(user),
+        compensationConfig,
+      });
+    },
+    [user, userId],
+  );
 
   const sendOrgMessage = useCallback(
     async ({ cohort, subject, message }) => {
@@ -462,24 +489,17 @@ export function useInboxActions({ user, onNavigate, onItemUpdated }) {
 
   const openChatForItem = useCallback(
     (item) => {
-      if (!onNavigate || !item) return;
-      const isInv = isFounderTalentInvitation(item);
-      const targetId = isInv
-        ? isTalentInboxUser
-          ? String(item.founderId?._id || item.founderId || "")
-          : String(item.talentId?._id || item.talentId || "")
-        : isTalentInboxUser
-          ? String(item.founderId?._id || item.founderId || "")
-          : String(item.talentId?._id || item.talentId || "");
-      if (!targetId) {
+      const opened = navigateToInboxChat({
+        item,
+        isTalentInboxUser,
+        onNavigate,
+        onClose: onClose || (() => onItemUpdated?.(null)),
+      });
+      if (!opened) {
         toast.error("Chat user unavailable for this conversation.");
-        return;
       }
-      onItemUpdated?.(null);
-      const chatPage = isTalentInboxUser ? "talent-chat" : "founder-chat";
-      onNavigate(chatPage, { messageUserId: targetId });
     },
-    [onNavigate, isTalentInboxUser, onItemUpdated],
+    [onNavigate, isTalentInboxUser, onItemUpdated, onClose],
   );
 
   const openTalentProfile = useCallback(
@@ -546,6 +566,7 @@ export function useInboxActions({ user, onNavigate, onItemUpdated }) {
     acceptMembership,
     declineMembership,
     markInterestOnboarded,
+    markInvitationOnboarded,
     sendOrgMessage,
     openChatForItem,
     openTalentProfile,
