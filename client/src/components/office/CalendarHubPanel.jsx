@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Calendar,
@@ -8,25 +8,28 @@ import {
   ChevronRight,
   Video,
   Users,
-  CheckSquare,
   CalendarDays,
   Clock,
   MapPin,
-  ArrowRight,
 } from "lucide-react";
 import MeetingScheduler from "../calendar/MeetingScheduler";
+import MeetingDetailModal from "../calendar/MeetingDetailModal";
 import AgendaPanel from "../calendar/AgendaPanel";
 import * as meetingApi from "../../utils/api/meetingApi";
 import * as teamMemberApi from "../../utils/api/teamMemberApi";
 import { getStartupId } from "../../utils/startupId";
+import { cn } from "../ui/utils";
 
-const TODAY = new Date();
+const YELLOW_DAY = "#fef3c7";
+const YELLOW_DAY_SELECTED = "#fde68a";
+const YELLOW_TEXT = "#92400e";
 
 function isToday(date) {
+  const today = new Date();
   return (
-    date.getDate() === TODAY.getDate() &&
-    date.getMonth() === TODAY.getMonth() &&
-    date.getFullYear() === TODAY.getFullYear()
+    date.getDate() === today.getDate() &&
+    date.getMonth() === today.getMonth() &&
+    date.getFullYear() === today.getFullYear()
   );
 }
 
@@ -53,25 +56,101 @@ function formatDate(d) {
   return `${y}-${m}-${day}`;
 }
 
+function parseLocalYmd(ymd) {
+  const [y, m, d] = String(ymd || "")
+    .slice(0, 10)
+    .split("-")
+    .map(Number);
+  if (!y || !m || !d) return null;
+  return new Date(y, m - 1, d);
+}
+
 function getTypeChip(type) {
-  if (type === "video-call") return { label: "Video Call", bg: "#dbeafe", color: "#1d4ed8", Icon: Video };
-  return { label: "Meeting", bg: "#ede9fe", color: "#7c3aed", Icon: Users };
+  if (type === "video-call")
+    return { label: "Video", bg: "bg-sky-50", color: "text-sky-700", Icon: Video };
+  return {
+    label: "In-person",
+    bg: "bg-amber-50",
+    color: "text-amber-800",
+    Icon: Users,
+  };
+}
+
+function countUniqueMeetingSeries(meetings) {
+  const keys = new Set();
+  for (const m of meetings || []) {
+    keys.add(m.recurrenceGroupId || m.id);
+  }
+  return keys.size;
+}
+
+function findNextMeetingDate(
+  meetings,
+  fromDate = new Date(),
+  { allowPast = false } = {},
+) {
+  const fromKey = formatDate(fromDate);
+  const upcoming = (meetings || [])
+    .map((m) => m.date)
+    .filter((d) => d && d >= fromKey)
+    .sort();
+  if (upcoming[0]) return upcoming[0];
+  if (!allowPast) return null;
+  const any = (meetings || [])
+    .map((m) => m.date)
+    .filter(Boolean)
+    .sort();
+  return any[0] || null;
+}
+
+function meetingFromAgendaItem(item) {
+  if (!item) return null;
+  const meta = item.metadata || item.raw || {};
+  return {
+    id: String(item.id || meta.id || meta._id || ""),
+    title: item.title || meta.title || "Meeting",
+    description: item.description || meta.description || "",
+    date: item.date || meta.date || "",
+    startTime: item.startTime || meta.startTime || item.time || "",
+    endTime: item.endTime || meta.endTime || "",
+    type: item.subtype || meta.type || item.type || "meeting",
+    location: item.location || meta.location || "",
+    attendees: meta.attendees || item.attendees || [],
+    organizerId: meta.organizerId || item.organizerId || "",
+    isRecurring: Boolean(
+      meta.isRecurring || item.isRecurring || item.isRecurringSeries,
+    ),
+    recurrenceGroupId:
+      item.recurrenceGroupId || meta.recurrenceGroupId || null,
+    status: meta.status || item.status || "scheduled",
+  };
 }
 
 const DAY_HEADERS = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
 
-export default function CalendarHubPanel({ user, onClose, startupId: propStartupId }) {
+export default function CalendarHubPanel({
+  user,
+  onClose,
+  startupId: propStartupId,
+  onMeetingScheduled: onMeetingScheduledProp,
+}) {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [meetings, setMeetings] = useState([]);
   const [teamMembers, setTeamMembers] = useState([]);
   const [showScheduler, setShowScheduler] = useState(false);
   const [loadingMeetings, setLoadingMeetings] = useState(false);
+  const [hoverDay, setHoverDay] = useState(null);
+  const [hoverPos, setHoverPos] = useState({ x: 0, y: 0 });
+  const [detailMeeting, setDetailMeeting] = useState(null);
+  const [agendaReloadToken, setAgendaReloadToken] = useState(0);
+  const didAutoSelect = useRef(false);
 
   const resolvedStartupId = propStartupId || getStartupId(user || {});
   const normalizedUser = user
     ? { ...user, id: user.id || String(user._id || "") }
     : null;
+  const isFounder = String(user?.role || "") === "founder";
 
   const loadMeetings = useCallback(async () => {
     if (!resolvedStartupId) return;
@@ -86,21 +165,48 @@ export default function CalendarHubPanel({ user, onClose, startupId: propStartup
     }
   }, [resolvedStartupId]);
 
-  useEffect(() => { loadMeetings(); }, [loadMeetings]);
+  useEffect(() => {
+    loadMeetings();
+  }, [loadMeetings]);
 
   useEffect(() => {
     if (!resolvedStartupId) return;
-    teamMemberApi.getStartupTeamMembers(resolvedStartupId)
+    teamMemberApi
+      .getStartupTeamMembers(resolvedStartupId)
       .then((list) => {
-        const members = Array.isArray(list) ? list : (list?.members || []);
-        setTeamMembers(members.filter((m) => String(m.id) !== String(normalizedUser?.id)));
+        const members = Array.isArray(list) ? list : list?.members || [];
+        setTeamMembers(
+          members.filter((m) => String(m.id) !== String(normalizedUser?.id)),
+        );
       })
       .catch(() => setTeamMembers([]));
   }, [resolvedStartupId, normalizedUser?.id]);
 
+  useEffect(() => {
+    if (didAutoSelect.current || loadingMeetings || !meetings.length) return;
+    const onSelected = meetings.some(
+      (m) => m.date === formatDate(selectedDate),
+    );
+    if (onSelected) {
+      didAutoSelect.current = true;
+      return;
+    }
+    const nextKey = findNextMeetingDate(meetings, new Date(), {
+      allowPast: true,
+    });
+    const nextDate = parseLocalYmd(nextKey);
+    if (nextDate) {
+      setSelectedDate(nextDate);
+      setCurrentDate(new Date(nextDate.getFullYear(), nextDate.getMonth(), 1));
+    }
+    didAutoSelect.current = true;
+  }, [meetings, loadingMeetings, selectedDate]);
+
   const handleMeetingScheduled = (meeting) => {
     if (meeting) setMeetings((prev) => [...prev, meeting]);
     loadMeetings();
+    setAgendaReloadToken((n) => n + 1);
+    onMeetingScheduledProp?.(meeting);
   };
 
   const navigateMonth = (dir) => {
@@ -115,9 +221,73 @@ export default function CalendarHubPanel({ user, onClose, startupId: propStartup
     meetings.filter((m) => m.date === formatDate(date));
 
   const selectedEvents = getEventsForDate(selectedDate);
-  const monthName = currentDate.toLocaleDateString("en-US", { month: "long", year: "numeric" });
+  const monthName = currentDate.toLocaleDateString("en-US", {
+    month: "long",
+    year: "numeric",
+  });
   const { total, firstDay } = getDaysInMonth(currentDate);
   const meetingDates = new Set(meetings.map((m) => m.date));
+
+  const seriesCount = useMemo(
+    () => countUniqueMeetingSeries(meetings),
+    [meetings],
+  );
+
+  const nextMeetingAfterSelected = useMemo(() => {
+    if (selectedEvents.length > 0) return null;
+    return findNextMeetingDate(meetings, selectedDate);
+  }, [meetings, selectedDate, selectedEvents.length]);
+
+  const openMeetingDetail = (meeting) => {
+    if (!meeting) return;
+    setDetailMeeting(meeting);
+  };
+
+  const handleDayClick = (cellDate) => {
+    setSelectedDate(cellDate);
+    const dayMeetings = getEventsForDate(cellDate);
+    if (dayMeetings.length === 1) {
+      openMeetingDetail(dayMeetings[0]);
+    }
+  };
+
+  const jumpToDateKey = (ymd) => {
+    const d = parseLocalYmd(ymd);
+    if (!d) return;
+    setSelectedDate(d);
+    setCurrentDate(new Date(d.getFullYear(), d.getMonth(), 1));
+  };
+
+  const handleAgendaItemClick = (item) => {
+    if (!item) return;
+    const type = String(item.type || "");
+    if (
+      type === "meeting" ||
+      type === "company-event" ||
+      item.subtype === "video-call"
+    ) {
+      const mapped = meetingFromAgendaItem(item);
+      if (mapped?.id) {
+        const fromList = meetings.find(
+          (m) => String(m.id) === String(mapped.id),
+        );
+        openMeetingDetail(fromList || mapped);
+        return;
+      }
+    }
+    if (item.date) {
+      const d = parseLocalYmd(item.date) || new Date(`${item.date}T12:00:00`);
+      if (!Number.isNaN(d.getTime())) setSelectedDate(d);
+    }
+  };
+
+  const hoverMeetings = hoverDay != null ? getEventsForDate(hoverDay) : [];
+
+  const cells = [];
+  for (let i = 0; i < firstDay; i += 1) cells.push(null);
+  for (let day = 1; day <= total; day += 1) {
+    cells.push(new Date(currentDate.getFullYear(), currentDate.getMonth(), day));
+  }
 
   return (
     <>
@@ -126,265 +296,226 @@ export default function CalendarHubPanel({ user, onClose, startupId: propStartup
         animate={{ x: 0 }}
         exit={{ x: "100%" }}
         transition={{ type: "spring", damping: 28, stiffness: 260 }}
-        style={{
-          position: "fixed",
-          top: 0,
-          right: 0,
-          height: "100vh",
-          width: "50vw",
-          minWidth: 580,
-          zIndex: 70,
-          display: "flex",
-          flexDirection: "column",
-          backgroundColor: "#ffffff",
-          boxShadow: "-4px 0 32px rgba(0,0,0,0.10)",
-          borderLeft: "1px solid #e5e7eb",
-        }}
+        className="fixed right-0 top-0 z-[70] flex h-screen w-[min(50vw,720px)] min-w-[560px] flex-col border-l border-surface-border bg-surface-card shadow-[-8px_0_40px_rgba(15,23,42,0.08)]"
       >
-        {/* ── Header ── */}
-        <div
-          style={{
-            flexShrink: 0,
-            padding: "14px 20px",
-            borderBottom: "1px solid #f1f5f9",
-            background: "linear-gradient(135deg, #f8f7ff 0%, #fff 100%)",
-            display: "flex",
-            alignItems: "center",
-            gap: 12,
-          }}
-        >
-          <div
-            style={{
-              width: 40,
-              height: 40,
-              borderRadius: 12,
-              background: "linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%)",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              flexShrink: 0,
-              boxShadow: "0 4px 12px rgba(79,70,229,0.3)",
-            }}
-          >
-            <Calendar style={{ width: 20, height: 20, color: "#fff" }} />
+        <header className="flex shrink-0 items-center gap-3 border-b border-surface-border px-5 py-4">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary-tint">
+            <Calendar className="h-5 w-5 text-primary" />
           </div>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <p style={{ fontSize: 16, fontWeight: 700, color: "#111827", lineHeight: 1.2 }}>
+          <div className="min-w-0 flex-1">
+            <p className="font-heading text-base font-bold text-text-heading">
               Calendar &amp; Schedule
             </p>
-            <p style={{ fontSize: 12, color: "#9ca3af", marginTop: 2 }}>
-              {meetings.length} meeting{meetings.length !== 1 ? "s" : ""} scheduled
+            <p className="mt-0.5 text-xs text-text-muted">
+              {seriesCount} scheduled series
+              {meetings.length !== seriesCount
+                ? ` · ${meetings.length} occurrences`
+                : ""}
             </p>
           </div>
-          <button
-            type="button"
-            onClick={() => setShowScheduler(true)}
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              gap: 6,
-              height: 36,
-              padding: "0 16px",
-              borderRadius: 9,
-              fontSize: 13,
-              fontWeight: 600,
-              background: "linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%)",
-              color: "#fff",
-              border: "none",
-              cursor: "pointer",
-              boxShadow: "0 2px 8px rgba(79,70,229,0.35)",
-              flexShrink: 0,
-            }}
-          >
-            <Plus style={{ width: 14, height: 14 }} />
-            Schedule Meeting
-          </button>
+          {isFounder ? (
+            <button
+              type="button"
+              onClick={() => setShowScheduler(true)}
+              className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-lg bg-primary px-3.5 text-[13px] font-semibold text-white transition-opacity hover:opacity-90"
+            >
+              <Plus className="h-3.5 w-3.5" />
+              Schedule Meeting
+            </button>
+          ) : null}
           <button
             type="button"
             onClick={onClose}
-            style={{
-              width: 32,
-              height: 32,
-              borderRadius: 8,
-              border: "1px solid #e5e7eb",
-              backgroundColor: "#f9fafb",
-              cursor: "pointer",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              flexShrink: 0,
-              color: "#6b7280",
-            }}
+            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-surface-border bg-surface-page text-text-muted transition-colors hover:bg-surface-card hover:text-text-heading"
           >
-            <X style={{ width: 15, height: 15 }} />
+            <X className="h-4 w-4" />
           </button>
-        </div>
+        </header>
 
-        {/* ── Body: two columns ── */}
-        <div style={{ flex: 1, minHeight: 0, display: "flex", overflow: "hidden" }}>
-
-          {/* ── Left column: calendar + day events ── */}
-          <div
-            style={{
-              flex: "0 0 55%",
-              display: "flex",
-              flexDirection: "column",
-              overflow: "hidden",
-              borderRight: "1px solid #f1f5f9",
-            }}
-          >
-            {/* Calendar grid (fixed, not scrollable) */}
-            <div style={{ flexShrink: 0, padding: "20px 20px 12px" }}>
-              {/* Month nav */}
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  <CalendarDays style={{ width: 16, height: 16, color: "#4f46e5" }} />
-                  <span style={{ fontSize: 15, fontWeight: 700, color: "#111827" }}>{monthName}</span>
-                </div>
-                <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+        <div className="flex min-h-0 flex-1 overflow-hidden">
+          <div className="flex min-h-0 w-[55%] flex-col border-r border-surface-border">
+            <div className="shrink-0 px-5 pb-3 pt-5">
+              <div className="mb-4 flex items-center justify-between">
+                <p className="font-heading text-[15px] font-semibold text-text-heading">
+                  {monthName}
+                </p>
+                <div className="flex items-center gap-1">
                   <button
                     type="button"
-                    onClick={() => { setCurrentDate(new Date()); setSelectedDate(new Date()); }}
-                    style={{
-                      height: 28, padding: "0 10px", borderRadius: 7, fontSize: 12, fontWeight: 500,
-                      border: "1px solid #e5e7eb", backgroundColor: "#f9fafb", cursor: "pointer", color: "#374151",
+                    onClick={() => navigateMonth("prev")}
+                    className="flex h-8 w-8 items-center justify-center rounded-lg text-text-body transition-colors hover:bg-surface-page"
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const t = new Date();
+                      setCurrentDate(new Date(t.getFullYear(), t.getMonth(), 1));
+                      setSelectedDate(t);
                     }}
+                    className="h-8 rounded-lg px-2.5 text-xs font-semibold text-primary transition-colors hover:bg-primary-tint"
                   >
                     Today
                   </button>
-                  {[["prev", ChevronLeft], ["next", ChevronRight]].map(([dir, Icon]) => (
-                    <button
-                      key={dir}
-                      type="button"
-                      onClick={() => navigateMonth(dir)}
-                      style={{
-                        width: 28, height: 28, borderRadius: 7,
-                        border: "1px solid #e5e7eb", backgroundColor: "#f9fafb",
-                        cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
-                      }}
-                    >
-                      <Icon style={{ width: 13, height: 13, color: "#374151" }} />
-                    </button>
-                  ))}
+                  <button
+                    type="button"
+                    onClick={() => navigateMonth("next")}
+                    className="flex h-8 w-8 items-center justify-center rounded-lg text-text-body transition-colors hover:bg-surface-page"
+                  >
+                    <ChevronRight className="h-4 w-4" />
+                  </button>
                 </div>
               </div>
 
-              {/* Day headers */}
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", marginBottom: 6 }}>
+              <div className="mb-1 grid grid-cols-7 gap-1 text-center">
                 {DAY_HEADERS.map((d) => (
-                  <div key={d} style={{ textAlign: "center", fontSize: 11, fontWeight: 600, color: "#9ca3af", paddingBottom: 6 }}>
+                  <span
+                    key={d}
+                    className="py-1 text-[11px] font-semibold text-text-muted"
+                  >
                     {d}
-                  </div>
+                  </span>
                 ))}
               </div>
-
-              {/* Day cells */}
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 3 }}>
-                {Array.from({ length: firstDay }).map((_, i) => (
-                  <div key={`empty-${i}`} />
-                ))}
-                {Array.from({ length: total }).map((_, idx) => {
-                  const day = idx + 1;
-                  const cellDate = new Date(currentDate.getFullYear(), currentDate.getMonth(), day);
-                  const isCurrentDay = isToday(cellDate);
-                  const isSelected = isSameDay(cellDate, selectedDate);
-                  const hasMeeting = meetingDates.has(formatDate(cellDate));
-                  const meetingCount = meetings.filter((m) => m.date === formatDate(cellDate)).length;
-
+              <div className="grid grid-cols-7 gap-1">
+                {cells.map((cellDate, index) => {
+                  if (!cellDate) {
+                    return <div key={`empty-${index}`} className="h-10" />;
+                  }
+                  const key = formatDate(cellDate);
+                  const hasMeeting = meetingDates.has(key);
+                  const selected = isSameDay(cellDate, selectedDate);
+                  const currentDay = isToday(cellDate);
                   return (
                     <button
-                      key={day}
+                      key={key}
                       type="button"
-                      onClick={() => setSelectedDate(cellDate)}
-                      style={{
-                        height: 42,
-                        borderRadius: 10,
-                        fontSize: 13,
-                        fontWeight: isCurrentDay ? 700 : isSelected ? 600 : 400,
-                        position: "relative",
-                        border: "none",
-                        backgroundColor: isCurrentDay
-                          ? "#4f46e5"
-                          : isSelected
-                            ? "#eef2ff"
-                            : "transparent",
-                        color: isCurrentDay ? "#fff" : isSelected ? "#4f46e5" : "#374151",
-                        cursor: "pointer",
-                        display: "flex",
-                        flexDirection: "column",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        gap: 2,
-                        outline: isSelected && !isCurrentDay ? "2px solid #c7d2fe" : "none",
-                        transition: "background 0.12s",
+                      onClick={() => handleDayClick(cellDate)}
+                      onMouseEnter={(e) => {
+                        if (!hasMeeting) return;
+                        const rect = e.currentTarget.getBoundingClientRect();
+                        setHoverDay(cellDate);
+                        setHoverPos({
+                          x: rect.left + rect.width / 2,
+                          y: rect.bottom + 8,
+                        });
                       }}
-                    >
-                      {day}
-                      {hasMeeting && (
-                        <div style={{ display: "flex", gap: 2 }}>
-                          {Array.from({ length: Math.min(meetingCount, 3) }).map((_, di) => (
-                            <span
-                              key={di}
-                              style={{
-                                width: 4,
-                                height: 4,
-                                borderRadius: "50%",
-                                backgroundColor: isCurrentDay ? "rgba(255,255,255,0.7)" : "#7c3aed",
-                              }}
-                            />
-                          ))}
-                        </div>
+                      onMouseLeave={() => setHoverDay(null)}
+                      className={cn(
+                        "relative mx-auto flex h-10 w-10 flex-col items-center justify-center rounded-full text-sm transition-colors",
+                        currentDay &&
+                          !selected &&
+                          "bg-primary font-semibold text-white",
+                        currentDay && selected && "bg-primary font-semibold text-white ring-2 ring-amber-300 ring-offset-1",
+                        !currentDay &&
+                          selected &&
+                          hasMeeting &&
+                          "font-semibold",
+                        !currentDay &&
+                          selected &&
+                          !hasMeeting &&
+                          "bg-surface-page font-semibold text-text-heading",
+                        !currentDay &&
+                          !selected &&
+                          hasMeeting &&
+                          "font-semibold hover:opacity-90",
+                        !currentDay &&
+                          !selected &&
+                          !hasMeeting &&
+                          "text-text-heading hover:bg-surface-page",
                       )}
+                      style={
+                        !currentDay && hasMeeting
+                          ? {
+                              backgroundColor: selected
+                                ? YELLOW_DAY_SELECTED
+                                : YELLOW_DAY,
+                              color: YELLOW_TEXT,
+                            }
+                          : undefined
+                      }
+                    >
+                      {cellDate.getDate()}
+                      {hasMeeting && !currentDay ? (
+                        <span
+                          className="absolute bottom-1 h-1 w-1 rounded-full"
+                          style={{ backgroundColor: "#f59e0b" }}
+                        />
+                      ) : null}
+                      {hasMeeting && currentDay ? (
+                        <span className="absolute bottom-1 h-1 w-1 rounded-full bg-white/85" />
+                      ) : null}
                     </button>
                   );
                 })}
               </div>
             </div>
 
-            {/* Selected day events — scrollable */}
-            <div style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: "0 20px 20px" }}>
-              <div style={{
-                display: "flex", alignItems: "center", gap: 8,
-                paddingBottom: 10, marginBottom: 10,
-                borderBottom: "1px solid #f1f5f9",
-              }}>
-                <div style={{
-                  width: 6, height: 6, borderRadius: "50%",
-                  backgroundColor: selectedEvents.length > 0 ? "#4f46e5" : "#d1d5db",
-                }} />
-                <span style={{ fontSize: 12, fontWeight: 600, color: "#374151" }}>
-                  {selectedDate.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}
+            <div className="min-h-0 flex-1 overflow-y-auto px-5 pb-5">
+              <div className="mb-2.5 flex items-center gap-2 border-b border-surface-border pb-2.5">
+                <span
+                  className="h-1.5 w-1.5 rounded-full"
+                  style={{
+                    backgroundColor:
+                      selectedEvents.length > 0 ? "#f59e0b" : "#d1d5db",
+                  }}
+                />
+                <span className="text-xs font-semibold text-text-heading">
+                  {selectedDate.toLocaleDateString("en-US", {
+                    weekday: "long",
+                    month: "long",
+                    day: "numeric",
+                  })}
                 </span>
-                {selectedEvents.length > 0 && (
-                  <span style={{
-                    marginLeft: "auto", fontSize: 11, fontWeight: 600,
-                    color: "#4f46e5", backgroundColor: "#eef2ff",
-                    padding: "1px 8px", borderRadius: 20,
-                  }}>
-                    {selectedEvents.length} event{selectedEvents.length !== 1 ? "s" : ""}
+                {selectedEvents.length > 0 ? (
+                  <span
+                    className="ml-auto rounded-full px-2 py-0.5 text-[11px] font-semibold"
+                    style={{
+                      color: YELLOW_TEXT,
+                      backgroundColor: YELLOW_DAY,
+                    }}
+                  >
+                    {selectedEvents.length} event
+                    {selectedEvents.length !== 1 ? "s" : ""}
                   </span>
-                )}
+                ) : null}
               </div>
 
               <AnimatePresence mode="wait">
                 {loadingMeetings ? (
-                  <div key="loading" style={{ padding: "20px 0", textAlign: "center" }}>
-                    <div style={{
-                      width: 20, height: 20, margin: "0 auto",
-                      border: "2px solid #4f46e5", borderTopColor: "transparent",
-                      borderRadius: "50%", animation: "spin 0.7s linear infinite",
-                    }} />
+                  <div key="loading" className="flex justify-center py-8">
+                    <div className="h-5 w-5 animate-spin rounded-full border-2 border-primary border-t-transparent" />
                   </div>
                 ) : selectedEvents.length === 0 ? (
                   <motion.div
                     key="empty"
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
-                    style={{ textAlign: "center", padding: "28px 0", color: "#9ca3af" }}
+                    className="px-2 py-8 text-center text-text-muted"
                   >
-                    <CalendarDays style={{ width: 28, height: 28, margin: "0 auto 8px", opacity: 0.4 }} />
-                    <p style={{ fontSize: 13, fontWeight: 500 }}>No events</p>
-                    <p style={{ fontSize: 11, marginTop: 4 }}>Nothing scheduled for this day</p>
+                    <CalendarDays className="mx-auto mb-2 h-7 w-7 opacity-40" />
+                    <p className="text-[13px] font-medium text-text-heading">
+                      Nothing on this day
+                    </p>
+                    <p className="mt-1 text-[11px]">
+                      No meetings scheduled for this date
+                    </p>
+                    {nextMeetingAfterSelected ? (
+                      <button
+                        type="button"
+                        onClick={() => jumpToDateKey(nextMeetingAfterSelected)}
+                        className="mt-3 inline-flex items-center rounded-lg border border-surface-border bg-surface-page px-3 py-1.5 text-[12px] font-semibold text-primary transition-colors hover:bg-primary-tint"
+                      >
+                        Next meeting:{" "}
+                        {parseLocalYmd(
+                          nextMeetingAfterSelected,
+                        )?.toLocaleDateString("en-US", {
+                          month: "short",
+                          day: "numeric",
+                        })}
+                      </button>
+                    ) : null}
                   </motion.div>
                 ) : (
                   <motion.div
@@ -393,64 +524,72 @@ export default function CalendarHubPanel({ user, onClose, startupId: propStartup
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0 }}
                     transition={{ duration: 0.15 }}
-                    style={{ display: "flex", flexDirection: "column", gap: 8 }}
+                    className="flex flex-col gap-2"
                   >
                     {selectedEvents.map((evt) => {
                       const chip = getTypeChip(evt.type);
                       const ChipIcon = chip.Icon;
                       return (
-                        <div
+                        <button
                           key={evt.id}
-                          style={{
-                            borderRadius: 12,
-                            border: "1px solid #e9eef6",
-                            backgroundColor: "#fafbff",
-                            overflow: "hidden",
-                          }}
+                          type="button"
+                          onClick={() => openMeetingDetail(evt)}
+                          className="w-full rounded-xl border border-surface-border bg-surface-page p-3 text-left transition-colors hover:border-primary/25 hover:bg-primary-tint/30"
                         >
-                          {/* Color bar */}
-                          <div style={{ height: 3, backgroundColor: chip.color, width: "100%" }} />
-                          <div style={{ padding: "12px 14px" }}>
-                            <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
-                              <div style={{
-                                width: 34, height: 34, borderRadius: 9,
-                                backgroundColor: chip.bg,
-                                display: "flex", alignItems: "center", justifyContent: "center",
-                                flexShrink: 0,
-                              }}>
-                                <ChipIcon style={{ width: 16, height: 16, color: chip.color }} />
-                              </div>
-                              <div style={{ flex: 1, minWidth: 0 }}>
-                                <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}>
-                                  <p style={{ fontSize: 13, fontWeight: 600, color: "#111827" }}>{evt.title}</p>
-                                  <span style={{
-                                    fontSize: 10, fontWeight: 600, padding: "1px 7px",
-                                    borderRadius: 20, backgroundColor: chip.bg, color: chip.color, flexShrink: 0,
-                                  }}>
-                                    {chip.label}
+                          <div className="flex items-start gap-2.5">
+                            <div
+                              className={cn(
+                                "flex h-9 w-9 shrink-0 items-center justify-center rounded-lg",
+                                chip.bg,
+                              )}
+                            >
+                              <ChipIcon
+                                className={cn("h-4 w-4", chip.color)}
+                              />
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <div className="mb-1 flex flex-wrap items-center gap-1.5">
+                                <p className="text-[13px] font-semibold text-text-heading">
+                                  {evt.title}
+                                </p>
+                                <span
+                                  className={cn(
+                                    "rounded-full px-2 py-0.5 text-[10px] font-semibold",
+                                    chip.bg,
+                                    chip.color,
+                                  )}
+                                >
+                                  {chip.label}
+                                </span>
+                                {evt.isRecurring ? (
+                                  <span className="rounded-full bg-surface-card px-2 py-0.5 text-[10px] font-semibold text-text-muted">
+                                    Recurring
                                   </span>
-                                </div>
-                                {evt.description && (
-                                  <p style={{ fontSize: 11, color: "#6b7280", marginBottom: 6 }}>{evt.description}</p>
-                                )}
-                                <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-                                  {evt.startTime && (
-                                    <span style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 11, color: "#6b7280" }}>
-                                      <Clock style={{ width: 11, height: 11, color: "#4f46e5" }} />
-                                      {evt.startTime}{evt.endTime ? ` – ${evt.endTime}` : ""}
-                                    </span>
-                                  )}
-                                  {evt.location && (
-                                    <span style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 11, color: "#6b7280" }}>
-                                      <MapPin style={{ width: 11, height: 11, color: "#4f46e5" }} />
-                                      {evt.location}
-                                    </span>
-                                  )}
-                                </div>
+                                ) : null}
+                              </div>
+                              {evt.description ? (
+                                <p className="mb-1.5 line-clamp-2 text-[11px] text-text-muted">
+                                  {evt.description}
+                                </p>
+                              ) : null}
+                              <div className="flex flex-wrap gap-2 text-[11px] text-text-body">
+                                {evt.startTime ? (
+                                  <span className="inline-flex items-center gap-1">
+                                    <Clock className="h-2.5 w-2.5 text-text-muted" />
+                                    {evt.startTime}
+                                    {evt.endTime ? ` – ${evt.endTime}` : ""}
+                                  </span>
+                                ) : null}
+                                {evt.location ? (
+                                  <span className="inline-flex items-center gap-1">
+                                    <MapPin className="h-2.5 w-2.5 text-text-muted" />
+                                    {evt.location}
+                                  </span>
+                                ) : null}
                               </div>
                             </div>
                           </div>
-                        </div>
+                        </button>
                       );
                     })}
                   </motion.div>
@@ -459,54 +598,91 @@ export default function CalendarHubPanel({ user, onClose, startupId: propStartup
             </div>
           </div>
 
-          {/* ── Right column: full-height Agenda ── */}
-          <div
-            style={{
-              flex: "0 0 45%",
-              display: "flex",
-              flexDirection: "column",
-              overflow: "hidden",
-              backgroundColor: "#fafbff",
-            }}
-          >
-            {/* Agenda header */}
-            <div style={{
-              flexShrink: 0,
-              padding: "20px 18px 12px",
-              borderBottom: "1px solid #f1f5f9",
-              display: "flex",
-              alignItems: "center",
-              gap: 8,
-            }}>
-              <div style={{
-                width: 28, height: 28, borderRadius: 8,
-                background: "linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%)",
-                display: "flex", alignItems: "center", justifyContent: "center",
-              }}>
-                <CalendarDays style={{ width: 14, height: 14, color: "#fff" }} />
+          <div className="flex min-h-0 w-[45%] flex-col bg-surface-page">
+            <div className="flex shrink-0 items-center gap-2 border-b border-surface-border px-4 py-4">
+              <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-surface-card">
+                <CalendarDays className="h-3.5 w-3.5 text-text-body" />
               </div>
-              <span style={{ fontSize: 14, fontWeight: 700, color: "#111827" }}>Agenda</span>
-              <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 4 }}>
-                <ArrowRight style={{ width: 12, height: 12, color: "#9ca3af" }} />
-                <span style={{ fontSize: 11, color: "#9ca3af" }}>Upcoming</span>
-              </div>
+              <span className="font-heading text-sm font-semibold text-text-heading">
+                Agenda
+              </span>
             </div>
-
-            {/* AgendaPanel fills the rest */}
-            <div style={{ flex: 1, minHeight: 0, overflow: "hidden" }}>
-              <AgendaPanel user={normalizedUser} compact={false} />
+            <div className="min-h-0 flex-1 overflow-hidden">
+              <AgendaPanel
+                user={normalizedUser}
+                compact={false}
+                reloadToken={agendaReloadToken}
+                onItemClick={handleAgendaItemClick}
+              />
             </div>
           </div>
         </div>
       </motion.div>
 
-      {/* Meeting Scheduler modal */}
+      {hoverMeetings.length > 0 && hoverDay ? (
+        <div
+          className="pointer-events-none fixed z-[90] min-w-[200px] max-w-[260px] rounded-xl border border-amber-200 bg-amber-50 px-3 py-2.5 shadow-lg"
+          style={{
+            left: hoverPos.x,
+            top: hoverPos.y,
+            transform: "translateX(-50%)",
+          }}
+        >
+          <p
+            className="mb-1.5 text-[11px] font-bold"
+            style={{ color: YELLOW_TEXT }}
+          >
+            {hoverDay.toLocaleDateString("en-US", {
+              weekday: "short",
+              month: "short",
+              day: "numeric",
+            })}
+          </p>
+          {hoverMeetings.slice(0, 3).map((m) => (
+            <div key={m.id} className="mb-1.5 last:mb-0">
+              <p className="text-xs font-semibold leading-snug text-text-heading">
+                {m.title}
+              </p>
+              <p className="text-[11px] text-text-muted">
+                {m.startTime || "--:--"}
+                {m.endTime ? ` – ${m.endTime}` : ""}
+                {" · "}
+                {m.type === "video-call" ? "Video" : "In-person"}
+              </p>
+            </div>
+          ))}
+          {hoverMeetings.length > 3 ? (
+            <p
+              className="text-[11px] font-semibold"
+              style={{ color: YELLOW_TEXT }}
+            >
+              +{hoverMeetings.length - 3} more
+            </p>
+          ) : null}
+        </div>
+      ) : null}
+
       <MeetingScheduler
         open={showScheduler}
         onClose={() => setShowScheduler(false)}
         user={user}
         teamMembers={teamMembers}
         onMeetingScheduled={handleMeetingScheduled}
+        defaultDate={selectedDate}
+      />
+
+      <MeetingDetailModal
+        open={Boolean(detailMeeting)}
+        meeting={detailMeeting}
+        currentUserId={normalizedUser?.id}
+        teamMembers={teamMembers}
+        onClose={() => setDetailMeeting(null)}
+        onDeleted={() => {
+          setDetailMeeting(null);
+          loadMeetings();
+          setAgendaReloadToken((n) => n + 1);
+          onMeetingScheduledProp?.();
+        }}
       />
     </>
   );

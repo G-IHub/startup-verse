@@ -2,12 +2,10 @@ import React, { useState, useEffect, useRef } from "react";
 import { useIsMobile } from "../ui/use-mobile";
 import { motion, AnimatePresence } from "motion/react";
 import { Button } from "../ui/button";
-import { Avatar, AvatarFallback } from "../ui/avatar";
 import { Input } from "../ui/input";
 import { cn } from "../ui/utils";
 import { ScrollArea } from "../ui/scroll-area";
-// 🔥 REALTIME: Import real-time messaging hook
-
+import UserAvatar from "../shared/UserAvatar";
 import { subscribeToMessages } from "../../utils/realtimeSubscriptions";
 import {
   X,
@@ -44,6 +42,8 @@ import {
   chatThreadPaneClass,
   sidebarRowClass,
 } from "../messaging/chatStyles";
+
+const AVATAR_FALLBACK = avatarFallbackClass();
 
 function getPeerHeaderSubtitle(member, { embedded, isOnline }) {
   if (member?.location) return member.location;
@@ -300,6 +300,22 @@ export function SimpleTeamMessaging({
     );
   };
 
+  const resolveSenderAvatar = (message) => {
+    const roster =
+      teamMembersRef.current.length > 0 ? teamMembersRef.current : teamMembers;
+    const member = roster.find(
+      (m) => String(m.id) === String(message.senderId),
+    );
+    return (
+      message.senderAvatar ||
+      message.avatarUrl ||
+      message.avatar ||
+      member?.avatarUrl ||
+      member?.avatar ||
+      ""
+    );
+  };
+
   const sendMessage = async () => {
     if (!selectedConversation) return;
     const text = messageInput.trim();
@@ -516,16 +532,12 @@ export function SimpleTeamMessaging({
                       onClick={() => selectConversation(member.id)}
                       className={sidebarRowClass(isSel)}
                     >
-                      <Avatar className="h-9 w-9 shrink-0 rounded-card">
-                        <AvatarFallback className={avatarFallbackClass()}>
-                          {String(member.name || member.id || "?")
-                            .split(" ")
-                            .map((n) => n[0])
-                            .join("")
-                            .substring(0, 2)
-                            .toUpperCase()}
-                        </AvatarFallback>
-                      </Avatar>
+                      <UserAvatar
+                        user={member}
+                        name={member.name || member.id}
+                        className="h-9 w-9 rounded-card"
+                        fallbackClassName={AVATAR_FALLBACK}
+                      />
                       <div className="w-0 flex-1">
                         <div className="mb-0.5 flex items-center justify-between gap-1">
                           <p
@@ -610,16 +622,12 @@ export function SimpleTeamMessaging({
                     peerUserId={selectedConversation}
                     onViewPeerProfile={onViewPeerProfile}
                   >
-                    <Avatar className="h-8 w-8 shrink-0 rounded-card">
-                      <AvatarFallback className={avatarFallbackClass()}>
-                        {String(selectedMember?.name || selectedConversation || "?")
-                          .split(" ")
-                          .map((n) => n[0])
-                          .join("")
-                          .substring(0, 2)
-                          .toUpperCase()}
-                      </AvatarFallback>
-                    </Avatar>
+                    <UserAvatar
+                      user={selectedMember}
+                      name={selectedMember?.name || selectedConversation}
+                      className="h-8 w-8 rounded-card"
+                      fallbackClassName={AVATAR_FALLBACK}
+                    />
                   </ChatPeerHeaderButton>
                   {onStartVideoCall &&
                     selectedConversation &&
@@ -646,6 +654,7 @@ export function SimpleTeamMessaging({
                       loading={messagesLoading}
                       currentUserId={currentUserId}
                       resolveSenderName={resolveSenderName}
+                      resolveSenderAvatar={resolveSenderAvatar}
                       messagesEndRef={messagesEndRef}
                       {...messageActionProps}
                     />
@@ -756,16 +765,12 @@ export function SimpleTeamMessaging({
                     className="flex w-full items-start gap-3 overflow-hidden px-4 py-3 cursor-pointer border-b border-gray-100 hover:bg-gray-50 transition-colors"
                   >
                     <div className="relative flex-shrink-0">
-                      <Avatar className="w-10 h-10">
-                        <AvatarFallback className="text-xs font-medium bg-blue-600 text-white">
-                          {String(member.name || member.id || "?")
-                            .split(" ")
-                            .map((n) => n[0])
-                            .join("")
-                            .substring(0, 2)
-                            .toUpperCase()}
-                        </AvatarFallback>
-                      </Avatar>
+                      <UserAvatar
+                        user={member}
+                        name={member.name || member.id}
+                        className="h-10 w-10"
+                        fallbackClassName="bg-primary text-xs font-medium text-white"
+                      />
                       {member.online && (
                         <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 rounded-full border-2 border-white" />
                       )}
@@ -859,16 +864,12 @@ export function SimpleTeamMessaging({
                     onViewPeerProfile={onViewPeerProfile}
                   >
                     <div className="relative shrink-0">
-                      <Avatar className="h-8 w-8">
-                        <AvatarFallback className="bg-primary text-[10px] font-medium text-white">
-                          {String(selectedConv?.userName || selectedConversation || "?")
-                            .split(" ")
-                            .map((n) => n[0])
-                            .join("")
-                            .substring(0, 2)
-                            .toUpperCase()}
-                        </AvatarFallback>
-                      </Avatar>
+                      <UserAvatar
+                        user={stableMembers.find((m) => m.id === selectedConversation)}
+                        name={selectedConv?.userName || selectedConversation}
+                        className="h-8 w-8"
+                        fallbackClassName="bg-primary text-[10px] font-medium text-white"
+                      />
                       {getOnlineStatus(selectedConversation) && (
                         <div className="absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full border-2 border-white bg-status-success" />
                       )}
@@ -893,6 +894,7 @@ export function SimpleTeamMessaging({
                     loading={messagesLoading}
                     currentUserId={currentUserId}
                     resolveSenderName={resolveSenderName}
+                    resolveSenderAvatar={resolveSenderAvatar}
                     emptyLabel="No messages yet"
                     messagesEndRef={messagesEndRef}
                     {...messageActionProps}

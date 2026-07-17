@@ -1258,8 +1258,6 @@ button.bg-primary svg {
   [data-slot="command-item"][data-selected="true"] {
   background-color: #e8ebff !important;
   color: #0d0d0d !important;
-  border-left: 3px solid #3a5afe !important;
-  padding-left: calc(0.5rem - 3px) !important;
 }
 
 [data-slot="dialog-content"]

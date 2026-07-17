@@ -5,7 +5,7 @@ import { toast } from "sonner";
 import VerticalSidebar from "./VerticalSidebar";
 import NotificationCenter from "../notifications/NotificationCenter";
 import { MobileActionDock, PageViewport } from "../shell/PageScaffold";
-import { Menu, SlidersHorizontal, UserCircle } from "lucide-react";
+import { Menu, UserCircle } from "lucide-react";
 import HeaderProfileMenu from "./HeaderProfileMenu";
 import StartupVerseLogo from "../brand/StartupVerseLogo";
 import { usePresenceSession } from "../../domains/presence/usePresenceSession";
@@ -161,9 +161,6 @@ export default function AppLayoutHybrid({
     currentPage === "startup-office" ||
     currentPage === "talent-chat" ||
     currentPage === "founder-chat";
-  const showSettingsSwitcher =
-    normalizedPage === "settings" || normalizedPage === "profile";
-
   usePresenceSession(user);
 
   const switchRole = (newRole) => {
@@ -235,43 +232,24 @@ export default function AppLayoutHybrid({
                 ) : null}
               </div>
               <div className="flex items-center gap-1.5 sm:gap-2">
-                {showSettingsSwitcher ? (
-                  <div className="flex items-center gap-1 rounded-input border border-surface-border bg-surface-page p-1">
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => onPageChange("profile")}
-                      className={`h-8 gap-2 rounded-input px-2 font-body text-xs font-semibold sm:px-3 ${
-                        normalizedPage === "profile"
-                          ? "bg-surface-card text-primary shadow-sm"
-                          : "text-text-body hover:bg-surface-card hover:text-text-heading"
-                      }`}
-                    >
-                      <UserCircle className="h-4 w-4" />
-                      <span className="hidden md:inline">Profile</span>
-                    </Button>
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => onPageChange("settings")}
-                      className={`h-8 gap-2 rounded-input px-2 font-body text-xs font-semibold sm:px-3 ${
-                        normalizedPage === "settings"
-                          ? "bg-surface-card text-primary shadow-sm"
-                          : "text-text-body hover:bg-surface-card hover:text-text-heading"
-                      }`}
-                    >
-                      <SlidersHorizontal className="h-4 w-4" />
-                      <span className="hidden md:inline">Settings</span>
-                    </Button>
-                  </div>
-                ) : null}
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => onPageChange("profile")}
+                  aria-label="Profile"
+                  className={`h-9 w-9 p-0 transition-colors duration-200 ease-in-out ${
+                    normalizedPage === "profile"
+                      ? "bg-primary-tint text-primary"
+                      : "text-text-body hover:bg-surface-page hover:text-text-heading"
+                  }`}
+                >
+                  <UserCircle className="h-5 w-5" />
+                </Button>
                 <NotificationCenter onNavigate={onPageChange} />
                 {user.role !== "organization-admin" ? (
                   <HeaderProfileMenu
                     user={user}
-                    onPageChange={onPageChange}
                     onLogout={onLogout}
                     showDevRoleSwitcher={showDevRoleSwitcher}
                     onSwitchRole={switchRole}

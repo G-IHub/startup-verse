@@ -3,6 +3,11 @@ import Notification from "../models/Notification.js";
 import { error as apiError, success as apiSuccess } from "../utils/apiResponse.js";
 import { sanitizeUser } from "../utils/sanitize.js";
 import { USER_ROLES } from "../utils/enums.js";
+import { uploadBuffer } from "../services/uploadService.js";
+import {
+  getAvatarMaxBytes,
+  isAllowedAvatarMime,
+} from "../utils/avatarAttachments.js";
 
 const MAX_CLIENT_PREF_KEYS = 80;
 const MAX_CLIENT_PREF_JSON_BYTES = 120_000;
@@ -189,11 +194,10 @@ export const updateClientPreferences = async (req, res) => {
   return apiSuccess(res, updated.clientPreferences || {});
 };
 
-// - Upload Avatar (Compatibility & Canonical)
+// - Upload Avatar (file multipart or URL body for compat)
 export const uploadAvatar = async (req, res) => {
   const requestedUserId = String(req.body?.userId || "").trim();
   const userId = requestedUserId || req.user.id;
-  const avatarUrl = req.body?.avatarUrl || "";
   if (!userId) {
     return apiError(res, "userId is required.", 400);
   }
@@ -203,20 +207,49 @@ export const uploadAvatar = async (req, res) => {
     return apiError(res, "Forbidden.", 403);
   }
 
-  // Ensure URL is not ridiculously long and is safe
-  if (avatarUrl && avatarUrl.length > 1000) {
-    return apiError(res, "avatarUrl exceeds maximum length.", 400);
+  let nextAvatarUrl = "";
+
+  if (req.file) {
+    if (!isAllowedAvatarMime(req.file.mimetype)) {
+      return apiError(
+        res,
+        "Avatar must be a JPEG, PNG, WebP, or GIF image.",
+        400,
+      );
+    }
+    const maxBytes = getAvatarMaxBytes();
+    if (req.file.size > maxBytes) {
+      return apiError(res, "Avatar must be 2MB or smaller.", 413);
+    }
+    const uploaded = await uploadBuffer({
+      buffer: req.file.buffer,
+      mimeType: req.file.mimetype,
+      originalName: req.file.originalname,
+      scope: "avatars",
+    });
+    nextAvatarUrl = String(uploaded?.url || "").trim();
+    if (!nextAvatarUrl) {
+      return apiError(res, "Upload did not return a URL.", 500);
+    }
+  } else {
+    nextAvatarUrl = String(req.body?.avatarUrl || "").trim();
+    if (!nextAvatarUrl) {
+      return apiError(res, "file or avatarUrl is required.", 400);
+    }
+    if (nextAvatarUrl.length > 1000) {
+      return apiError(res, "avatarUrl exceeds maximum length.", 400);
+    }
   }
 
   const user = await User.findByIdAndUpdate(
-    userId, 
-    { avatarUrl }, 
-    { new: true, runValidators: true }
+    userId,
+    { avatarUrl: nextAvatarUrl },
+    { new: true, runValidators: true },
   );
-  
+
   if (!user) {
     return apiError(res, "User not found.", 404);
   }
 
-  return apiSuccess(res, { avatarUrl: user.avatarUrl });
+  return apiSuccess(res, sanitizeUser(user));
 };

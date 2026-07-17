@@ -1,5 +1,6 @@
 /** Build API/preview payload from Launch Startup form state. */
 import { formatMoney } from "../../utils/formatMoney";
+import { resolveUserAvatar } from "../../utils/resolveMediaUrl";
 
 export function buildStartupPostOfferFromForm(formData) {
   if (!formData?.compensationPhilosophy) return undefined;
@@ -31,7 +32,7 @@ export function buildStartupPostPayload({ formData, user, existingPost }) {
     description: formData.description,
     founder: user?.name || "You",
     founderId: userId,
-    founderAvatar: user?.profile?.avatar,
+    founderAvatar: resolveUserAvatar(user),
     industry: formData.industry,
     stage: formData.stage,
     lookingFor: String(formData.lookingFor || "")

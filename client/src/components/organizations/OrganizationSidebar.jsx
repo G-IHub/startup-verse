@@ -84,7 +84,7 @@ export default function OrganizationSidebar({
             "group relative flex w-full items-center gap-2.5 rounded-input px-2.5 py-2 text-left font-body transition-all duration-200 ease-in-out",
             "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/25",
             active
-              ? "sidebar-selected shadow-[inset_3px_0_0_0_var(--primary)]"
+              ? "sidebar-selected"
               : "text-text-body hover:bg-surface-page hover:text-text-heading",
           )}
         >

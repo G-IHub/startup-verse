@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import {
   Dialog,
   DialogContent,
@@ -24,10 +24,17 @@ import {
   X,
   Check,
   Repeat,
+  Search,
 } from "lucide-react";
 import { getInitials } from "../../utils/nameHelpers";
 import * as meetingApi from "../../utils/api/meetingApi";
+import { getStartupId } from "../../utils/startupId";
 import { toast } from "sonner";
+
+function memberKey(member) {
+  return String(member?.id || member?.userId || member?._id || "");
+}
+
 export default function MeetingScheduler({
   open,
   onClose,
@@ -44,6 +51,7 @@ export default function MeetingScheduler({
   const [type, setType] = useState("meeting");
   const [location, setLocation] = useState("");
   const [selectedAttendees, setSelectedAttendees] = useState([]);
+  const [attendeeFilter, setAttendeeFilter] = useState("");
   const [loading, setLoading] = useState(false);
 
   // Recurring meeting states
@@ -53,20 +61,58 @@ export default function MeetingScheduler({
   const [recurrenceEndDate, setRecurrenceEndDate] = useState("");
   const [recurrenceOccurrences, setRecurrenceOccurrences] = useState("10");
   const [weeklyDays, setWeeklyDays] = useState([]);
+
+  const normalizedMembers = useMemo(
+    () =>
+      (teamMembers || [])
+        .map((m) => ({
+          ...m,
+          id: memberKey(m),
+          name: String(m.name || m.userName || "Team member"),
+        }))
+        .filter((m) => m.id),
+    [teamMembers],
+  );
+
+  const filteredMembers = useMemo(() => {
+    const q = attendeeFilter.trim().toLowerCase();
+    if (!q) return normalizedMembers;
+    return normalizedMembers.filter((m) => {
+      const name = String(m.name || "").toLowerCase();
+      const role = String(m.profile?.title || m.title || m.role || "").toLowerCase();
+      return name.includes(q) || role.includes(q);
+    });
+  }, [normalizedMembers, attendeeFilter]);
+
   useEffect(() => {
+    if (!open) return;
     if (defaultDate) {
       const year = defaultDate.getFullYear();
       const month = String(defaultDate.getMonth() + 1).padStart(2, "0");
       const day = String(defaultDate.getDate()).padStart(2, "0");
       setDate(`${year}-${month}-${day}`);
     }
-  }, [defaultDate]);
+    // Default-select the whole team so everyone sees the meeting in Agenda
+    setSelectedAttendees(normalizedMembers.map((m) => m.id));
+    setAttendeeFilter("");
+  }, [open, defaultDate, normalizedMembers]);
+
   const toggleAttendee = (memberId) => {
-    if (selectedAttendees.includes(memberId)) {
-      setSelectedAttendees(selectedAttendees.filter((id) => id !== memberId));
-    } else {
-      setSelectedAttendees([...selectedAttendees, memberId]);
-    }
+    const id = String(memberId || "");
+    if (!id) return;
+    setSelectedAttendees((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
+    );
+  };
+
+  const selectAllFiltered = () => {
+    const ids = filteredMembers.map((m) => m.id);
+    setSelectedAttendees((prev) => [...new Set([...prev, ...ids])]);
+  };
+
+  const clearFiltered = () => {
+    const remove = new Set(filteredMembers.map((m) => m.id));
+    setSelectedAttendees((prev) => prev.filter((id) => !remove.has(id)));
   };
   const handleSchedule = async () => {
     if (!title || !date || !startTime || !endTime) {
@@ -103,8 +149,8 @@ export default function MeetingScheduler({
         type,
         location: type === "video-call" ? "Virtual Office" : location,
         attendees: selectedAttendees,
-        organizerId: user.id,
-        startupId: user.role === "founder" ? user.id : user.startupId,
+        organizerId: user.id || user._id,
+        startupId: getStartupId(user),
         status: "scheduled",
         // Recurring meeting data
         isRecurring,
@@ -152,6 +198,8 @@ export default function MeetingScheduler({
     setType("meeting");
     setLocation("");
     setSelectedAttendees([]);
+    setAttendeeFilter("");
+    setIsRecurring(false);
     onClose();
   };
   return (
@@ -419,61 +467,113 @@ export default function MeetingScheduler({
               </div>
             )}
             <div className="space-y-1.5">
-              <Label className="text-sm">
-                Attendees ({selectedAttendees.length})
-              </Label>
-              <div className="space-y-1.5 border rounded-lg p-2 bg-muted/30 max-h-[180px] overflow-y-auto">
-                {teamMembers.length > 0 ? (
-                  teamMembers.map((member) => {
+              <div className="flex items-center justify-between gap-2">
+                <Label className="text-sm">
+                  Attendees ({selectedAttendees.length}/
+                  {normalizedMembers.length})
+                </Label>
+                <div className="flex items-center gap-1">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 px-2 text-[11px]"
+                    onClick={selectAllFiltered}
+                    disabled={filteredMembers.length === 0}
+                  >
+                    Select all
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 px-2 text-[11px]"
+                    onClick={clearFiltered}
+                    disabled={filteredMembers.length === 0}
+                  >
+                    Clear
+                  </Button>
+                </div>
+              </div>
+              <div className="relative">
+                <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  value={attendeeFilter}
+                  onChange={(e) => setAttendeeFilter(e.target.value)}
+                  placeholder="Filter team members…"
+                  className="h-8 pl-8 text-sm"
+                />
+              </div>
+              <div className="max-h-[180px] space-y-1 overflow-y-auto rounded-lg border bg-muted/30 p-2">
+                {normalizedMembers.length === 0 ? (
+                  <p className="py-3 text-center text-sm text-muted-foreground">
+                    No team members available
+                  </p>
+                ) : filteredMembers.length === 0 ? (
+                  <p className="py-3 text-center text-sm text-muted-foreground">
+                    No members match “{attendeeFilter.trim()}”
+                  </p>
+                ) : (
+                  filteredMembers.map((member) => {
                     const isSelected = selectedAttendees.includes(member.id);
                     return (
-                      <div
+                      <button
                         key={member.id}
+                        type="button"
                         onClick={() => toggleAttendee(member.id)}
-                        className={`flex items-center gap-2 p-2 rounded-lg cursor-pointer transition-colors ${isSelected ? "bg-[#3A5AFE]/10 border border-[#3A5AFE]" : "bg-background hover:bg-muted/50"}`}
+                        className={`flex w-full cursor-pointer items-center gap-2 rounded-lg border p-2 text-left transition-colors ${
+                          isSelected
+                            ? "border-primary/40 bg-primary/5"
+                            : "border-transparent bg-background hover:bg-muted/50"
+                        }`}
                       >
-                        <Avatar className="w-7 h-7">
-                          <AvatarFallback className="text-[9px] bg-gradient-to-br from-[#3A5AFE] to-purple-600 text-white">
+                        <span
+                          className={`flex h-4 w-4 shrink-0 items-center justify-center rounded border ${
+                            isSelected
+                              ? "border-primary bg-primary text-white"
+                              : "border-surface-border bg-surface-card"
+                          }`}
+                          aria-hidden
+                        >
+                          {isSelected ? (
+                            <Check className="h-3 w-3" strokeWidth={3} />
+                          ) : null}
+                        </span>
+                        <Avatar className="h-7 w-7">
+                          <AvatarFallback className="bg-primary text-[9px] text-white">
                             {getInitials(member.name)}
                           </AvatarFallback>
                         </Avatar>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium truncate">
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-sm font-medium">
                             {member.name}
                           </p>
-                          <p className="text-[9px] text-muted-foreground truncate">
-                            {member.profile?.title || member.role}
+                          <p className="truncate text-[9px] text-muted-foreground">
+                            {member.profile?.title || member.title || member.role}
                           </p>
                         </div>
-                        {isSelected && (
-                          <div className="w-5 h-5 rounded-full bg-[#3A5AFE] flex items-center justify-center flex-shrink-0">
-                            <Check className="w-3 h-3 text-white" />
-                          </div>
-                        )}
-                      </div>
+                      </button>
                     );
                   })
-                ) : (
-                  <p className="text-sm text-muted-foreground text-center py-3">
-                    No team members available
-                  </p>
                 )}
               </div>
             </div>
             {selectedAttendees.length > 0 && (
               <div className="flex flex-wrap gap-1.5">
                 {selectedAttendees.map((attendeeId) => {
-                  const member = teamMembers.find((m) => m.id === attendeeId);
+                  const member = normalizedMembers.find(
+                    (m) => m.id === attendeeId,
+                  );
                   if (!member) return null;
                   return (
                     <Badge
                       key={attendeeId}
                       variant="secondary"
-                      className="text-[9px] px-2 py-0.5 gap-1"
+                      className="gap-1 px-2 py-0.5 text-[9px]"
                     >
                       {member.name.split(" ")[0]}
                       <X
-                        className="w-2.5 h-2.5 cursor-pointer hover:text-destructive"
+                        className="h-2.5 w-2.5 cursor-pointer hover:text-destructive"
                         onClick={() => toggleAttendee(attendeeId)}
                       />
                     </Badge>

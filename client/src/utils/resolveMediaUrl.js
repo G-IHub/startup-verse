@@ -32,6 +32,14 @@ export function resolveMediaUrl(url) {
   return `${origin}/${trimmed}`;
 }
 
+/** Prefer canonical `avatarUrl`, then legacy `avatar` / `profile.avatar`. */
+export function resolveUserAvatar(user) {
+  if (!user || typeof user !== "object") return "";
+  return resolveMediaUrl(
+    user.avatarUrl || user.avatar || user.profile?.avatar || "",
+  );
+}
+
 /**
  * Build a download URL for PDFs/docs. Routes through the authenticated API proxy
  * so Cloudinary delivery restrictions (401) are avoided.

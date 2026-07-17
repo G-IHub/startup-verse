@@ -59,6 +59,7 @@ import {
 import { TALENT_BROWSE_MIN_COMPLETION } from "../constants/talentProfile.js";
 import { augmentTalentBrowseFields } from "../utils/talentBrowseNormalize";
 import { getTalentBrowseProfileCompletionPercent } from "../utils/talentProfileCompletion.js";
+import { resolveUserAvatar } from "../utils/resolveMediaUrl";
 import TeamOnboardingManager from "./compensation/TeamOnboardingManager";
 import EmptyStateBlock from "./organizations/_primitives/EmptyStateBlock";
 import {
@@ -462,7 +463,7 @@ export default function TeamMatching({ user, onNavigate }) {
       description: postFormData.description,
       founder: user.name,
       founderId: resolvedUserId,
-      founderAvatar: user.profile?.avatar,
+      founderAvatar: resolveUserAvatar(user),
       industry: postFormData.industry || "Other",
       stage: postFormData.stage || "Idea Stage",
       lookingFor: postFormData.lookingFor
@@ -1013,7 +1014,9 @@ export default function TeamMatching({ user, onNavigate }) {
                                   )}
                                   <div className="flex items-start gap-3 mb-3">
                                     <Avatar className="w-11 h-11 ring-2 ring-slate-100 ring-offset-1.5 transition-transform duration-300 group-hover:scale-105">
-                                      <AvatarImage src={member.avatar} />
+                                      <AvatarImage
+                                        src={resolveUserAvatar(member)}
+                                      />
                                       <AvatarFallback className="bg-gradient-to-br from-primary/10 to-primary/5 text-primary font-semibold">
                                         {member.name?.split(" ").map(n => n[0]).join("").slice(0, 2).toUpperCase() || "??"}
                                       </AvatarFallback>
@@ -1140,7 +1143,9 @@ export default function TeamMatching({ user, onNavigate }) {
                           <div className="p-5 pb-4">
                             <div className="flex items-start gap-4">
                               <Avatar className="w-14 h-14 ring-2 ring-slate-100 ring-offset-2 transition-transform duration-300 group-hover:scale-105">
-                                <AvatarImage src={member.avatar} />
+                                <AvatarImage
+                                  src={resolveUserAvatar(member)}
+                                />
                                 <AvatarFallback className="bg-gradient-to-br from-primary/10 to-primary/5 text-primary font-semibold text-lg">
                                   {member.name?.split(" ").map(n => n[0]).join("").slice(0, 2).toUpperCase() || "??"}
                                 </AvatarFallback>
@@ -1284,7 +1289,12 @@ export default function TeamMatching({ user, onNavigate }) {
                       <CardContent className="p-4 flex flex-col flex-1">
                         <div className="flex items-start gap-3 mb-3">
                           <Avatar className="w-10 h-10">
-                            <AvatarImage src={idea.founderAvatar} />
+                            <AvatarImage
+                              src={resolveUserAvatar({
+                                avatarUrl: idea.founderAvatar,
+                                avatar: idea.founderAvatar,
+                              })}
+                            />
                             <AvatarFallback>
                               {idea.founder.substring(0, 2)}
                             </AvatarFallback>
@@ -2062,6 +2072,7 @@ export default function TeamMatching({ user, onNavigate }) {
                   <div className="flex items-start justify-between mb-2">
                     <div className="flex items-start gap-3 flex-1">
                       <Avatar className="w-12 h-12">
+                        <AvatarImage src={resolveUserAvatar(user)} />
                         <AvatarFallback className="bg-primary/10 text-primary text-base">
                           {user.name
                             .split(" ")

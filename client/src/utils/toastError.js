@@ -78,6 +78,9 @@ export function toastError(err, fallback = "Something went wrong") {
       message || "Conflict - already exists or was just changed.",
     );
   }
+  if (status === 413) {
+    return toast.error(message || "File is too large.");
+  }
   if (status >= 500) {
     return toast.error("Server error - please retry.");
   }

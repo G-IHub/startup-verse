@@ -36,6 +36,7 @@ function mapMember(raw, fallbackStartupId) {
     role: raw.role || raw.talentArea || "team-member",
     email: raw.email || "",
     avatar:
+      raw.avatarUrl ||
       raw.avatar ||
       raw.profileImage ||
       raw.profilePicture ||

@@ -35,12 +35,21 @@ export function augmentTalentBrowseFields(profile) {
 
   const skills = Array.isArray(profile.skills) ? profile.skills : [];
 
+  const avatar =
+    String(profile.avatarUrl || "").trim() ||
+    String(profile.avatar || "").trim() ||
+    String(populatedUser?.avatarUrl || "").trim() ||
+    String(populatedUser?.avatar || "").trim() ||
+    "";
+
   return {
     ...profile,
     name: displayName || profile.name,
     talentName: displayName || profile.talentName,
     role: roleLabel || profile.role,
     experience: expRaw || profile.experience,
+    avatar,
+    avatarUrl: avatar || profile.avatarUrl,
     talentSkills: Array.isArray(profile.talentSkills)
       ? profile.talentSkills
       : skills,

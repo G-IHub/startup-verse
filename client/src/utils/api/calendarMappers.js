@@ -44,6 +44,9 @@ export function timelineItemToAgendaPanel(row) {
     startTime,
     endTime,
     color: row.color || colorForAgendaType(type),
+    recurrenceGroupId:
+      row.recurrenceGroupId || row.metadata?.recurrenceGroupId || null,
+    isRecurring: Boolean(row.isRecurring || row.metadata?.isRecurring),
   };
 }
 

@@ -147,11 +147,16 @@ function mapMeetingToTimelineItem(m, now) {
     startTime: m.startTime || null,
     endTime: m.endTime || null,
     color: "#7c3aed",
+    recurrenceGroupId: m.recurrenceGroupId || null,
+    isRecurring: Boolean(m.isRecurring),
     metadata: {
       type: m.type || "meeting",
       description: String(m.description || ""),
       location: String(m.location || ""),
       attendees: m.attendees || [],
+      organizerId: m.organizerId ? String(m.organizerId) : "",
+      recurrenceGroupId: m.recurrenceGroupId || null,
+      isRecurring: Boolean(m.isRecurring),
     },
   };
 }

@@ -170,7 +170,7 @@ export const getProfiles = async (req, res) => {
   const raw = await TalentProfile.find({})
     .sort({ createdAt: -1 })
     .limit(100)
-    .populate({ path: "userId", select: "name email" })
+    .populate({ path: "userId", select: "name email avatarUrl" })
     .lean();
   let profiles = filterTalentProfilesForBrowse(raw);
   if (req.user?.role === "founder" && req.user?.id) {
@@ -183,7 +183,7 @@ export const browseTalent = async (req, res) => {
   const raw = await TalentProfile.find({})
     .sort({ createdAt: -1 })
     .limit(100)
-    .populate({ path: "userId", select: "name email" })
+    .populate({ path: "userId", select: "name email avatarUrl" })
     .lean();
   let profiles = filterTalentProfilesForBrowse(raw);
   if (req.user?.role === "founder" && req.user?.id) {
@@ -207,7 +207,7 @@ export const getStartupPostsFeed = async (req, res) => {
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(pageSize)
-      .populate("founderId", "name")
+      .populate("founderId", "name avatarUrl")
       .lean(),
     StartupPost.countDocuments({}),
   ]);
@@ -224,6 +224,11 @@ export const getStartupPostsFeed = async (req, res) => {
       founderId: post.founderId?._id ?? post.founderId,
       founderName: resolvedName,
       founder: resolvedName,
+      founderAvatar:
+        post.founderAvatar ||
+        post.founderId?.avatarUrl ||
+        post.founderId?.avatar ||
+        "",
       role: lookingFor[0] || "",
       requirements: lookingFor,
       type: post.stage || "startup",

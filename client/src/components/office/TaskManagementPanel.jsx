@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { Button } from "../ui/button";
 import { Card, CardContent } from "../ui/card";
-import { Avatar, AvatarFallback } from "../ui/avatar";
+import UserAvatar from "../shared/UserAvatar";
 import { Badge } from "../ui/badge";
 import { Input } from "../ui/input";
 import { Label } from "../ui/label";
@@ -1498,14 +1498,7 @@ export function TaskManagementPanel({
                     {teamMembers.map((member) => (
                       <SelectItem key={member.id} value={member.id}>
                         <div className="flex items-center gap-2">
-                          <Avatar className="w-5 h-5">
-                            <AvatarFallback className="text-[9px]">
-                              {member.name
-                                .split(" ")
-                                .map((n) => n[0])
-                                .join("")}
-                            </AvatarFallback>
-                          </Avatar>
+                          <UserAvatar user={member} name={member.name} className="h-5 w-5" fallbackClassName="text-[9px]" />
                           <span>{member.name}</span>
                         </div>
                       </SelectItem>
@@ -1779,14 +1772,14 @@ function TaskCard({
             <div className="flex items-center justify-between gap-2 border-t border-primary/10 pt-2 text-[11px]">
               {task.assignedToName ? (
                 <div className="flex min-w-0 items-center gap-1.5">
-                  <Avatar className="h-6 w-6 border border-primary/12">
-                    <AvatarFallback className="bg-primary/[0.08] text-[8px] font-semibold text-[#1a237e]">
-                      {task.assignedToName
-                        .split(" ")
-                        .map((n) => n[0])
-                        .join("")}
-                    </AvatarFallback>
-                  </Avatar>
+                  <UserAvatar
+                    user={teamMembers.find(
+                      (m) => String(m.id) === String(task.assignedTo),
+                    )}
+                    name={task.assignedToName}
+                    className="h-6 w-6 border border-primary/12"
+                    fallbackClassName="bg-primary/[0.08] text-[8px] font-semibold text-[#1a237e]"
+                  />
                   <span className="max-w-[120px] truncate font-medium text-[#4a4a5a]">
                     {task.assignedToName}
                   </span>
@@ -1838,14 +1831,7 @@ function TaskCard({
                   {teamMembers.map((member) => (
                     <SelectItem key={member.id} value={member.id}>
                       <div className="flex items-center gap-2">
-                        <Avatar className="w-5 h-5">
-                          <AvatarFallback className="text-[9px]">
-                            {member.name
-                              .split(" ")
-                              .map((n) => n[0])
-                              .join("")}
-                          </AvatarFallback>
-                        </Avatar>
+                        <UserAvatar user={member} name={member.name} className="h-5 w-5" fallbackClassName="text-[9px]" />
                         <span>{member.name}</span>
                       </div>
                     </SelectItem>
@@ -1893,14 +1879,11 @@ function TaskCard({
                   {blockerReasons.map((reason) => (
                     <SelectItem key={reason.value} value={reason.value}>
                       <div className="flex items-center gap-2">
-                        <Avatar className="w-5 h-5">
-                          <AvatarFallback className="text-[9px]">
-                            {reason.label
-                              .split(" ")
-                              .map((n) => n[0])
-                              .join("")}
-                          </AvatarFallback>
-                        </Avatar>
+                        <UserAvatar
+                          name={reason.label}
+                          className="h-5 w-5"
+                          fallbackClassName="text-[9px]"
+                        />
                         <span>{reason.label}</span>
                       </div>
                       <p className="text-[10px] text-muted-foreground mt-1">

@@ -27,6 +27,7 @@ export function useOfficeWorkspaceData({ user }) {
   const announcementRows = useOfficeStore((s) => s.announcements);
   const taskRows = useOfficeStore((s) => s.tasks);
   const agendaRows = useOfficeStore((s) => s.agenda);
+  const meetingRows = useOfficeStore((s) => s.meetings);
   const patchTask = useOfficeStore((s) => s.patchTask);
   const removeTask = useOfficeStore((s) => s.removeTask);
   const patchActivity = useOfficeStore((s) => s.patchActivity);
@@ -129,6 +130,7 @@ export function useOfficeWorkspaceData({ user }) {
         announcementRows,
         taskRows,
         agendaRows,
+        meetingRows,
       }),
     [
       user,
@@ -140,6 +142,7 @@ export function useOfficeWorkspaceData({ user }) {
       announcementRows,
       taskRows,
       agendaRows,
+      meetingRows,
     ],
   );
 

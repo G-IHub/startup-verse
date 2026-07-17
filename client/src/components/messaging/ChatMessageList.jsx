@@ -1,5 +1,4 @@
 import React, { useCallback, useEffect } from "react";
-import { Avatar, AvatarFallback } from "../ui/avatar";
 import { cn } from "../ui/utils";
 import { Check, Loader2, MessageSquare } from "lucide-react";
 import { useIsMobile } from "../ui/use-mobile";
@@ -11,6 +10,7 @@ import { formatMessageTime, isServerMessageId } from "../../utils/messaging";
 import { MessageMentionCards } from "./MessageMentionCards";
 import { MessageMentionText } from "./mentionUi";
 import { useMessageSelection, useLongPress } from "./useMessageSelection";
+import UserAvatar from "../shared/UserAvatar";
 import {
   avatarFallbackClass,
   bubbleClass,
@@ -28,6 +28,8 @@ import {
   timestampClass,
   tombstoneBubbleClass,
 } from "./chatStyles";
+
+const AVATAR_FALLBACK = avatarFallbackClass();
 
 function isSelectableMessage(message) {
   return (
@@ -53,20 +55,17 @@ function DateDivider({ timestamp }) {
   );
 }
 
-function SenderAvatar({ name, hidden }) {
+function SenderAvatar({ name, avatar, hidden }) {
   if (hidden) {
     return <div className="h-7 w-7 shrink-0" aria-hidden="true" />;
   }
-  const initials = String(name || "?")
-    .split(" ")
-    .map((n) => n[0])
-    .join("")
-    .substring(0, 2)
-    .toUpperCase();
   return (
-    <Avatar className="h-7 w-7 shrink-0 rounded-card">
-      <AvatarFallback className={avatarFallbackClass()}>{initials}</AvatarFallback>
-    </Avatar>
+    <UserAvatar
+      src={avatar}
+      name={name}
+      className="h-7 w-7 rounded-card"
+      fallbackClassName={AVATAR_FALLBACK}
+    />
   );
 }
 
@@ -113,6 +112,7 @@ function ChatMessageRow({
   message,
   currentUserId,
   resolveSenderName,
+  resolveSenderAvatar,
   showSenderName = false,
   hideAvatar = false,
   onReply,
@@ -134,6 +134,12 @@ function ChatMessageRow({
   const hasTextOnly = !hasMedia && Boolean(caption);
   const hasMentions = Array.isArray(message?.metadata?.mentions) && message.metadata.mentions.length > 0;
   const senderName = resolveSenderName?.(message) || message.senderName || "?";
+  const senderAvatar =
+    resolveSenderAvatar?.(message) ||
+    message.senderAvatar ||
+    message.avatarUrl ||
+    message.avatar ||
+    "";
   const forwarded = message.forwardedFrom;
   const forwardedAttachments =
     forwarded && !message.deletedForEveryone
@@ -162,7 +168,13 @@ function ChatMessageRow({
             isMe ? "flex-row-reverse" : "flex-row",
           )}
         >
-          {!isMe && <SenderAvatar name={senderName} hidden={hideAvatar} />}
+          {!isMe && (
+            <SenderAvatar
+              name={senderName}
+              avatar={senderAvatar}
+              hidden={hideAvatar}
+            />
+          )}
           <div className={cn("min-w-0", isMe ? "items-end" : "items-start")}>
             <div className={tombstoneBubbleClass(isMe)}>This message was deleted</div>
             <p className={timestampClass(isMe)}>{formatMessageTime(message.timestamp)}</p>
@@ -224,7 +236,13 @@ function ChatMessageRow({
           isMe ? "flex-row-reverse" : "flex-row",
         )}
       >
-        {!isMe && <SenderAvatar name={senderName} hidden={hideAvatar} />}
+        {!isMe && (
+          <SenderAvatar
+            name={senderName}
+            avatar={senderAvatar}
+            hidden={hideAvatar}
+          />
+        )}
         <div className={cn("relative min-w-0 flex flex-col", isMe ? "items-end" : "items-start")}>
           {selectionMode && selectable && (
             <div className={selectionCheckClass(isMe, isSelected)} aria-hidden>
@@ -281,6 +299,7 @@ export function ChatMessageList({
   messages = [],
   currentUserId,
   resolveSenderName,
+  resolveSenderAvatar,
   emptyLabel = "No messages yet — say hi!",
   loading = false,
   loadingLabel = "Loading messages...",
@@ -386,6 +405,7 @@ export function ChatMessageList({
               message={message}
               currentUserId={currentUserId}
               resolveSenderName={resolveSenderName}
+              resolveSenderAvatar={resolveSenderAvatar}
               showSenderName={!isMe}
               hideAvatar={!isMe && isGrouped}
               onReply={onReply}

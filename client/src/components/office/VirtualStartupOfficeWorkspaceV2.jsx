@@ -35,6 +35,7 @@ import { useOfficePanels } from "../../domains/office/hooks/useOfficePanels";
 import { useOfficeWorkspaceData } from "../../domains/office/hooks/useOfficeWorkspaceData";
 import { useOfficeStore } from "../../state/useOfficeStore";
 import PresenceIndicator from "../presence/PresenceIndicator";
+import UserAvatar from "../shared/UserAvatar";
 
 function formatRelativeTime(dateValue) {
   const date = dateValue instanceof Date ? dateValue : new Date(dateValue || Date.now());
@@ -75,14 +76,46 @@ function getDayGreeting(now = new Date()) {
   return "Good evening";
 }
 
-function getInitials(name) {
-  return String(name || "")
-    .split(" ")
-    .filter(Boolean)
-    .map((part) => part[0])
-    .join("")
-    .slice(0, 2)
-    .toUpperCase();
+function formatYmdLocal(date) {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const d = String(date.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
+
+/** Collapse recurring meeting occurrences into one preview row with a count. */
+function collapseRecurringAgendaPreview(items) {
+  const sorted = [...(items || [])].sort(
+    (a, b) => (a.date?.getTime?.() || 0) - (b.date?.getTime?.() || 0),
+  );
+  const groupCounts = new Map();
+  for (const item of sorted) {
+    const gid =
+      item.recurrenceGroupId || item.metadata?.recurrenceGroupId || "";
+    if (
+      gid &&
+      (item.type === "meeting" || item.metadata?.isRecurring)
+    ) {
+      groupCounts.set(gid, (groupCounts.get(gid) || 0) + 1);
+    }
+  }
+  const seen = new Set();
+  const out = [];
+  for (const item of sorted) {
+    const gid =
+      item.recurrenceGroupId || item.metadata?.recurrenceGroupId || "";
+    if (gid && (item.type === "meeting" || item.metadata?.isRecurring)) {
+      if (seen.has(gid)) continue;
+      seen.add(gid);
+      out.push({
+        ...item,
+        occurrenceCount: groupCounts.get(gid) || 1,
+      });
+      continue;
+    }
+    out.push(item);
+  }
+  return out;
 }
 
 function buildMonthGrid(date = new Date()) {
@@ -413,7 +446,6 @@ export default function VirtualStartupOfficeWorkspaceV2({
     teammatesInCall.find((member) => member.callType)?.callType ||
     "video";
   const canJoinTeamCall = Boolean(joinableCallRoom && !activeCall);
-  const upcomingAgenda = office.agenda.slice(0, 8);
   const myTasks = office.myTasks.slice(0, 8);
   const unassignedByMilestone = office.unassignedByMilestone || [];
   const unassignedTotal = useMemo(
@@ -425,9 +457,36 @@ export default function VirtualStartupOfficeWorkspaceV2({
     [unassignedByMilestone],
   );
   const now = new Date();
+  const todayKey = formatYmdLocal(now);
   const monthLabel = now.toLocaleDateString([], { month: "short", year: "numeric" });
   const monthGrid = buildMonthGrid(now);
   const todayDate = now.getDate();
+  const calendarYear = now.getFullYear();
+  const calendarMonth = now.getMonth();
+  const agendaDaysThisMonth = useMemo(() => {
+    const days = new Set();
+    for (const meeting of office.meetings || []) {
+      const dateStr = String(meeting?.date || "").slice(0, 10);
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) continue;
+      const [y, m, d] = dateStr.split("-").map(Number);
+      if (y === calendarYear && m - 1 === calendarMonth) {
+        days.add(d);
+      }
+    }
+    return days;
+  }, [office.meetings, calendarYear, calendarMonth]);
+  const upcomingAgenda = useMemo(() => {
+    const fromToday = (office.agenda || []).filter((item) => {
+      const d = item?.date instanceof Date ? item.date : new Date(item?.date);
+      if (Number.isNaN(d?.getTime?.())) return false;
+      return formatYmdLocal(d) >= todayKey;
+    });
+    return collapseRecurringAgendaPreview(fromToday).slice(0, 8);
+  }, [office.agenda, todayKey]);
+  const isFounder = String(user?.role || "") === "founder";
+  const refreshOfficeAfterMeeting = () => {
+    void office.refresh({ silent: true });
+  };
 
   const taskPanelOpen = panels.isMobile ? mobileTaskManagerOpen : panels.isOpen("tasks");
   const calendarDialogOpen = panels.isMobile
@@ -641,8 +700,14 @@ export default function VirtualStartupOfficeWorkspaceV2({
                     className="h-fit rounded-[12px] border border-surface-border bg-surface-page p-4"
                   >
                     <div className="mb-2 flex items-center gap-2.5">
-                      <div className="relative flex h-[38px] w-[38px] flex-shrink-0 items-center justify-center rounded-[10px] bg-primary font-heading text-[13px] font-bold text-white">
-                        {getInitials(member.name)}
+                      <div className="relative shrink-0">
+                        <UserAvatar
+                          user={member}
+                          name={member.name}
+                          className="h-[38px] w-[38px] rounded-[10px]"
+                          imageClassName="rounded-[10px]"
+                          fallbackClassName="rounded-[10px] bg-primary font-heading text-[13px] font-bold text-white"
+                        />
                         {isOnline && (
                           <span
                             className={`absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border-2 border-surface-card ${
@@ -779,7 +844,7 @@ export default function VirtualStartupOfficeWorkspaceV2({
               onClick={() => panels.openPanel("calendar")}
             >
               <Plus className="h-3.5 w-3.5 shrink-0" />
-              Schedule
+              {isFounder ? "Schedule" : "Open"}
             </button>
           }
           className="min-h-[248px] office-workspace-grid-bottom__calendar sm:min-h-[268px]"
@@ -799,22 +864,39 @@ export default function VirtualStartupOfficeWorkspaceV2({
                     {day}
                   </span>
                 ))}
-                {monthGrid.flat().map((day, index) => (
-                  <span
-                    key={`${day || "blank"}-${index}`}
-                    className={cn(
-                      "mx-auto flex min-h-[34px] min-w-[34px] items-center justify-center rounded-full font-body text-sm leading-none sm:min-h-[38px] sm:min-w-[38px] sm:text-[15px]",
-                      day == null && "pointer-events-none text-transparent",
-                      day !== null &&
-                        day !== todayDate &&
-                        "cursor-default text-text-heading transition-colors duration-200 ease-in-out hover:bg-primary-tint hover:text-primary",
-                      day === todayDate &&
-                        "bg-primary font-semibold text-white shadow-sm",
-                    )}
-                  >
-                    {day || "."}
-                  </span>
-                ))}
+                {monthGrid.flat().map((day, index) => {
+                  const hasAgenda = day != null && agendaDaysThisMonth.has(day);
+                  return (
+                    <button
+                      key={`${day || "blank"}-${index}`}
+                      type="button"
+                      disabled={day == null}
+                      onClick={() => {
+                        if (day != null) panels.openPanel("calendar");
+                      }}
+                      className={cn(
+                        "mx-auto flex min-h-[34px] min-w-[34px] items-center justify-center rounded-full font-body text-sm leading-none sm:min-h-[38px] sm:min-w-[38px] sm:text-[15px]",
+                        day == null && "pointer-events-none text-transparent",
+                        day !== null &&
+                          day !== todayDate &&
+                          !hasAgenda &&
+                          "cursor-pointer text-text-heading transition-colors duration-200 ease-in-out hover:bg-primary-tint hover:text-primary",
+                        day !== null &&
+                          day !== todayDate &&
+                          hasAgenda &&
+                          "cursor-pointer bg-[#fef3c7] font-semibold text-[#92400e] transition-colors duration-200 ease-in-out hover:bg-[#fde68a]",
+                        day === todayDate &&
+                          "bg-primary font-semibold text-white shadow-sm",
+                        day === todayDate &&
+                          hasAgenda &&
+                          "ring-2 ring-amber-300 ring-offset-1",
+                      )}
+                      title={hasAgenda ? "Has scheduled items — open calendar" : undefined}
+                    >
+                      {day || "."}
+                    </button>
+                  );
+                })}
               </div>
             </div>
             <div className="office-calendar-split__agenda rounded-card border border-surface-border bg-surface-card p-4 md:p-5">
@@ -849,11 +931,21 @@ export default function VirtualStartupOfficeWorkspaceV2({
                         idx < Math.min(upcomingAgenda.length, 4) - 1 && "border-b border-surface-border/80",
                       )}
                     >
-                      <p className="truncate font-body text-[13px] font-medium text-text-heading">{item.title}</p>
+                      <p className="truncate font-body text-[13px] font-medium text-text-heading">
+                        {item.title}
+                        {item.occurrenceCount > 1
+                          ? ` · ${item.occurrenceCount} events`
+                          : ""}
+                      </p>
                       <p className="font-body text-[11px] text-text-body">
-                        {item.date.toLocaleDateString()}
-                        {" "}
-                        {item.date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                        {item.date instanceof Date
+                          ? item.date.toLocaleDateString()
+                          : ""}
+                        {item.startTime
+                          ? ` · ${item.startTime}${item.endTime ? ` – ${item.endTime}` : ""}`
+                          : item.date instanceof Date
+                            ? ` ${item.date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`
+                            : ""}
                       </p>
                     </div>
                   ))}
@@ -1009,6 +1101,7 @@ export default function VirtualStartupOfficeWorkspaceV2({
           user={user}
           startupId={office.startupId}
           onClose={() => panels.closePanel("calendar")}
+          onMeetingScheduled={refreshOfficeAfterMeeting}
         />
       )}
 
@@ -1139,18 +1232,20 @@ export default function VirtualStartupOfficeWorkspaceV2({
                       </p>
                     </div>
                   ))}
-                  <div className="sticky bottom-0 bg-background/95 backdrop-blur-sm border-t border-border pt-3">
-                    <Button
-                      type="button"
-                      className="w-full h-11 text-[14px]"
-                      onClick={() => {
-                        panels.closeAll();
-                        setMobileMeetingSchedulerOpen(true);
-                      }}
-                    >
-                      Schedule a meeting
-                    </Button>
-                  </div>
+                  {isFounder ? (
+                    <div className="sticky bottom-0 bg-background/95 backdrop-blur-sm border-t border-border pt-3">
+                      <Button
+                        type="button"
+                        className="w-full h-11 text-[14px]"
+                        onClick={() => {
+                          panels.closeAll();
+                          setMobileMeetingSchedulerOpen(true);
+                        }}
+                      >
+                        Schedule a meeting
+                      </Button>
+                    </div>
+                  ) : null}
                 </div>
               )}
             </div>
@@ -1158,15 +1253,18 @@ export default function VirtualStartupOfficeWorkspaceV2({
         </Drawer>
       )}
 
-      {panels.isMobile && (
+      {panels.isMobile && isFounder ? (
         <MeetingScheduler
           open={mobileMeetingSchedulerOpen}
           onClose={() => setMobileMeetingSchedulerOpen(false)}
           user={user}
           teamMembers={office.teamRoster}
-          onMeetingScheduled={() => setMobileMeetingSchedulerOpen(false)}
+          onMeetingScheduled={() => {
+            setMobileMeetingSchedulerOpen(false);
+            refreshOfficeAfterMeeting();
+          }}
         />
-      )}
+      ) : null}
 
     </div>
   );

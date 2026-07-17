@@ -225,7 +225,7 @@ export function buildTalentProfile(user) {
     id: user.id,
     name: user.name,
     email: user.email,
-    avatar: user.avatar,
+    avatar: user.avatarUrl || user.avatar,
     professionalTitle: user.professionalTitle,
     location: user.location,
     bio: user.bio,

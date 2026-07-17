@@ -418,7 +418,7 @@ function AppContent() {
     navigate("/", { replace: true });
   };
 
-  const handleUpdateUser = async (updatedUser) => {
+  const handleUpdateUser = async (updatedUser, options = {}) => {
     if (!updatedUser) {
       logout();
       setCurrentView(APP_VIEWS.landing);
@@ -427,6 +427,11 @@ function AppContent() {
     }
 
     setUser(updatedUser);
+
+    // Avatar upload already persisted on the server — only refresh local session.
+    if (options.skipRemoteSync) {
+      return;
+    }
 
     authApi
       .updateProfile(String(updatedUser._id ?? updatedUser.id), updatedUser)

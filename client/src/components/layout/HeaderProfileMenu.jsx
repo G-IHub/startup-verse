@@ -3,7 +3,6 @@ import {
   ChevronDown,
   LogOut,
   Rocket,
-  Settings,
   UserCheck,
   Users,
 } from "lucide-react";
@@ -17,6 +16,7 @@ import {
   DropdownMenuTrigger,
 } from "../ui/dropdown-menu";
 import { cn } from "../ui/utils";
+import { resolveUserAvatar } from "../../utils/resolveMediaUrl";
 
 const menuItemClass =
   "mx-1 rounded-input font-body text-[13px] text-text-body cursor-pointer focus:bg-surface-page focus:text-text-heading";
@@ -31,7 +31,6 @@ const roleLabel = (role) => {
 
 export default function HeaderProfileMenu({
   user,
-  onPageChange,
   onLogout,
   showDevRoleSwitcher = false,
   onSwitchRole,
@@ -39,6 +38,7 @@ export default function HeaderProfileMenu({
   const initials = user?.name
     ? user.name.substring(0, 2).toUpperCase()
     : "??";
+  const avatarSrc = resolveUserAvatar(user);
 
   return (
     <div data-tour="profile-menu">
@@ -50,7 +50,7 @@ export default function HeaderProfileMenu({
             className="h-9 gap-2 rounded-input border border-surface-border/60 bg-surface-card px-2 shadow-none transition-all duration-200 hover:border-surface-border hover:bg-surface-page"
           >
             <Avatar className="h-7 w-7 ring-2 ring-primary/15">
-              <AvatarImage src={user.profile?.avatar} alt="" />
+              {avatarSrc ? <AvatarImage src={avatarSrc} alt="" /> : null}
               <AvatarFallback className="bg-primary font-body text-[11px] font-semibold text-white">
                 {initials}
               </AvatarFallback>
@@ -66,7 +66,7 @@ export default function HeaderProfileMenu({
           <div className="border-b border-surface-border/80 bg-surface-page/40 px-4 py-3">
             <div className="flex items-center gap-3">
               <Avatar className="h-10 w-10 shrink-0 ring-2 ring-primary/20">
-                <AvatarImage src={user.profile?.avatar} alt="" />
+                {avatarSrc ? <AvatarImage src={avatarSrc} alt="" /> : null}
                 <AvatarFallback className="bg-primary font-body text-sm font-semibold text-white">
                   {initials}
                 </AvatarFallback>
@@ -98,14 +98,6 @@ export default function HeaderProfileMenu({
                 </div>
               </>
             ) : null}
-
-            <DropdownMenuItem
-              onClick={() => onPageChange("settings")}
-              className={menuItemClass}
-            >
-              <Settings className="h-4 w-4 text-primary" strokeWidth={1.75} />
-              Settings
-            </DropdownMenuItem>
 
             {showDevRoleSwitcher ? (
               <>

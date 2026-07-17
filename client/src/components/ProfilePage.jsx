@@ -37,6 +37,7 @@ import {
   Award,
   Briefcase,
   Calendar,
+  Camera,
   Code,
   Edit,
   ExternalLink,
@@ -45,6 +46,7 @@ import {
   Globe,
   GraduationCap,
   Linkedin,
+  Loader2,
   Mail,
   MapPin,
   Plus,
@@ -59,6 +61,7 @@ import {
 } from "lucide-react";
 import { cn } from "./ui/utils";
 import { Checkbox } from "./ui/checkbox";
+import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
 import {
   SETTINGS_CARD,
   settingsBtnPrimary,
@@ -66,6 +69,12 @@ import {
   settingsBtnDangerOutline,
 } from "./settings/SettingsPrimitives.jsx";
 import ResumeImportPanel from "./talent/ResumeImportPanel";
+import {
+  AVATAR_ACCEPT,
+  uploadAvatar,
+} from "../utils/api/userApi";
+import { resolveUserAvatar } from "../utils/resolveMediaUrl";
+import { toastError } from "../utils/toastError";
 
 const FIELD_LABEL =
   "font-body text-[11px] font-semibold uppercase tracking-wide text-text-muted";
@@ -506,8 +515,10 @@ export default function ProfilePage({ user, onUpdateUser, initialEditing = false
   const [showPreview, setShowPreview] = useState(false);
   const [editedProfile, setEditedProfile] = useState(() => buildInitialProfile(user));
   const [autosaveStatus, setAutosaveStatus] = useState("idle");
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const autosaveSnapshotRef = useRef(JSON.stringify(buildInitialProfile(user)));
   const autosaveTimerRef = useRef(null);
+  const avatarInputRef = useRef(null);
 
   useEffect(() => {
     setIsEditing(initialEditing);
@@ -790,16 +801,85 @@ export default function ProfilePage({ user, onUpdateUser, initialEditing = false
     reader.readAsDataURL(file);
   };
 
+  const avatarSrc = resolveUserAvatar(user);
+
+  const handleAvatarChange = async (event) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file || !onUpdateUser) return;
+    try {
+      setUploadingAvatar(true);
+      const updatedUser = await uploadAvatar(file);
+      const nextUrl = updatedUser?.avatarUrl || "";
+      onUpdateUser(
+        {
+          ...user,
+          ...updatedUser,
+          avatarUrl: nextUrl,
+          avatar: nextUrl,
+          profile: {
+            ...(user.profile || {}),
+            ...(updatedUser?.profile || {}),
+            avatar: nextUrl,
+          },
+        },
+        { skipRemoteSync: true },
+      );
+      toast.success("Profile picture updated");
+    } catch (error) {
+      toastError(error, "Failed to update profile picture");
+    } finally {
+      setUploadingAvatar(false);
+    }
+  };
+
   return (
     <div className="min-h-full bg-surface-page p-2 font-body md:p-3 lg:p-4">
       <div className="mx-auto max-w-7xl space-y-4">
         <section className={cn(SECTION_CLASS, "overflow-hidden")}>
           <div className="flex flex-col gap-5 p-4 md:flex-row md:items-center md:justify-between md:p-5">
             <div className="flex min-w-0 items-center gap-4">
-              <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-primary text-white shadow-[0_8px_24px_rgba(58,90,254,0.25)]">
-                <span className="font-heading text-lg font-extrabold">
-                  {initialsFor(editedProfile.name)}
-                </span>
+              <div className="relative shrink-0">
+                <button
+                  type="button"
+                  onClick={() => avatarInputRef.current?.click()}
+                  disabled={uploadingAvatar || !onUpdateUser}
+                  aria-label="Change profile picture"
+                  className="group relative block rounded-2xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 disabled:cursor-not-allowed"
+                >
+                  <Avatar className="h-14 w-14 rounded-2xl shadow-[0_8px_24px_rgba(58,90,254,0.25)]">
+                    {avatarSrc ? (
+                      <AvatarImage
+                        src={avatarSrc}
+                        alt=""
+                        className="rounded-2xl object-cover"
+                      />
+                    ) : null}
+                    <AvatarFallback className="rounded-2xl bg-primary font-heading text-lg font-extrabold text-white">
+                      {initialsFor(editedProfile.name)}
+                    </AvatarFallback>
+                  </Avatar>
+                  <span
+                    className={cn(
+                      "absolute inset-0 flex items-center justify-center rounded-2xl bg-black/45 text-white opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100",
+                      uploadingAvatar && "opacity-100",
+                    )}
+                  >
+                    {uploadingAvatar ? (
+                      <Loader2 className="h-5 w-5 animate-spin" />
+                    ) : (
+                      <Camera className="h-5 w-5" strokeWidth={1.75} />
+                    )}
+                  </span>
+                </button>
+                <input
+                  ref={avatarInputRef}
+                  type="file"
+                  accept={AVATAR_ACCEPT}
+                  className="sr-only"
+                  onChange={handleAvatarChange}
+                  disabled={uploadingAvatar}
+                />
               </div>
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-2">

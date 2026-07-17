@@ -12,6 +12,10 @@ import {
   isAllowedResumeMime,
   isResumeScope,
 } from "../utils/resumeAttachments.js";
+import {
+  isAllowedAvatarMime,
+  isAvatarScope,
+} from "../utils/avatarAttachments.js";
 
 const MESSAGES_MAX_UPLOAD_BYTES = 40 * 1024 * 1024;
 
@@ -67,6 +71,13 @@ uploadsRouter.post(
       return apiError(
         res,
         "Resume must be a PDF or DOCX file (max 5MB).",
+        400,
+      );
+    }
+    if (isAvatarScope(scope) && !isAllowedAvatarMime(req.file.mimetype)) {
+      return apiError(
+        res,
+        "Avatar must be a JPEG, PNG, WebP, or GIF image (max 2MB).",
         400,
       );
     }

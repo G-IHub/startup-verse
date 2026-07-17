@@ -80,6 +80,7 @@ import {
 } from "../../domains/founder/mappers/weeklyPlanPayload.js";
 import PendingCompensationCard from "../compensation/PendingCompensationCard";
 import * as founderApi from "../../utils/api/founderApi";
+import { resolveUserAvatar } from "../../utils/resolveMediaUrl";
 import FounderHomeHero from "./founder/FounderHomeHero";
 import FounderMetricsRow from "./founder/FounderMetricsRow";
 import FounderQuickActions from "./founder/FounderQuickActions";
@@ -2294,7 +2295,7 @@ export default function FounderDashboard({
                 }))}
                 founderId={founderId}
                 founderName={user.name}
-                founderAvatar={user.avatar || user.profileImage || ""}
+                founderAvatar={resolveUserAvatar(user) || user.profileImage || ""}
                 onNavigate={onNavigate}
                 onVirtualOfficeViewChange={onVirtualOfficeViewChange}
               />

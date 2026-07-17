@@ -2,6 +2,11 @@ import {
   normalizePresenceRow,
   sortRosterByPresence,
 } from "../../presence/presenceModel.js";
+import { resolveUserAvatar } from "../../../utils/resolveMediaUrl.js";
+
+function pickAvatar(row) {
+  return resolveUserAvatar(row) || "";
+}
 
 function toId(row) {
   if (!row || typeof row !== "object") return "";
@@ -10,9 +15,36 @@ function toId(row) {
 
 function toDate(value) {
   if (value instanceof Date) return value;
+  if (typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    const [y, m, d] = value.split("-").map(Number);
+    return new Date(y, m - 1, d);
+  }
   const parsed = new Date(value || Date.now());
   if (Number.isNaN(parsed.getTime())) return new Date();
   return parsed;
+}
+
+function normalizeMeeting(row) {
+  if (!row) return null;
+  const id = toId(row);
+  if (!id) return null;
+  const dateStr = String(row.date || "").slice(0, 10);
+  return {
+    id,
+    title: String(row.title || "Meeting"),
+    description: String(row.description || ""),
+    date: dateStr,
+    dateObj: dateStr ? toDate(dateStr) : null,
+    startTime: String(row.startTime || ""),
+    endTime: String(row.endTime || ""),
+    type: String(row.type || "meeting"),
+    location: String(row.location || ""),
+    status: String(row.status || "scheduled"),
+    isRecurring: Boolean(row.isRecurring),
+    recurrenceGroupId: row.recurrenceGroupId || null,
+    attendees: Array.isArray(row.attendees) ? row.attendees : [],
+    organizerId: String(row.organizerId || ""),
+  };
 }
 
 function normalizeStatus(status) {
@@ -50,7 +82,7 @@ function normalizePresence(row) {
     callRoomName: inCall ? String(metadata.callRoomName || "") : "",
     callType: inCall ? String(metadata.callType || "video") : "video",
     statusText: inCall ? "In a team call" : normalized.statusText,
-    avatar: row?.avatar || "",
+    avatar: pickAvatar(row),
   };
 }
 
@@ -109,14 +141,19 @@ function normalizeTask(row) {
 function normalizeAgendaItem(row) {
   if (!row) return null;
   const id = toId(row) || `${row.type || "item"}-${row.date || row.dueDate || Date.now()}`;
-  const when = toDate(row.date || row.dueDate || row.start || row.startsAt || row.createdAt);
+  const dateRaw = row.date || row.dueDate || row.start || row.startsAt || row.at || row.createdAt;
+  const when = toDate(dateRaw);
   return {
     id,
-    type: String(row.type || "event"),
+    type: String(row.type || row.agendaType || "event"),
     title: String(row.title || row.name || "Untitled"),
     status: String(row.status || ""),
     date: when,
+    startTime: String(row.startTime || ""),
+    endTime: String(row.endTime || ""),
     isOverdue: Boolean(row.isOverdue),
+    recurrenceGroupId:
+      row.recurrenceGroupId || row.metadata?.recurrenceGroupId || null,
     metadata: row.metadata && typeof row.metadata === "object" ? row.metadata : {},
   };
 }
@@ -149,6 +186,7 @@ export function mapOfficeWorkspaceModel({
   announcementRows = [],
   taskRows = [],
   agendaRows = [],
+  meetingRows = [],
 }) {
   const normalizedTeamMembers = (Array.isArray(teamMembers) ? teamMembers : [])
     .map((row) => ({
@@ -156,7 +194,7 @@ export function mapOfficeWorkspaceModel({
       name: String(row.name || row.userName || "Team member"),
       role: String(row.role || "team-member"),
       title: String(row.title || row.professionalTitle || ""),
-      avatar: row.avatar || "",
+      avatar: pickAvatar(row),
       isOnline: Boolean(row.isOnline),
       connection: row.connection || (row.isOnline ? "online" : "offline"),
     }))
@@ -176,8 +214,8 @@ export function mapOfficeWorkspaceModel({
         id: userId,
         name: String(user?.name || "You"),
         role: String(user?.role || "team-member"),
-        title: String(user?.title || ""),
-        avatar: user?.avatar || "",
+        title: String(user?.title || user?.professionalTitle || ""),
+        avatar: pickAvatar(user),
       }
     : null;
 
@@ -191,7 +229,10 @@ export function mapOfficeWorkspaceModel({
           name: row.userName,
           role: row.role,
           title: memberById.get(row.id)?.title || "",
-          avatar: memberById.get(row.id)?.avatar || row.avatar || "",
+          avatar:
+            memberById.get(row.id)?.avatar ||
+            pickAvatar(row) ||
+            (row.id === userId ? pickAvatar(user) : ""),
         })),
       ],
       (row) => row.id,
@@ -276,8 +317,41 @@ export function mapOfficeWorkspaceModel({
       .sort((a, b) => b.count - a.count);
   })();
 
+  const meetings = mergeByIdInternal(
+    (meetingRows || []).map(normalizeMeeting).filter(Boolean),
+    (row) => row.id,
+  ).sort((left, right) => {
+    const leftKey = `${left.date || ""}-${left.startTime || ""}`;
+    const rightKey = `${right.date || ""}-${right.startTime || ""}`;
+    return leftKey.localeCompare(rightKey);
+  });
+
+  const agendaFromMeetings = meetings.map((meeting) => ({
+    id: meeting.id,
+    type: "meeting",
+    title: meeting.title,
+    status: meeting.status,
+    date: meeting.dateObj || toDate(meeting.date),
+    startTime: meeting.startTime,
+    endTime: meeting.endTime,
+    isOverdue: false,
+    recurrenceGroupId: meeting.recurrenceGroupId,
+    metadata: {
+      type: meeting.type,
+      description: meeting.description,
+      location: meeting.location,
+      attendees: meeting.attendees,
+      organizerId: meeting.organizerId,
+      isRecurring: meeting.isRecurring,
+      recurrenceGroupId: meeting.recurrenceGroupId,
+    },
+  }));
+
   const agenda = mergeByIdInternal(
-    (agendaRows || []).map(normalizeAgendaItem).filter(Boolean),
+    [
+      ...(agendaRows || []).map(normalizeAgendaItem).filter(Boolean),
+      ...agendaFromMeetings,
+    ],
     (row) => row.id,
   ).sort((left, right) => left.date.getTime() - right.date.getTime());
 
@@ -295,7 +369,7 @@ export function mapOfficeWorkspaceModel({
       name: String(t.name || "Interested Talent"),
       role: "talent",
       title: String(t.title || ""),
-      avatar: t.avatar || "",
+      avatar: pickAvatar(t),
       status: "away",
       isOnline: false,
       activity: "working",
@@ -318,6 +392,7 @@ export function mapOfficeWorkspaceModel({
     teamTasks,
     unassignedByMilestone,
     agenda,
+    meetings,
     teamEnergy: {
       onlineCount,
       inCallCount,

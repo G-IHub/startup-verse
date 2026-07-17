@@ -9,6 +9,7 @@ import {
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { Avatar, AvatarFallback, AvatarImage } from "../ui/avatar";
+import { resolveUserAvatar } from "../../utils/resolveMediaUrl";
 import { X, User, CheckCircle2, Search } from "lucide-react";
 
 function assigneeIdOnTask(t) {
@@ -56,7 +57,7 @@ export default function TaskAssignmentModal({
       taskPrimaryId,
       member.id,
       member.name,
-      member.avatar || "",
+      member.avatarUrl || member.avatar || "",
     );
     onClose();
   };
@@ -167,8 +168,8 @@ export default function TaskAssignmentModal({
                   >
                     <div className="flex items-center gap-3">
                       <Avatar className="h-9 w-9 border border-primary/12 shadow-none">
-                        {member.avatar ? (
-                          <AvatarImage src={member.avatar} alt="" />
+                        {resolveUserAvatar(member) ? (
+                          <AvatarImage src={resolveUserAvatar(member)} alt="" />
                         ) : null}
                         <AvatarFallback className="bg-muted text-[11px] font-medium">
                           {member.name

@@ -5,6 +5,17 @@
  * roster for the sidebar-based chat system.
  */
 
+function pickAvatar(person) {
+  if (!person || typeof person !== "object") return "";
+  return (
+    person.avatarUrl ||
+    person.avatar ||
+    person.profile?.avatar ||
+    person.profileImage ||
+    ""
+  );
+}
+
 /**
  * Build chat roster for Founder view
  * Combines: talents who sent interest + talents founder invited + team members
@@ -27,7 +38,7 @@ export function buildFounderChatRoster(founderId, receivedInterests, sentInvitat
         role: "talent",
         title: interest.preferredRole || interest.role || "Talent",
         location: interest.talentLocation || interest.location || "",
-        avatar: interest.talentId?.avatar || "",
+        avatar: pickAvatar(interest.talentId) || pickAvatar(interest),
         isOnline: false,
         status: "away",
         source: "interest",
@@ -56,7 +67,7 @@ export function buildFounderChatRoster(founderId, receivedInterests, sentInvitat
         role: "talent",
         title: invitation.role || "Talent",
         location: invitation.talentLocation || invitation.location || "",
-        avatar: invitation.talentId?.avatar || "",
+        avatar: pickAvatar(invitation.talentId) || pickAvatar(invitation),
         isOnline: false,
         status: "away",
         source: "invitation",
@@ -81,7 +92,7 @@ export function buildFounderChatRoster(founderId, receivedInterests, sentInvitat
       existing.status = member.status || (existing.isOnline ? "online" : "away");
       existing.title = member.title || member.role || existing.title;
       existing.location = member.location || existing.location || "";
-      existing.avatar = member.avatar || existing.avatar;
+      existing.avatar = pickAvatar(member) || existing.avatar;
       existing.source = "team";
     } else {
       byUserId.set(memberId, {
@@ -90,7 +101,7 @@ export function buildFounderChatRoster(founderId, receivedInterests, sentInvitat
         role: member.role || "team-member",
         title: member.title || member.role || "Team Member",
         location: member.location || "",
-        avatar: member.avatar || "",
+        avatar: pickAvatar(member),
         isOnline: member.isOnline || member.online || false,
         status: member.status || "away",
         source: "team",
@@ -130,7 +141,7 @@ export function buildTalentChatRoster(talentId, sentInterests, receivedInvitatio
         role: "founder",
         title: interest.startupTitle || "Startup Founder",
         location: interest.startupLocation || interest.location || "",
-        avatar: interest.founderId?.avatar || "",
+        avatar: pickAvatar(interest.founderId) || pickAvatar(interest),
         isOnline: false,
         status: "away",
         source: "interest",
@@ -158,7 +169,7 @@ export function buildTalentChatRoster(talentId, sentInterests, receivedInvitatio
         role: "founder",
         title: invitation.startupTitle || "Startup Founder",
         location: invitation.startupLocation || invitation.location || "",
-        avatar: invitation.founderId?.avatar || "",
+        avatar: pickAvatar(invitation.founderId) || pickAvatar(invitation),
         isOnline: false,
         status: "away",
         source: "invitation",

@@ -67,6 +67,7 @@ function getNotificationIcon(type) {
     case "announcement-comment":
       return <MessageSquare className="h-4 w-4 text-primary" />;
     case "event-reminder":
+    case "meeting-scheduled":
       return <Calendar className="h-4 w-4 text-primary" />;
     case "org-announcement":
     case "org-announcement-urgent":

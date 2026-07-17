@@ -10,10 +10,10 @@ import {
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { ScrollArea } from "../ui/scroll-area";
-import { Avatar, AvatarFallback } from "../ui/avatar";
 import { toast } from "sonner";
 import { forwardMessage } from "../../utils/messageActionsApi";
 import { avatarFallbackClass } from "./chatStyles";
+import UserAvatar from "../shared/UserAvatar";
 
 export function ForwardMessageModal({
   open,
@@ -108,16 +108,13 @@ export function ForwardMessageModal({
                       sel ? "bg-primary-tint" : "hover:bg-primary-tint/50"
                     }`}
                   >
-                    <Avatar className="h-8 w-8 rounded-card">
-                      <AvatarFallback className={avatarFallbackClass()}>
-                        {String(conv.userName || "?")
-                          .split(" ")
-                          .map((n) => n[0])
-                          .join("")
-                          .substring(0, 2)
-                          .toUpperCase()}
-                      </AvatarFallback>
-                    </Avatar>
+                    <UserAvatar
+                      user={conv}
+                      name={conv.userName}
+                      src={conv.avatar || conv.avatarUrl}
+                      className="h-8 w-8 rounded-card"
+                      fallbackClassName={avatarFallbackClass()}
+                    />
                     <span className="truncate font-body text-sm font-medium text-text-heading">
                       {conv.userName}
                     </span>

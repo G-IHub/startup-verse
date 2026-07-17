@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { Button } from "../ui/button";
 import { Badge } from "../ui/badge";
 import {
@@ -27,38 +27,73 @@ import {
   ChevronDown,
   Circle,
   CheckCircle2,
+  Check,
 } from "lucide-react";
 import * as agendaApi from "../../utils/api/agendaApi";
 import { format, isToday, isTomorrow, isThisWeek, parseISO } from "date-fns";
 
-/**
- * AgendaPanel - Unified Startup Command Center
- *
- * Displays all startup activities in one place:
- * - Meetings (in-person & video calls)
- * - Tasks with due dates
- * - Milestones with deadlines
- * - Weekly review cycles
- * - Overdue items highlighted in red
- *
- * Features:
- * - 4 view modes: Upcoming, Today, This Week, Overdue
- * - Type filters (meetings, tasks, milestones, etc.)
- * - Color-coded items by type and status
- * - Grouped by date with smart labels
- */
 function itemMatchesSelectedTypes(item, selectedTypes) {
   if (selectedTypes.includes(item.type)) return true;
-  if (
-    item.type === "company-event" &&
-    selectedTypes.includes("meeting")
-  ) {
+  if (item.type === "company-event" && selectedTypes.includes("meeting")) {
     return true;
   }
   return false;
 }
 
-export default function AgendaPanel({ user, onItemClick, compact = false }) {
+function isMeetingItem(item) {
+  const type = String(item?.type || item?.agendaType || "");
+  return type === "meeting" || type === "company-event";
+}
+
+function getRecurrenceGroupId(item) {
+  return (
+    item?.recurrenceGroupId ||
+    item?.metadata?.recurrenceGroupId ||
+    ""
+  );
+}
+
+/** Keep the next occurrence per recurring series; attach occurrenceCount. */
+export function collapseRecurringAgendaItems(items) {
+  const sorted = [...(items || [])].sort((a, b) => {
+    const aKey = `${a.date || a.dueDate || ""}-${a.startTime || ""}`;
+    const bKey = `${b.date || b.dueDate || ""}-${b.startTime || ""}`;
+    return aKey.localeCompare(bKey);
+  });
+
+  const groupCounts = new Map();
+  for (const item of sorted) {
+    const gid = getRecurrenceGroupId(item);
+    if (gid && isMeetingItem(item)) {
+      groupCounts.set(gid, (groupCounts.get(gid) || 0) + 1);
+    }
+  }
+
+  const seen = new Set();
+  const out = [];
+  for (const item of sorted) {
+    const gid = getRecurrenceGroupId(item);
+    if (gid && isMeetingItem(item)) {
+      if (seen.has(gid)) continue;
+      seen.add(gid);
+      out.push({
+        ...item,
+        occurrenceCount: groupCounts.get(gid) || 1,
+        isRecurringSeries: (groupCounts.get(gid) || 1) > 1,
+      });
+      continue;
+    }
+    out.push(item);
+  }
+  return out;
+}
+
+export default function AgendaPanel({
+  user,
+  onItemClick,
+  compact: _compact = false,
+  reloadToken = 0,
+}) {
   const [agendaItems, setAgendaItems] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -74,17 +109,8 @@ export default function AgendaPanel({ user, onItemClick, compact = false }) {
     "onboarding-milestone",
     "company-event",
   ]);
-  const [showFilters, setShowFilters] = useState(false);
   const [view, setView] = useState("upcoming");
   const calendarUserId = user?.id || user?._id || null;
-
-  useEffect(() => {
-    if (calendarUserId) {
-      loadAgenda();
-    } else {
-      setLoading(false);
-    }
-  }, [calendarUserId, selectedTypes, view]);
 
   const loadAgenda = async () => {
     if (!calendarUserId) return;
@@ -125,6 +151,16 @@ export default function AgendaPanel({ user, onItemClick, compact = false }) {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    if (calendarUserId) {
+      loadAgenda();
+    } else {
+      setLoading(false);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- load when filters/view/token change
+  }, [calendarUserId, selectedTypes, view, reloadToken]);
+
   const toggleType = (type) => {
     if (selectedTypes.includes(type)) {
       setSelectedTypes(selectedTypes.filter((t) => t !== type));
@@ -132,6 +168,7 @@ export default function AgendaPanel({ user, onItemClick, compact = false }) {
       setSelectedTypes([...selectedTypes, type]);
     }
   };
+
   const getItemIcon = (item) => {
     switch (item.type) {
       case "meeting":
@@ -152,6 +189,7 @@ export default function AgendaPanel({ user, onItemClick, compact = false }) {
         return Circle;
     }
   };
+
   const getItemStatusBadge = (item) => {
     if (item.isOverdue) {
       return (
@@ -180,108 +218,59 @@ export default function AgendaPanel({ user, onItemClick, compact = false }) {
         </Badge>
       );
     }
+    if (item.isRecurringSeries && item.occurrenceCount > 1) {
+      return (
+        <Badge variant="secondary" className="text-[8px] px-1.5 py-0">
+          {item.occurrenceCount} events
+        </Badge>
+      );
+    }
     return null;
   };
+
   const getDateLabel = (dateStr) => {
     try {
       const date = parseISO(dateStr);
-      if (isToday(date)) {
-        return "Today";
-      }
-      if (isTomorrow(date)) {
-        return "Tomorrow";
-      }
-      if (isThisWeek(date)) {
-        return format(date, "EEEE"); // Day name
-      }
+      if (isToday(date)) return "Today";
+      if (isTomorrow(date)) return "Tomorrow";
+      if (isThisWeek(date)) return format(date, "EEEE");
       return format(date, "MMM d, yyyy");
     } catch {
       return dateStr;
     }
   };
 
-  // Group items by date
-  const groupedItems = agendaItems.reduce((acc, item) => {
+  const displayItems = useMemo(
+    () => collapseRecurringAgendaItems(agendaItems),
+    [agendaItems],
+  );
+
+  const groupedItems = displayItems.reduce((acc, item) => {
     const dateKey = item.date || item.dueDate || "No Date";
-    if (!acc[dateKey]) {
-      acc[dateKey] = [];
-    }
+    if (!acc[dateKey]) acc[dateKey] = [];
     acc[dateKey].push(item);
     return acc;
   }, {});
   const sortedDates = Object.keys(groupedItems).sort();
+
   const typeOptions = [
-    {
-      type: "meeting",
-      label: "Meetings",
-      color: "bg-purple-500",
-    },
-    {
-      type: "task",
-      label: "Tasks",
-      color: "bg-blue-500",
-    },
-    {
-      type: "milestone",
-      label: "Milestones",
-      color: "bg-amber-500",
-    },
-    {
-      type: "deadline",
-      label: "Deadlines",
-      color: "bg-red-500",
-    },
-    {
-      type: "weekly-review",
-      label: "Reviews",
-      color: "bg-emerald-500",
-    },
-    {
-      type: "organization-deadline",
-      label: "Org Deadlines",
-      color: "bg-red-500",
-    },
-    {
-      type: "performance-review",
-      label: "Perf Reviews",
-      color: "bg-emerald-500",
-    },
-    {
-      type: "compensation-review",
-      label: "Comp Reviews",
-      color: "bg-emerald-500",
-    },
-    {
-      type: "onboarding-milestone",
-      label: "Onboarding",
-      color: "bg-amber-500",
-    },
-    {
-      type: "company-event",
-      label: "Events",
-      color: "bg-purple-500",
-    },
+    { type: "meeting", label: "Meetings" },
+    { type: "task", label: "Tasks" },
+    { type: "milestone", label: "Milestones" },
+    { type: "deadline", label: "Deadlines" },
+    { type: "weekly-review", label: "Reviews" },
+    { type: "organization-deadline", label: "Org Deadlines" },
+    { type: "performance-review", label: "Perf Reviews" },
+    { type: "compensation-review", label: "Comp Reviews" },
+    { type: "onboarding-milestone", label: "Onboarding" },
+    { type: "company-event", label: "Events" },
   ];
+
   return (
-    <div style={{ display: "flex", flexDirection: "column", height: "100%", overflow: "hidden" }}>
-      {/* Controls bar */}
-      <div style={{
-        flexShrink: 0,
-        display: "flex",
-        alignItems: "center",
-        gap: 8,
-        padding: "10px 16px 8px",
-        borderBottom: "1px solid #f1f5f9",
-      }}>
+    <div className="flex h-full min-h-0 flex-col overflow-hidden bg-surface-page">
+      <div className="flex shrink-0 items-center gap-2 border-b border-surface-border px-4 py-2.5">
         <Select value={view} onValueChange={(value) => setView(value)}>
-          <SelectTrigger
-            style={{
-              height: 30, fontSize: 12, fontWeight: 500,
-              border: "1px solid #e5e7eb", borderRadius: 7,
-              padding: "0 10px", backgroundColor: "#f9fafb",
-              color: "#374151", cursor: "pointer", width: 110,
-            }}
-          >
+          <SelectTrigger className="h-8 w-[118px] rounded-lg border-surface-border bg-surface-card text-xs font-medium text-text-heading">
             <SelectValue />
           </SelectTrigger>
           <SelectContent className="z-[9999]">
@@ -294,167 +283,168 @@ export default function AgendaPanel({ user, onItemClick, compact = false }) {
         <DropdownMenu>
           <DropdownMenuTrigger asChild={true}>
             <Button
-              variant="ghost"
+              variant="outline"
               size="sm"
-              style={{
-                height: 30, fontSize: 12, fontWeight: 500,
-                border: "1px solid #e5e7eb", borderRadius: 7,
-                padding: "0 10px", backgroundColor: "#f9fafb",
-                color: "#374151", gap: 4,
-              }}
+              className="h-8 gap-1 rounded-lg border-surface-border bg-surface-card px-2.5 text-xs font-medium text-text-heading"
             >
-              <Filter style={{ width: 12, height: 12 }} />
+              <Filter className="h-3 w-3" />
               Filter
-              <ChevronDown style={{ width: 12, height: 12 }} />
+              <ChevronDown className="h-3 w-3" />
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="start" className="w-[150px] z-[9999]">
+          <DropdownMenuContent align="start" className="z-[9999] w-[150px]">
             {typeOptions.map((option) => (
               <DropdownMenuItem
                 key={option.type}
-                className="text-[12px] flex items-center gap-2 cursor-pointer"
+                className="flex cursor-pointer items-center gap-2 text-[12px]"
                 onSelect={(e) => {
                   e.preventDefault();
                   toggleType(option.type);
                 }}
               >
                 <div
-                  className={`w-3.5 h-3.5 border border-gray-400 rounded-sm flex items-center justify-center ${selectedTypes.includes(option.type) ? "bg-indigo-600 border-indigo-600" : "bg-white"}`}
-                />
+                  className={`flex h-3.5 w-3.5 items-center justify-center rounded-sm border ${
+                    selectedTypes.includes(option.type)
+                      ? "border-primary bg-primary text-white"
+                      : "border-surface-border bg-surface-card"
+                  }`}
+                >
+                  {selectedTypes.includes(option.type) ? (
+                    <Check className="h-2.5 w-2.5" strokeWidth={3} />
+                  ) : null}
+                </div>
                 <span>{option.label}</span>
               </DropdownMenuItem>
             ))}
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
-      {/* Scrollable content fills remaining height */}
-      <div style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: "8px 12px 16px" }}>
-          {loading ? (
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "center", padding: "40px 0" }}>
-              <div style={{ width: 24, height: 24, border: "2px solid #4f46e5", borderTopColor: "transparent", borderRadius: "50%", animation: "spin 0.7s linear infinite" }} />
-            </div>
-          ) : error ? (
-            <div className="text-center py-8 px-2 text-muted-foreground space-y-2">
-              <AlertCircle className="w-8 h-8 mx-auto text-destructive opacity-80" />
-              <p className="text-[11px] text-destructive">{error}</p>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className="h-7 text-[10px]"
-                onClick={() => loadAgenda()}
-              >
-                Retry
-              </Button>
-            </div>
-          ) : agendaItems.length === 0 ? (
-            <div style={{ textAlign: "center", padding: "48px 16px", color: "#9ca3af" }}>
-              <Calendar style={{ width: 36, height: 36, margin: "0 auto 12px", opacity: 0.35 }} />
-              <p style={{ fontSize: 14, fontWeight: 600, color: "#374151", marginBottom: 4 }}>No agenda items</p>
-              <p style={{ fontSize: 12 }}>
-                {view === "overdue" ? "You're all caught up!" : "Nothing scheduled for this period"}
-              </p>
-            </div>
-          ) : (
-            <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-              {sortedDates.map((dateKey) => (
-                <div key={dateKey}>
-                  {/* Date group header */}
-                  <div style={{
-                    display: "flex", alignItems: "center", gap: 8,
-                    marginBottom: 8,
-                    position: "sticky", top: 0,
-                    backgroundColor: "#fafbff",
-                    paddingTop: 4, paddingBottom: 4,
-                    zIndex: 10,
-                  }}>
-                    <span style={{ fontSize: 11, fontWeight: 700, color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.06em" }}>
-                      {getDateLabel(dateKey)}
-                    </span>
-                    <div style={{ flex: 1, height: 1, backgroundColor: "#e9eef6" }} />
-                    <span style={{ fontSize: 10, color: "#9ca3af" }}>
-                      {groupedItems[dateKey].length} item{groupedItems[dateKey].length !== 1 ? "s" : ""}
-                    </span>
-                  </div>
-                  {/* Items */}
-                  <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                    {groupedItems[dateKey].map((item) => {
-                      const Icon = getItemIcon(item);
-                      const accentColor = item.color || "#6b7280";
-                      return (
-                        <button
-                          key={`${item.kind || "item"}-${item.id}`}
-                          onClick={() => onItemClick?.(item)}
-                          style={{
-                            width: "100%", textAlign: "left",
-                            padding: "10px 12px",
-                            borderRadius: 10,
-                            border: "1px solid #e9eef6",
-                            backgroundColor: "#ffffff",
-                            cursor: "pointer",
-                            display: "flex", alignItems: "flex-start", gap: 10,
-                            borderLeft: `3px solid ${accentColor}`,
-                          }}
-                        >
-                          <div style={{
-                            width: 30, height: 30, borderRadius: 8, flexShrink: 0,
-                            backgroundColor: "#f8f7ff",
-                            display: "flex", alignItems: "center", justifyContent: "center",
-                          }}>
-                            <Icon style={{ width: 14, height: 14, color: accentColor }} />
-                          </div>
-                          <div style={{ flex: 1, minWidth: 0 }}>
-                            <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 6, marginBottom: 3 }}>
-                              <p style={{
-                                fontSize: 13, fontWeight: 600, color: "#111827",
-                                textDecoration: item.status === "completed" ? "line-through" : "none",
-                                opacity: item.status === "completed" ? 0.5 : 1,
-                                overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-                              }}>
-                                {item.title}
-                              </p>
-                              {getItemStatusBadge(item)}
-                            </div>
-                            {item.description && (
-                              <p style={{ fontSize: 11, color: "#9ca3af", marginBottom: 4, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                                {item.description}
-                              </p>
-                            )}
-                            <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
-                              {item.startTime && (
-                                <span style={{ display: "flex", alignItems: "center", gap: 3, fontSize: 11, color: "#6b7280" }}>
-                                  <Clock style={{ width: 10, height: 10, color: "#4f46e5" }} />
-                                  {item.startTime}{item.endTime ? ` – ${item.endTime}` : ""}
-                                </span>
-                              )}
-                              {item.type === "task" && item.metadata?.progress !== undefined && (
-                                <Badge variant="outline" className="text-[10px] px-1.5 py-0">
-                                  {item.metadata.progress}%
-                                </Badge>
-                              )}
-                              {item.type === "milestone" && item.metadata?.tasksCompleted !== undefined && (
-                                <Badge variant="outline" className="text-[10px] px-1.5 py-0">
-                                  {item.metadata.tasksCompleted}/{item.metadata.totalTasks} tasks
-                                </Badge>
-                              )}
-                              {item.priority && item.priority !== "medium" && (
-                                <Badge
-                                  variant={item.priority === "urgent" ? "destructive" : "secondary"}
-                                  className="text-[10px] px-1.5 py-0"
-                                >
-                                  {item.priority}
-                                </Badge>
-                              )}
-                            </div>
-                          </div>
-                        </button>
-                      );
-                    })}
-                  </div>
+
+      <div className="min-h-0 flex-1 overflow-y-auto px-3 py-3">
+        {loading ? (
+          <div className="flex items-center justify-center py-10">
+            <div className="h-5 w-5 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+          </div>
+        ) : error ? (
+          <div className="space-y-2 px-2 py-8 text-center text-muted-foreground">
+            <AlertCircle className="mx-auto h-8 w-8 text-destructive opacity-80" />
+            <p className="text-[11px] text-destructive">{error}</p>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="h-7 text-[10px]"
+              onClick={() => loadAgenda()}
+            >
+              Retry
+            </Button>
+          </div>
+        ) : displayItems.length === 0 ? (
+          <div className="px-4 py-12 text-center text-text-muted">
+            <Calendar className="mx-auto mb-3 h-8 w-8 opacity-35" />
+            <p className="mb-1 text-sm font-semibold text-text-heading">
+              No agenda items
+            </p>
+            <p className="text-xs">
+              {view === "overdue"
+                ? "You're all caught up!"
+                : "Nothing scheduled for this period"}
+            </p>
+          </div>
+        ) : (
+          <div className="flex flex-col gap-4">
+            {sortedDates.map((dateKey) => (
+              <div key={dateKey}>
+                <div className="sticky top-0 z-10 mb-2 flex items-center gap-2 bg-surface-page py-1">
+                  <span className="text-[11px] font-semibold uppercase tracking-wide text-text-muted">
+                    {getDateLabel(dateKey)}
+                  </span>
+                  <div className="h-px flex-1 bg-surface-border" />
+                  <span className="text-[10px] text-text-muted">
+                    {groupedItems[dateKey].length} item
+                    {groupedItems[dateKey].length !== 1 ? "s" : ""}
+                  </span>
                 </div>
-              ))}
-            </div>
-          )}
+                <div className="flex flex-col gap-2">
+                  {groupedItems[dateKey].map((item) => {
+                    const Icon = getItemIcon(item);
+                    return (
+                      <button
+                        key={`${item.kind || "item"}-${item.id}`}
+                        type="button"
+                        onClick={() => onItemClick?.(item)}
+                        className="flex w-full cursor-pointer items-start gap-2.5 rounded-xl border border-surface-border bg-surface-card px-3 py-2.5 text-left transition-colors hover:border-primary/30 hover:bg-primary-tint/40"
+                      >
+                        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-surface-page">
+                          <Icon className="h-3.5 w-3.5 text-text-body" />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <div className="mb-0.5 flex items-start justify-between gap-2">
+                            <p
+                              className={`truncate text-[13px] font-semibold text-text-heading ${
+                                item.status === "completed"
+                                  ? "line-through opacity-50"
+                                  : ""
+                              }`}
+                            >
+                              {item.title}
+                            </p>
+                            {getItemStatusBadge(item)}
+                          </div>
+                          {item.description ? (
+                            <p className="mb-1 truncate text-[11px] text-text-muted">
+                              {item.description}
+                            </p>
+                          ) : null}
+                          <div className="flex flex-wrap items-center gap-2">
+                            {item.startTime ? (
+                              <span className="inline-flex items-center gap-1 text-[11px] text-text-body">
+                                <Clock className="h-2.5 w-2.5 text-text-muted" />
+                                {item.startTime}
+                                {item.endTime ? ` – ${item.endTime}` : ""}
+                              </span>
+                            ) : null}
+                            {item.type === "task" &&
+                            item.metadata?.progress !== undefined ? (
+                              <Badge
+                                variant="outline"
+                                className="px-1.5 py-0 text-[10px]"
+                              >
+                                {item.metadata.progress}%
+                              </Badge>
+                            ) : null}
+                            {item.type === "milestone" &&
+                            item.metadata?.tasksCompleted !== undefined ? (
+                              <Badge
+                                variant="outline"
+                                className="px-1.5 py-0 text-[10px]"
+                              >
+                                {item.metadata.tasksCompleted}/
+                                {item.metadata.totalTasks} tasks
+                              </Badge>
+                            ) : null}
+                            {item.priority && item.priority !== "medium" ? (
+                              <Badge
+                                variant={
+                                  item.priority === "urgent"
+                                    ? "destructive"
+                                    : "secondary"
+                                }
+                                className="px-1.5 py-0 text-[10px]"
+                              >
+                                {item.priority}
+                              </Badge>
+                            ) : null}
+                          </div>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );

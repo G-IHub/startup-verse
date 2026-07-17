@@ -4,6 +4,7 @@ import * as activityApi from "../utils/activityApi";
 import * as presenceApi from "../utils/presenceApi";
 import * as agendaApi from "../utils/api/agendaApi";
 import * as taskApi from "../utils/api/taskApi";
+import * as meetingApi from "../utils/api/meetingApi";
 import { getStartupAnnouncements, postStartupAnnouncement } from "../utils/announcementApi";
 import { postWin } from "../utils/activityApi";
 import { getReceivedInterests } from "../utils/api/inboxApi";
@@ -23,6 +24,7 @@ function initialState() {
     wins: [],
     announcements: [],
     agenda: [],
+    meetings: [],
     tasks: [],
     loading: false,
     error: "",
@@ -88,6 +90,7 @@ export const useOfficeStore = create((set, get) => ({
       winsRes,
       announcementsRes,
       agendaRes,
+      meetingsRes,
       presenceRes,
       tasksRes,
       pendingTalentsRes,
@@ -97,6 +100,7 @@ export const useOfficeStore = create((set, get) => ({
       activityApi.getStartupWins(startupId, { limit: 50 }),
       getStartupAnnouncements(startupId),
       agendaApi.getUpcomingAgenda(userId, 14),
+      meetingApi.getStartupMeetings(startupId),
       presenceApi.getActiveUsers(startupId),
       tasksPromise,
       userRole === "founder" ? getReceivedInterests(founderId) : Promise.resolve([]),
@@ -155,6 +159,10 @@ export const useOfficeStore = create((set, get) => ({
         agendaRes.status === "fulfilled" && agendaRes.value?.success
           ? safeArray(agendaRes.value.agenda)
           : previous.agenda,
+      meetings:
+        meetingsRes.status === "fulfilled"
+          ? safeArray(meetingsRes.value)
+          : previous.meetings,
       presenceRows:
         presenceRes.status === "fulfilled" && presenceRes.value?.success
           ? safeArray(presenceRes.value.presence)

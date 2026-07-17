@@ -2,7 +2,6 @@ import React from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "./ui/dialog";
 import { Button } from "./ui/button";
 import { Badge } from "./ui/badge";
-import { Avatar, AvatarFallback } from "./ui/avatar";
 import {
   MapPin,
   Briefcase,
@@ -18,6 +17,7 @@ import {
 } from "lucide-react";
 import { Separator } from "./ui/separator";
 import { InvitationComposer } from "./invitations/InvitationComposer";
+import UserAvatar from "./shared/UserAvatar";
 export function TalentProfileModal({
   isOpen,
   onClose,
@@ -55,14 +55,12 @@ export function TalentProfileModal({
           <DialogTitle className="sr-only">Talent Profile</DialogTitle>
         </DialogHeader>
         <div className="flex items-start gap-4 pb-4">
-          <Avatar className="w-16 h-16 flex-shrink-0">
-            <AvatarFallback className="bg-primary/10 text-primary text-body-medium">
-              {talent.name
-                .split(" ")
-                .map((n) => n[0])
-                .join("")}
-            </AvatarFallback>
-          </Avatar>
+          <UserAvatar
+            user={talent}
+            name={talent.name}
+            className="h-16 w-16 shrink-0"
+            fallbackClassName="bg-primary/10 text-primary text-body-medium"
+          />
           <div className="flex-1 min-w-0">
             <div className="flex items-start justify-between gap-3 mb-1">
               <div>
