@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import {
   Dialog,
   DialogContent,
@@ -84,17 +84,37 @@ export default function MeetingScheduler({
     });
   }, [normalizedMembers, attendeeFilter]);
 
+  // Seed attendees once per open session — do not reset when the roster refreshes mid-edit.
+  const attendeesSeededRef = useRef(false);
+  const prevOpenRef = useRef(false);
+
   useEffect(() => {
-    if (!open) return;
-    if (defaultDate) {
-      const year = defaultDate.getFullYear();
-      const month = String(defaultDate.getMonth() + 1).padStart(2, "0");
-      const day = String(defaultDate.getDate()).padStart(2, "0");
-      setDate(`${year}-${month}-${day}`);
+    if (!open) {
+      prevOpenRef.current = false;
+      attendeesSeededRef.current = false;
+      return;
     }
-    // Default-select the whole team so everyone sees the meeting in Agenda
+
+    const justOpened = !prevOpenRef.current;
+    prevOpenRef.current = true;
+
+    if (justOpened) {
+      if (defaultDate) {
+        const year = defaultDate.getFullYear();
+        const month = String(defaultDate.getMonth() + 1).padStart(2, "0");
+        const day = String(defaultDate.getDate()).padStart(2, "0");
+        setDate(`${year}-${month}-${day}`);
+      }
+      setAttendeeFilter("");
+    }
+
+    if (attendeesSeededRef.current) return;
+
+    // If roster is still empty on first open, wait for the next roster update to seed.
+    if (justOpened && normalizedMembers.length === 0) return;
+
     setSelectedAttendees(normalizedMembers.map((m) => m.id));
-    setAttendeeFilter("");
+    attendeesSeededRef.current = true;
   }, [open, defaultDate, normalizedMembers]);
 
   const toggleAttendee = (memberId) => {

@@ -52,7 +52,7 @@ ANSWER_ALL_ROUNDS
 **Operation**: OPERATION
 
 **References level** (what to cite, chosen by the engineer): REFERENCES_LEVEL
-<!-- One of: none | sources | sources+links. Gates the References section and (basis: ...) citations only; the Rationale (the reasoning itself) ALWAYS stays. none = NO ## References section and NO (basis: ...) citations anywhere. sources = ## References with named Project sources and Practices only, no Links. sources+links = sources plus the web verified links the Stage (c) landscape / tool-discovery checks already returned during the conversation; do NOT fetch or re-fetch at write time, reuse those. See "On sourcing & citations" under "Expert rules that apply to all modes". -->
+<!-- One of: none | sources | sources+links. Must be set before writing — from Stage (c), or from the write-phase consent panel when Stage (c) was skipped (documentation path: none | sources only). Gates the References section and (basis: ...) citations only; the Rationale (the reasoning itself) ALWAYS stays. none = NO ## References section and NO (basis: ...) citations anywhere. sources = ## References with named Project sources and Practices only, no Links. sources+links = sources plus the web verified links the Stage (c) landscape / tool-discovery checks already returned during the conversation; do NOT fetch or re-fetch at write time, reuse those. See "On sourcing & citations" under "Expert rules that apply to all modes". -->
 
 **Existing spec (update/supersede only):**
 EXISTING_SPEC_PATH_OR_NONE
@@ -186,6 +186,7 @@ Read MODE_FILE_PATH now and follow that mode file as the only mode specific inst
 **On documenting an existing decision (the documentation path, `DOCUMENTATION_CONTEXT` provided):**
 - The decision is already made. Do not evaluate options again from scratch or write an analytical spec.
 - Write the spec's `**Status**:` as **`Accepted`**; it documents shipped reality, not a proposal.
+- Stage (c) was skipped on this path, so `REFERENCES_LEVEL` was never set there. The main thread must already have presented the References consent panel at write time and filled `REFERENCES_LEVEL` (`none` or `sources` only). Do not invent a level or treat Stage (c) as if it ran.
 - If SOURCE_FILE_COUNT > 0: read the relevant existing code and document what was built, not what could have been built.
 - If DOCUMENTATION_CONTEXT was provided: use the engineer's stated reasoning for Context, Rationale, and Consequences. Do not invent alternatives they didn't mention.
 - In `## Options considered`: briefly note the alternatives the engineer considered. If none were mentioned, write "Options considered were not documented at decision time."

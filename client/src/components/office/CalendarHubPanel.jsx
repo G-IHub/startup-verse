@@ -133,9 +133,24 @@ export default function CalendarHubPanel({
   onClose,
   startupId: propStartupId,
   onMeetingScheduled: onMeetingScheduledProp,
+  /** When opening from the office mini-calendar, focus this day. */
+  initialDate = null,
 }) {
-  const [currentDate, setCurrentDate] = useState(new Date());
-  const [selectedDate, setSelectedDate] = useState(new Date());
+  const focusDate =
+    initialDate instanceof Date && !Number.isNaN(initialDate.getTime())
+      ? initialDate
+      : null;
+  const focusKey = focusDate ? formatDate(focusDate) : "auto";
+
+  const [currentDate, setCurrentDate] = useState(
+    () =>
+      focusDate
+        ? new Date(focusDate.getFullYear(), focusDate.getMonth(), 1)
+        : new Date(),
+  );
+  const [selectedDate, setSelectedDate] = useState(
+    () => focusDate || new Date(),
+  );
   const [meetings, setMeetings] = useState([]);
   const [teamMembers, setTeamMembers] = useState([]);
   const [showScheduler, setShowScheduler] = useState(false);
@@ -145,6 +160,7 @@ export default function CalendarHubPanel({
   const [detailMeeting, setDetailMeeting] = useState(null);
   const [agendaReloadToken, setAgendaReloadToken] = useState(0);
   const didAutoSelect = useRef(false);
+  const autoSelectSessionKey = useRef("");
 
   const resolvedStartupId = propStartupId || getStartupId(user || {});
   const normalizedUser = user
@@ -182,8 +198,36 @@ export default function CalendarHubPanel({
       .catch(() => setTeamMembers([]));
   }, [resolvedStartupId, normalizedUser?.id]);
 
+  // Reset auto-select when the open session changes (startup or focused day).
   useEffect(() => {
-    if (didAutoSelect.current || loadingMeetings || !meetings.length) return;
+    const sessionKey = `${resolvedStartupId || ""}:${focusKey}`;
+    if (autoSelectSessionKey.current !== sessionKey) {
+      autoSelectSessionKey.current = sessionKey;
+      didAutoSelect.current = false;
+    }
+  }, [resolvedStartupId, focusKey]);
+
+  // Honor mini-calendar day focus as soon as it is provided.
+  useEffect(() => {
+    if (!focusDate) return;
+    setSelectedDate(focusDate);
+    setCurrentDate(
+      new Date(focusDate.getFullYear(), focusDate.getMonth(), 1),
+    );
+    didAutoSelect.current = true;
+  }, [focusKey]); // eslint-disable-line react-hooks/exhaustive-deps -- focusKey encodes focusDate
+
+  useEffect(() => {
+    if (didAutoSelect.current || loadingMeetings) return;
+
+    // Explicit day from office mini-calendar — do not jump away.
+    if (focusDate) {
+      didAutoSelect.current = true;
+      return;
+    }
+
+    if (!meetings.length) return;
+
     const onSelected = meetings.some(
       (m) => m.date === formatDate(selectedDate),
     );
@@ -200,7 +244,7 @@ export default function CalendarHubPanel({
       setCurrentDate(new Date(nextDate.getFullYear(), nextDate.getMonth(), 1));
     }
     didAutoSelect.current = true;
-  }, [meetings, loadingMeetings, selectedDate]);
+  }, [meetings, loadingMeetings, selectedDate, focusDate]);
 
   const handleMeetingScheduled = (meeting) => {
     if (meeting) setMeetings((prev) => [...prev, meeting]);

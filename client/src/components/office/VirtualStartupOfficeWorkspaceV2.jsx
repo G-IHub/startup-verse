@@ -393,6 +393,7 @@ export default function VirtualStartupOfficeWorkspaceV2({
   } = useCallCoordinator();
   const [mobileTaskManagerOpen, setMobileTaskManagerOpen] = useState(false);
   const [mobileMeetingSchedulerOpen, setMobileMeetingSchedulerOpen] = useState(false);
+  const [calendarFocusDate, setCalendarFocusDate] = useState(null);
 
   useEffect(() => {
     if (!taskToOpen) return;
@@ -841,7 +842,10 @@ export default function VirtualStartupOfficeWorkspaceV2({
             <button
               type="button"
               className="inline-flex h-7 cursor-pointer items-center gap-1 rounded-input border border-surface-border bg-surface-page px-2.5 font-body text-[12px] font-semibold text-primary transition-colors duration-200 ease-in-out hover:border-primary hover:bg-primary-tint"
-              onClick={() => panels.openPanel("calendar")}
+              onClick={() => {
+                setCalendarFocusDate(null);
+                panels.openPanel("calendar");
+              }}
             >
               <Plus className="h-3.5 w-3.5 shrink-0" />
               {isFounder ? "Schedule" : "Open"}
@@ -872,7 +876,11 @@ export default function VirtualStartupOfficeWorkspaceV2({
                       type="button"
                       disabled={day == null}
                       onClick={() => {
-                        if (day != null) panels.openPanel("calendar");
+                        if (day == null) return;
+                        setCalendarFocusDate(
+                          new Date(calendarYear, calendarMonth, day),
+                        );
+                        panels.openPanel("calendar");
                       }}
                       className={cn(
                         "mx-auto flex min-h-[34px] min-w-[34px] items-center justify-center rounded-full font-body text-sm leading-none sm:min-h-[38px] sm:min-w-[38px] sm:text-[15px]",
@@ -1100,7 +1108,11 @@ export default function VirtualStartupOfficeWorkspaceV2({
         <CalendarHubPanel
           user={user}
           startupId={office.startupId}
-          onClose={() => panels.closePanel("calendar")}
+          initialDate={calendarFocusDate}
+          onClose={() => {
+            panels.closePanel("calendar");
+            setCalendarFocusDate(null);
+          }}
           onMeetingScheduled={refreshOfficeAfterMeeting}
         />
       )}
