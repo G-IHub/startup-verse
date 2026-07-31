@@ -151,7 +151,7 @@ export async function getTalentProfile(userId) {
 }
 
 /**
- * Check whether resume import (OpenAI) is configured on the server.
+ * Check whether resume import (DeepSeek) is configured on the server.
  */
 export async function getResumeParseStatus() {
   const json = await apiCall("/talent/resume/status", { method: "GET" });

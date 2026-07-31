@@ -32,6 +32,7 @@
     "test:phase8-security": "node scripts/phase8-security-alignment-smoke.mjs",
     "test:phase9-remediation": "node scripts/phase9-remediation-readiness-smoke.mjs",
     "test:founder-team-exclusions": "node src/utils/founderTeamTalentExclusions.test.js",
+    "test:resume-parser": "node --test src/services/resumeParseService.test.js",
     "test:onboarding": "node --test src/controllers/invitations.controller.test.js"
   },
   "keywords": [],
@@ -57,7 +58,6 @@
     "multer": "^2.1.1",
     "node-cron": "^4.2.1",
     "nodemailer": "^9.0.3",
-    "openai": "^6.45.0",
     "pdf-parse": "^2.4.5",
     "socket.io": "^4.8.3",
     "validator": "^13.15.26"

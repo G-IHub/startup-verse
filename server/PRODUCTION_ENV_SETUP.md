@@ -32,6 +32,8 @@ JWT_SECRET=<new 48+ byte random secret>
 JWT_EXPIRES_IN=7d
 MONGODB_CONNECTION_URI=mongodb+srv://<user>:<pass>@<cluster>/<db>?retryWrites=true&w=majority
 PUBLIC_APP_URL=https://app.yourdomain.com
+DEEPSEEK_API_KEY=<your DeepSeek API key>
+DEEPSEEK_RESUME_MODEL=deepseek-v4-flash
 ```
 
 **MongoDB:** Create a production Atlas cluster (or DB), user with read/write on that DB, network access for your API server IP (or `0.0.0.0/0` only if your host has no fixed IP — tighten when possible).
@@ -39,6 +41,8 @@ PUBLIC_APP_URL=https://app.yourdomain.com
 **JWT:** Generate a **new** secret for production. Do not copy from `.env.local`.
 
 **CORS:** Exact frontend origin(s), comma-separated if you have staging + prod frontends.
+
+**Resume parsing:** `DEEPSEEK_API_KEY` enables resume import. `DEEPSEEK_RESUME_MODEL` is optional and defaults to `deepseek-v4-flash`.
 
 ## 3. Server — email (Mailtrap **Sending**, not sandbox)
 

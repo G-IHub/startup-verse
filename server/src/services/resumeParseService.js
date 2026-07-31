@@ -1,10 +1,12 @@
-import OpenAI from "openai";
 import {
   TALENT_SKILL_OPTIONS,
   TALENT_SKILL_OPTION_SET,
 } from "../domain/talentSkillOptions.js";
 
-const DEFAULT_MODEL = "gpt-4o-mini";
+const DEEPSEEK_CHAT_COMPLETIONS_URL =
+  "https://api.deepseek.com/chat/completions";
+const DEFAULT_MODEL = "deepseek-v4-flash";
+const REQUEST_TIMEOUT_MS = 45_000;
 
 const LINKEDIN_RE =
   /https?:\/\/(?:www\.)?linkedin\.com\/in\/[a-zA-Z0-9_-]+\/?/gi;
@@ -12,7 +14,7 @@ const GITHUB_RE =
   /https?:\/\/(?:www\.)?github\.com\/[a-zA-Z0-9_-]+\/?/gi;
 
 export function isResumeParseConfigured() {
-  return Boolean(String(process.env.OPENAI_API_KEY || "").trim());
+  return Boolean(String(process.env.DEEPSEEK_API_KEY || "").trim());
 }
 
 function clampStr(value, max) {
@@ -139,39 +141,82 @@ Rules:
 - bio: 1-3 sentence professional summary if present`;
 
 export async function parseResumeText(text) {
-  const apiKey = String(process.env.OPENAI_API_KEY || "").trim();
+  const apiKey = String(process.env.DEEPSEEK_API_KEY || "").trim();
   if (!apiKey) {
     const err = new Error("Resume import is not configured.");
     err.status = 503;
     throw err;
   }
 
-  const model = String(process.env.OPENAI_RESUME_MODEL || DEFAULT_MODEL).trim();
-  const client = new OpenAI({ apiKey });
+  const model = String(
+    process.env.DEEPSEEK_RESUME_MODEL || DEFAULT_MODEL,
+  ).trim();
 
-  const completion = await client.chat.completions.create({
-    model,
-    response_format: { type: "json_object" },
-    temperature: 0.1,
-    messages: [
-      { role: "system", content: SYSTEM_PROMPT },
-      {
-        role: "user",
-        content: `Extract profile data from this resume:\n\n${text}`,
+  let response;
+  try {
+    response = await fetch(DEEPSEEK_CHAT_COMPLETIONS_URL, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
       },
-    ],
-  });
+      body: JSON.stringify({
+        model,
+        response_format: { type: "json_object" },
+        thinking: { type: "disabled" },
+        temperature: 0.1,
+        max_tokens: 4096,
+        messages: [
+          { role: "system", content: SYSTEM_PROMPT },
+          {
+            role: "user",
+            content: `Extract profile data from this resume and return JSON:\n\n${text}`,
+          },
+        ],
+      }),
+      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+    });
+  } catch (cause) {
+    const err = new Error(
+      cause?.name === "TimeoutError"
+        ? "Resume parsing timed out. Please try again."
+        : "Could not reach DeepSeek. Please try again.",
+    );
+    err.status = cause?.name === "TimeoutError" ? 504 : 502;
+    err.cause = cause;
+    throw err;
+  }
+
+  if (!response.ok) {
+    const err = new Error("DeepSeek could not parse the resume. Please try again.");
+    err.status = 502;
+    throw err;
+  }
+
+  let completion;
+  try {
+    completion = await response.json();
+  } catch (cause) {
+    const err = new Error("Could not parse DeepSeek response. Please try again.");
+    err.status = 502;
+    err.cause = cause;
+    throw err;
+  }
 
   const content = completion.choices?.[0]?.message?.content;
   if (!content) {
-    throw new Error("Could not parse resume. Please try again.");
+    const err = new Error("Could not parse resume. Please try again.");
+    err.status = 502;
+    throw err;
   }
 
   let parsed;
   try {
     parsed = JSON.parse(content);
   } catch {
-    throw new Error("Could not parse resume response. Please try again.");
+    const err = new Error("Could not parse resume response. Please try again.");
+    err.status = 502;
+    throw err;
   }
 
   return normalizeDraft(parsed, text);
