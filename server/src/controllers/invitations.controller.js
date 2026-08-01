@@ -928,6 +928,7 @@ export const sendFounderTalentInvitation = async (req, res) => {
     await createNotification({
       userId: invitation.talentId,
       type: "talent-invitation-received",
+      skipPreferences: true,
       title: "New invitation from a founder",
       message: body.message
         ? String(body.message).slice(0, 200)
@@ -1105,6 +1106,7 @@ export const updateFounderTalentInvitationStatus = async (req, res) => {
         await createNotification({
           userId: invitation.founderId,
           type: "invitation-accepted",
+          skipPreferences: true,
           title: `${talentName} accepted your invitation`,
           message: "Ready to onboard — set compensation to add them to your team.",
           actionUrl: inboxDeepLink({ invitationId: invitationIdStr }),
@@ -1274,6 +1276,7 @@ export const createInterest = async (req, res) => {
   await createNotification({
     userId: body.founderId,
     type: "interest-received",
+    skipPreferences: true,
     title: "New talent interest",
     message: `${talentName} expressed interest in your startup.`,
     actionUrl: inboxDeepLink({ interestId: String(interest._id) }),

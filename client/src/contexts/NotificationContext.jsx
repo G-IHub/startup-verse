@@ -9,6 +9,7 @@ import { API_BASE_URL } from "../config/apiBase.js";
 import { toast } from "sonner";
 import { useAuth } from "./AuthContext";
 import { normalizeNotificationType } from "../utils/notificationType.js";
+import { resolveNotificationUserId } from "../utils/notificationUserId.js";
 import { subscribeToUnreadCount } from "../utils/socketIoRealtime.js";
 
 const NotificationContext = createContext(undefined);
@@ -91,6 +92,7 @@ function mapNotificationList(rows) {
 
 export function NotificationProvider({ children }) {
   const { user } = useAuth();
+  const userId = resolveNotificationUserId(user);
   const [notifications, setNotifications] = useState([]);
   const [preferences, setPreferences] = useState(DEFAULT_PREFERENCES);
   const [loading, setLoading] = useState(true);
@@ -98,7 +100,7 @@ export function NotificationProvider({ children }) {
   const [backendAvailable, setBackendAvailable] = useState(true);
 
   const fetchNotifications = useCallback(async () => {
-    if (!user?.id) return;
+    if (!userId) return;
 
     const backendOnline = await checkBackendAvailability();
     if (!backendOnline) {
@@ -114,7 +116,7 @@ export function NotificationProvider({ children }) {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 10000);
 
-      const response = await fetch(`${API_BASE_URL}/users/${user.id}/notifications`, {
+      const response = await fetch(`${API_BASE_URL}/users/${userId}/notifications`, {
         method: "GET",
         ...defaultOptions,
         signal: controller.signal,
@@ -155,17 +157,17 @@ export function NotificationProvider({ children }) {
       setLoading(false);
       setNotifications([]);
     }
-  }, [user?.id]);
+  }, [userId]);
 
   const fetchPreferences = useCallback(async () => {
-    if (!user?.id) return;
+    if (!userId) return;
 
     try {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 8000);
 
       const response = await fetch(
-        `${API_BASE_URL}/users/${user.id}/notification-preferences`,
+        `${API_BASE_URL}/users/${userId}/notification-preferences`,
         {
           method: "GET",
           ...defaultOptions,
@@ -181,10 +183,10 @@ export function NotificationProvider({ children }) {
     } catch {
       // Silent fallback to defaults.
     }
-  }, [user?.id]);
+  }, [userId]);
 
   useEffect(() => {
-    if (!user?.id) {
+    if (!userId) {
       setNotifications([]);
       setPreferences(DEFAULT_PREFERENCES);
       setLoading(false);
@@ -202,7 +204,7 @@ export function NotificationProvider({ children }) {
       }
     }, 120000);
 
-    const unsubRealtime = subscribeToUnreadCount(null, user.id, () => {
+    const unsubRealtime = subscribeToUnreadCount(null, userId, () => {
       fetchNotifications();
     });
 
@@ -210,10 +212,10 @@ export function NotificationProvider({ children }) {
       clearInterval(interval);
       unsubRealtime?.();
     };
-  }, [user?.id, user?.role, backendAvailable, fetchNotifications, fetchPreferences]);
+  }, [userId, user?.role, backendAvailable, fetchNotifications, fetchPreferences]);
 
   const addNotification = async (notification) => {
-    if (!user?.id || !backendAvailable) {
+    if (!userId || !backendAvailable) {
       const localNotification = {
         ...notification,
         id: `local-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
@@ -246,7 +248,7 @@ export function NotificationProvider({ children }) {
         method: "POST",
         ...defaultOptions,
         body: JSON.stringify({
-          userId: user.id,
+          userId,
           title: notification?.title || "Notification",
           message: notification?.message || "",
           type: normalizedType,
@@ -279,7 +281,7 @@ export function NotificationProvider({ children }) {
       prev.map((n) => (n.id === id ? { ...n, read: true } : n)),
     );
 
-    if (!backendAvailable || !user?.id) return;
+    if (!backendAvailable || !userId) return;
 
     try {
       const controller = new AbortController();
@@ -304,7 +306,7 @@ export function NotificationProvider({ children }) {
   };
 
   const markAllAsRead = async () => {
-    if (!user?.id) return;
+    if (!userId) return;
 
     const previousNotifications = [...notifications];
     setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
@@ -316,7 +318,7 @@ export function NotificationProvider({ children }) {
       const timeoutId = setTimeout(() => controller.abort(), 5000);
 
       const response = await fetch(
-        `${API_BASE_URL}/users/${user.id}/notifications/mark-all-read`,
+        `${API_BASE_URL}/users/${userId}/notifications/mark-all-read`,
         {
           method: "POST",
           ...defaultOptions,
@@ -363,7 +365,7 @@ export function NotificationProvider({ children }) {
   };
 
   const clearAll = async () => {
-    if (!user?.id) return;
+    if (!userId) return;
 
     const previousNotifications = [...notifications];
     setNotifications([]);
@@ -374,7 +376,7 @@ export function NotificationProvider({ children }) {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 5000);
 
-      const response = await fetch(`${API_BASE_URL}/users/${user.id}/notifications`, {
+      const response = await fetch(`${API_BASE_URL}/users/${userId}/notifications`, {
         method: "DELETE",
         ...defaultOptions,
         signal: controller.signal,
@@ -392,7 +394,7 @@ export function NotificationProvider({ children }) {
   };
 
   const updatePreferences = async (prefs) => {
-    if (!user?.id) return;
+    if (!userId) return;
 
     const previousPreferences = { ...preferences };
     setPreferences((prev) => ({ ...prev, ...prefs }));
@@ -404,7 +406,7 @@ export function NotificationProvider({ children }) {
       const timeoutId = setTimeout(() => controller.abort(), 5000);
 
       const response = await fetch(
-        `${API_BASE_URL}/users/${user.id}/notification-preferences`,
+        `${API_BASE_URL}/users/${userId}/notification-preferences`,
         {
           method: "PUT",
           ...defaultOptions,

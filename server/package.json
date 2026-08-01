@@ -32,6 +32,7 @@
     "test:phase8-security": "node scripts/phase8-security-alignment-smoke.mjs",
     "test:phase9-remediation": "node scripts/phase9-remediation-readiness-smoke.mjs",
     "test:founder-team-exclusions": "node src/utils/founderTeamTalentExclusions.test.js",
+    "test:notifications": "node --test src/services/notificationService.test.js",
     "test:resume-parser": "node --test src/services/resumeParseService.test.js",
     "test:onboarding": "node --test src/controllers/invitations.controller.test.js"
   },
