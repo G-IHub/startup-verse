@@ -11,6 +11,11 @@ import * as mentorsController from "../controllers/mentors.controller.js";
 
 const organizationsRouter = Router();
 
+organizationsRouter.post(
+  "/organizations/onboarding",
+  requireAuth,
+  asyncHandler(organizationsController.completeOrganizationOnboarding),
+);
 organizationsRouter.post("/organizations/create", requireAuth, asyncHandler(organizationsController.createOrganization));
 organizationsRouter.get("/organizations/user/:userId", requireAuth, requireSelfOrAdmin("userId"), asyncHandler(organizationsController.getOrganizationsByUser));
 organizationsRouter.get("/organizations/:orgId/mentors", requireAuth, asyncHandler(mentorsController.listOrganizationMentors));

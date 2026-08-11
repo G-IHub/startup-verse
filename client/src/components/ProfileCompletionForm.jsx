@@ -22,6 +22,7 @@ import {
 import { syncJourneyProgressToServer } from "../utils/founderJourneyApi.js";
 import { toast } from "sonner";
 import * as founderApi from "../utils/api/founderApi";
+import { completeOrganizationOnboarding } from "../utils/api/organizationApi";
 import {
   FOUNDER_INDUSTRY_OPTIONS,
   FOUNDER_TARGET_AUDIENCE_OPTIONS,
@@ -634,6 +635,22 @@ export default function ProfileCompletionForm({
         }
       }
 
+      let organizationOnboarding = null;
+      if (role === "organization-admin") {
+        organizationOnboarding = await completeOrganizationOnboarding({
+          name: startupName.trim(),
+          description: startupDescription.trim(),
+          organizationType:
+            organizationType === "Others" ? otherOrgType.trim() : organizationType,
+          expectedCohorts,
+          expectedStartups,
+          programDuration,
+          teamSize,
+          supportedStages,
+          supportedIndustries,
+        });
+      }
+
       const resolvedFounderIndustry =
         role === "founder"
           ? resolveIndustryForPersistence(industryFocus, otherIndustry)
@@ -680,7 +697,9 @@ export default function ProfileCompletionForm({
 
       if (!isMountedRef.current) return;
 
-      if (user && onUpdateUser) {
+      if (organizationOnboarding?.user && onUpdateUser) {
+        onUpdateUser(organizationOnboarding.user, { skipRemoteSync: true });
+      } else if (user && onUpdateUser) {
         const updatedUser = {
           ...user,
           ...(role === "founder"

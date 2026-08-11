@@ -15,6 +15,11 @@ const PAGE_META = {
     title: "Dashboard",
     description: "Execution overview and key actions",
   },
+  program: {
+    title: "Program",
+    description:
+      "See which organization assigned your startup, what is due, and when",
+  },
   "startup-office": {
     title: "Virtual Office",
     description: "Live startup workspace",
@@ -105,10 +110,17 @@ const PAGE_META = {
   },
 };
 
-function resolvePageMeta(currentPage, userRole) {
+function resolvePageMeta(currentPage, userRole, virtualOfficeView) {
   const pageKey = String(currentPage || "dashboard");
   const normalizedPage = pageKey.split(":")[0];
   const base = PAGE_META[pageKey] || PAGE_META[normalizedPage] || PAGE_META.dashboard;
+
+  if (
+    normalizedPage === "startup-office" &&
+    virtualOfficeView === "matching"
+  ) {
+    return PAGE_META["team-matching"];
+  }
 
   if (normalizedPage === "dashboard") {
     if (userRole === "founder") {
@@ -149,10 +161,11 @@ export default function AppLayoutHybrid({
   virtualOfficeView,
   onVirtualOfficeViewChange,
   talentDashboardMode = "overview",
+  programTab = "overview",
   mobileActions = null,
 }) {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const pageMeta = resolvePageMeta(currentPage, user.role);
+  const pageMeta = resolvePageMeta(currentPage, user.role, virtualOfficeView);
   const normalizedPage = String(currentPage || "dashboard").split(":")[0];
   const isTeamDashboardPage =
     normalizedPage === "dashboard" &&
@@ -193,6 +206,7 @@ export default function AppLayoutHybrid({
           user={user}
           currentPage={currentPage}
           virtualOfficeView={virtualOfficeView}
+          programTab={programTab}
           onPageChange={onPageChange}
           onVirtualOfficeViewChange={onVirtualOfficeViewChange}
           isOpen={isMobileMenuOpen}

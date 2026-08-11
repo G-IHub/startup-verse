@@ -89,6 +89,49 @@ import {
   AlertCircle,
   Edit,
 } from "lucide-react";
+
+function TalentCardSkeleton() {
+  return (
+    <div className="animate-pulse rounded-card border border-surface-border bg-surface-card p-5 shadow-soft">
+      <div className="flex items-start gap-4">
+        <div className="h-14 w-14 shrink-0 rounded-full bg-surface-border/60" />
+        <div className="min-w-0 flex-1 space-y-2 pt-1">
+          <div className="h-5 w-2/3 rounded bg-surface-border/50" />
+          <div className="h-4 w-1/2 rounded bg-surface-border/40" />
+        </div>
+      </div>
+      <div className="mt-4 space-y-2">
+        <div className="h-4 w-full rounded bg-surface-border/40" />
+        <div className="h-4 w-4/5 rounded bg-surface-border/30" />
+      </div>
+      <div className="mt-4 flex flex-wrap gap-2">
+        <div className="h-6 w-16 rounded-pill bg-surface-border/40" />
+        <div className="h-6 w-20 rounded-pill bg-surface-border/40" />
+        <div className="h-6 w-14 rounded-pill bg-surface-border/40" />
+      </div>
+      <div className="mt-5 grid grid-cols-2 gap-3">
+        <div className="h-4 rounded bg-surface-border/30" />
+        <div className="h-4 rounded bg-surface-border/30" />
+      </div>
+      <div className="mt-5 h-10 w-full rounded-input bg-surface-border/40" />
+    </div>
+  );
+}
+
+function TalentBrowseSkeleton({ count = 6 }) {
+  return (
+    <div
+      className="grid gap-4 md:grid-cols-2 lg:grid-cols-3"
+      aria-busy="true"
+      aria-label="Loading talent profiles"
+    >
+      {Array.from({ length: count }, (_, i) => (
+        <TalentCardSkeleton key={i} />
+      ))}
+    </div>
+  );
+}
+
 function normalizeTalentProfile(profile) {
   if (!profile) return null;
   if (
@@ -128,6 +171,7 @@ export default function TeamMatching({ user, onNavigate }) {
     user.role === "founder" ? "loading" : "idle",
   );
   const [availableTalent, setAvailableTalent] = useState([]);
+  const [talentLoading, setTalentLoading] = useState(false);
   const [sortBy, setSortBy] = useState("match");
   const [showOnlyWithOffers, setShowOnlyWithOffers] = useState(false);
   const [interestMessage, setInterestMessage] = useState("");
@@ -196,8 +240,10 @@ export default function TeamMatching({ user, onNavigate }) {
     if (user.role !== "founder") return;
     if (founderPostsStatus !== "has-post") {
       setAvailableTalent([]);
+      setTalentLoading(false);
       return;
     }
+    setTalentLoading(true);
     loadTalentProfiles();
   }, [user.role, user.id, founderPostsStatus]);
 
@@ -285,6 +331,7 @@ export default function TeamMatching({ user, onNavigate }) {
   const loadTalentProfiles = async () => {
     console.log("🔍 [TeamMatching] Loading talent profiles...");
     console.log("🌐 [TeamMatching] Fetching talent profiles from backend...");
+    setTalentLoading(true);
     try {
       const res = await fetch(`${API_BASE_URL}/talent/profiles`, defaultOptions);
       const data = await res.json();
@@ -338,6 +385,8 @@ export default function TeamMatching({ user, onNavigate }) {
         error,
       );
       setAvailableTalent([]);
+    } finally {
+      setTalentLoading(false);
     }
   };
 
@@ -766,68 +815,52 @@ export default function TeamMatching({ user, onNavigate }) {
     user.role === "founder" && !founderPostsLoading && !founderCanBrowseTalent;
 
   return (
-    <div
-      className={`min-h-full bg-surface-page font-body ${
-        founderNeedsLaunch ? "p-4 md:p-6" : "space-y-3 p-2 md:space-y-4 md:p-3 lg:p-4"
-      }`}
-    >
-      <div
-        className={`flex flex-col gap-3 ${
-          founderNeedsLaunch ? "mb-6" : "mb-4 justify-between md:mb-6 md:flex-row md:items-center"
-        }`}
-      >
-        <div>
-          <h2 className="mb-1 font-heading text-xl font-extrabold text-text-heading md:text-2xl">
-            {user.role === "founder"
-              ? "Browse Talent"
-              : "Browse Startups"}
-          </h2>
-          <p className="font-body text-xs text-text-body md:text-sm">
-            {user.role === "founder"
-              ? "Discover talent that can grow into your team"
-              : user.role === "team-member"
-                ? "Already committed to a startup"
-                : "Find your next startup opportunity"}
-          </p>
-        </div>
-        {user.role === "founder" &&
-          !founderPostsLoading &&
-          founderCanBrowseTalent &&
-          (() => {
-            const hasExistingPost = Boolean(founderStartupPost);
-            return (
-              <div className="flex gap-2">
-                <Button
-                  onClick={() => {
-                    // Navigate to the new dedicated Post Startup page
-                    onNavigate?.("post-startup");
-                  }}
-                  className="rounded-input bg-primary font-body text-sm font-semibold text-white shadow-[0_4px_16px_rgba(58,90,254,0.20)] transition-colors duration-200 ease-in-out hover:bg-primary-hover"
-                >
-                  {hasExistingPost ? (
-                    <>
-                      <Edit className="w-4 h-4 mr-1.5" />
-                      Edit Startup Post
-                    </>
-                  ) : (
-                    <>
-                      <Plus className="w-4 h-4 mr-1.5" />
-                      Post Startup Idea
-                    </>
-                  )}
-                </Button>
-                <Button
-                  onClick={() => setShowCompensationManager(true)}
-                  variant="outline"
-                  className="rounded-input border border-surface-border bg-surface-card font-body text-sm font-semibold text-text-body transition-colors duration-200 ease-in-out hover:border-primary hover:bg-surface-card hover:text-primary"
-                >
-                  <DollarSign className="w-4 h-4 mr-1.5" />
-                  Onboarding & Comp
-                </Button>
-              </div>
-            );
-          })()}
-      </div>
+    <div className="min-h-full bg-surface-page font-body">
+      <div className="mx-auto w-full max-w-6xl space-y-5 py-5 md:py-6">
+      {user.role === "founder" &&
+        !founderPostsLoading &&
+        founderCanBrowseTalent && (
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <p className="font-body text-sm text-text-muted">
+              {talentLoading
+                ? "Finding people who fit your startup…"
+                : filteredTalent.length > 0
+                  ? `${filteredTalent.length} ${filteredTalent.length === 1 ? "person" : "people"} ready to join`
+                  : "No matches yet — check back as new talent joins"}
+            </p>
+            <div className="flex flex-wrap gap-2">
+              <Button
+                onClick={() => onNavigate?.("post-startup")}
+                className="rounded-input bg-primary font-body text-sm font-semibold text-white shadow-[0_4px_16px_rgba(58,90,254,0.20)] transition-colors duration-200 ease-in-out hover:bg-primary-hover"
+              >
+                {founderStartupPost ? (
+                  <>
+                    <Edit className="mr-1.5 h-4 w-4" />
+                    Edit Startup Post
+                  </>
+                ) : (
+                  <>
+                    <Plus className="mr-1.5 h-4 w-4" />
+                    Post Startup Idea
+                  </>
+                )}
+              </Button>
+              <Button
+                onClick={() => setShowCompensationManager(true)}
+                variant="outline"
+                className="rounded-input border border-surface-border bg-surface-card font-body text-sm font-semibold text-text-body transition-colors duration-200 ease-in-out hover:border-primary hover:text-primary"
+              >
+                <DollarSign className="mr-1.5 h-4 w-4" />
+                Onboarding & Comp
+              </Button>
+            </div>
+          </div>
+        )}
+      {user.role === "talent" && (
+        <p className="font-body text-sm text-text-muted">
+          Find your next startup opportunity
+        </p>
+      )}
       {user.role === "team-member" && (
         <Card className="rounded-card border border-surface-border bg-yellow-50/90 shadow-soft">
           <CardContent className="p-4 md:p-6">
@@ -848,7 +881,7 @@ export default function TeamMatching({ user, onNavigate }) {
                 </p>
                 <p className="text-xs text-gray-600">
                   Focus on executing with your current team and making your
-                  startup successful! 🚀
+                  startup successful!
                 </p>
               </div>
             </div>
@@ -894,13 +927,13 @@ export default function TeamMatching({ user, onNavigate }) {
       )}
       {(user.role === "talent" || (user.role === "founder" && founderCanBrowseTalent)) && (
         <>
-          <div className="flex flex-col sm:flex-row gap-2 mb-4">
-            <div className="flex-1 relative">
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-muted" />
               <Input
                 placeholder={
                   user.role === "founder"
-                    ? "Search talent..."
+                    ? "Search by name, role, or skill…"
                     : "Search startups..."
                 }
                 value={searchQuery}
@@ -920,350 +953,151 @@ export default function TeamMatching({ user, onNavigate }) {
           </div>
           {user.role === "founder" ? (
             <>
-              {teamRecommendations.length > 0 &&
-                recommendedTalent.length > 0 && (
-                  <div className="mb-6">
-                    <Card className="rounded-card border border-surface-border bg-gradient-to-br from-primary/5 to-primary/10 shadow-soft">
-                      <CardHeader className="pb-3">
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-2">
-                            <Sparkles className="w-5 h-5 text-primary" />
-                            <CardTitle className="text-lg">
-                              Recommended for You
-                            </CardTitle>
-                          </div>
-                          <Badge variant="secondary" className="text-xs">
-                            Smart Match
-                          </Badge>
-                        </div>
-                        <p className="text-xs text-muted-foreground mt-1">
-                          {"Based on your "}
-                          {user.profile?.industryFocus}
-                          {" startup at "}
-                          {user.profile?.stage}
-                          {" stage"}
-                        </p>
-                      </CardHeader>
-                      <CardContent>
-                        <div className="mb-4">
-                          <h4 className="text-sm font-semibold mb-2 flex items-center gap-1.5">
-                            <Target className="w-4 h-4 text-orange-600" />
-                            Key Roles You Need
-                          </h4>
-                          <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
-                            {teamRecommendations.slice(0, 3).map((rec) => (
-                              <div
-                                key={rec.id}
-                                className="rounded-input bg-surface-page p-3 shadow-soft"
-                              >
-                                <div className="flex items-start justify-between mb-1">
-                                  <p className="font-medium text-sm">
-                                    {rec.role}
-                                  </p>
-                                  <Badge
-                                    variant="outline"
-                                    className="text-xs"
-                                    style={{
-                                      borderColor:
-                                        rec.priority === "critical"
-                                          ? "#EF4444"
-                                          : rec.priority === "high"
-                                            ? "#F59E0B"
-                                            : "#10B981",
-                                      color:
-                                        rec.priority === "critical"
-                                          ? "#EF4444"
-                                          : rec.priority === "high"
-                                            ? "#F59E0B"
-                                            : "#10B981",
-                                    }}
-                                  >
-                                    {rec.priority === "critical"
-                                      ? "🔴 Critical"
-                                      : rec.priority === "high"
-                                        ? "🟠 High"
-                                        : "🟢 Medium"}
-                                  </Badge>
-                                </div>
-                                <p className="text-xs text-muted-foreground line-clamp-2">
-                                  {rec.reasoning}
-                                </p>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                        <div>
-                          <h4 className="text-sm font-semibold mb-3 flex items-center gap-1.5">
-                            <Users className="w-4 h-4 text-blue-600" />
-                            Top Matches
-                          </h4>
-                          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                            {recommendedTalent.map((member) => (
-                              <Card
-                                key={member.id}
-                                className="group relative overflow-hidden rounded-xl border border-slate-200/60 bg-white shadow-sm transition-all duration-300 ease-out hover:shadow-lg hover:border-primary/20 hover:-translate-y-0.5"
-                              >
-                                <CardContent className="p-4">
-                                  {member.matchScore && (
-                                    <Badge
-                                      className="absolute top-3 right-3 text-white border-0 text-xs font-semibold px-2 py-0.5 bg-gradient-to-r from-primary to-primary/90 shadow-md"
-                                    >
-                                      <Star className="w-3 h-3 mr-1 fill-white" />
-                                      {member.matchScore}% Match
-                                    </Badge>
-                                  )}
-                                  <div className="flex items-start gap-3 mb-3">
-                                    <Avatar className="w-11 h-11 ring-2 ring-slate-100 ring-offset-1.5 transition-transform duration-300 group-hover:scale-105">
-                                      <AvatarImage
-                                        src={resolveUserAvatar(member)}
-                                      />
-                                      <AvatarFallback className="bg-gradient-to-br from-primary/10 to-primary/5 text-primary font-semibold">
-                                        {member.name?.split(" ").map(n => n[0]).join("").slice(0, 2).toUpperCase() || "??"}
-                                      </AvatarFallback>
-                                    </Avatar>
-                                    <div className="flex-1 min-w-0 pt-0.5">
-                                      <h3 className="text-sm font-semibold text-slate-900 truncate">
-                                        {member.name || "Unknown"}
-                                      </h3>
-                                      <div className="flex items-center gap-1 text-xs text-slate-500">
-                                        {getRoleIcon(member.role || "")}
-                                        <span className="truncate">
-                                          {member.role || "Role not specified"}
-                                        </span>
-                                      </div>
-                                    </div>
-                                  </div>
-                                  <p className="text-xs text-slate-600 mb-3 line-clamp-2 leading-relaxed">
-                                    {member.bio || "No bio provided"}
-                                  </p>
-                                  <div className="flex flex-wrap gap-1 mb-3">
-                                    {(Array.isArray(member.skills)
-                                      ? member.skills
-                                      : []
-                                    )
-                                      .slice(0, 3)
-                                      .map((skill) => (
-                                        <span
-                                          key={skill}
-                                          className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-slate-100 text-slate-600 border border-slate-200/60"
-                                        >
-                                          {skill}
-                                        </span>
-                                      ))}
-                                    {(Array.isArray(member.skills)
-                                      ? member.skills
-                                      : []
-                                    ).length > 3 && (
-                                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-slate-50 text-slate-500 border border-slate-200/60">
-                                        +{(Array.isArray(member.skills)
-                                          ? member.skills
-                                          : []).length - 3}
-                                      </span>
-                                    )}
-                                  </div>
-                                  <Button
-                                    size="sm"
-                                    className="w-full text-xs bg-primary hover:bg-primary/90 text-white font-medium"
-                                    onClick={() => viewTalentProfile(member)}
-                                  >
-                                    View Profile
-                                  </Button>
-                                </CardContent>
-                              </Card>
-                            ))}
-                          </div>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  </div>
-                )}
               {(!user.onboardingComplete || !user.profile) && (
-                <Card className="mb-4 rounded-card border border-surface-border bg-orange-50/50 shadow-soft">
+                <Card className="rounded-card border border-surface-border bg-status-warning/5 shadow-soft">
                   <CardContent className="p-4">
                     <div className="flex items-start gap-3">
-                      <AlertCircle className="w-5 h-5 text-orange-600 flex-shrink-0 mt-0.5" />
+                      <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-status-warning" />
                       <div>
-                        <p className="font-medium text-sm text-orange-900">
-                          Complete your profile to get smart recommendations
+                        <p className="font-heading text-sm font-semibold text-text-heading">
+                          Complete your profile to get smarter matches
                         </p>
-                        <p className="text-xs text-orange-700 mt-1">
-                          Tell us about your startup to see talent
-                          recommendations tailored to your needs.
+                        <p className="mt-1 font-body text-xs text-text-muted">
+                          Tell us about your startup to see talent ranked for your needs.
                         </p>
                       </div>
                     </div>
                   </CardContent>
                 </Card>
               )}
-              <div className="pt-6">
-                <h3 className="mb-3 flex items-center gap-2 font-heading text-base font-semibold text-text-heading">
-                  <Search className="h-4 w-4 text-primary" />
-                  Browse Talent
-                </h3>
-                {filteredTalent.length === 0 ? (
-                  <Card className="rounded-card border-0 bg-surface-card shadow-soft">
-                    <CardContent className="flex flex-col items-center justify-center py-12">
-                      <Users className="mb-4 h-16 w-16 text-surface-border" />
-                      <h3 className="mb-2 font-heading text-lg font-semibold text-text-heading">
-                        No talent profiles yet
-                      </h3>
-                      <p className="max-w-md text-center font-body text-sm text-text-muted">
-                        Check back soon! Talented people are joining
-                        StartupVerse every day.
-                      </p>
-                    </CardContent>
-                  </Card>
-                ) : (
-                  <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-3">
-                    {filteredTalent.map((member) => (
-                      <Card 
-                        key={member.id} 
-                        className="group relative overflow-hidden rounded-2xl border border-slate-200/60 bg-white shadow-sm transition-all duration-300 ease-out hover:shadow-xl hover:shadow-primary/5 hover:border-primary/20 hover:-translate-y-1"
+              {talentLoading ? (
+                <TalentBrowseSkeleton />
+              ) : filteredTalent.length === 0 ? (
+                <EmptyStateBlock
+                  icon={Users}
+                  tone="info"
+                  title={
+                    searchQuery.trim()
+                      ? "No talent matches that search"
+                      : "No talent profiles yet"
+                  }
+                  description={
+                    searchQuery.trim()
+                      ? "Try a different name, role, or skill."
+                      : "Check back soon — people join StartupVerse every day."
+                  }
+                  className="min-h-[280px] rounded-card border border-surface-border bg-surface-card py-10 shadow-soft"
+                />
+              ) : (
+                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                  {filteredTalent.map((member) => {
+                    const skills = Array.isArray(member.skills) ? member.skills : [];
+                    const availability = String(member.availability || "");
+                    const availabilityTone = availability.toLowerCase().includes("full")
+                      ? "border-status-success/30 bg-status-success/10 text-status-success"
+                      : availability.toLowerCase().includes("part")
+                        ? "border-status-warning/30 bg-status-warning/10 text-status-warning"
+                        : "border-surface-border bg-surface-page text-text-body";
+
+                    return (
+                      <Card
+                        key={member.id}
+                        className="group relative overflow-hidden rounded-card border border-surface-border bg-surface-card shadow-soft transition-shadow duration-200 ease-in-out hover:shadow-[0_4px_16px_rgba(0,0,0,0.08)]"
                       >
-                        {/* Match Score Badge - Premium Style */}
-                        {member.matchScore && member.matchScore >= 40 && (
-                          <div className="absolute top-4 right-4 z-10">
-                            <Badge
-                              className={`text-white border-0 font-semibold text-xs px-2.5 py-1 shadow-lg ${
-                                member.matchScore >= 80
-                                  ? "bg-gradient-to-r from-emerald-500 to-emerald-600"
-                                  : member.matchScore >= 60
-                                    ? "bg-gradient-to-r from-blue-500 to-blue-600"
-                                    : "bg-gradient-to-r from-slate-500 to-slate-600"
-                              }`}
-                            >
-                              <Star className="w-3 h-3 mr-1 fill-white" />
-                              {member.matchScore}% Match
-                            </Badge>
-                          </div>
-                        )}
-
-                        <CardContent className="p-0">
-                          {/* Header Section with Avatar */}
-                          <div className="p-5 pb-4">
-                            <div className="flex items-start gap-4">
-                              <Avatar className="w-14 h-14 ring-2 ring-slate-100 ring-offset-2 transition-transform duration-300 group-hover:scale-105">
-                                <AvatarImage
-                                  src={resolveUserAvatar(member)}
-                                />
-                                <AvatarFallback className="bg-gradient-to-br from-primary/10 to-primary/5 text-primary font-semibold text-lg">
-                                  {member.name?.split(" ").map(n => n[0]).join("").slice(0, 2).toUpperCase() || "??"}
-                                </AvatarFallback>
-                              </Avatar>
-                              <div className="flex-1 min-w-0 pt-0.5">
-                                <h3 className="font-semibold text-slate-900 text-lg leading-tight truncate">
-                                  {member.name || "Unknown"}
-                                </h3>
-                                <div className="flex items-center gap-1.5 text-sm text-slate-500 mt-1">
-                                  {getRoleIcon(member.role || "")}
-                                  <span className="truncate">
-                                    {member.role || "Role not specified"}
-                                  </span>
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-
-                          {/* Bio Section */}
-                          <div className="px-5 pb-4">
-                            <p className="text-sm text-slate-600 line-clamp-2 leading-relaxed">
-                              {member.bio || "No bio provided"}
-                            </p>
-                          </div>
-
-                          {/* Skills Section - Premium Tags */}
-                          <div className="px-5 pb-4">
-                            <div className="flex flex-wrap gap-1.5">
-                              {(Array.isArray(member.skills) ? member.skills : [])
-                                .slice(0, 4)
-                                .map((skill) => (
-                                  <span
-                                    key={skill}
-                                    className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-slate-100 text-slate-700 border border-slate-200/60"
-                                  >
-                                    {skill}
-                                  </span>
-                                ))}
-                              {(Array.isArray(member.skills) ? member.skills : []).length > 4 && (
-                                <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-slate-50 text-slate-500 border border-slate-200/60">
-                                  +{(Array.isArray(member.skills) ? member.skills : []).length - 4}
+                        {member.matchScore >= 40 ? (
+                          <Badge className="absolute right-4 top-4 z-10 border-0 bg-primary font-body text-xs font-semibold text-white">
+                            <Star className="mr-1 h-3 w-3 fill-white" />
+                            {member.matchScore}% match
+                          </Badge>
+                        ) : null}
+                        <CardContent className="flex h-full flex-col p-5">
+                          <div className="flex items-start gap-3">
+                            <Avatar className="h-12 w-12 ring-2 ring-surface-border ring-offset-2 ring-offset-surface-card">
+                              <AvatarImage src={resolveUserAvatar(member)} />
+                              <AvatarFallback className="bg-primary-tint font-semibold text-primary">
+                                {member.name
+                                  ?.split(" ")
+                                  .map((n) => n[0])
+                                  .join("")
+                                  .slice(0, 2)
+                                  .toUpperCase() || "??"}
+                              </AvatarFallback>
+                            </Avatar>
+                            <div className="min-w-0 flex-1 pt-0.5">
+                              <h3 className="truncate font-heading text-base font-bold text-text-heading">
+                                {member.name || "Unknown"}
+                              </h3>
+                              <div className="mt-0.5 flex items-center gap-1.5 font-body text-sm text-text-muted">
+                                {getRoleIcon(member.role || "")}
+                                <span className="truncate">
+                                  {member.role || "Role not specified"}
                                 </span>
-                              )}
-                            </div>
-                          </div>
-
-                          {/* Info Grid */}
-                          <div className="px-5 pb-4">
-                            <div className="grid grid-cols-2 gap-3 text-sm">
-                              <div className="flex items-center gap-2 text-slate-600">
-                                <MapPin className="w-4 h-4 text-slate-400 flex-shrink-0" />
-                                <span className="truncate">{member.location || "Remote"}</span>
-                              </div>
-                              <div className="flex items-center gap-2 text-slate-600">
-                                <Briefcase className="w-4 h-4 text-slate-400 flex-shrink-0" />
-                                <span className="truncate">{member.experience || "N/A"}</span>
                               </div>
                             </div>
                           </div>
 
-                          {/* Availability & Interests */}
-                          <div className="px-5 pb-5">
-                            <div className="flex items-center justify-between">
-                              <div className="flex items-center gap-2">
-                                {member.availability ? (
-                                  <Badge 
-                                    variant="outline" 
-                                    className={`text-xs font-medium ${
-                                      member.availability.toLowerCase().includes("full") 
-                                        ? "border-emerald-200 bg-emerald-50 text-emerald-700"
-                                        : member.availability.toLowerCase().includes("part")
-                                          ? "border-amber-200 bg-amber-50 text-amber-700"
-                                          : "border-slate-200 bg-slate-50 text-slate-700"
-                                    }`}
-                                  >
-                                    <div className={`w-1.5 h-1.5 rounded-full mr-1.5 ${
-                                      member.availability.toLowerCase().includes("full")
-                                        ? "bg-emerald-500"
-                                        : member.availability.toLowerCase().includes("part")
-                                          ? "bg-amber-500"
-                                          : "bg-slate-400"
-                                    }`} />
-                                    {member.availability}
-                                  </Badge>
-                                ) : (
-                                  <Badge variant="outline" className="text-xs font-medium border-slate-200 bg-slate-50 text-slate-600">
-                                    <div className="w-1.5 h-1.5 rounded-full mr-1.5 bg-slate-400" />
-                                    Unknown
-                                  </Badge>
-                                )}
-                              </div>
-                              
-                              {(member.interests || []).length > 0 && (
-                                <div className="flex items-center gap-1 text-xs text-slate-500">
-                                  <Heart className="w-3.5 h-3.5 text-rose-400" />
-                                  <span>{member.interests.length} interests</span>
-                                </div>
-                              )}
+                          <p className="mt-4 line-clamp-2 font-body text-sm leading-relaxed text-text-body">
+                            {member.bio || "No bio provided"}
+                          </p>
+
+                          <div className="mt-4 flex flex-wrap gap-1.5">
+                            {skills.slice(0, 4).map((skill) => (
+                              <span
+                                key={skill}
+                                className="inline-flex items-center rounded-pill border border-surface-border bg-surface-page px-2.5 py-0.5 font-body text-xs font-medium text-text-body"
+                              >
+                                {skill}
+                              </span>
+                            ))}
+                            {skills.length > 4 ? (
+                              <span className="inline-flex items-center rounded-pill border border-surface-border bg-surface-page px-2.5 py-0.5 font-body text-xs font-medium text-text-muted">
+                                +{skills.length - 4}
+                              </span>
+                            ) : null}
+                          </div>
+
+                          <div className="mt-4 grid grid-cols-2 gap-3 font-body text-sm text-text-muted">
+                            <div className="flex min-w-0 items-center gap-2">
+                              <MapPin className="h-4 w-4 shrink-0 text-text-muted" />
+                              <span className="truncate">
+                                {member.location || "Remote"}
+                              </span>
+                            </div>
+                            <div className="flex min-w-0 items-center gap-2">
+                              <Briefcase className="h-4 w-4 shrink-0 text-text-muted" />
+                              <span className="truncate">
+                                {member.experience || "Experience N/A"}
+                              </span>
                             </div>
                           </div>
 
-                          {/* Action Button */}
-                          <div className="px-5 pb-5 pt-0">
-                            <Button
-                              size="default"
-                              className="w-full bg-gradient-to-r from-primary to-primary/90 hover:from-primary/95 hover:to-primary/85 text-white font-medium shadow-lg shadow-primary/20 transition-all duration-200 hover:shadow-xl hover:shadow-primary/30"
-                              onClick={() => viewTalentProfile(member)}
+                          <div className="mt-4 flex items-center justify-between gap-2">
+                            <Badge
+                              variant="outline"
+                              className={`font-body text-xs font-medium ${availabilityTone}`}
                             >
-                              View Full Profile
-                              <ExternalLink className="w-4 h-4 ml-2" />
-                            </Button>
+                              {availability || "Availability unknown"}
+                            </Badge>
+                            {(member.interests || []).length > 0 ? (
+                              <span className="font-body text-xs text-text-muted">
+                                {(member.interests || []).length} interests
+                              </span>
+                            ) : null}
                           </div>
+
+                          <Button
+                            className="mt-5 w-full rounded-input bg-primary font-body text-sm font-semibold text-white transition-colors duration-200 ease-in-out hover:bg-primary-hover"
+                            onClick={() => viewTalentProfile(member)}
+                          >
+                            View profile
+                            <ArrowRight className="ml-2 h-4 w-4" />
+                          </Button>
                         </CardContent>
                       </Card>
-                    ))}
-                  </div>
-                )}
-              </div>
+                    );
+                  })}
+                </div>
+              )}
             </>
           ) : // TALENT SEE: Startup Ideas - this section will be rendered separately below
           null}
@@ -1379,6 +1213,7 @@ export default function TeamMatching({ user, onNavigate }) {
           )}
         </>
       )}
+      </div>
       <Dialog
         open={showDetailsDialog}
         onOpenChange={(open) => {

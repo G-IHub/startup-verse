@@ -131,7 +131,7 @@ export function GoogleMeetCall({
       }}
       className="fixed inset-0 bg-black/95 z-50 flex flex-col"
     >
-      <div className="bg-gradient-to-r from-[#3A5AFE] to-[#7C3AED] text-white px-6 py-4 flex items-center justify-between">
+      <div className="bg-primary text-white px-6 py-4 flex items-center justify-between">
         <div className="flex items-center gap-4">
           <div className="flex items-center gap-2">
             <div className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
@@ -193,8 +193,8 @@ export function GoogleMeetCall({
       <div className="flex-1 flex flex-col items-center justify-center p-8">
         <div className="w-full max-w-6xl bg-white rounded-xl shadow-2xl overflow-hidden">
           <div className="p-8 text-center space-y-4">
-            <div className="w-20 h-20 rounded-full bg-[#3A5AFE]/10 flex items-center justify-center mx-auto">
-              <Video className="w-10 h-10 text-[#3A5AFE]" />
+            <div className="w-20 h-20 rounded-full bg-primary-tint flex items-center justify-center mx-auto">
+              <Video className="w-10 h-10 text-primary" />
             </div>
             <div>
               <h2 className="text-2xl font-bold text-gray-900 mb-2">
@@ -218,7 +218,7 @@ export function GoogleMeetCall({
                         className="w-6 h-6 rounded-full"
                       />
                     ) : (
-                      <div className="w-6 h-6 rounded-full bg-gradient-to-br from-blue-500 to-purple-500 flex items-center justify-center text-white text-xs font-bold">
+                      <div className="w-6 h-6 rounded-full bg-primary flex items-center justify-center text-white text-xs font-bold">
                         {participant.name.charAt(0).toUpperCase()}
                       </div>
                     )}

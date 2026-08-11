@@ -84,17 +84,63 @@ function toRelativePosted(postedDate, fallbackPosted) {
 
 function getAvatarTone(companyName) {
   const toneClasses = [
-    "bg-slate-100 text-slate-700",
-    "bg-indigo-100 text-indigo-700",
-    "bg-emerald-100 text-emerald-700",
-    "bg-amber-100 text-amber-700",
-    "bg-rose-100 text-rose-700",
-    "bg-cyan-100 text-cyan-700",
+    "bg-primary-tint text-primary",
+    "bg-surface-page text-text-heading border border-surface-border",
+    "bg-surface-border/40 text-text-body",
+    "bg-primary-tint/70 text-primary",
   ];
-  const hash = companyName
+  const hash = (companyName || "Startup")
     .split("")
     .reduce((sum, char) => sum + char.charCodeAt(0), 0);
   return toneClasses[Math.abs(hash) % toneClasses.length];
+}
+
+function OpportunityCardSkeleton() {
+  return (
+    <div
+      className={`animate-pulse rounded-card p-5 space-y-4 ${SETTINGS_CARD}`}
+      aria-hidden="true"
+    >
+      <div className="flex gap-3">
+        <div className="h-10 w-10 shrink-0 rounded-lg bg-surface-border/60" />
+        <div className="flex-1 space-y-2">
+          <div className="h-4 w-3/4 rounded bg-surface-border/50" />
+          <div className="h-3 w-1/2 rounded bg-surface-border/40" />
+        </div>
+      </div>
+      <div className="h-14 rounded bg-surface-border/35" />
+      <div className="h-8 rounded bg-surface-border/30" />
+      <div className="grid grid-cols-2 gap-2">
+        {[1, 2, 3, 4].map((i) => (
+          <div key={i} className="h-3 rounded bg-surface-border/30" />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function MatchListSkeleton({ count = 5 }) {
+  return (
+    <ul
+      className="divide-y divide-surface-border px-4"
+      aria-busy="true"
+      aria-label="Loading startup matches"
+    >
+      {Array.from({ length: count }, (_, i) => (
+        <li key={i} className="animate-pulse py-3">
+          <div className="flex items-start gap-3">
+            <div className="h-8 w-8 shrink-0 rounded-[6px] bg-surface-border/60" />
+            <div className="min-w-0 flex-1 space-y-2">
+              <div className="h-4 w-2/5 rounded bg-surface-border/50" />
+              <div className="h-3 w-1/4 rounded bg-surface-border/40" />
+              <div className="h-3 w-3/5 rounded bg-surface-border/35" />
+            </div>
+            <div className="hidden h-7 w-24 rounded bg-surface-border/40 lg:block" />
+          </div>
+        </li>
+      ))}
+    </ul>
+  );
 }
 
 function getInitials(name) {
@@ -409,16 +455,13 @@ export default function TalentDashboard({
     return (
       <div className="min-h-full bg-surface-page">
         <div className="max-w-7xl mx-auto py-4 space-y-4">
-          {/* Welcome Header */}
+          {/* Compact greeting — AppLayout owns the page title */}
           <div className="flex items-start justify-between gap-4">
-            <div>
-              <h1 className="font-heading text-2xl font-extrabold text-text-heading">
-                {"Welcome back, "}
-                {getFirstName(user?.name) || "New User"}
-              </h1>
-              <p className="font-body text-sm text-text-muted mt-0.5">
-                {dateLabel}
+            <div className="min-w-0 space-y-0.5">
+              <p className="font-heading text-[15px] font-semibold text-text-heading">
+                Welcome back, {getFirstName(user?.name) || "there"}
               </p>
+              <p className="font-body text-[12px] text-text-muted">{dateLabel}</p>
             </div>
             <div className="flex items-center gap-3 shrink-0">
               {viewModel.summary.sentInterestCount > 0 && (
@@ -493,27 +536,13 @@ export default function TalentDashboard({
             </p>
 
             {isLoading && topMatches.length === 0 && (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+              <div
+                className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5"
+                aria-busy="true"
+                aria-label="Loading recommendations"
+              >
                 {[1, 2, 3].map((n) => (
-                  <div
-                    key={n}
-                    className={`rounded-card p-5 space-y-4 animate-pulse ${SETTINGS_CARD}`}
-                  >
-                    <div className="flex gap-3">
-                      <div className="h-10 w-10 bg-muted rounded-lg shrink-0" />
-                      <div className="flex-1 space-y-2">
-                        <div className="h-4 bg-muted rounded w-3/4" />
-                        <div className="h-3 bg-muted rounded w-1/2" />
-                      </div>
-                    </div>
-                    <div className="h-14 bg-muted rounded" />
-                    <div className="h-8 bg-muted rounded" />
-                    <div className="grid grid-cols-2 gap-2">
-                      {[1, 2, 3, 4].map((i) => (
-                        <div key={i} className="h-3 bg-muted rounded" />
-                      ))}
-                    </div>
-                  </div>
+                  <OpportunityCardSkeleton key={n} />
                 ))}
               </div>
             )}
@@ -1131,12 +1160,8 @@ export default function TalentDashboard({
               </div>
             </div>
           </div>
-          {isLoading && !hasRows && (
-            <div className="px-4 py-8 text-[13px] text-muted-foreground">
-              Loading startup matches...
-            </div>
-          )}
-          {!!error && !hasRows && (
+          {isLoading && !hasRows && <MatchListSkeleton />}
+          {!!error && !hasRows && !isLoading && (
             <div className="px-4 py-8 text-[13px] text-red-600">{error}</div>
           )}
           {!isLoading && !error && !hasRows && (

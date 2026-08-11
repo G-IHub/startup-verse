@@ -47,8 +47,8 @@ export default function FounderQuickActions({ onNavigate }) {
             type="button"
             onClick={() => onNavigate?.(action.page)}
             className={cn(
-              "flex items-center gap-3 rounded-card border-0 bg-white p-4 text-left shadow-soft",
-              "transition-shadow duration-200 ease-in-out hover:shadow-[0_4px_24px_rgba(58,90,254,0.12)]",
+              "flex items-center gap-3 rounded-card border border-surface-border bg-surface-card p-4 text-left shadow-soft",
+              "transition-shadow duration-200 ease-in-out hover:shadow-card",
             )}
           >
             <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-input bg-primary-tint text-primary">

@@ -3,6 +3,10 @@ import { cn } from "../ui/utils";
 import StartupVerseLogo from "../brand/StartupVerseLogo";
 import * as founderApi from "../../utils/api/founderApi";
 import {
+  normalizeProgramTab,
+  PROGRAM_NAV_TABS,
+} from "../../app/dashboardPaths";
+import {
   Building,
   Users,
   Home,
@@ -11,12 +15,28 @@ import {
   X,
   MessageCircle,
   Rocket,
+  GraduationCap,
+  CheckSquare,
+  Flag,
+  Calendar,
+  MessageSquare,
+  ChevronDown,
 } from "lucide-react";
+
+const PROGRAM_TAB_ICONS = {
+  overview: GraduationCap,
+  deliverables: CheckSquare,
+  milestones: Flag,
+  events: Calendar,
+  mentors: Users,
+  communication: MessageSquare,
+};
 
 export default function VerticalSidebar({
   user,
   currentPage,
   virtualOfficeView,
+  programTab = "overview",
   onPageChange,
   onVirtualOfficeViewChange,
   isOpen = false,
@@ -70,11 +90,24 @@ export default function VerticalSidebar({
       roles: ["founder", "team-member", "team"],
     },
     {
+      id: "program",
+      icon: GraduationCap,
+      label: "Program",
+      page: "program",
+      roles: ["founder", "team-member", "team"],
+      children: PROGRAM_NAV_TABS.map((tab) => ({
+        id: `program-${tab.id}`,
+        label: tab.label,
+        page: "program",
+        programTab: tab.id,
+        icon: PROGRAM_TAB_ICONS[tab.id] || GraduationCap,
+      })),
+    },
+    {
       id: "browse",
       icon: Users,
       label: "Browse",
-      page: user.role === "talent" ? "browse-startups" : "startup-office",
-      view: user.role === "talent" ? undefined : "matching",
+      page: user.role === "talent" ? "browse-startups" : "team-matching",
       roles: ["founder", "talent"],
     },
     ...(user.role === "founder" && founderHasStartupPost === false
@@ -129,15 +162,30 @@ export default function VerticalSidebar({
     item.roles.includes(user.role),
   );
 
+  const activeProgramTab = normalizeProgramTab(programTab);
+
   const isActive = (item) => {
     if (item.id === "launch-startup") {
       return currentPage === "post-startup";
     }
-    if (user.role === "talent" && item.id === "browse") {
-      return currentPage === "browse-startups";
+    if (item.id === "browse") {
+      if (user.role === "talent") return currentPage === "browse-startups";
+      return (
+        currentPage === "team-matching" ||
+        (currentPage === "startup-office" && virtualOfficeView === "matching")
+      );
     }
     if (user.role === "talent" && item.id === "dashboard") {
       return currentPage === "dashboard";
+    }
+    if (item.programTab) {
+      return (
+        currentPage === "program" &&
+        activeProgramTab === normalizeProgramTab(item.programTab)
+      );
+    }
+    if (item.id === "program") {
+      return currentPage === "program";
     }
     if (item.page && item.view) {
       return currentPage === item.page && virtualOfficeView === item.view;
@@ -146,12 +194,20 @@ export default function VerticalSidebar({
   };
 
   const handleNavClick = (item) => {
+    if (item.id === "program") {
+      // Expand Program and land on Overview; keep drawer open so children stay visible.
+      onPageChange("program", { programTab: "overview" });
+      return;
+    }
+
     if (item.page) {
-      const opts =
-        item.view != null
-          ? { ...item.options, officeView: item.view }
-          : item.options;
-      onPageChange(item.page, opts);
+      const opts = {
+        ...(item.view != null ? { officeView: item.view } : {}),
+        ...(item.programTab ? { programTab: item.programTab } : {}),
+        ...item.options,
+      };
+      const hasOpts = Object.keys(opts).length > 0;
+      onPageChange(item.page, hasOpts ? opts : undefined);
     } else if (item.view && onVirtualOfficeViewChange) {
       onVirtualOfficeViewChange(item.view);
     }
@@ -161,26 +217,33 @@ export default function VerticalSidebar({
   const NavItem = ({ item }) => {
     const Icon = item.icon;
     const active = isActive(item);
+    const hasChildren = Array.isArray(item.children) && item.children.length > 0;
+    const showChildren = hasChildren && currentPage === "program";
+    const parentSelected = hasChildren ? false : active;
+    const parentInSection = hasChildren && active;
 
     return (
       <li>
         <button
           type="button"
-          data-tour={item.id}
+          data-nav={item.id}
           onClick={() => handleNavClick(item)}
-          aria-current={active ? "page" : undefined}
+          aria-current={parentSelected ? "page" : undefined}
+          aria-expanded={hasChildren ? showChildren : undefined}
           className={cn(
             "group relative flex w-full items-center gap-2.5 rounded-input px-2.5 py-2 text-left font-body transition-all duration-200 ease-in-out",
             "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/25",
-            active
+            parentSelected
               ? "sidebar-selected"
-              : "text-text-body hover:bg-surface-page hover:text-text-heading",
+              : parentInSection
+                ? "text-text-heading"
+                : "text-text-body hover:bg-surface-page hover:text-text-heading",
           )}
         >
           <span
             className={cn(
               "flex h-8 w-8 shrink-0 items-center justify-center rounded-input transition-colors duration-200",
-              active
+              parentSelected || parentInSection
                 ? "bg-primary/10 text-primary"
                 : "text-text-muted group-hover:text-primary",
             )}
@@ -190,7 +253,59 @@ export default function VerticalSidebar({
           <span className="min-w-0 flex-1 truncate text-[13px] font-medium leading-tight">
             {item.label}
           </span>
+          {hasChildren ? (
+            <ChevronDown
+              className={cn(
+                "h-3.5 w-3.5 shrink-0 text-text-muted transition-transform duration-200",
+                showChildren ? "rotate-0" : "-rotate-90",
+              )}
+              aria-hidden
+            />
+          ) : null}
         </button>
+
+        {showChildren ? (
+          <ul
+            className="mt-0.5 ml-[22px] space-y-0.5 border-l border-surface-border/80 pl-2"
+            role="list"
+          >
+            {item.children.map((child) => {
+              const ChildIcon = child.icon;
+              const childActive = isActive(child);
+              return (
+                <li key={child.id}>
+                  <button
+                    type="button"
+                    data-nav={child.id}
+                    onClick={() => handleNavClick(child)}
+                    aria-current={childActive ? "page" : undefined}
+                    className={cn(
+                      "group relative flex w-full items-center gap-2 rounded-input px-2 py-1.5 text-left font-body transition-all duration-200 ease-in-out",
+                      "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/25",
+                      childActive
+                        ? "sidebar-selected"
+                        : "text-text-body hover:bg-surface-page hover:text-text-heading",
+                    )}
+                  >
+                    <span
+                      className={cn(
+                        "flex h-7 w-7 shrink-0 items-center justify-center rounded-input transition-colors duration-200",
+                        childActive
+                          ? "bg-primary/10 text-primary"
+                          : "text-text-muted group-hover:text-primary",
+                      )}
+                    >
+                      <ChildIcon className="h-3.5 w-3.5" strokeWidth={1.75} aria-hidden />
+                    </span>
+                    <span className="min-w-0 flex-1 truncate text-[12px] font-medium leading-tight">
+                      {child.label}
+                    </span>
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        ) : null}
       </li>
     );
   };

@@ -380,7 +380,7 @@ export async function getStartupMemberships(startupId) {
   console.log("📥 Fetching startup memberships from backend...", { startupId });
 
   try {
-    const response = await orgApi.getFounderMemberships(startupId);
+    const response = await orgApi.getStartupMemberships(startupId);
 
     if (response.success && response.memberships) {
       console.log(
@@ -388,17 +388,20 @@ export async function getStartupMemberships(startupId) {
         response.memberships.length,
       );
 
-      // Transform backend format to frontend format
       return response.memberships.map((membership) => ({
         id: membership.id,
         cohortId: membership.cohortId,
-        organizationId: membership.organizationId,
-        startupId: membership.founderId,
-        startupName: membership.startupName,
+        organizationId:
+          membership.organizationId ||
+          membership.organization?.id ||
+          membership.cohort?.organizationId,
+        startupId: membership.startupId,
+        founderId: membership.founderId,
         founderEmail: membership.founderEmail,
         founderName: membership.founderName,
         joinedAt: membership.joinedAt,
         leftAt: membership.leftAt,
+        status: membership.status,
         cohort: membership.cohort,
         organization: membership.organization,
       }));

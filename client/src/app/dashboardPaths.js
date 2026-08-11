@@ -7,11 +7,28 @@ import { parseOfficeCallRoute } from "../utils/callRouteUtils.js";
 
 const DEFAULT_OFFICE_VIEW = "workspace";
 
-/** @typedef {{ currentPage: string, virtualOfficeView?: string, talentDashboardMode?: string, initialProfileEditing?: boolean, messageUserId?: string, returnToChat?: boolean, profileFromChat?: boolean, taskId?: string, announcementId?: string, winId?: string, deliverableId?: string, officeTab?: string, startupId?: string, talentId?: string, invitationId?: string }} DashboardNavState */
+/** @typedef {{ currentPage: string, virtualOfficeView?: string, talentDashboardMode?: string, initialProfileEditing?: boolean, messageUserId?: string, returnToChat?: boolean, profileFromChat?: boolean, taskId?: string, announcementId?: string, winId?: string, deliverableId?: string, officeTab?: string, programTab?: string, startupId?: string, talentId?: string, invitationId?: string }} DashboardNavState */
+
+const DEFAULT_PROGRAM_TAB = "overview";
+
+/** Sidebar + workspace labels for founder/team program sections. */
+export const PROGRAM_NAV_TABS = Object.freeze([
+  { id: "overview", label: "Overview" },
+  { id: "deliverables", label: "Deliverables" },
+  { id: "milestones", label: "Milestones" },
+  { id: "events", label: "Events" },
+  { id: "mentors", label: "Mentors" },
+  { id: "communication", label: "Communication" },
+]);
+
+const PROGRAM_TABS = Object.freeze(
+  new Set(PROGRAM_NAV_TABS.map((tab) => tab.id)),
+);
 
 const PATH_TO_PAGE = Object.freeze({
   "/home": "dashboard",
   "/office": "startup-office",
+  "/program": "program",
   "/browse-talent": "team-matching",
   "/analytics": "analytics",
   "/settings": "settings",
@@ -39,6 +56,7 @@ export const DASHBOARD_PATH_PREFIXES = Object.freeze(
     [
       "home",
       "office",
+      "program",
       "inbox",
       "browse-talent",
       "chat",
@@ -56,6 +74,11 @@ export const DASHBOARD_PATH_PREFIXES = Object.freeze(
     ],
   ),
 );
+
+export function normalizeProgramTab(tab) {
+  const value = String(tab || "").trim().toLowerCase();
+  return PROGRAM_TABS.has(value) ? value : DEFAULT_PROGRAM_TAB;
+}
 
 function normalizePath(pathname) {
   if (!pathname || pathname === "") return "/";
@@ -145,6 +168,20 @@ export function pathToDashboardState(pathname, search, role) {
     return {
       currentPage: chatPageForRole(role),
       ...(withUser ? { messageUserId: withUser } : {}),
+    };
+  }
+
+  if (path === "/program") {
+    if (
+      role !== "founder" &&
+      role !== "team-member" &&
+      role !== "team"
+    ) {
+      return null;
+    }
+    return {
+      currentPage: "program",
+      programTab: normalizeProgramTab(q.get("tab")),
     };
   }
 
@@ -241,6 +278,7 @@ export function dashboardStateToPath(state) {
     winId,
     deliverableId,
     officeTab,
+    programTab,
     startupId,
     talentId,
     invitationId,
@@ -278,6 +316,12 @@ export function dashboardStateToPath(state) {
       return messageUserId
         ? appendEntityParams("/chat", { with: messageUserId })
         : "/chat";
+    case "program": {
+      const tab = normalizeProgramTab(programTab);
+      return tab && tab !== DEFAULT_PROGRAM_TAB
+        ? appendEntityParams("/program", { tab })
+        : "/program";
+    }
     case "analytics":
       return "/analytics";
     case "settings":
@@ -338,6 +382,7 @@ export const DASHBOARD_ROUTE_PATHS = Object.freeze([
   "/home",
   "/office",
   "/office/call/:roomName",
+  "/program",
   "/inbox",
   "/inbox/received",
   "/inbox/sent",

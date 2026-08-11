@@ -6,6 +6,7 @@ import CohortMembership from "../models/CohortMembership.js";
 import ProgramMilestone from "../models/ProgramMilestone.js";
 import User from "../models/User.js";
 import { error as apiError, success as apiSuccess } from "../utils/apiResponse.js";
+import { sanitizeUser } from "../utils/sanitize.js";
 import { loadCohortMembersEnriched } from "../utils/cohortMemberAggregation.js";
 import { loadAvailableStartupsForCohort } from "../utils/cohortAvailableStartups.js";
 import {
@@ -104,6 +105,150 @@ function normalizeLogoUrl(rawLogo) {
   }
   return { ok: true, value };
 }
+
+function normalizeOrganizationOnboarding(body = {}) {
+  const name = String(body.name || "").trim();
+  const description = String(body.description || "").trim();
+  const organizationType = String(body.organizationType || "").trim();
+  const expectedCohorts = String(body.expectedCohorts || "").trim();
+  const expectedStartups = String(body.expectedStartups || "").trim();
+  const programDuration = String(body.programDuration || "").trim();
+  const teamSize = String(body.teamSize || "").trim();
+  const supportedStages = Array.isArray(body.supportedStages)
+    ? body.supportedStages.map((value) => String(value).trim()).filter(Boolean)
+    : [];
+  const supportedIndustries = Array.isArray(body.supportedIndustries)
+    ? body.supportedIndustries.map((value) => String(value).trim()).filter(Boolean)
+    : [];
+
+  if (
+    !name ||
+    !description ||
+    !organizationType ||
+    !expectedCohorts ||
+    !expectedStartups ||
+    !programDuration ||
+    !teamSize
+  ) {
+    return {
+      ok: false,
+      message: "Complete all required organization setup fields.",
+    };
+  }
+
+  return {
+    ok: true,
+    value: {
+      name,
+      description,
+      settings: {
+        organizationType,
+        expectedCohorts,
+        expectedStartups,
+        programDuration,
+        teamSize,
+        supportedStages,
+        supportedIndustries,
+      },
+    },
+  };
+}
+
+export const completeOrganizationOnboarding = async (req, res) => {
+  if (req.user.role !== "organization-admin") {
+    return apiError(res, "Only organization admins can complete organization setup.", 403);
+  }
+
+  const normalized = normalizeOrganizationOnboarding(req.body);
+  if (!normalized.ok) {
+    return apiError(res, normalized.message, 400);
+  }
+
+  const session = await mongoose.startSession();
+  let result;
+
+  try {
+    await session.withTransaction(async () => {
+      const user = await User.findById(req.user.id).session(session);
+      if (!user) {
+        const error = new Error("User not found.");
+        error.statusCode = 404;
+        throw error;
+      }
+      if (user.role !== "organization-admin") {
+        const error = new Error("Only organization admins can complete organization setup.");
+        error.statusCode = 403;
+        throw error;
+      }
+
+      const existingMembership = await OrganizationAdmin.findOne({ userId: user._id }).session(session);
+      let organization;
+      let created = false;
+
+      if (existingMembership) {
+        organization = await Organization.findById(existingMembership.organizationId).session(session);
+        if (!organization) {
+          const error = new Error("Organization membership references a missing organization.");
+          error.statusCode = 409;
+          throw error;
+        }
+
+        organization.name = normalized.value.name;
+        organization.description = normalized.value.description;
+        organization.settings = {
+          ...(organization.settings || {}),
+          ...normalized.value.settings,
+        };
+        organization.markModified("settings");
+        await organization.save({ session });
+      } else {
+        [organization] = await Organization.create(
+          [
+            {
+              ...normalized.value,
+              createdBy: user._id,
+            },
+          ],
+          { session },
+        );
+        await OrganizationAdmin.create(
+          [{ organizationId: organization._id, userId: user._id }],
+          { session },
+        );
+        created = true;
+      }
+
+      user.profile = {
+        ...(user.profile || {}),
+        organizationId: String(organization._id),
+        organizationName: normalized.value.name,
+        organizationDescription: normalized.value.description,
+        ...normalized.value.settings,
+      };
+      user.onboardingComplete = true;
+      await user.save({ session });
+
+      result = { organization, user, created };
+    });
+  } catch (error) {
+    if (error?.statusCode) {
+      return apiError(res, error.message, error.statusCode);
+    }
+    throw error;
+  } finally {
+    await session.endSession();
+  }
+
+  return apiSuccess(
+    res,
+    {
+      organization: result.organization,
+      user: sanitizeUser(result.user),
+      created: result.created,
+    },
+    result.created ? 201 : 200,
+  );
+};
 
 export const createOrganization = async (req, res) => {
   const rawType = req.body?.type;

@@ -110,24 +110,42 @@ export default function PortfolioOverview({ cohortId, onViewStartup }) {
 
   if (loading) {
     return (
-      <SectionCard>
-        <SectionCard.Body className="p-8 text-center">
-          <div className="font-body text-[13px] text-text-muted animate-pulse">
-            Loading portfolio...
-          </div>
-        </SectionCard.Body>
-      </SectionCard>
+      <div
+        className="space-y-4 font-body"
+        aria-busy="true"
+        aria-label="Loading portfolio"
+      >
+        <div className="grid animate-pulse grid-cols-2 gap-3 md:grid-cols-5">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <div
+              key={i}
+              className="h-20 rounded-card border border-surface-border bg-surface-card shadow-soft"
+            />
+          ))}
+        </div>
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3">
+          {Array.from({ length: 3 }).map((_, i) => (
+            <div
+              key={i}
+              className="h-48 animate-pulse rounded-card border border-surface-border bg-surface-card shadow-soft"
+            />
+          ))}
+        </div>
+      </div>
     );
   }
 
   if (error) {
     return (
       <SectionCard>
-        <SectionCard.Body className="p-8 text-center">
-          <div className="font-body text-[13px] text-[#ff4f6b]">
-            {"Error: "}
-            {error}
-          </div>
+        <SectionCard.Body className="p-0">
+          <EmptyStateBlock
+            variant="centered"
+            icon={AlertTriangle}
+            tone="danger"
+            title="Failed to load portfolio"
+            description={error}
+          />
         </SectionCard.Body>
       </SectionCard>
     );

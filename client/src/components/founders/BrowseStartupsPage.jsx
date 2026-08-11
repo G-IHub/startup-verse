@@ -56,6 +56,55 @@ function getCompensationLabel(philosophy) {
   return "Compensation details available";
 }
 
+function StartupCardSkeleton() {
+  return (
+    <div
+      className={cn(
+        "animate-pulse rounded-card border border-surface-border bg-surface-card p-5 shadow-soft",
+      )}
+      aria-hidden="true"
+    >
+      <div className="flex items-start gap-3">
+        <div className="h-12 w-12 shrink-0 rounded-lg bg-surface-border/60" />
+        <div className="min-w-0 flex-1 space-y-2 pt-1">
+          <div className="h-5 w-2/3 rounded bg-surface-border/50" />
+          <div className="h-3 w-1/2 rounded bg-surface-border/40" />
+        </div>
+        <div className="h-8 w-8 shrink-0 rounded-full bg-surface-border/35" />
+      </div>
+      <div className="mt-4 space-y-2">
+        <div className="h-4 w-full rounded bg-surface-border/40" />
+        <div className="h-4 w-5/6 rounded bg-surface-border/35" />
+        <div className="h-4 w-4/6 rounded bg-surface-border/30" />
+      </div>
+      <div className="mt-4 flex flex-wrap gap-2">
+        <div className="h-6 w-16 rounded-pill bg-surface-border/40" />
+        <div className="h-6 w-20 rounded-pill bg-surface-border/40" />
+      </div>
+      <div className="mt-4 space-y-2 border-t border-surface-border pt-4">
+        <div className="h-4 w-3/5 rounded bg-surface-border/30" />
+        <div className="h-4 w-1/2 rounded bg-surface-border/30" />
+        <div className="h-4 w-2/3 rounded bg-surface-border/30" />
+      </div>
+      <div className="mt-5 h-10 w-full rounded-input bg-surface-border/40" />
+    </div>
+  );
+}
+
+function BrowseStartupsSkeleton({ count = 6 }) {
+  return (
+    <div
+      className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3"
+      aria-busy="true"
+      aria-label="Loading startups"
+    >
+      {Array.from({ length: count }, (_, i) => (
+        <StartupCardSkeleton key={i} />
+      ))}
+    </div>
+  );
+}
+
 export function BrowseStartupsPage({ user, onNavigate, onViewStartup }) {
   const [startups, setStartups] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -171,10 +220,33 @@ export function BrowseStartupsPage({ user, onNavigate, onViewStartup }) {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-surface-page flex items-center justify-center">
-        <div className="text-center space-y-3">
-          <div className="w-10 h-10 border-3 border-primary border-t-transparent rounded-full animate-spin mx-auto" />
-          <p className="text-text-muted text-sm">Loading startups...</p>
+      <div className="min-h-full bg-surface-page p-2 font-body md:p-3 lg:p-4">
+        <div className="mx-auto max-w-7xl space-y-5">
+          <div className={cn("space-y-4 p-4", SETTINGS_CARD)}>
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-muted" />
+                <Input
+                  placeholder="Search by name, description, founder, or role..."
+                  value={searchQuery}
+                  disabled
+                  className={cn(authFieldClass, "h-10 bg-surface-page pl-9")}
+                />
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                disabled
+                className={cn("h-10 shrink-0", settingsBtnOutline)}
+              >
+                <Filter className="h-4 w-4 mr-2" />
+                Filters
+                <ChevronDown className="h-4 w-4 ml-2" />
+              </Button>
+            </div>
+          </div>
+          <div className="h-4 w-32 animate-pulse rounded bg-surface-border/40" />
+          <BrowseStartupsSkeleton />
         </div>
       </div>
     );

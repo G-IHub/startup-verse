@@ -2,11 +2,17 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   Card,
   CardContent,
-  CardDescription,
-  CardFooter,
   CardHeader,
   CardTitle,
 } from "../ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "../ui/dialog";
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
@@ -27,7 +33,6 @@ import {
   ChevronRight,
   Clock,
   Flag,
-  X,
   UserPlus,
   ExternalLink,
   Users,
@@ -56,19 +61,19 @@ function taskPriority(task) {
 
 function priorityFlagClass(p) {
   if (p === "high")
-    return "text-[color:var(--primary-dark)] hover:bg-primary/10 hover:text-primary";
+    return "text-primary-dark hover:bg-primary-tint hover:text-primary";
   if (p === "low")
-    return "text-muted-foreground hover:bg-muted/70 hover:text-foreground";
-  return "text-primary hover:bg-primary/10 hover:text-[color:var(--primary-dark)]";
+    return "text-text-muted hover:bg-surface-page hover:text-text-heading";
+  return "text-primary hover:bg-primary-tint hover:text-primary-dark";
 }
 
 /** Surfaces only — label color forced in CSS (see `.sv-priority-chip` in globals) so modal/theme tokens can’t turn it white */
 function priorityBadgeClass(p) {
   if (p === "high")
-    return "border-primary/35 bg-primary/12 font-semibold";
+    return "border-primary/30 bg-primary/10 font-semibold";
   if (p === "low")
-    return "border-border/90 bg-muted/50 font-medium";
-  return "border-primary/35 bg-[#e8ebff] font-semibold";
+    return "border-surface-border bg-surface-page font-medium";
+  return "border-primary/30 bg-primary-tint font-semibold";
 }
 
 function priorityLabelFor(p) {
@@ -78,13 +83,10 @@ function priorityLabelFor(p) {
 
 /** Background tint per task status — avoids heavy per-row borders inside grouped lists */
 function taskRowSurfaceClass(task) {
-  if (task.status === "completed")
-    return "bg-emerald-50/50";
-  if (task.status === "blocked")
-    return "bg-orange-50/35";
-  if (task.status === "in-progress")
-    return "bg-primary/[0.06]";
-  return "";
+  if (task.status === "completed") return "bg-status-success/5";
+  if (task.status === "blocked") return "bg-status-warning/10";
+  if (task.status === "in-progress") return "bg-primary-tint/60";
+  return "bg-surface-card";
 }
 
 function taskIdStr(t) {
@@ -289,8 +291,6 @@ export default function MilestoneDetailView({
     }
   };
 
-  if (!isOpen) return null;
-
   const assigningTask = assigningTaskId
     ? draftTasks.find((t) => taskIdStr(t) === String(assigningTaskId))
     : null;
@@ -328,12 +328,12 @@ export default function MilestoneDetailView({
 
   const getMilestoneIcon = (rowStatus) => {
     if (rowStatus === "completed")
-      return <CheckCircle2 className="h-4 w-4 shrink-0 text-green-500" />;
+      return <CheckCircle2 className="h-4 w-4 shrink-0 text-status-success" />;
     if (rowStatus === "in-progress")
       return (
         <Circle className="h-4 w-4 shrink-0 fill-primary/20 text-primary" />
       );
-    return <Circle className="h-4 w-4 shrink-0 text-muted-foreground" />;
+    return <Circle className="h-4 w-4 shrink-0 text-text-muted" />;
   };
 
   const handleTaskCheckboxChange = (task, checked) => {
@@ -450,634 +450,701 @@ export default function MilestoneDetailView({
   const milestoneCount = draftMilestones.length;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sv-modal-backdrop">
-      <Card className="sv-modal-panel max-h-[82vh] w-full max-w-[min(100%,26rem)] overflow-y-auto rounded-[14px] border-0 shadow-modal sm:max-w-[28rem]">
-        <CardHeader className="flex-shrink-0 border-b border-primary/12 pb-2 pt-3">
-          <div className="flex items-start justify-between gap-2">
-            <div className="min-w-0 flex-1">
-              <CardTitle className="flex items-center gap-2 text-sm font-semibold leading-snug md:text-[15px]">
-                {outcome.title}
-              </CardTitle>
-              <CardDescription className="mt-0.5 text-[11px] text-text-muted md:text-xs">
-                {"Week "}
-                {outcome.weekNumber}
-                {" • "}
-                {milestoneCount}
-                {" milestones • "}
-                {draftTasks.length}
-                {" tasks"}
-              </CardDescription>
-            </div>
-            <Button
-              variant="ghost"
-              size="sm"
-              type="button"
-              onClick={onClose}
-              disabled={committing}
-              className="h-8 w-8 shrink-0 rounded-md text-muted-foreground hover:bg-transparent hover:text-foreground"
-            >
-              <X className="h-4 w-4" />
-            </Button>
-          </div>
-        </CardHeader>
-        <CardContent className="min-h-0 flex-1 space-y-2.5 overflow-y-auto px-3 py-2.5 scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-transparent md:space-y-3 md:px-4 md:py-3">
-          <div className="rounded-xl border border-primary/15 bg-primary/[0.04] p-2.5">
-            <div className="mb-1.5 flex items-center justify-between gap-2">
-              <span className="text-xs font-medium text-card-foreground">
-                Overall progress
-              </span>
-              <span className="text-[11px] text-text-muted tabular-nums md:text-xs">
-                {completedTaskCount}
-                {" / "}
-                {totalTasks}
-                {" tasks"}
-              </span>
-            </div>
-            <Progress value={overallProgressPct} className="h-1.5" />
-          </div>
-          <div className="space-y-2 md:space-y-2.5">
-            {draftMilestones.map((milestone) => {
-              const milestoneTasks = getTasksForMilestone(milestone.id);
-              const isExpanded = expandedMilestones.has(milestone.id);
-              const completedTasks = milestoneTasks.filter(
-                (t) => t.status === "completed",
-              ).length;
-              const blockedTasks = milestoneTasks.filter(
-                (t) => t.status === "blocked",
-              ).length;
-              const rowStatus = deriveMilestoneStatus(milestone, milestoneTasks);
-              const nTasks = milestoneTasks.length;
+    <>
+      <Dialog
+        open={isOpen}
+        onOpenChange={(open) => {
+          if (!open && !committing) onClose();
+        }}
+      >
+        <DialogContent
+          hideClose={committing}
+          className="sv-modal-panel flex max-h-[min(90vh,880px)] w-[calc(100%-1.5rem)] max-w-none flex-col gap-0 overflow-hidden rounded-card border border-surface-border bg-surface-card p-0 shadow-modal sm:w-[60vw] sm:max-w-[56rem]"
+        >
+          <DialogHeader className="shrink-0 space-y-1 border-b border-surface-border bg-surface-page/60 px-5 py-4 pr-12 text-left sm:px-6">
+            <DialogTitle className="font-heading text-[17px] font-semibold leading-snug tracking-tight text-text-heading sm:text-lg">
+              {outcome?.title || "Weekly outcome"}
+            </DialogTitle>
+            <DialogDescription className="font-body text-[13px] text-text-muted">
+              Week {outcome?.weekNumber ?? "—"} · {milestoneCount} milestones ·{" "}
+              {draftTasks.length} tasks
+            </DialogDescription>
+          </DialogHeader>
 
-              return (
-                <div
-                  key={milestone.id}
-                  className="overflow-x-clip overflow-y-visible rounded-lg border border-primary/15"
-                >
+          <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-5 py-4 scrollbar-thin scrollbar-thumb-surface-border scrollbar-track-transparent sm:px-6 sm:py-5">
+            <div className="space-y-2">
+              <div className="flex items-center justify-between gap-3">
+                <span className="font-body text-[13px] font-medium text-text-heading">
+                  Overall progress
+                </span>
+                <span className="font-body text-[13px] tabular-nums text-text-muted">
+                  {completedTaskCount} / {totalTasks} tasks
+                </span>
+              </div>
+              <Progress value={overallProgressPct} className="h-2" />
+            </div>
+
+            <div className="space-y-3">
+              {draftMilestones.map((milestone) => {
+                const milestoneTasks = getTasksForMilestone(milestone.id);
+                const isExpanded = expandedMilestones.has(milestone.id);
+                const completedTasks = milestoneTasks.filter(
+                  (t) => t.status === "completed",
+                ).length;
+                const blockedTasks = milestoneTasks.filter(
+                  (t) => t.status === "blocked",
+                ).length;
+                const rowStatus = deriveMilestoneStatus(
+                  milestone,
+                  milestoneTasks,
+                );
+                const nTasks = milestoneTasks.length;
+
+                return (
                   <div
-                    className={`transition-colors ${rowStatus === "completed" ? "bg-emerald-50/85" : rowStatus === "in-progress" ? "bg-primary/[0.04]" : "bg-card"} px-3 py-2`}
+                    key={milestone.id}
+                    className="overflow-hidden rounded-card border border-surface-border bg-surface-card shadow-soft"
                   >
-                    <div className="flex min-w-0 items-start gap-1.5 md:gap-2">
-                      <button
-                        type="button"
-                        className="mt-0.5 shrink-0 rounded p-0.5 text-muted-foreground hover:bg-primary/10"
-                        onClick={() => toggleMilestone(milestone.id)}
-                        aria-expanded={isExpanded}
-                      >
-                        {isExpanded ? (
-                          <ChevronDown className="h-4 w-4" />
-                        ) : (
-                          <ChevronRight className="h-4 w-4" />
-                        )}
-                      </button>
-                      <button
-                        type="button"
-                        className="mt-0.5 shrink-0 text-left"
-                        onClick={() => toggleMilestone(milestone.id)}
-                      >
-                        {getMilestoneIcon(rowStatus)}
-                      </button>
-                      <div className="flex min-w-0 flex-1 items-center justify-between gap-2">
-                        <div
-                          className="min-w-0 cursor-pointer"
+                    <div
+                      className={`px-3 py-3 sm:px-4 ${
+                        rowStatus === "completed"
+                          ? "bg-status-success/5"
+                          : rowStatus === "in-progress"
+                            ? "bg-primary-tint/40"
+                            : "bg-surface-card"
+                      }`}
+                    >
+                      <div className="flex min-w-0 items-start gap-2">
+                        <button
+                          type="button"
+                          className="mt-0.5 shrink-0 rounded-input p-1 text-text-muted transition-colors hover:bg-primary-tint hover:text-primary"
                           onClick={() => toggleMilestone(milestone.id)}
-                          onKeyDown={(e) => {
-                            if (e.key === "Enter" || e.key === " ") {
-                              e.preventDefault();
-                              toggleMilestone(milestone.id);
-                            }
-                          }}
-                          role="button"
-                          tabIndex={0}
+                          aria-expanded={isExpanded}
                         >
-                          {editingMilestoneId === milestone.id ? (
-                            <Input
-                              value={milestone.title}
-                              onChange={(e) =>
-                                setDraftMilestones((prev) =>
-                                  prev.map((m) =>
-                                    String(m.id) === String(milestone.id)
-                                      ? { ...m, title: e.target.value }
-                                      : m,
-                                  ),
-                                )
-                              }
-                              onBlur={() => setEditingMilestoneId(null)}
-                              onClick={(e) => e.stopPropagation()}
-                              onKeyDown={(e) => {
-                                e.stopPropagation();
-                                if (e.key === "Enter")
-                                  setEditingMilestoneId(null);
-                              }}
-                              className="h-7 text-xs font-semibold md:text-sm"
-                              autoFocus
-                            />
+                          {isExpanded ? (
+                            <ChevronDown className="h-4 w-4" />
                           ) : (
-                            <h4
-                              className={`text-left text-sm font-semibold leading-snug md:text-[15px] ${rowStatus === "completed" ? "text-muted-foreground line-through" : "text-card-foreground"}`}
-                            >
-                              {milestone.title || "Untitled milestone"}
-                            </h4>
+                            <ChevronRight className="h-4 w-4" />
                           )}
-                          <div className="mt-0.5 flex items-center gap-3 text-[11px] text-text-muted md:text-xs">
-                            <span>
-                              {completedTasks}/{nTasks}
-                              {" tasks"}
-                            </span>
-                            {blockedTasks > 0 && (
-                              <span className="flex items-center gap-1 text-orange-600">
-                                <AlertCircle className="w-3 h-3" />
-                                {blockedTasks}
-                                {" blocked"}
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                        <div className="flex shrink-0 items-center gap-0.5">
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon"
-                            className="h-7 w-7 shrink-0 text-muted-foreground hover:bg-primary/10 hover:text-foreground"
-                            disabled={committing}
-                            aria-label="Edit milestone title"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setEditingMilestoneId(milestone.id);
-                            }}
-                          >
-                            <Pencil className="h-3.5 w-3.5" />
-                          </Button>
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon"
-                            className="h-7 w-7 shrink-0 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
-                            disabled={committing}
-                            aria-label="Delete milestone"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setDeleteConfirm({
-                                kind: "milestone",
-                                milestoneId: String(milestone.id),
-                              });
-                            }}
-                          >
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </Button>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                  {isExpanded && (
-                    <div className="border-t border-primary/10 bg-muted/25 px-2 pb-2 pt-1.5 md:px-2.5 md:pb-2.5 md:pt-2">
-                      <div className="overflow-hidden rounded-lg border border-primary/12 bg-card">
-                      {milestoneTasks.length === 0 ? (
-                        <p className="px-3 py-5 text-center text-[11px] text-muted-foreground md:text-xs">
-                          No tasks in this milestone yet. Add one below.
-                        </p>
-                      ) : (
-                      milestoneTasks.map((task) => {
-                        const assignees = taskAssignees(task, assigneeRoster);
-                        const p = taskPriority(task);
-                        const pLabel = priorityLabelFor(p);
-                        return (
+                        </button>
+                        <button
+                          type="button"
+                          className="mt-0.5 shrink-0 text-left"
+                          onClick={() => toggleMilestone(milestone.id)}
+                        >
+                          {getMilestoneIcon(rowStatus)}
+                        </button>
+                        <div className="flex min-w-0 flex-1 items-start justify-between gap-2">
                           <div
-                            key={taskIdStr(task)}
-                            role="presentation"
-                            onClick={(e) => e.stopPropagation()}
-                            className={`border-b border-primary/[0.09] px-2 py-1.5 transition-colors last:border-b-0 md:px-2.5 md:py-2 ${taskRowSurfaceClass(task)}`}
+                            className="min-w-0 flex-1 cursor-pointer"
+                            onClick={() => toggleMilestone(milestone.id)}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter" || e.key === " ") {
+                                e.preventDefault();
+                                toggleMilestone(milestone.id);
+                              }
+                            }}
+                            role="button"
+                            tabIndex={0}
                           >
-                            <div className="flex min-w-0 items-start gap-2">
-                              <div className="flex shrink-0 items-center pt-0.5">
-                                <Checkbox
-                                  checked={task.status === "completed"}
-                                  onCheckedChange={(c) =>
-                                    handleTaskCheckboxChange(task, c)
-                                  }
-                                  disabled={
-                                    task.status === "blocked" || committing
-                                  }
-                                />
-                              </div>
-                              <div className="flex min-w-0 flex-1 items-start justify-between gap-2">
-                              <div className="min-w-0">
-                                <div className="flex items-center gap-2 min-h-[20px] flex-wrap">
-                                  <span
-                                    className={`text-xs ${task.status === "completed" ? "line-through text-muted-foreground" : ""}`}
-                                  >
-                                    {task.title}
-                                  </span>
-                                  <span
-                                    data-priority={p}
-                                    className={`sv-priority-chip inline-flex h-5 max-w-full shrink-0 items-center rounded-full border px-2 text-[10px] leading-none tracking-tight ${priorityBadgeClass(p)}`}
-                                  >
-                                    {pLabel}
-                                  </span>
-                                </div>
-                                {task.description && (
-                                  <p className="text-[10px] text-muted-foreground mt-0.5">
-                                    {task.description}
-                                  </p>
-                                )}
-                                <div className="flex items-center gap-3 mt-1.5 text-xs flex-wrap">
-                                  {task.status === "blocked" &&
-                                    task.blockerReason && (
-                                      <Badge
-                                        variant="outline"
-                                        className="text-orange-600 border-orange-300"
-                                      >
-                                        <AlertCircle className="w-3 h-3 mr-1" />
-                                        {
-                                          blockerReasons.find(
-                                            (r) =>
-                                              r.value === task.blockerReason,
-                                          )?.label
-                                        }
-                                      </Badge>
-                                    )}
-                                  {task.status === "in-progress" && (
-                                    <Badge
-                                      variant="outline"
-                                      className="border-primary/28 bg-primary/[0.06] text-primary-dark"
-                                    >
-                                      In Progress
-                                    </Badge>
-                                  )}
-                                  {task.incentive &&
-                                    task.incentive.type !== "unpaid" && (
-                                      <Badge
-                                        variant="outline"
-                                        className="text-green-600 border-green-300"
-                                      >
-                                        {task.incentive.type === "equity" && (
-                                          <>
-                                            <TrendingUp className="w-3 h-3 mr-1" />
-                                            {task.incentive.equity}
-                                          </>
-                                        )}
-                                        {task.incentive.type === "paid" && (
-                                          <>
-                                            <DollarSign className="w-3 h-3 mr-1" />
-                                            {task.incentive.pay}
-                                          </>
-                                        )}
-                                        {task.incentive.type === "hourly" && (
-                                          <>
-                                            <Clock className="w-3 h-3 mr-1" />
-                                            {task.incentive.hourlyRate}
-                                          </>
-                                        )}
-                                      </Badge>
-                                    )}
-                                </div>
-                                {task.status === "blocked" &&
-                                  task.blockerNote && (
-                                    <div className="mt-2 p-2 bg-orange-100 rounded text-xs">
-                                      <p className="text-orange-900">
-                                        {task.blockerNote}
-                                      </p>
-                                    </div>
-                                  )}
-                                {task.actionButton &&
-                                  task.status !== "completed" && (
-                                    <div className="mt-3">
-                                      <Button
-                                        size="sm"
-                                        variant="default"
-                                        className="w-full sm:w-auto bg-primary hover:bg-primary/90"
-                                        onClick={() => {
-                                          if (task.actionButton?.route) {
-                                            if (
-                                              task.actionButton.route ===
-                                              "startup-office"
-                                            ) {
-                                              if (onNavigate)
-                                                onNavigate("startup-office");
-                                              if (onVirtualOfficeViewChange)
-                                                onVirtualOfficeViewChange(
-                                                  "matching",
-                                                );
-                                            } else if (
-                                              task.actionButton.route ===
-                                              "team"
-                                            ) {
-                                              if (onNavigate)
-                                                onNavigate("startup-office");
-                                              if (onVirtualOfficeViewChange)
-                                                onVirtualOfficeViewChange(
-                                                  "workspace",
-                                                );
-                                            } else {
-                                              if (onNavigate) {
-                                                onNavigate(
-                                                  task.actionButton.route,
-                                                );
-                                              } else {
-                                                window.location.href =
-                                                  task.actionButton.route;
-                                              }
-                                            }
-                                            onClose();
-                                          }
-                                        }}
-                                      >
-                                        {task.actionButton.icon ===
-                                          "search" && (
-                                          <Search className="w-4 h-4 mr-2" />
-                                        )}
-                                        {task.actionButton.icon ===
-                                          "users" && (
-                                          <Users className="w-4 h-4 mr-2" />
-                                        )}
-                                        {task.actionButton.icon ===
-                                          "user" && (
-                                          <UserCircle className="w-4 h-4 mr-2" />
-                                        )}
-                                        {!task.actionButton.icon && (
-                                          <ExternalLink className="w-4 h-4 mr-2" />
-                                        )}
-                                        {task.actionButton.label}
-                                      </Button>
-                                    </div>
-                                  )}
-                              </div>
-                              <div className="flex shrink-0 flex-wrap items-center justify-end gap-0.5 overflow-visible">
-                                <DropdownMenu>
-                                  <DropdownMenuTrigger asChild>
-                                    <Button
-                                      size="sm"
-                                      variant="ghost"
-                                      className={`h-8 w-8 shrink-0 p-0 ${priorityFlagClass(p)}`}
-                                      aria-label="Set priority"
-                                      disabled={committing}
-                                    >
-                                      <Flag className="h-4 w-4" />
-                                    </Button>
-                                  </DropdownMenuTrigger>
-                                  <DropdownMenuContent align="end">
-                                    {PRIORITY_OPTIONS.map((opt) => (
-                                      <DropdownMenuItem
-                                        key={opt.value}
-                                        onClick={() =>
-                                          setDraftTasks((prev) =>
-                                            prev.map((row) =>
-                                              taskIdStr(row) === taskIdStr(task)
-                                                ? { ...row, priority: opt.value }
-                                                : row,
-                                            ),
-                                          )
-                                        }
-                                      >
-                                        {opt.label}
-                                        {p === opt.value ? " (current)" : ""}
-                                      </DropdownMenuItem>
-                                    ))}
-                                  </DropdownMenuContent>
-                                </DropdownMenu>
-                                {task.status !== "completed" &&
-                                  (task.status === "blocked" ? (
-                                    <Button
-                                      size="sm"
-                                      variant="outline"
-                                      disabled={committing}
-                                      onClick={() =>
-                                        setDraftTasks((prev) =>
-                                          prev.map((row) =>
-                                            taskIdStr(row) === taskIdStr(task)
-                                              ? {
-                                                  ...row,
-                                                  status: "pending",
-                                                  blockerReason: null,
-                                                  blockerNote: null,
-                                                }
-                                              : row,
-                                          ),
-                                        )
-                                      }
-                                    >
-                                      Unblock
-                                    </Button>
-                                  ) : (
-                                    <Button
-                                      size="sm"
-                                      variant="ghost"
-                                      className="text-orange-600"
-                                      aria-label="Report blocker"
-                                      disabled={committing}
-                                      onClick={() =>
-                                        setBlockingTaskId(taskIdStr(task))
-                                      }
-                                    >
-                                      <AlertCircle className="w-4 h-4" />
-                                    </Button>
-                                  ))}
-                                {assignees.length > 0 && (
-                                  <div
-                                    className="flex flex-row items-center -space-x-2 shrink-0 pr-0.5"
-                                    aria-label={`Assigned: ${assignees.map((a) => a.name).filter(Boolean).join(", ")}`}
-                                  >
-                                    {assignees
-                                      .slice(0, ASSIGNEE_STACK_MAX)
-                                      .map((person, idx) => (
-                                        <span
-                                          key={person.id}
-                                          className="inline-flex"
-                                          style={{ zIndex: idx + 1 }}
-                                          title={person.name || undefined}
-                                        >
-                                          <Avatar className="h-7 w-7 border-2 border-background bg-muted shadow-sm">
-                                            {person.avatar ? (
-                                              <AvatarImage
-                                                src={person.avatar}
-                                                alt=""
-                                              />
-                                            ) : null}
-                                            <AvatarFallback className="text-[8px] font-medium">
-                                              {initialsFromName(person.name)}
-                                            </AvatarFallback>
-                                          </Avatar>
-                                        </span>
-                                      ))}
-                                    {assignees.length > ASSIGNEE_STACK_MAX && (
-                                      <span
-                                        className="inline-flex"
-                                        style={{
-                                          zIndex: ASSIGNEE_STACK_MAX + 2,
-                                        }}
-                                        title={`${assignees.length - ASSIGNEE_STACK_MAX} more`}
-                                      >
-                                      <Avatar
-                                        className="h-7 w-7 border-2 border-background bg-muted-foreground/20 text-foreground shadow-sm"
-                                      >
-                                        <AvatarFallback className="px-0 text-[9px] font-semibold tabular-nums">
-                                          +
-                                          {assignees.length -
-                                            ASSIGNEE_STACK_MAX}
-                                        </AvatarFallback>
-                                      </Avatar>
-                                      </span>
-                                    )}
-                                  </div>
-                                )}
-                                <Button
-                                  size="sm"
-                                  variant="ghost"
-                                  className="text-destructive hover:text-destructive"
-                                  disabled={committing}
-                                  aria-label="Delete task"
-                                  onClick={() =>
-                                    setDeleteConfirm({ kind: "task", task })
-                                  }
-                                >
-                                  <Trash2 className="w-4 h-4" />
-                                </Button>
-                                {task.status !== "completed" && (
-                                  <Button
-                                    size="sm"
-                                    variant="ghost"
-                                    disabled={committing}
-                                    onClick={() =>
-                                      setAssigningTaskId(taskIdStr(task))
-                                    }
-                                    aria-label="Assign task"
-                                  >
-                                    <UserPlus className="w-4 h-4" />
-                                  </Button>
-                                )}
-                              </div>
-                              </div>
+                            {editingMilestoneId === milestone.id ? (
+                              <Input
+                                value={milestone.title}
+                                onChange={(e) =>
+                                  setDraftMilestones((prev) =>
+                                    prev.map((m) =>
+                                      String(m.id) === String(milestone.id)
+                                        ? { ...m, title: e.target.value }
+                                        : m,
+                                    ),
+                                  )
+                                }
+                                onBlur={() => setEditingMilestoneId(null)}
+                                onClick={(e) => e.stopPropagation()}
+                                onKeyDown={(e) => {
+                                  e.stopPropagation();
+                                  if (e.key === "Enter")
+                                    setEditingMilestoneId(null);
+                                }}
+                                className="h-9 font-heading text-sm font-semibold"
+                                autoFocus
+                              />
+                            ) : (
+                              <h4
+                                className={`font-heading text-left text-[15px] font-semibold leading-snug ${
+                                  rowStatus === "completed"
+                                    ? "text-text-muted line-through"
+                                    : "text-text-heading"
+                                }`}
+                              >
+                                {milestone.title || "Untitled milestone"}
+                              </h4>
+                            )}
+                            <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 font-body text-xs text-text-muted">
+                              <span>
+                                {completedTasks}/{nTasks} tasks
+                              </span>
+                              {blockedTasks > 0 && (
+                                <span className="flex items-center gap-1 text-status-warning">
+                                  <AlertCircle className="h-3.5 w-3.5" />
+                                  {blockedTasks} blocked
+                                </span>
+                              )}
                             </div>
                           </div>
-                        );
-                      })
-                      )}
-                      </div>
-                      <div
-                        role="presentation"
-                        onClick={(e) => e.stopPropagation()}
-                        className="mt-2 flex flex-col gap-2 border-t border-primary/10 pt-2 sm:flex-row"
-                      >
-                        <Input
-                          placeholder="Add a task…"
-                          value={newTaskTitleByMilestone[milestone.id] ?? ""}
-                          onChange={(e) =>
-                            setNewTaskTitleByMilestone((prev) => ({
-                              ...prev,
-                              [milestone.id]: e.target.value,
-                            }))
-                          }
-                          onKeyDown={(e) => {
-                            if (e.key === "Enter") {
-                              e.preventDefault();
-                              addDraftTask(milestone);
-                            }
-                          }}
-                          className="h-8 flex-1 text-xs md:text-sm"
-                          disabled={committing}
-                        />
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="secondary"
-                          className="h-8 shrink-0 border border-primary/15 bg-card text-xs hover:bg-primary/[0.06] sm:w-auto"
-                          disabled={
-                            committing ||
-                            !String(
-                              newTaskTitleByMilestone[milestone.id] ?? "",
-                            ).trim()
-                          }
-                          onClick={() => addDraftTask(milestone)}
-                        >
-                          <Plus className="w-4 h-4 sm:mr-1" />
-                          <span className="hidden sm:inline">Add task</span>
-                        </Button>
+                          <div className="flex shrink-0 items-center gap-0.5">
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 shrink-0 text-text-muted hover:bg-primary-tint hover:text-text-heading"
+                              disabled={committing}
+                              aria-label="Edit milestone title"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setEditingMilestoneId(milestone.id);
+                              }}
+                            >
+                              <Pencil className="h-3.5 w-3.5" />
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 shrink-0 text-text-muted hover:bg-destructive/10 hover:text-destructive"
+                              disabled={committing}
+                              aria-label="Delete milestone"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setDeleteConfirm({
+                                  kind: "milestone",
+                                  milestoneId: String(milestone.id),
+                                });
+                              }}
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </Button>
+                          </div>
+                        </div>
                       </div>
                     </div>
-                  )}
-                </div>
-              );
-            })}
+
+                    {isExpanded && (
+                      <div className="border-t border-surface-border bg-surface-page/40 px-3 pb-3 pt-2 sm:px-4 sm:pb-4">
+                        {milestoneTasks.length === 0 ? (
+                          <p className="px-1 py-6 text-center font-body text-[13px] text-text-muted">
+                            No tasks in this milestone yet. Add one below.
+                          </p>
+                        ) : (
+                          <ul className="divide-y divide-surface-border overflow-hidden rounded-input border border-surface-border bg-surface-card">
+                            {milestoneTasks.map((task) => {
+                              const assignees = taskAssignees(
+                                task,
+                                assigneeRoster,
+                              );
+                              const p = taskPriority(task);
+                              const pLabel = priorityLabelFor(p);
+                              return (
+                                <li
+                                  key={taskIdStr(task)}
+                                  role="presentation"
+                                  onClick={(e) => e.stopPropagation()}
+                                  className={`px-3 py-3 transition-colors sm:px-3.5 ${taskRowSurfaceClass(task)}`}
+                                >
+                                  <div className="flex min-w-0 items-start gap-3">
+                                    <div className="flex shrink-0 items-center pt-0.5">
+                                      <Checkbox
+                                        checked={task.status === "completed"}
+                                        onCheckedChange={(c) =>
+                                          handleTaskCheckboxChange(task, c)
+                                        }
+                                        disabled={
+                                          task.status === "blocked" ||
+                                          committing
+                                        }
+                                      />
+                                    </div>
+                                    <div className="flex min-w-0 flex-1 items-start justify-between gap-3">
+                                      <div className="min-w-0 flex-1">
+                                        <div className="flex min-h-[22px] flex-wrap items-center gap-2">
+                                          <span
+                                            className={`font-body text-[14px] leading-snug text-text-heading ${
+                                              task.status === "completed"
+                                                ? "text-text-muted line-through"
+                                                : ""
+                                            }`}
+                                          >
+                                            {task.title}
+                                          </span>
+                                          <span
+                                            data-priority={p}
+                                            className={`sv-priority-chip inline-flex h-5 max-w-full shrink-0 items-center rounded-pill border px-2 font-body text-[11px] font-medium leading-none tracking-tight ${priorityBadgeClass(p)}`}
+                                          >
+                                            {pLabel}
+                                          </span>
+                                        </div>
+                                        {task.description && (
+                                          <p className="mt-1 font-body text-[13px] leading-relaxed text-text-muted">
+                                            {task.description}
+                                          </p>
+                                        )}
+                                        <div className="mt-2 flex flex-wrap items-center gap-2">
+                                          {task.status === "blocked" &&
+                                            task.blockerReason && (
+                                              <Badge
+                                                variant="outline"
+                                                className="border-status-warning/40 bg-status-warning/10 font-body text-xs text-status-warning"
+                                              >
+                                                <AlertCircle className="mr-1 h-3 w-3" />
+                                                {
+                                                  blockerReasons.find(
+                                                    (r) =>
+                                                      r.value ===
+                                                      task.blockerReason,
+                                                  )?.label
+                                                }
+                                              </Badge>
+                                            )}
+                                          {task.status === "in-progress" && (
+                                            <Badge
+                                              variant="outline"
+                                              className="border-primary/25 bg-primary-tint font-body text-xs text-primary-dark"
+                                            >
+                                              In Progress
+                                            </Badge>
+                                          )}
+                                          {task.incentive &&
+                                            task.incentive.type !==
+                                              "unpaid" && (
+                                              <Badge
+                                                variant="outline"
+                                                className="border-status-success/35 bg-status-success/10 font-body text-xs text-status-success"
+                                              >
+                                                {task.incentive.type ===
+                                                  "equity" && (
+                                                  <>
+                                                    <TrendingUp className="mr-1 h-3 w-3" />
+                                                    {task.incentive.equity}
+                                                  </>
+                                                )}
+                                                {task.incentive.type ===
+                                                  "paid" && (
+                                                  <>
+                                                    <DollarSign className="mr-1 h-3 w-3" />
+                                                    {task.incentive.pay}
+                                                  </>
+                                                )}
+                                                {task.incentive.type ===
+                                                  "hourly" && (
+                                                  <>
+                                                    <Clock className="mr-1 h-3 w-3" />
+                                                    {
+                                                      task.incentive
+                                                        .hourlyRate
+                                                    }
+                                                  </>
+                                                )}
+                                              </Badge>
+                                            )}
+                                        </div>
+                                        {task.status === "blocked" &&
+                                          task.blockerNote && (
+                                            <div className="mt-2 rounded-input border border-status-warning/25 bg-status-warning/10 px-3 py-2">
+                                              <p className="font-body text-[13px] text-text-heading">
+                                                {task.blockerNote}
+                                              </p>
+                                            </div>
+                                          )}
+                                        {task.actionButton &&
+                                          task.status !== "completed" && (
+                                            <div className="mt-3">
+                                              <Button
+                                                size="sm"
+                                                variant="default"
+                                                className="w-full bg-primary font-body hover:bg-primary-hover sm:w-auto"
+                                                onClick={() => {
+                                                  if (
+                                                    task.actionButton?.route
+                                                  ) {
+                                                    if (
+                                                      task.actionButton
+                                                        .route ===
+                                                      "startup-office"
+                                                    ) {
+                                                      if (onNavigate)
+                                                        onNavigate(
+                                                          "startup-office",
+                                                        );
+                                                      if (
+                                                        onVirtualOfficeViewChange
+                                                      )
+                                                        onVirtualOfficeViewChange(
+                                                          "matching",
+                                                        );
+                                                    } else if (
+                                                      task.actionButton
+                                                        .route === "team"
+                                                    ) {
+                                                      if (onNavigate)
+                                                        onNavigate(
+                                                          "startup-office",
+                                                        );
+                                                      if (
+                                                        onVirtualOfficeViewChange
+                                                      )
+                                                        onVirtualOfficeViewChange(
+                                                          "workspace",
+                                                        );
+                                                    } else if (onNavigate) {
+                                                      onNavigate(
+                                                        task.actionButton
+                                                          .route,
+                                                      );
+                                                    } else {
+                                                      window.location.href =
+                                                        task.actionButton.route;
+                                                    }
+                                                    onClose();
+                                                  }
+                                                }}
+                                              >
+                                                {task.actionButton.icon ===
+                                                  "search" && (
+                                                  <Search className="mr-2 h-4 w-4" />
+                                                )}
+                                                {task.actionButton.icon ===
+                                                  "users" && (
+                                                  <Users className="mr-2 h-4 w-4" />
+                                                )}
+                                                {task.actionButton.icon ===
+                                                  "user" && (
+                                                  <UserCircle className="mr-2 h-4 w-4" />
+                                                )}
+                                                {!task.actionButton.icon && (
+                                                  <ExternalLink className="mr-2 h-4 w-4" />
+                                                )}
+                                                {task.actionButton.label}
+                                              </Button>
+                                            </div>
+                                          )}
+                                      </div>
+                                      <div className="flex shrink-0 flex-wrap items-center justify-end gap-0.5">
+                                        <DropdownMenu>
+                                          <DropdownMenuTrigger asChild>
+                                            <Button
+                                              size="sm"
+                                              variant="ghost"
+                                              className={`h-8 w-8 shrink-0 p-0 ${priorityFlagClass(p)}`}
+                                              aria-label="Set priority"
+                                              disabled={committing}
+                                            >
+                                              <Flag className="h-4 w-4" />
+                                            </Button>
+                                          </DropdownMenuTrigger>
+                                          <DropdownMenuContent align="end">
+                                            {PRIORITY_OPTIONS.map((opt) => (
+                                              <DropdownMenuItem
+                                                key={opt.value}
+                                                onClick={() =>
+                                                  setDraftTasks((prev) =>
+                                                    prev.map((row) =>
+                                                      taskIdStr(row) ===
+                                                      taskIdStr(task)
+                                                        ? {
+                                                            ...row,
+                                                            priority:
+                                                              opt.value,
+                                                          }
+                                                        : row,
+                                                    ),
+                                                  )
+                                                }
+                                              >
+                                                {opt.label}
+                                                {p === opt.value
+                                                  ? " (current)"
+                                                  : ""}
+                                              </DropdownMenuItem>
+                                            ))}
+                                          </DropdownMenuContent>
+                                        </DropdownMenu>
+                                        {task.status !== "completed" &&
+                                          (task.status === "blocked" ? (
+                                            <Button
+                                              size="sm"
+                                              variant="outline"
+                                              className="h-8 border-surface-border font-body text-xs"
+                                              disabled={committing}
+                                              onClick={() =>
+                                                setDraftTasks((prev) =>
+                                                  prev.map((row) =>
+                                                    taskIdStr(row) ===
+                                                    taskIdStr(task)
+                                                      ? {
+                                                          ...row,
+                                                          status: "pending",
+                                                          blockerReason: null,
+                                                          blockerNote: null,
+                                                        }
+                                                      : row,
+                                                  ),
+                                                )
+                                              }
+                                            >
+                                              Unblock
+                                            </Button>
+                                          ) : (
+                                            <Button
+                                              size="sm"
+                                              variant="ghost"
+                                              className="h-8 w-8 p-0 text-status-warning hover:bg-status-warning/10"
+                                              aria-label="Report blocker"
+                                              disabled={committing}
+                                              onClick={() =>
+                                                setBlockingTaskId(
+                                                  taskIdStr(task),
+                                                )
+                                              }
+                                            >
+                                              <AlertCircle className="h-4 w-4" />
+                                            </Button>
+                                          ))}
+                                        {assignees.length > 0 && (
+                                          <div
+                                            className="flex shrink-0 flex-row items-center -space-x-2 pr-0.5"
+                                            aria-label={`Assigned: ${assignees
+                                              .map((a) => a.name)
+                                              .filter(Boolean)
+                                              .join(", ")}`}
+                                          >
+                                            {assignees
+                                              .slice(0, ASSIGNEE_STACK_MAX)
+                                              .map((person, idx) => (
+                                                <span
+                                                  key={person.id}
+                                                  className="inline-flex"
+                                                  style={{ zIndex: idx + 1 }}
+                                                  title={
+                                                    person.name || undefined
+                                                  }
+                                                >
+                                                  <Avatar className="h-7 w-7 border-2 border-surface-card bg-surface-page shadow-soft">
+                                                    {person.avatar ? (
+                                                      <AvatarImage
+                                                        src={person.avatar}
+                                                        alt=""
+                                                      />
+                                                    ) : null}
+                                                    <AvatarFallback className="font-body text-[10px] font-medium text-text-body">
+                                                      {initialsFromName(
+                                                        person.name,
+                                                      )}
+                                                    </AvatarFallback>
+                                                  </Avatar>
+                                                </span>
+                                              ))}
+                                            {assignees.length >
+                                              ASSIGNEE_STACK_MAX && (
+                                              <span
+                                                className="inline-flex"
+                                                style={{
+                                                  zIndex:
+                                                    ASSIGNEE_STACK_MAX + 2,
+                                                }}
+                                                title={`${assignees.length - ASSIGNEE_STACK_MAX} more`}
+                                              >
+                                                <Avatar className="h-7 w-7 border-2 border-surface-card bg-surface-page text-text-heading shadow-soft">
+                                                  <AvatarFallback className="px-0 font-body text-[10px] font-semibold tabular-nums">
+                                                    +
+                                                    {assignees.length -
+                                                      ASSIGNEE_STACK_MAX}
+                                                  </AvatarFallback>
+                                                </Avatar>
+                                              </span>
+                                            )}
+                                          </div>
+                                        )}
+                                        <Button
+                                          size="sm"
+                                          variant="ghost"
+                                          className="h-8 w-8 p-0 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                                          disabled={committing}
+                                          aria-label="Delete task"
+                                          onClick={() =>
+                                            setDeleteConfirm({
+                                              kind: "task",
+                                              task,
+                                            })
+                                          }
+                                        >
+                                          <Trash2 className="h-4 w-4" />
+                                        </Button>
+                                        {task.status !== "completed" && (
+                                          <Button
+                                            size="sm"
+                                            variant="ghost"
+                                            className="h-8 w-8 p-0 text-text-muted hover:bg-primary-tint hover:text-primary"
+                                            disabled={committing}
+                                            onClick={() =>
+                                              setAssigningTaskId(
+                                                taskIdStr(task),
+                                              )
+                                            }
+                                            aria-label="Assign task"
+                                          >
+                                            <UserPlus className="h-4 w-4" />
+                                          </Button>
+                                        )}
+                                      </div>
+                                    </div>
+                                  </div>
+                                </li>
+                              );
+                            })}
+                          </ul>
+                        )}
+                        <div
+                          role="presentation"
+                          onClick={(e) => e.stopPropagation()}
+                          className="mt-3 flex flex-col gap-2 sm:flex-row"
+                        >
+                          <Input
+                            placeholder="Add a task…"
+                            value={newTaskTitleByMilestone[milestone.id] ?? ""}
+                            onChange={(e) =>
+                              setNewTaskTitleByMilestone((prev) => ({
+                                ...prev,
+                                [milestone.id]: e.target.value,
+                              }))
+                            }
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") {
+                                e.preventDefault();
+                                addDraftTask(milestone);
+                              }
+                            }}
+                            className="h-9 flex-1 font-body text-sm"
+                            disabled={committing}
+                          />
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="secondary"
+                            className="h-9 shrink-0 border border-surface-border bg-surface-card font-body text-[13px] hover:bg-primary-tint sm:w-auto"
+                            disabled={
+                              committing ||
+                              !String(
+                                newTaskTitleByMilestone[milestone.id] ?? "",
+                              ).trim()
+                            }
+                            onClick={() => addDraftTask(milestone)}
+                          >
+                            <Plus className="h-4 w-4 sm:mr-1.5" />
+                            <span className="hidden sm:inline">Add task</span>
+                          </Button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-10 w-full rounded-input border-dashed border-surface-border font-body text-[13px] text-primary hover:border-primary/40 hover:bg-primary-tint"
+                disabled={committing}
+                onClick={() => {
+                  const newId = `temp-ms-${Date.now()}`;
+                  setDraftMilestones((prev) => [
+                    ...prev,
+                    {
+                      id: newId,
+                      title: "New milestone",
+                      description: "",
+                      sequence: prev.length + 1,
+                    },
+                  ]);
+                  setExpandedMilestones((prev) => {
+                    const next = new Set(prev);
+                    next.add(newId);
+                    return next;
+                  });
+                }}
+              >
+                <Plus className="mr-2 h-4 w-4" />
+                Add milestone
+              </Button>
+            </div>
+          </div>
+
+          <DialogFooter className="shrink-0 gap-2 border-t border-surface-border bg-surface-page/50 px-5 py-3.5 sm:flex-row sm:justify-end sm:px-6">
             <Button
               type="button"
               variant="outline"
-              size="sm"
-              className="h-8 w-full rounded-[10px] border-primary/22 text-xs text-primary hover:bg-primary/[0.06] md:h-9 md:text-sm"
+              className="h-9 rounded-input border-surface-border font-body text-[13px] font-semibold hover:bg-primary-tint"
+              onClick={onClose}
               disabled={committing}
-              onClick={() => {
-                const newId = `temp-ms-${Date.now()}`;
-                setDraftMilestones((prev) => [
-                  ...prev,
-                  {
-                    id: newId,
-                    title: "New milestone",
-                    description: "",
-                    sequence: prev.length + 1,
-                  },
-                ]);
-                setExpandedMilestones((prev) => {
-                  const next = new Set(prev);
-                  next.add(newId);
-                  return next;
-                });
-              }}
             >
-              <Plus className="w-4 h-4 mr-2" />
-              Add milestone
+              Cancel
             </Button>
-          </div>
-        </CardContent>
-        <div className="flex shrink-0 flex-wrap justify-end gap-2 border-t border-primary/12 bg-muted/20 px-3 py-2.5 md:py-3">
-          <Button
-            type="button"
-            variant="outline"
-            className="h-8 rounded-[10px] border-primary/22 text-xs hover:bg-primary/[0.05] md:h-9 md:text-sm"
-            onClick={onClose}
-            disabled={committing}
-          >
-            Cancel
-          </Button>
-          <Button
-            type="button"
-            className="h-8 rounded-[10px] text-xs shadow-sm md:h-9 md:text-sm"
-            onClick={handleConfirm}
-            disabled={
-              !isDirty || committing || typeof onCommitTaskDraft !== "function"
-            }
-          >
-            {committing ? "Saving..." : "Confirm changes"}
-          </Button>
-        </div>
-      </Card>
-      {blockingTaskId && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 sv-modal-backdrop">
-          <Card className="sv-modal-panel w-full rounded-[16px] border-0 shadow-modal sm:max-w-lg">
-            <CardHeader className="pb-2 pt-3">
-              <CardTitle className="flex items-center gap-2 text-base">
-                <AlertCircle className="w-5 h-5 text-orange-500" />
+            <Button
+              type="button"
+              className="h-9 rounded-input bg-primary font-body text-[13px] font-semibold shadow-soft hover:bg-primary-hover"
+              onClick={handleConfirm}
+              disabled={
+                !isDirty ||
+                committing ||
+                typeof onCommitTaskDraft !== "function"
+              }
+            >
+              {committing ? "Saving..." : "Confirm changes"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {isOpen && blockingTaskId && (
+        <div className="sv-modal-backdrop fixed inset-0 z-[60] flex items-center justify-center p-4">
+          <Card className="sv-modal-panel w-full rounded-card border border-surface-border shadow-modal sm:max-w-lg">
+            <CardHeader className="border-b border-surface-border pb-3 pt-4">
+              <CardTitle className="flex items-center gap-2 font-heading text-base text-text-heading">
+                <AlertCircle className="h-5 w-5 text-status-warning" />
                 Report Task Blocker
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent className="space-y-4 pt-4">
               <div className="space-y-2">
                 {blockerReasons.map((reason) => (
-                  <div
+                  <button
                     key={reason.value}
-                    className={`cursor-pointer rounded-lg border p-3 transition-all ${blockReason === reason.value ? "border-primary bg-primary/5" : "border-primary/20 hover:border-primary/40"}`}
+                    type="button"
+                    className={`w-full cursor-pointer rounded-input border p-3 text-left transition-colors ${
+                      blockReason === reason.value
+                        ? "border-primary bg-primary-tint"
+                        : "border-surface-border hover:border-primary/40 hover:bg-surface-page"
+                    }`}
                     onClick={() => setBlockReason(reason.value)}
                   >
-                    <p className="font-medium text-sm">{reason.label}</p>
-                  </div>
+                    <p className="font-body text-sm font-medium text-text-heading">
+                      {reason.label}
+                    </p>
+                    <p className="mt-0.5 font-body text-xs text-text-muted">
+                      {reason.description}
+                    </p>
+                  </button>
                 ))}
               </div>
               <div>
-                <label className="text-sm font-medium mb-2 block">
+                <label className="mb-2 block font-body text-sm font-medium text-text-heading">
                   Additional details (optional)
                 </label>
                 <textarea
                   value={blockNote}
                   onChange={(e) => setBlockNote(e.target.value)}
                   placeholder="Provide more context..."
-                  className="w-full p-2 border rounded-lg min-h-[60px] text-sm"
+                  className="min-h-[72px] w-full rounded-input border border-surface-border bg-surface-card p-3 font-body text-sm text-text-body outline-none focus-visible:ring-2 focus-visible:ring-primary/25"
                 />
               </div>
               <div className="flex gap-2">
@@ -1088,14 +1155,14 @@ export default function MilestoneDetailView({
                     setBlockReason("");
                     setBlockNote("");
                   }}
-                  className="flex-1"
+                  className="flex-1 border-surface-border font-body"
                 >
                   Cancel
                 </Button>
                 <Button
                   onClick={handleBlockTask}
                   disabled={!blockReason}
-                  className="flex-1"
+                  className="flex-1 bg-primary font-body hover:bg-primary-hover"
                 >
                   Report Blocker
                 </Button>
@@ -1104,7 +1171,8 @@ export default function MilestoneDetailView({
           </Card>
         </div>
       )}
-      {assigningTask && (
+
+      {isOpen && assigningTask && (
         <TaskAssignmentModal
           isOpen={!!assigningTask}
           onClose={() => setAssigningTaskId(null)}
@@ -1130,7 +1198,8 @@ export default function MilestoneDetailView({
           }}
         />
       )}
-      {incentiveTask && (
+
+      {isOpen && incentiveTask && (
         <TaskIncentiveModal
           isOpen={!!incentiveTask}
           onClose={() => setIncentiveTask(null)}
@@ -1142,9 +1211,10 @@ export default function MilestoneDetailView({
           }}
         />
       )}
-      {deleteConfirm && (
+
+      {isOpen && deleteConfirm && (
         <div
-          className="fixed inset-0 z-[70] flex items-center justify-center p-3 sv-modal-backdrop"
+          className="sv-modal-backdrop fixed inset-0 z-[70] flex items-center justify-center p-3"
           role="presentation"
           onClick={() => !committing && setDeleteConfirm(null)}
         >
@@ -1153,7 +1223,7 @@ export default function MilestoneDetailView({
             aria-modal="true"
             aria-labelledby="delete-confirm-title"
             aria-describedby="delete-confirm-desc"
-            className="sv-modal-panel w-full max-w-[min(100%,22rem)] overflow-hidden rounded-[14px] border-0 shadow-modal sm:max-w-sm"
+            className="sv-modal-panel w-full max-w-[min(100%,22rem)] overflow-hidden rounded-card border border-surface-border shadow-modal sm:max-w-sm"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="px-4 pb-1 pt-4">
@@ -1167,7 +1237,7 @@ export default function MilestoneDetailView({
                 <div className="min-w-0 flex-1 space-y-1.5">
                   <h3
                     id="delete-confirm-title"
-                    className="font-heading text-sm font-semibold leading-snug text-card-foreground md:text-[15px]"
+                    className="font-heading text-[15px] font-semibold leading-snug text-text-heading"
                   >
                     {deleteConfirm.kind === "milestone"
                       ? "Delete milestone?"
@@ -1175,7 +1245,7 @@ export default function MilestoneDetailView({
                   </h3>
                   <p
                     id="delete-confirm-desc"
-                    className="text-[13px] leading-relaxed text-text-body md:text-sm"
+                    className="font-body text-[13px] leading-relaxed text-text-body"
                   >
                     {deleteConfirm.kind === "milestone"
                       ? "This removes the milestone and every task under it. You can’t undo this after you save your week plan."
@@ -1184,15 +1254,12 @@ export default function MilestoneDetailView({
                 </div>
               </div>
             </div>
-            <div
-              data-slot="dialog-footer"
-              className="flex flex-col gap-2 border-t border-primary/12 px-4 py-3 sm:flex-row sm:justify-end sm:gap-2"
-            >
+            <div className="flex flex-col gap-2 border-t border-surface-border px-4 py-3 sm:flex-row sm:justify-end sm:gap-2">
               <Button
                 type="button"
                 variant="outline"
                 disabled={committing}
-                className="order-2 w-full border-primary/22 bg-card font-semibold hover:bg-primary/[0.04] sm:order-1 sm:w-auto"
+                className="order-2 w-full border-surface-border bg-surface-card font-body font-semibold hover:bg-primary-tint sm:order-1 sm:w-auto"
                 onClick={() => setDeleteConfirm(null)}
               >
                 Cancel
@@ -1201,7 +1268,7 @@ export default function MilestoneDetailView({
                 type="button"
                 variant="destructive"
                 disabled={committing}
-                className="order-1 w-full font-semibold sm:order-2 sm:w-auto"
+                className="order-1 w-full font-body font-semibold sm:order-2 sm:w-auto"
                 onClick={confirmPendingDelete}
               >
                 {deleteConfirm.kind === "milestone"
@@ -1212,6 +1279,6 @@ export default function MilestoneDetailView({
           </Card>
         </div>
       )}
-    </div>
+    </>
   );
 }

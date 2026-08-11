@@ -1,10 +1,11 @@
 /**
  * COHORT ANALYTICS - Comprehensive metrics dashboard
+ * Loading / empty / token patterns mirror founder AnalyticsDashboard (Stream A).
  */
 import React, { useState, useEffect } from "react";
 import { API_BASE_URL } from "../../config/apiBase.js";
+import { Button } from "../ui/button";
 import {
-  BarChart3,
   TrendingUp,
   Users,
   Target,
@@ -15,35 +16,132 @@ import {
   Send,
   Inbox,
   Award,
+  RefreshCw,
+  AlertCircle,
 } from "lucide-react";
 import { unwrapData } from "../../utils/apiEnvelope";
 import {
   StatTile,
   SectionCard,
-  SectionHeader,
   BrandProgress,
   EmptyStateBlock,
 } from "./_primitives";
+import { cn } from "../ui/utils";
 
 const API_BASE = API_BASE_URL;
+
+const OUTLINE_BTN =
+  "h-8 rounded-input border border-surface-border bg-white font-body text-[13px] font-medium text-text-body shadow-none hover:bg-primary-tint hover:text-primary";
 
 const defaultOptions = {
   credentials: "include",
   headers: { "Content-Type": "application/json" },
 };
 
+function SkeletonBlock({ className }) {
+  return <div className={cn("rounded bg-surface-border/50", className)} />;
+}
+
+function CohortAnalyticsSkeleton() {
+  return (
+    <div
+      className="min-h-full space-y-4 font-body"
+      aria-busy="true"
+      aria-label="Loading cohort analytics"
+    >
+      <div className="flex flex-wrap items-center justify-end gap-2">
+        <SkeletonBlock className="h-8 w-24" />
+      </div>
+
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+        {Array.from({ length: 4 }).map((_, i) => (
+          <div
+            key={i}
+            className="animate-pulse rounded-card border border-surface-border bg-surface-card p-4 shadow-soft"
+          >
+            <div className="flex items-center gap-3">
+              <SkeletonBlock className="h-10 w-10 shrink-0 rounded-input" />
+              <div className="min-w-0 flex-1 space-y-2">
+                <SkeletonBlock className="h-7 w-12" />
+                <SkeletonBlock className="h-3 w-20" />
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div className="grid animate-pulse grid-cols-1 gap-3 md:grid-cols-2">
+        {Array.from({ length: 2 }).map((_, i) => (
+          <div
+            key={i}
+            className="rounded-card border border-surface-border bg-surface-card p-4 shadow-soft sm:p-5"
+          >
+            <SkeletonBlock className="mb-2 h-4 w-36" />
+            <SkeletonBlock className="mb-4 h-3 w-48" />
+            <div className="mb-3 grid grid-cols-2 gap-3">
+              <SkeletonBlock className="h-16 w-full rounded-input" />
+              <SkeletonBlock className="h-16 w-full rounded-input" />
+            </div>
+            <SkeletonBlock className="h-1.5 w-full" />
+          </div>
+        ))}
+      </div>
+
+      <div className="animate-pulse space-y-3">
+        <SkeletonBlock className="h-4 w-40" />
+        <SkeletonBlock className="h-3 w-56" />
+        <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div
+              key={i}
+              className="rounded-card border border-surface-border bg-surface-card p-4 shadow-soft"
+            >
+              <SkeletonBlock className="mb-2 h-8 w-10" />
+              <SkeletonBlock className="h-3 w-24" />
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function PanelSection({ title, description, children, className }) {
+  return (
+    <div className={cn("min-w-0", className)}>
+      {(title || description) && (
+        <header className="mb-3">
+          {title && (
+            <h3 className="font-heading text-[15px] font-semibold text-text-heading">
+              {title}
+            </h3>
+          )}
+          {description && (
+            <p className="mt-0.5 font-body text-[12px] text-text-muted">
+              {description}
+            </p>
+          )}
+        </header>
+      )}
+      {children}
+    </div>
+  );
+}
+
 function ProgressRow({ label, value, max, tone = "info" }) {
   const numericValue = typeof value === "number" ? value : Number(value) || 0;
   const numericMax = typeof max === "number" ? max : Number(max) || 0;
   const pct =
-    numericMax > 0 ? Math.min(100, Math.round((numericValue / numericMax) * 100)) : 0;
+    numericMax > 0
+      ? Math.min(100, Math.round((numericValue / numericMax) * 100))
+      : 0;
   const toneClass =
     tone === "success"
-      ? "text-[#00c896]"
+      ? "text-status-success"
       : tone === "warning"
-        ? "text-[#ffb300]"
+        ? "text-status-warning"
         : tone === "danger"
-          ? "text-[#ff4f6b]"
+          ? "text-status-error"
           : "text-primary";
   return (
     <div className="space-y-1.5">
@@ -51,7 +149,7 @@ function ProgressRow({ label, value, max, tone = "info" }) {
         <span className="font-body text-[12px] text-text-muted">{label}</span>
         <span className="font-heading text-[14px] font-semibold text-text-heading">
           <span className={toneClass}>{numericValue}</span>
-          <span className="text-text-muted font-normal"> / {numericMax}</span>
+          <span className="font-normal text-text-muted"> / {numericMax}</span>
         </span>
       </div>
       <BrandProgress value={pct} className="h-1.5" />
@@ -62,14 +160,23 @@ function ProgressRow({ label, value, max, tone = "info" }) {
 export default function CohortAnalyticsDashboard({ cohortId }) {
   const [analytics, setAnalytics] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [lastUpdated, setLastUpdated] = useState(null);
 
-  useEffect(() => {
-    loadAnalytics();
-  }, [cohortId]);
-
-  const loadAnalytics = async () => {
+  const loadAnalytics = async (isManualRefresh = false) => {
+    if (!cohortId) {
+      setError("Cohort ID not available");
+      setLoading(false);
+      return;
+    }
     try {
-      setLoading(true);
+      if (isManualRefresh) {
+        setIsRefreshing(true);
+      } else {
+        setLoading(true);
+      }
+      setError(null);
       const response = await fetch(
         `${API_BASE}/cohorts/${cohortId}/analytics/overview`,
         { ...defaultOptions },
@@ -77,35 +184,57 @@ export default function CohortAnalyticsDashboard({ cohortId }) {
       if (!response.ok) throw new Error("Failed to fetch analytics");
       const inner = unwrapData(await response.json());
       setAnalytics(inner.analytics);
-    } catch (error) {
-      console.error("Error loading analytics:", error);
+      setLastUpdated(new Date());
+    } catch (err) {
+      console.error("Error loading analytics:", err);
+      setError(err?.message || "Failed to load analytics");
+      if (!isManualRefresh) {
+        setAnalytics(null);
+      }
     } finally {
       setLoading(false);
+      setIsRefreshing(false);
     }
   };
 
-  if (loading) {
-    return (
-      <SectionCard>
-        <SectionCard.Body className="p-8 text-center">
-          <div className="font-body text-[13px] text-text-muted animate-pulse">
-            Loading analytics...
-          </div>
-        </SectionCard.Body>
-      </SectionCard>
-    );
+  useEffect(() => {
+    loadAnalytics(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- reload when cohort changes
+  }, [cohortId]);
+
+  const handleManualRefresh = () => {
+    loadAnalytics(true);
+  };
+
+  // Cold load only — keep last good data visible during refresh.
+  if (loading && !analytics) {
+    return <CohortAnalyticsSkeleton />;
   }
 
-  if (!analytics) {
+  if (!loading && !analytics) {
     return (
-      <SectionCard>
+      <SectionCard className="font-body">
         <SectionCard.Body className="p-0">
           <EmptyStateBlock
             variant="centered"
-            icon={BarChart3}
+            icon={AlertCircle}
             tone="danger"
             title="Failed to load analytics"
-            description="We could not fetch cohort analytics. Try refreshing the page."
+            description={error || "We could not fetch cohort analytics."}
+            action={
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleManualRefresh}
+                disabled={isRefreshing}
+                className={OUTLINE_BTN}
+              >
+                <RefreshCw
+                  className={`mr-2 h-3.5 w-3.5 ${isRefreshing ? "animate-spin" : ""}`}
+                />
+                Retry
+              </Button>
+            }
           />
         </SectionCard.Body>
       </SectionCard>
@@ -114,20 +243,48 @@ export default function CohortAnalyticsDashboard({ cohortId }) {
 
   const aggregate = analytics.aggregateMetrics || {};
   const program = analytics.programMetrics || {};
+  const hasTaskData =
+    Number(aggregate.totalTasks) > 0 || Number(aggregate.completedTasks) > 0;
+  const hasMilestoneData =
+    Number(aggregate.totalMilestones) > 0 ||
+    Number(aggregate.completedMilestones) > 0;
+  const hasProgramData =
+    Number(program.totalProgramMilestones) > 0 ||
+    Number(program.totalDeliverables) > 0 ||
+    Number(program.totalSubmissions) > 0;
+  const hasWeeklyData =
+    Number(aggregate.totalWeeklyOutcomes) > 0 ||
+    Number(aggregate.avgWeeklyOutcomesPerStartup) > 0;
 
   return (
-    <div className="space-y-4 font-body">
-      <SectionHeader
-        icon={BarChart3}
-        title="Analytics &amp; Insights"
-        description={
-          typeof analytics.recentJoinsLast30Days === "number"
-            ? `Key metrics across all ${analytics.cohortSize} active startups · ${analytics.recentJoinsLast30Days} joined in the last 30 days`
-            : `Key metrics across all ${analytics.cohortSize} active startups`
-        }
-      />
+    <div className="min-h-full space-y-4 font-body">
+      <div className="flex flex-wrap items-center justify-end gap-2">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={handleManualRefresh}
+          disabled={isRefreshing}
+          className={OUTLINE_BTN}
+        >
+          <RefreshCw
+            className={`mr-2 h-3.5 w-3.5 ${isRefreshing ? "animate-spin" : ""}`}
+          />
+          {isRefreshing ? "Refreshing..." : "Refresh"}
+        </Button>
+        {lastUpdated && (
+          <span className="w-full text-right font-body text-[11px] text-text-muted sm:w-auto">
+            Updated {lastUpdated.toLocaleTimeString()}
+          </span>
+        )}
+      </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+      <p className="font-body text-[12px] text-text-muted">
+        {typeof analytics.recentJoinsLast30Days === "number"
+          ? `Key metrics across ${analytics.cohortSize} active startups · ${analytics.recentJoinsLast30Days} joined in the last 30 days`
+          : `Key metrics across ${analytics.cohortSize} active startups`}
+      </p>
+
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
         <StatTile
           tone="info"
           icon={Users}
@@ -158,100 +315,100 @@ export default function CohortAnalyticsDashboard({ cohortId }) {
         />
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-        <SectionCard>
-          <SectionCard.Header
-            title={
-              <span className="inline-flex items-center gap-2">
-                <CheckCircle2 className="h-4 w-4 text-[#00c896]" />
-                Task Completion
-              </span>
-            }
-            description="Total vs completed tasks across the cohort"
-          />
-          <SectionCard.Body>
-            <div className="space-y-3">
-              <div className="grid grid-cols-2 gap-3">
-                <div className="rounded-input bg-surface-page p-3">
-                  <div className="font-body text-[12px] text-text-muted">
-                    Total Tasks
-                  </div>
-                  <div className="font-heading text-[20px] font-bold text-text-heading">
-                    {aggregate.totalTasks}
-                  </div>
-                </div>
-                <div className="rounded-input bg-surface-page p-3">
-                  <div className="font-body text-[12px] text-text-muted">
-                    Completed
-                  </div>
-                  <div className="font-heading text-[20px] font-bold text-[#00c896]">
-                    {aggregate.completedTasks}
-                  </div>
-                </div>
-              </div>
-              <ProgressRow
-                label="Completion Rate"
-                value={aggregate.completedTasks}
-                max={aggregate.totalTasks}
-                tone="success"
-              />
-            </div>
-          </SectionCard.Body>
-        </SectionCard>
-
-        <SectionCard>
-          <SectionCard.Header
-            title={
-              <span className="inline-flex items-center gap-2">
-                <Target className="h-4 w-4 text-primary" />
-                Milestone Progress
-              </span>
-            }
-            description="Total vs completed milestones across the cohort"
-          />
-          <SectionCard.Body>
-            <div className="space-y-3">
-              <div className="grid grid-cols-2 gap-3">
-                <div className="rounded-input bg-surface-page p-3">
-                  <div className="font-body text-[12px] text-text-muted">
-                    Total Milestones
-                  </div>
-                  <div className="font-heading text-[20px] font-bold text-text-heading">
-                    {aggregate.totalMilestones}
-                  </div>
-                </div>
-                <div className="rounded-input bg-surface-page p-3">
-                  <div className="font-body text-[12px] text-text-muted">
-                    Completed
-                  </div>
-                  <div className="font-heading text-[20px] font-bold text-primary">
-                    {aggregate.completedMilestones}
-                  </div>
-                </div>
-              </div>
-              <ProgressRow
-                label="Completion Rate"
-                value={aggregate.completedMilestones}
-                max={aggregate.totalMilestones}
-                tone="info"
-              />
-            </div>
-          </SectionCard.Body>
-        </SectionCard>
-      </div>
-
       <SectionCard>
-        <SectionCard.Header
-          title={
-            <span className="inline-flex items-center gap-2">
-              <FileText className="h-4 w-4 text-primary" />
-              Program Metrics
-            </span>
-          }
-          description="Deliverables and program milestones tracking"
-        />
-        <SectionCard.Body>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <SectionCard.Body className="pt-4">
+          <div className="grid grid-cols-1 gap-6 md:grid-cols-2 md:gap-8">
+            <PanelSection
+              title="Task completion"
+              description="Total vs completed tasks across the cohort"
+            >
+              {hasTaskData ? (
+                <div className="space-y-3">
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="rounded-input bg-surface-page p-3">
+                      <div className="font-body text-[12px] text-text-muted">
+                        Total Tasks
+                      </div>
+                      <div className="font-heading text-[20px] font-bold text-text-heading">
+                        {aggregate.totalTasks}
+                      </div>
+                    </div>
+                    <div className="rounded-input bg-surface-page p-3">
+                      <div className="font-body text-[12px] text-text-muted">
+                        Completed
+                      </div>
+                      <div className="font-heading text-[20px] font-bold text-status-success">
+                        {aggregate.completedTasks}
+                      </div>
+                    </div>
+                  </div>
+                  <ProgressRow
+                    label="Completion Rate"
+                    value={aggregate.completedTasks}
+                    max={aggregate.totalTasks}
+                    tone="success"
+                  />
+                </div>
+              ) : (
+                <EmptyStateBlock
+                  variant="compact"
+                  icon={CheckCircle2}
+                  title="No task data yet"
+                  description="Task activity will appear as startups execute."
+                />
+              )}
+            </PanelSection>
+
+            <PanelSection
+              title="Milestone progress"
+              description="Total vs completed milestones across the cohort"
+            >
+              {hasMilestoneData ? (
+                <div className="space-y-3">
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="rounded-input bg-surface-page p-3">
+                      <div className="font-body text-[12px] text-text-muted">
+                        Total Milestones
+                      </div>
+                      <div className="font-heading text-[20px] font-bold text-text-heading">
+                        {aggregate.totalMilestones}
+                      </div>
+                    </div>
+                    <div className="rounded-input bg-surface-page p-3">
+                      <div className="font-body text-[12px] text-text-muted">
+                        Completed
+                      </div>
+                      <div className="font-heading text-[20px] font-bold text-primary">
+                        {aggregate.completedMilestones}
+                      </div>
+                    </div>
+                  </div>
+                  <ProgressRow
+                    label="Completion Rate"
+                    value={aggregate.completedMilestones}
+                    max={aggregate.totalMilestones}
+                    tone="info"
+                  />
+                </div>
+              ) : (
+                <EmptyStateBlock
+                  variant="compact"
+                  icon={Target}
+                  title="No milestone data yet"
+                  description="Milestones appear as startups progress."
+                />
+              )}
+            </PanelSection>
+          </div>
+        </SectionCard.Body>
+      </SectionCard>
+
+      <PanelSection
+        title="Program metrics"
+        description="Deliverables and program milestones tracking"
+      >
+        {hasProgramData ? (
+          <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
             <StatTile
               tone="info"
               icon={Target}
@@ -282,38 +439,49 @@ export default function CohortAnalyticsDashboard({ cohortId }) {
               progress={Number(program.submissionRate) || 0}
             />
           </div>
-        </SectionCard.Body>
-      </SectionCard>
+        ) : (
+          <EmptyStateBlock
+            variant="compact"
+            icon={FileText}
+            title="No program metrics yet"
+            description="Configure milestones and deliverables to track submissions."
+          />
+        )}
+      </PanelSection>
 
       <SectionCard>
         <SectionCard.Header
-          title={
-            <span className="inline-flex items-center gap-2">
-              <Activity className="h-4 w-4 text-primary" />
-              Weekly Execution
-            </span>
-          }
+          title="Weekly execution"
           description="Outcome logging across the cohort"
         />
         <SectionCard.Body>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            <div className="rounded-input bg-surface-page p-4">
-              <div className="font-body text-[12px] text-text-muted">
-                Total Weekly Outcomes
+          {hasWeeklyData ? (
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+              <div className="rounded-input bg-surface-page p-4">
+                <div className="font-body text-[12px] text-text-muted">
+                  Total Weekly Outcomes
+                </div>
+                <div className="font-heading text-[20px] font-bold text-primary">
+                  {aggregate.totalWeeklyOutcomes}
+                </div>
               </div>
-              <div className="font-heading text-[20px] font-bold text-primary">
-                {aggregate.totalWeeklyOutcomes}
+              <div className="rounded-input bg-surface-page p-4">
+                <div className="font-body text-[12px] text-text-muted">
+                  Avg Per Startup
+                </div>
+                <div className="font-heading text-[20px] font-bold text-status-success">
+                  {aggregate.avgWeeklyOutcomesPerStartup}
+                </div>
               </div>
             </div>
-            <div className="rounded-input bg-surface-page p-4">
-              <div className="font-body text-[12px] text-text-muted">
-                Avg Per Startup
-              </div>
-              <div className="font-heading text-[20px] font-bold text-[#00c896]">
-                {aggregate.avgWeeklyOutcomesPerStartup}
-              </div>
-            </div>
-          </div>
+          ) : (
+            <EmptyStateBlock
+              variant="compact"
+              icon={Activity}
+              title="No weekly outcomes yet"
+              description="Outcome logging will show up as startups execute."
+            />
+          )}
         </SectionCard.Body>
       </SectionCard>
     </div>

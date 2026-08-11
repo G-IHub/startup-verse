@@ -4,13 +4,11 @@
  * Mobile-responsive with hamburger menu
  */
 import React, { useState, useEffect } from "react";
-import { Card, CardContent } from "../ui/card";
 import { Button } from "../ui/button";
 import { Menu, Plus, Download, Rocket, ChevronRight } from "lucide-react";
 import OrganizationSidebar from "./OrganizationSidebar";
 import {
   SectionCard,
-  SectionHeader,
   ListRow,
   StatusBadge,
   EmptyStateBlock,
@@ -342,22 +340,69 @@ export default function CohortDashboardWithSidebar({
   };
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-pulse font-body text-[13px] text-text-muted">
-          Loading cohort...
+      <div
+        className="flex h-full bg-surface-page"
+        aria-busy="true"
+        aria-label="Loading cohort"
+      >
+        <div className="hidden w-[216px] shrink-0 animate-pulse border-r border-surface-border bg-surface-card md:block">
+          <div className="space-y-3 p-4">
+            <div className="h-4 w-28 rounded bg-surface-border/50" />
+            <div className="h-3 w-20 rounded bg-surface-border/40" />
+            <div className="mt-6 space-y-2">
+              {Array.from({ length: 6 }).map((_, i) => (
+                <div
+                  key={i}
+                  className="h-8 w-full rounded-input bg-surface-border/40"
+                />
+              ))}
+            </div>
+          </div>
+        </div>
+        <div className="flex min-w-0 flex-1 flex-col">
+          <div className="flex min-h-[64px] items-center gap-3 border-b border-surface-border bg-surface-card px-4 py-3 md:px-6">
+            <div className="h-5 w-40 animate-pulse rounded bg-surface-border/50" />
+          </div>
+          <div className="flex-1 space-y-3 p-4 md:p-6">
+            <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+              {Array.from({ length: 4 }).map((_, i) => (
+                <div
+                  key={i}
+                  className="h-20 animate-pulse rounded-card border border-surface-border bg-surface-card"
+                />
+              ))}
+            </div>
+            <div className="h-48 animate-pulse rounded-card border border-surface-border bg-surface-card" />
+          </div>
         </div>
       </div>
     );
   }
   if (error || !cohort) {
     return (
-      <Card className="rounded-card border border-surface-border bg-white shadow-soft">
-        <CardContent className="p-8 text-center">
-          <p className="font-body text-[13px] text-[#ff4f6b]">
-            {error || "Cohort not found"}
-          </p>
-        </CardContent>
-      </Card>
+      <SectionCard className="m-4 md:m-6">
+        <SectionCard.Body className="p-0">
+          <EmptyStateBlock
+            variant="centered"
+            icon={Rocket}
+            tone="danger"
+            title={error || "Cohort not found"}
+            description="Return to your organization home and try again."
+            action={
+              onBack ? (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={onBack}
+                  className="h-9 rounded-input border border-surface-border bg-white font-body text-[13px] font-medium text-text-body hover:border-primary hover:text-primary"
+                >
+                  ← Back to cohorts
+                </Button>
+              ) : null
+            }
+          />
+        </SectionCard.Body>
+      </SectionCard>
     );
   }
   return (
@@ -373,27 +418,27 @@ export default function CohortDashboardWithSidebar({
         isOpen={isMobileSidebarOpen}
         onClose={() => setIsMobileSidebarOpen(false)}
       />
-      <div className="flex-1 flex flex-col overflow-hidden">
-        <div className="flex min-h-[82px] flex-shrink-0 items-center justify-between gap-4 border-b border-surface-border bg-surface-card px-4 py-4 shadow-[0_1px_8px_rgba(0,0,0,0.05)] md:px-6">
-          <div className="flex items-center gap-3 flex-1 min-w-0">
+      <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
+        <div className="flex min-h-[64px] flex-shrink-0 items-center justify-between gap-4 border-b border-surface-border bg-surface-card px-4 py-3 md:px-6">
+          <div className="flex min-w-0 flex-1 items-center gap-3">
             <Button
               variant="ghost"
               size="sm"
               onClick={() => setIsMobileSidebarOpen(true)}
-              className="md:hidden h-9 w-9 p-0 flex-shrink-0"
+              className="h-9 w-9 flex-shrink-0 p-0 md:hidden"
             >
-              <Menu className="w-5 h-5" />
+              <Menu className="h-5 w-5" />
             </Button>
             <div className="min-w-0 flex-1">
-              <h2 className="truncate font-heading text-lg font-extrabold leading-tight text-text-heading sm:text-xl">
+              <h2 className="truncate font-heading text-base font-bold leading-tight text-text-heading sm:text-lg">
                 {getPageTitle()}
               </h2>
-              <p className="hidden truncate font-body text-xs leading-snug text-text-body sm:block">
+              <p className="hidden truncate font-body text-xs leading-snug text-text-muted sm:block">
                 {getPageDescription()}
               </p>
             </div>
           </div>
-          <div className="flex items-center gap-2 flex-shrink-0">
+          <div className="flex flex-shrink-0 items-center gap-2">
             {onBack && (
               <Button
                 variant="outline"
@@ -401,7 +446,7 @@ export default function CohortDashboardWithSidebar({
                 onClick={onBack}
                 className="h-9 rounded-input border border-surface-border bg-white font-body text-[13px] font-medium text-text-body hover:border-primary hover:text-primary"
               >
-                ← Back to program
+                ← Back to cohorts
               </Button>
             )}
             {isAdmin && (
@@ -415,7 +460,7 @@ export default function CohortDashboardWithSidebar({
                     }}
                     className="h-9 rounded-input bg-primary font-body text-[13px] font-semibold text-white shadow-[0_4px_16px_rgba(58,90,254,0.20)] hover:bg-primary-hover"
                   >
-                    <Plus className="w-4 h-4 mr-2" />
+                    <Plus className="mr-2 h-4 w-4" />
                     Invite Startup
                   </Button>
                 )}
@@ -429,9 +474,9 @@ export default function CohortDashboardWithSidebar({
                           setInviteModalMode("browse");
                           setShowInviteModal(true);
                         }}
-                        className="h-9 rounded-input border border-surface-border bg-white font-body text-[13px] font-medium text-text-body hover:border-primary hover:text-primary hidden sm:flex"
+                        className="hidden h-9 rounded-input border border-surface-border bg-white font-body text-[13px] font-medium text-text-body hover:border-primary hover:text-primary sm:flex"
                       >
-                        <Plus className="w-4 h-4 mr-2" />
+                        <Plus className="mr-2 h-4 w-4" />
                         Invite
                       </Button>
                     )}
@@ -441,7 +486,7 @@ export default function CohortDashboardWithSidebar({
                       onClick={handleExport}
                       className="h-9 rounded-input border border-surface-border bg-white font-body text-[13px] font-medium text-text-body hover:border-primary hover:text-primary"
                     >
-                      <Download className="w-4 h-4 sm:mr-2" />
+                      <Download className="h-4 w-4 sm:mr-2" />
                       <span className="hidden sm:inline">Export</span>
                     </Button>
                   </>
@@ -450,7 +495,7 @@ export default function CohortDashboardWithSidebar({
             )}
           </div>
         </div>
-        <div className="flex-1 overflow-y-auto p-4 md:p-6 bg-surface-page">
+        <div className="flex-1 overflow-y-auto bg-surface-page p-4 md:p-6">
           {renderPageContent()}
         </div>
       </div>

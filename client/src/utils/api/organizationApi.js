@@ -103,6 +103,19 @@ export async function createOrganization(data) {
   return mapEntity(unwrapData(result));
 }
 
+export async function completeOrganizationOnboarding(data) {
+  const result = await apiCall("/organizations/onboarding", {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
+  const payload = unwrapData(result) || {};
+  return {
+    ...payload,
+    organization: mapEntity(payload.organization),
+    user: mapEntity(payload.user),
+  };
+}
+
 export async function getOrganization(orgId) {
   const result = await apiCall(`/organizations/${orgId}`);
   return mapEntity(unwrapData(result));
@@ -282,6 +295,57 @@ export async function getFounderMemberships(founderId) {
   const data = unwrapData(result);
   const items = Array.isArray(data) ? data : [];
   return { success: true, memberships: mapList(items) };
+}
+
+export async function getStartupMemberships(startupId) {
+  const result = await apiCall(`/memberships/startup/${startupId}`);
+  const data = unwrapData(result);
+  const items = Array.isArray(data) ? data : [];
+  return { success: true, memberships: mapList(items) };
+}
+
+export async function getProgramMilestones(cohortId) {
+  const result = await apiCall(`/cohorts/${cohortId}/program-milestones`);
+  const data = unwrapData(result);
+  const list = Array.isArray(data?.milestones)
+    ? data.milestones
+    : Array.isArray(data)
+      ? data
+      : [];
+  return mapList(list);
+}
+
+export async function getCohortEvents(cohortId) {
+  const result = await apiCall(`/cohorts/${cohortId}/events`);
+  const data = unwrapData(result);
+  const list = Array.isArray(data?.events)
+    ? data.events
+    : Array.isArray(data)
+      ? data
+      : [];
+  return mapList(list);
+}
+
+export async function getCohortAnnouncements(cohortId) {
+  const result = await apiCall(`/cohorts/${cohortId}/announcements`);
+  const data = unwrapData(result);
+  const list = Array.isArray(data?.announcements)
+    ? data.announcements
+    : Array.isArray(data)
+      ? data
+      : [];
+  return mapList(list);
+}
+
+export async function getFounderMentors(founderId) {
+  const result = await apiCall(`/founders/${founderId}/mentors`);
+  const data = unwrapData(result);
+  const list = Array.isArray(data?.mentors)
+    ? data.mentors
+    : Array.isArray(data)
+      ? data
+      : [];
+  return mapList(list);
 }
 
 export async function getStartupSnapshot(founderId) {

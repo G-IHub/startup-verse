@@ -23,6 +23,7 @@ import * as founderApi from "./utils/api/founderApi";
 import { buildFounderProfilePayload } from "./domains/founder/founderProfilePayload";
 import * as teamMemberApi from "./utils/api/teamMemberApi";
 import * as talentApi from "./utils/api/talentApi";
+import { getUserOrganizations } from "./utils/api/organizationApi";
 import { authApi } from "./api/authApi";
 import { initializeErrorSuppression } from "./utils/errorSuppression";
 import {
@@ -144,17 +145,34 @@ function BootstrapLegacyDashboardQuery() {
   return null;
 }
 
-function RequireDashboard() {
-  const { user, isLoading } = useAuth();
+function useOnboardingGateStatus(user) {
   const [founderStartupOk, setFounderStartupOk] = useState(null);
+  const [organizationReady, setOrganizationReady] = useState(null);
 
   useEffect(() => {
     let cancelled = false;
     async function run() {
       if (!user?.onboardingComplete) {
         setFounderStartupOk(null);
+        setOrganizationReady(null);
         return;
       }
+      if (user.role === "organization-admin") {
+        setFounderStartupOk(true);
+        const userId = String(user._id ?? user.id ?? "");
+        if (!userId) {
+          if (!cancelled) setOrganizationReady(false);
+          return;
+        }
+        try {
+          const organizations = await getUserOrganizations(userId);
+          if (!cancelled) setOrganizationReady(organizations.length > 0);
+        } catch {
+          if (!cancelled) setOrganizationReady(false);
+        }
+        return;
+      }
+      setOrganizationReady(true);
       if (user.role !== "founder") {
         setFounderStartupOk(true);
         return;
@@ -177,6 +195,13 @@ function RequireDashboard() {
     };
   }, [user]);
 
+  return { founderStartupOk, organizationReady };
+}
+
+function RequireDashboard() {
+  const { user, isLoading } = useAuth();
+  const { founderStartupOk, organizationReady } = useOnboardingGateStatus(user);
+
   if (isLoading) return <LoadingSpinner />;
   if (!user) return <Navigate to="/" replace />;
   if (!user.onboardingComplete) return <Navigate to="/onboarding" replace />;
@@ -184,6 +209,34 @@ function RequireDashboard() {
   if (user.role === "founder" && user.onboardingComplete) {
     if (founderStartupOk === null) return <LoadingSpinner />;
     if (!founderStartupOk) return <Navigate to="/onboarding" replace />;
+  }
+
+  if (user.role === "organization-admin" && user.onboardingComplete) {
+    if (organizationReady === null) return <LoadingSpinner />;
+    if (!organizationReady) return <Navigate to="/onboarding" replace />;
+  }
+
+  return <Outlet />;
+}
+
+/** Keep /onboarding available only until profile setup is finished. */
+function RequireOnboarding() {
+  const { user, isLoading } = useAuth();
+  const { founderStartupOk, organizationReady } = useOnboardingGateStatus(user);
+
+  if (isLoading) return <LoadingSpinner />;
+  if (!user) return <Navigate to="/" replace />;
+
+  if (user.onboardingComplete) {
+    if (user.role === "founder") {
+      if (founderStartupOk === null) return <LoadingSpinner />;
+      if (founderStartupOk) return <Navigate to="/home" replace />;
+    } else if (user.role === "organization-admin") {
+      if (organizationReady === null) return <LoadingSpinner />;
+      if (organizationReady) return <Navigate to="/home" replace />;
+    } else {
+      return <Navigate to="/home" replace />;
+    }
   }
 
   return <Outlet />;
@@ -641,21 +694,18 @@ function AppContent() {
     </>
   );
 
-  const onboardingRouteElement =
-    user ? (
-      <Suspense fallback={<LoadingSpinner />}>
-        <ProfileCompletionForm
-          variant="page"
-          showBack={false}
-          role={user.role}
-          user={user}
-          onUpdateUser={handleUpdateUser}
-          onComplete={() => navigate("/home", { replace: true })}
-        />
-      </Suspense>
-    ) : (
-      <Navigate to="/" replace />
-    );
+  const onboardingRouteElement = (
+    <Suspense fallback={<LoadingSpinner />}>
+      <ProfileCompletionForm
+        variant="page"
+        showBack={false}
+        role={user?.role}
+        user={user}
+        onUpdateUser={handleUpdateUser}
+        onComplete={() => navigate("/home", { replace: true })}
+      />
+    </Suspense>
+  );
 
   // ---------------------------------------------------------------------------
   // Render
@@ -678,7 +728,9 @@ function AppContent() {
             </Suspense>
           }
         />
-        <Route path="/onboarding" element={onboardingRouteElement} />
+        <Route element={<RequireOnboarding />}>
+          <Route path="/onboarding" element={onboardingRouteElement} />
+        </Route>
         <Route element={<RequireDashboard />}>
           {DASHBOARD_ROUTE_PATHS.map((p) => (
             <Route key={p} path={p} element={dashboardHybridElement} />

@@ -1,8 +1,13 @@
-import React from "react";
-import { Button } from "../ui/button";
+import React, { useEffect } from "react";
 import VirtualStartupOfficeV2 from "./VirtualStartupOfficeWorkspaceV2";
 import JourneyRoadmap from "../journey/JourneyRoadmap";
-import TeamMatching from "../TeamMatching";
+import PageLoadingFallback from "../shell/PageLoadingFallback";
+
+/**
+ * Adaptive office shell. Matching is no longer embedded here —
+ * founders go to dedicated Browse Talent (`team-matching`);
+ * talent goes to Browse Startups.
+ */
 export default function AdaptiveVirtualOffice({
   user,
   onNavigate,
@@ -16,6 +21,24 @@ export default function AdaptiveVirtualOffice({
   winToOpen,
   onWinOpened,
 }) {
+  useEffect(() => {
+    if (view !== "matching") return;
+
+    const browsePage =
+      user?.role === "talent" ? "browse-startups" : "team-matching";
+    onNavigate?.(browsePage);
+  }, [view, user?.role, onNavigate]);
+
+  if (view === "matching") {
+    return (
+      <div className="flex h-full flex-col bg-background font-body">
+        <div className="flex-1 overflow-auto">
+          <PageLoadingFallback />
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="flex h-full flex-col bg-background font-body">
       <div className="flex-1 overflow-auto">
@@ -37,29 +60,6 @@ export default function AdaptiveVirtualOffice({
             user={user}
             onNavigateToStage={(stage) => onNavigate(stage)}
           />
-        )}
-        {view === "matching" && (
-          user?.role === "talent" ? (
-            <div className="mx-auto mt-6 max-w-2xl rounded-xl border border-border bg-card p-6">
-              <h3 className="text-xl font-semibold text-foreground">
-                Browse Opportunities From Talent Home
-              </h3>
-              <p className="mt-2 text-sm text-muted-foreground">
-                Talent browsing is now canonical on Home. Use Browse/Home to
-                open opportunities and send interest from one flow.
-              </p>
-              <div className="mt-4">
-                <Button
-                  type="button"
-                  onClick={() => onNavigate("team-matching")}
-                >
-                  Open Browse
-                </Button>
-              </div>
-            </div>
-          ) : (
-            <TeamMatching user={user} onNavigate={onNavigate} />
-          )
         )}
       </div>
     </div>

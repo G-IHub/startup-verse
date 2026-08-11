@@ -418,3 +418,67 @@ export const unassignFounderFromMentor = async (req, res) => {
   const cohortIds = await cohortIdsForFounders(mentor.assignedFounders || []);
   return apiSuccess(res, { mentor: mapMentor(mentor, user, cohortIds) });
 };
+
+/**
+ * GET /founders/:founderId/mentors — mentors assigned to this founder.
+ * Allowed for the founder themself, platform admin, or a team member in that startup.
+ */
+export const getMentorsForFounder = async (req, res) => {
+  const founderId = String(req.params.founderId || "").trim();
+  if (!founderId) {
+    return apiError(res, "founderId is required.", 400);
+  }
+
+  const role = String(req.user?.role || "").toLowerCase();
+  const isAdmin = req.user?.isAdmin === true || role === "admin";
+  const isSelf = String(req.user?.id) === founderId;
+
+  if (!isAdmin && !isSelf) {
+    const me = await User.findById(req.user.id)
+      .select("role startupId founderId")
+      .lean();
+    const teamRole = String(me?.role || role);
+    const isTeam =
+      teamRole === "team-member" || teamRole === "team";
+    const linkedFounder = String(me?.founderId || me?.startupId || "");
+    if (!isTeam || linkedFounder !== founderId) {
+      return apiError(res, "Forbidden.", 403);
+    }
+  }
+
+  const mentors = await MentorProfile.find({
+    assignedFounders: founderId,
+    status: { $ne: "revoked" },
+  })
+    .sort({ updatedAt: -1 })
+    .lean();
+
+  const userIds = mentors.map((m) => m.userId).filter(Boolean);
+  const orgIds = mentors.map((m) => m.organizationId).filter(Boolean);
+  const [users, orgs] = await Promise.all([
+    userIds.length
+      ? User.find({ _id: { $in: userIds } }).select("name email avatarUrl").lean()
+      : [],
+    orgIds.length
+      ? Organization.find({ _id: { $in: orgIds } }).select("name logo").lean()
+      : [],
+  ]);
+  const userById = new Map(users.map((u) => [String(u._id), u]));
+  const orgById = new Map(orgs.map((o) => [String(o._id), o]));
+
+  const items = [];
+  for (const mentor of mentors) {
+    const user = mentor.userId ? userById.get(String(mentor.userId)) : null;
+    const organization = mentor.organizationId
+      ? orgById.get(String(mentor.organizationId))
+      : null;
+    const cohortIds = await cohortIdsForFounders(mentor.assignedFounders || []);
+    items.push({
+      ...mapMentor(mentor, user, cohortIds),
+      organizationName: organization?.name || "",
+      organizationLogo: organization?.logo || "",
+    });
+  }
+
+  return apiSuccess(res, { mentors: items });
+};

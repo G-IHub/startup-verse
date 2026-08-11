@@ -11,6 +11,7 @@ import {
 import { openNotificationHub } from "../utils/inboxNormalize";
 import AppLayoutHybrid from "./layout/AppLayoutHybrid";
 import AdaptiveVirtualOffice from "./office/AdaptiveVirtualOffice";
+import PageLoadingFallback from "./shell/PageLoadingFallback";
 // ⚡ LAZY LOAD HEAVY COMPONENTS - Only load when navigating to them
 const FounderDashboard = lazy(() => import("./dashboards/FounderDashboard"));
 const TeamMemberDashboard = lazy(
@@ -49,6 +50,7 @@ const AdminDebugIndicator = lazy(() =>
 const FounderDeliverablesView = lazy(
   () => import("./founders/FounderDeliverablesView"),
 );
+const ProgramWorkspace = lazy(() => import("./program/ProgramWorkspace"));
 const TalentChatPage = lazy(() => import("./talent/TalentChatPage"));
 const FounderChatPage = lazy(() => import("./office/FounderChatPage"));
 const TalentProfilePage = lazy(() => import("./TalentProfilePage"));
@@ -65,16 +67,6 @@ import { isTalentProfileReadyForDisplay } from "../utils/talentBrowseNormalize";
 import { broadcastMessageUpdate } from "../utils/realtimeSubscriptions";
 import { CallCoordinatorProvider } from "../contexts/CallCoordinatorContext";
 import { toast } from "sonner";
-
-// ⚡ LOADING FALLBACK - Minimal spinner for fast perceived performance
-const PageLoadingFallback = () => (
-  <div className="flex items-center justify-center min-h-[400px]">
-    <div className="text-center space-y-2">
-      <div className="w-8 h-8 border-3 border-primary border-t-transparent rounded-full animate-spin mx-auto" />
-      <p className="text-sm text-muted-foreground">Loading...</p>
-    </div>
-  </div>
-);
 
 const showCompensationDemo =
   import.meta.env.DEV ||
@@ -97,6 +89,7 @@ export default function DashboardHybrid({ user, onLogout, onUpdateUser }) {
         "talent-chat",
         "team-matching",
         "documents",
+        "program",
         "journey",
         "ideation",
         "formation",
@@ -216,11 +209,19 @@ export default function DashboardHybrid({ user, onLogout, onUpdateUser }) {
           (derivedNav?.talentDashboardMode || "overview")
         : undefined;
 
+    const programTabForPath =
+      page === "program"
+        ? options?.programTab ??
+          options?.tab ??
+          (derivedNav?.programTab || "overview")
+        : undefined;
+
     navigate(
       dashboardStateToPath({
         currentPage: page,
         virtualOfficeView: officeViewForPath,
         talentDashboardMode: talentModeForPath,
+        programTab: programTabForPath,
         initialProfileEditing:
           page === "profile"
             ? Boolean(options?.editProfile)
@@ -276,6 +277,7 @@ export default function DashboardHybrid({ user, onLogout, onUpdateUser }) {
     currentPage,
     virtualOfficeView = "workspace",
     talentDashboardMode = "overview",
+    programTab = "overview",
     initialProfileEditing = false,
     messageUserId,
     returnToChat = false,
@@ -544,6 +546,16 @@ export default function DashboardHybrid({ user, onLogout, onUpdateUser }) {
             <DocumentsPage user={user} onNavigate={handleNavigate} />
           </Suspense>
         );
+      case "program":
+        return (
+          <Suspense fallback={<PageLoadingFallback />}>
+            <ProgramWorkspace
+              user={user}
+              activeTab={programTab}
+              onNavigate={handleNavigate}
+            />
+          </Suspense>
+        );
       case "pitch-deck":
         return (
           <Suspense fallback={<PageLoadingFallback />}>
@@ -739,6 +751,7 @@ export default function DashboardHybrid({ user, onLogout, onUpdateUser }) {
             virtualOfficeView={virtualOfficeView}
             onVirtualOfficeViewChange={handleVirtualOfficeViewChange}
             talentDashboardMode={talentDashboardMode}
+            programTab={programTab}
           >
             {renderPageContent()}
           </AppLayoutHybrid>

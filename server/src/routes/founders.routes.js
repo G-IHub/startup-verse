@@ -3,6 +3,7 @@ import asyncHandler from "../utils/asyncHandler.js";
 import requireAuth from "../middleware/requireAuth.js";
 import * as foundersController from "../controllers/founders.controller.js";
 import * as teamMembersController from "../controllers/teamMembers.controller.js";
+import * as mentorsController from "../controllers/mentors.controller.js";
 
 const foundersRouter = Router();
 
@@ -73,5 +74,10 @@ foundersRouter.get("/founders/:founderId/learning-progress", requireAuth, asyncH
 foundersRouter.post("/founders/:founderId/learning-progress", requireAuth, asyncHandler(foundersController.trackLearningWatch));
 
 foundersRouter.get("/founders/:founderId/team-members", requireAuth, asyncHandler(teamMembersController.getFounderTeamMembers));
+foundersRouter.get(
+  "/founders/:founderId/mentors",
+  requireAuth,
+  asyncHandler(mentorsController.getMentorsForFounder),
+);
 
 export default foundersRouter;

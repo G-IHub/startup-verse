@@ -84,6 +84,7 @@ import { resolveUserAvatar } from "../../utils/resolveMediaUrl";
 import FounderHomeHero from "./founder/FounderHomeHero";
 import FounderMetricsRow from "./founder/FounderMetricsRow";
 import FounderQuickActions from "./founder/FounderQuickActions";
+import FounderHomeSkeleton from "./founder/FounderHomeSkeleton";
 import SectionCard from "../organizations/_primitives/SectionCard";
 import BrandProgress from "../organizations/_primitives/BrandProgress";
 
@@ -352,8 +353,7 @@ https://startupverse.com/12-week-challenge
   };
   return (
     <>
-      <Card className="h-full rounded-card border-0 bg-white shadow-soft transition-shadow duration-200 ease-in-out hover:shadow-[0_4px_24px_rgba(58,90,254,0.08)]">
-        <CardContent className="flex h-full items-center gap-3 p-4">
+      <div className="flex h-full items-center gap-3 rounded-card border border-surface-border bg-surface-card p-4 shadow-soft transition-shadow duration-200 ease-in-out hover:shadow-card">
           <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-input bg-primary-tint text-primary">
             <Zap className="h-4 w-4 text-status-warning" />
           </div>
@@ -403,8 +403,7 @@ https://startupverse.com/12-week-challenge
               </>
             )}
           </div>
-        </CardContent>
-      </Card>
+      </div>
       {showBreakdown && scoreData && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center p-4 sv-modal-backdrop"
@@ -1045,14 +1044,14 @@ export default function FounderDashboard({
       currentStageId,
       Math.min(newProgress, 95),
     );
-    toast.success("Task completed! 🎉", {
-      description: "Great progress on your startup journey!",
+    toast.success("Task completed", {
+      description: "Great progress on your startup journey.",
     });
     setActiveTaskId(null);
 
     if (newCount >= currentTasks.length) {
-      toast.success("🎊 Stage Complete!", {
-        description: `You've finished ${currentStage.name}! Ready to move to the next stage?`,
+      toast.success("Stage complete", {
+        description: `You've finished ${currentStage.name}. Ready to move to the next stage?`,
         action: {
           label: "Continue",
           onClick: handleCompleteStage,
@@ -1067,8 +1066,8 @@ export default function FounderDashboard({
       tasksCompletedCount: completedCount,
       tasksTotal: currentTasks.length,
     });
-    toast.success("🚀 Moving to next stage!", {
-      description: `Welcome to ${JOURNEY_STAGES[currentStageId]?.name || "the next phase"}!`,
+    toast.success("Moving to next stage", {
+      description: `Welcome to ${JOURNEY_STAGES[currentStageId]?.name || "the next phase"}.`,
     });
   };
   const handleSkipStage = () => {
@@ -1079,8 +1078,8 @@ export default function FounderDashboard({
       tasksCompletedCount: completedCount,
       tasksTotal: currentTasks.length,
     });
-    toast.success("🚀 Moving to next stage!", {
-      description: `Welcome to ${JOURNEY_STAGES[currentStageId]?.name || "the next phase"}!`,
+    toast.success("Moving to next stage", {
+      description: `Welcome to ${JOURNEY_STAGES[currentStageId]?.name || "the next phase"}.`,
     });
   };
   const handleViewTalent = (talent) => {
@@ -1173,8 +1172,8 @@ export default function FounderDashboard({
       await weeklyLoop.saveWeeklyPlan(plan, founderId);
       await refreshHome();
 
-      toast.success("🎯 Weekly outcome set!", {
-        description: `${plan.goal} - Let's make it happen this week!`,
+      toast.success("Weekly outcome set", {
+        description: `${plan.goal} — let's make it happen this week.`,
       });
     } catch (error) {
       console.error("Error setting outcome:", error);
@@ -1427,7 +1426,7 @@ export default function FounderDashboard({
             : incentive.type === "hourly"
               ? incentive.hourlyRate
               : "unpaid/volunteer";
-      toast.success(`Incentive set: ${incentiveLabel} 💰`);
+      toast.success(`Incentive set: ${incentiveLabel}`);
     } catch (error) {
       console.error("Error setting task incentive:", error);
       toast.error("Failed to set incentive");
@@ -1482,8 +1481,8 @@ export default function FounderDashboard({
       await weeklyLoop.saveWeeklyPlan(plan, founderId);
       await refreshHome();
 
-      toast.success("🎯 Weekly outcome set!", {
-        description: `${plan.goal} - Powered by your vision!`,
+      toast.success("Weekly outcome set", {
+        description: `${plan.goal} — powered by your vision.`,
       });
     } catch (error) {
       console.error("Error confirming intent:", error);
@@ -1516,15 +1515,15 @@ export default function FounderDashboard({
       );
 
       if (completionData.achievement === "completed") {
-        toast.success("🎉 Outstanding! Week completed!", {
-          description: `Streak: ${streak} weeks! Keep the momentum going!`,
+        toast.success("Week completed", {
+          description: `Streak: ${streak} weeks. Keep the momentum going.`,
         });
       } else if (completionData.achievement === "partial") {
-        toast.success(`💪 Good progress! Streak: ${streak}`, {
-          description: "Apply your learnings next week!",
+        toast.success(`Good progress — streak: ${streak}`, {
+          description: "Apply your learnings next week.",
         });
       } else {
-        toast.info("Week archived. Fresh start next week!", {
+        toast.info("Week archived. Fresh start next week.", {
           description: "Every setback is a learning opportunity.",
         });
       }
@@ -1674,18 +1673,9 @@ export default function FounderDashboard({
     );
   };
 
-  // Show loading state while fetching data from backend
+  // Layout-shaped skeleton while cold-loading home data
   if (isLoading) {
-    return (
-      <div className="h-screen flex items-center justify-center">
-        <div className="text-center">
-          <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mb-4" />
-          <p className="text-sm text-gray-600">
-            Loading your execution data...
-          </p>
-        </div>
-      </div>
-    );
+    return <FounderHomeSkeleton />;
   }
   return (
     <div className="flex min-h-screen flex-col bg-surface-page pb-12 pt-2 font-body md:pb-16">
@@ -1807,7 +1797,7 @@ export default function FounderDashboard({
               scoreSlot={<ExecutionScoreInlineCard userId={founderId} />}
             />
 
-            <SectionCard>
+            <SectionCard className="border border-surface-border bg-surface-card">
               <SectionCard.Header
                 title="This Week's Focus"
                 description={
@@ -1846,9 +1836,10 @@ export default function FounderDashboard({
                 }
               >
                 {user.startupId || founderId ? (
-                  <div className="mt-2">
+                  <div className="mt-3">
                     <CohortMembershipBadge
                       startupId={user.startupId || founderId}
+                      onNavigate={onNavigate}
                     />
                   </div>
                 ) : null}
@@ -2219,7 +2210,7 @@ export default function FounderDashboard({
             ) : null}
 
             {smartInsight?.message ? (
-              <div className="flex flex-col gap-2 rounded-card border border-surface-border/70 bg-white px-4 py-3 shadow-soft sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+              <div className="flex flex-col gap-2 rounded-card border border-surface-border bg-surface-card px-4 py-3 shadow-soft sm:flex-row sm:items-center sm:justify-between sm:gap-4">
                 <p className="font-body text-[13px] leading-snug text-text-body">
                   {smartInsight.message}
                 </p>
@@ -2227,7 +2218,7 @@ export default function FounderDashboard({
                   <Button
                     size="sm"
                     variant="outline"
-                    className="h-8 shrink-0 rounded-input border-surface-border bg-white px-3 font-body text-[12px] font-semibold text-primary hover:bg-primary-tint"
+                    className="h-8 shrink-0 rounded-input border-surface-border bg-surface-card px-3 font-body text-[12px] font-semibold text-primary hover:bg-primary-tint"
                     onClick={() => {
                       if (smartInsight.action === "set-outcome") {
                         requestWeeklyOutcome();
