@@ -19,6 +19,7 @@ export const PROGRAM_NAV_TABS = Object.freeze([
   { id: "events", label: "Events" },
   { id: "mentors", label: "Mentors" },
   { id: "communication", label: "Communication" },
+  { id: "notes", label: "Notes" },
 ]);
 
 const PROGRAM_TABS = Object.freeze(
@@ -110,7 +111,23 @@ export function pathToDashboardState(pathname, search, role) {
     search.startsWith("?") ? search.slice(1) : search,
   );
 
+  if (path.startsWith("/office/tasks/")) {
+    const taskId = path.split("/").filter(Boolean)[2] || "";
+    if (!taskId) return { currentPage: "startup-office" };
+    return {
+      currentPage: "task-detail",
+      taskId,
+    };
+  }
+
   if (path === "/office" || path.startsWith("/office/call/")) {
+    const redirectTask = path === "/office" ? q.get("taskId") : "";
+    if (redirectTask) {
+      return {
+        currentPage: "task-detail",
+        taskId: redirectTask,
+      };
+    }
     const view = q.get("view") || DEFAULT_OFFICE_VIEW;
     const tab = q.get("tab") || undefined;
     const callRoute = path.startsWith("/office/call/")
@@ -120,7 +137,7 @@ export function pathToDashboardState(pathname, search, role) {
       currentPage: "startup-office",
       virtualOfficeView: view,
       officeTab: tab,
-      taskId: q.get("taskId") || undefined,
+      taskId: undefined,
       announcementId: q.get("announcementId") || undefined,
       winId: q.get("winId") || undefined,
       deliverableId: q.get("deliverableId") || undefined,
@@ -165,9 +182,11 @@ export function pathToDashboardState(pathname, search, role) {
 
   if (path === "/chat") {
     const withUser = q.get("with") || undefined;
+    const chatTaskId = q.get("taskId") || undefined;
     return {
       currentPage: chatPageForRole(role),
       ...(withUser ? { messageUserId: withUser } : {}),
+      ...(chatTaskId ? { taskId: chatTaskId } : {}),
     };
   }
 
@@ -292,6 +311,8 @@ export function dashboardStateToPath(state) {
           : null;
       return mode ? `/home?mode=${encodeURIComponent(mode)}` : "/home";
     }
+    case "task-detail":
+      return taskId ? `/office/tasks/${encodeURIComponent(taskId)}` : "/office";
     case "startup-office": {
       const v = virtualOfficeView || DEFAULT_OFFICE_VIEW;
       return appendEntityParams("/office", {
@@ -313,9 +334,10 @@ export function dashboardStateToPath(state) {
       return "/browse-talent";
     case "founder-chat":
     case "talent-chat":
-      return messageUserId
-        ? appendEntityParams("/chat", { with: messageUserId })
-        : "/chat";
+      return appendEntityParams("/chat", {
+        ...(messageUserId ? { with: messageUserId } : {}),
+        ...(taskId ? { taskId } : {}),
+      });
     case "program": {
       const tab = normalizeProgramTab(programTab);
       return tab && tab !== DEFAULT_PROGRAM_TAB
@@ -381,6 +403,7 @@ export function dashboardStateToPath(state) {
 export const DASHBOARD_ROUTE_PATHS = Object.freeze([
   "/home",
   "/office",
+  "/office/tasks/:taskId",
   "/office/call/:roomName",
   "/program",
   "/inbox",

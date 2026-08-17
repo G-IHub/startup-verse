@@ -21,6 +21,7 @@ import {
   Calendar,
   MessageSquare,
   ChevronDown,
+  StickyNote,
 } from "lucide-react";
 
 const PROGRAM_TAB_ICONS = {
@@ -30,6 +31,7 @@ const PROGRAM_TAB_ICONS = {
   events: Calendar,
   mentors: Users,
   communication: MessageSquare,
+  notes: StickyNote,
 };
 
 export default function VerticalSidebar({

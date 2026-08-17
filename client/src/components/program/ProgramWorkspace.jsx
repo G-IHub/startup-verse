@@ -12,6 +12,8 @@ import ProgramEventsPanel from "./ProgramEventsPanel";
 import ProgramCommunicationPanel from "./ProgramCommunicationPanel";
 import ProgramMentorsPanel from "./ProgramMentorsPanel";
 import ProgramDeliverablesPanel from "./ProgramDeliverablesPanel";
+import ProgramNotesPanel from "./ProgramNotesPanel";
+import ProgramDirectoryPanel from "./ProgramDirectoryPanel";
 
 function JoinProgramEmpty({ onOpenInbox }) {
   return (
@@ -143,13 +145,25 @@ export default function ProgramWorkspace({
             memberships={memberships}
           />
         );
+      case "notes":
+        return (
+          <ProgramNotesPanel
+            cohortId={cohortIds[0] || ""}
+            memberships={memberships}
+          />
+        );
       case "overview":
       default:
         return (
-          <ProgramOverviewPanel
-            memberships={memberships}
-            upcoming={upcoming}
-          />
+          <div className="space-y-4">
+            <ProgramOverviewPanel
+              memberships={memberships}
+              upcoming={upcoming}
+            />
+            {role === "founder" ? (
+              <ProgramDirectoryPanel enabled />
+            ) : null}
+          </div>
         );
     }
   };
@@ -200,7 +214,14 @@ export default function ProgramWorkspace({
             </Button>
           </div>
         ) : !hasMembership ? (
-          <JoinProgramEmpty onOpenInbox={openInbox} />
+          tab === "overview" && role === "founder" ? (
+            <div className="space-y-4">
+              <JoinProgramEmpty onOpenInbox={openInbox} />
+              <ProgramDirectoryPanel enabled />
+            </div>
+          ) : (
+            <JoinProgramEmpty onOpenInbox={openInbox} />
+          )
         ) : (
           renderActivePanel()
         )}

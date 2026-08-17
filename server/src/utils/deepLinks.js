@@ -12,9 +12,17 @@ function appendQuery(path, params) {
   return `${path}?${qs.toString()}`;
 }
 
-export function chatDeepLink(peerUserId) {
+export function chatDeepLink(peerUserId, taskId) {
   if (!peerUserId) return "/chat";
-  return appendQuery("/chat", { with: peerUserId });
+  return appendQuery("/chat", {
+    with: peerUserId,
+    ...(taskId ? { taskId } : {}),
+  });
+}
+
+export function taskPageDeepLink(taskId) {
+  if (!taskId) return "/office";
+  return `/office/tasks/${encodeURIComponent(String(taskId))}`;
 }
 
 export function officeDeepLink(params = {}) {

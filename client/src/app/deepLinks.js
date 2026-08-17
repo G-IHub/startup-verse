@@ -24,6 +24,11 @@ export function buildChatPath(peerUserId) {
   return appendQuery("/chat", { with: peerUserId });
 }
 
+export function buildTaskPagePath(taskId) {
+  if (!taskId) return "/office";
+  return `/office/tasks/${encodeURIComponent(String(taskId))}`;
+}
+
 /**
  * @param {{ tab?: string, taskId?: string, announcementId?: string, winId?: string, deliverableId?: string, mentorId?: string, cohortId?: string, view?: string }} params
  */
@@ -110,6 +115,15 @@ export function parseDeepLink(url, metadata = {}, role = "founder") {
     };
   }
 
+  if (pathname.startsWith("/office/tasks/")) {
+    const taskId = decodeURIComponent(pathname.split("/")[3] || "") || meta.taskId || "";
+    if (!taskId) return { page: "startup-office" };
+    return {
+      page: "task-detail",
+      options: { taskId: String(taskId) },
+    };
+  }
+
   if (pathname === "/office" || pathname === "/tasks" || pathname.startsWith("/tasks/")) {
     const taskId =
       params.get("taskId") ||
@@ -135,11 +149,17 @@ export function parseDeepLink(url, metadata = {}, role = "founder") {
       };
     }
 
+    if (taskId) {
+      return {
+        page: "task-detail",
+        options: { taskId: String(taskId) },
+      };
+    }
+
     return {
       page: "startup-office",
       options: {
         officeTab: tab || undefined,
-        ...(taskId ? { taskId: String(taskId) } : {}),
         ...(announcementId ? { announcementId: String(announcementId) } : {}),
         ...(winId ? { winId: String(winId) } : {}),
         ...(deliverableId ? { deliverableId: String(deliverableId) } : {}),

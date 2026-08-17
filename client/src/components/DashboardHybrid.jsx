@@ -53,6 +53,7 @@ const FounderDeliverablesView = lazy(
 const ProgramWorkspace = lazy(() => import("./program/ProgramWorkspace"));
 const TalentChatPage = lazy(() => import("./talent/TalentChatPage"));
 const FounderChatPage = lazy(() => import("./office/FounderChatPage"));
+const TaskDetailPage = lazy(() => import("./office/TaskDetailPage"));
 const TalentProfilePage = lazy(() => import("./TalentProfilePage"));
 
 // Startup Pages - redesigned separate pages
@@ -81,6 +82,7 @@ export default function DashboardHybrid({ user, onLogout, onUpdateUser }) {
       new Set([
         "dashboard",
         "startup-office",
+        "task-detail",
         "analytics",
         "settings",
         "profile",
@@ -268,6 +270,15 @@ export default function DashboardHybrid({ user, onLogout, onUpdateUser }) {
     derivedNav?.interestId,
     navigate,
   ]);
+
+  useEffect(() => {
+    if (derivedNav?.currentPage !== "task-detail" || !derivedNav.taskId) return;
+    const canonical = dashboardStateToPath(derivedNav);
+    const here = `${location.pathname}${location.search}`;
+    if (here !== canonical) {
+      navigate(canonical, { replace: true });
+    }
+  }, [derivedNav, location.pathname, location.search, navigate]);
 
   if (!derivedNav || !validPages.has(derivedNav.currentPage)) {
     return <Navigate to="/home" replace />;
@@ -607,6 +618,7 @@ export default function DashboardHybrid({ user, onLogout, onUpdateUser }) {
               user={user}
               onNavigate={handleNavigate}
               initialSelectedUserId={messageUserId || null}
+              composeTaskId={taskId || null}
             />
           </Suspense>
         );
@@ -711,6 +723,17 @@ export default function DashboardHybrid({ user, onLogout, onUpdateUser }) {
         );
 
       // Default: Virtual Office (adaptive based on solo/team)
+      case "task-detail":
+        return (
+          <Suspense fallback={<PageLoadingFallback />}>
+            <TaskDetailPage
+              user={user}
+              taskId={taskId || null}
+              onNavigate={handleNavigate}
+            />
+          </Suspense>
+        );
+
       case "startup-office":
       default:
         return (

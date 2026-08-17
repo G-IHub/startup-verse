@@ -34,7 +34,7 @@ import {
 } from "../utils/apiResponse.js";
 import { emitRealtime } from "../services/realtime.service.js";
 import { createNotification, broadcastNotification } from "../services/notificationService.js";
-import { officeDeepLink } from "../utils/deepLinks.js";
+import { officeDeepLink, taskPageDeepLink } from "../utils/deepLinks.js";
 import { SOCKET_EVENTS } from "../realtime/events.js";
 import { startupRoom } from "../realtime/rooms.js";
 
@@ -465,7 +465,7 @@ export const createTask = async (req, res) => {
       type: "task-assigned",
       title: "New task assigned",
       message: `You have a new task: ${task.title}`,
-      actionUrl: officeDeepLink({ tab: "tasks", taskId: task._id }),
+      actionUrl: taskPageDeepLink(task._id),
       metadata: {
         taskId: String(task._id),
         startupId: String(task.startupId || ""),
@@ -506,9 +506,39 @@ export const updateTask = async (req, res) => {
     }
   }
 
+  const allowed = {};
+  const copyString = (key, max) => {
+    if (!Object.prototype.hasOwnProperty.call(payload || {}, key)) return;
+    allowed[key] = String(payload[key] ?? "").slice(0, max);
+  };
+  if (payload?.title) allowed.title = String(payload.title).trim().slice(0, 200);
+  copyString("description", 5000);
+  if (payload?.status) allowed.status = payload.status;
+  if (Object.prototype.hasOwnProperty.call(payload || {}, "assignedTo")) {
+    allowed.assignedTo = payload.assignedTo || null;
+  }
+  copyString("assignedToName", 200);
+  copyString("assignedToAvatar", 2000);
+  if (Object.prototype.hasOwnProperty.call(payload || {}, "milestoneId")) {
+    allowed.milestoneId = payload.milestoneId || null;
+  }
+  if (payload?.priority) allowed.priority = String(payload.priority).toLowerCase();
+  copyString("incentive", 1000);
+  copyString("actionButton", 1000);
+  copyString("blockerReason", 1000);
+  copyString("blockerNote", 1000);
+  if (Object.prototype.hasOwnProperty.call(payload || {}, "links") && Array.isArray(payload.links)) {
+    allowed.links = payload.links
+      .filter((row) => row && /^https?:\/\//i.test(String(row.url || "")))
+      .map((row) => ({
+        url: String(row.url).trim().slice(0, 2000),
+        label: String(row.label || "").trim().slice(0, 200),
+      }));
+  }
+
   const updatedTask = await Task.findOneAndUpdate(
     { _id: req.params.taskId, founderId },
-    payload || {},
+    allowed,
     { new: true, runValidators: true },
   );
   await syncMilestoneCounters(existingTask.milestoneId);
@@ -542,7 +572,7 @@ export const updateTask = async (req, res) => {
       type: "task-assigned",
       title: "Task reassigned to you",
       message: `You have been assigned: ${updatedTask.title}`,
-      actionUrl: officeDeepLink({ tab: "tasks", taskId: updatedTask._id }),
+      actionUrl: taskPageDeepLink(updatedTask._id),
       metadata: {
         taskId: String(updatedTask._id),
         startupId: String(updatedTask.startupId || ""),
@@ -562,7 +592,7 @@ export const updateTask = async (req, res) => {
       type: "task-blocked",
       title: "Task blocked",
       message: `Task is blocked: ${updatedTask.title}`,
-      actionUrl: officeDeepLink({ tab: "tasks", taskId: updatedTask._id }),
+      actionUrl: taskPageDeepLink(updatedTask._id),
       metadata: {
         taskId: String(updatedTask._id),
         blockerReason: updatedTask.blockerReason || "",
@@ -645,7 +675,7 @@ export const updateTaskStatus = async (req, res) => {
       type: "task-blocked",
       title: "Task blocked",
       message: `Task is blocked: ${updatedTask.title}`,
-      actionUrl: officeDeepLink({ tab: "tasks", taskId: updatedTask._id }),
+      actionUrl: taskPageDeepLink(updatedTask._id),
       metadata: {
         taskId: String(updatedTask._id),
         blockerReason: updatedTask.blockerReason || "",
@@ -723,7 +753,7 @@ export const assignTask = async (req, res) => {
       type: "task-assigned",
       title: "Task assigned to you",
       message: `You have been assigned: ${task.title}`,
-      actionUrl: officeDeepLink({ tab: "tasks", taskId: task._id }),
+      actionUrl: taskPageDeepLink(task._id),
       metadata: {
         taskId: String(task._id),
         startupId: String(task.startupId || ""),

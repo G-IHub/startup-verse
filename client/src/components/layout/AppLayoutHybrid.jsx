@@ -24,6 +24,10 @@ const PAGE_META = {
     title: "Virtual Office",
     description: "Live startup workspace",
   },
+  "task-detail": {
+    title: "Task",
+    description: "Brief, files, links, and comments",
+  },
   "team-matching": {
     title: "Browse Talent",
     description: "Discover talent that can grow into your team",

@@ -63,6 +63,7 @@ export default function FounderChatPage({
   user,
   onNavigate,
   initialSelectedUserId = null,
+  composeTaskId = null,
 }) {
   const currentUserId = String(user._id ?? user.id ?? "");
   const startupId = getStartupId(user);
@@ -148,6 +149,7 @@ export default function FounderChatPage({
         startupId={startupId}
         teamMembers={roster}
         initialSelectedUserId={initialSelectedUserId}
+        composeTaskId={composeTaskId}
         onSelectedPeerChange={(peerUserId) => {
           onNavigate?.(
             "founder-chat",

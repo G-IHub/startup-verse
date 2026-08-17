@@ -32,6 +32,7 @@ import {
   settingsBtnDangerOutline,
   settingsBtnDanger,
 } from "./settings/SettingsPrimitives.jsx";
+import GitHubAccountConnect from "./shared/GitHubAccountConnect.jsx";
 
 export default function SettingsPage({
   user,
@@ -151,6 +152,16 @@ export default function SettingsPage({
             </Card>
           )}
         </SettingsPanelCard>
+
+        {user?.role === "founder" ? (
+          <SettingsPanelCard
+            icon={Shield}
+            title="GitHub"
+            description="Connect GitHub to import issues as startup tasks"
+          >
+            <GitHubAccountConnect user={user} />
+          </SettingsPanelCard>
+        ) : null}
 
         <SettingsPanelCard
           icon={Shield}

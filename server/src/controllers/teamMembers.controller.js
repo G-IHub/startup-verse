@@ -16,7 +16,9 @@ import {
 import { error as apiError, success as apiSuccess } from "../utils/apiResponse.js";
 import { mapActivityToDto } from "../utils/activityDto.js";
 import { createNotification } from "../services/notificationService.js";
-import { officeDeepLink } from "../utils/deepLinks.js";
+import { taskPageDeepLink } from "../utils/deepLinks.js";
+import { canAccessStartupTask } from "../utils/taskAccess.js";
+import { createTaskComment } from "../services/taskCommentService.js";
 import { syncMilestoneCounters } from "../utils/syncMilestoneCounters.js";
 
 export const createOrUpdateProfile = async (req, res) => {
@@ -83,9 +85,6 @@ export const updateTask = async (req, res) => {
     }
   }
 
-  if (Object.prototype.hasOwnProperty.call(req.body || {}, "description")) {
-    updates.description = req.body.description || "";
-  }
   if (Object.keys(updates).length === 0) {
     return apiError(res, "No updates provided.", 400);
   }
@@ -118,7 +117,7 @@ export const updateTask = async (req, res) => {
       type: "task-blocked",
       title: "Task blocked by team member",
       message: `${task.assignedToName || "A team member"} blocked: ${task.title}`,
-      actionUrl: officeDeepLink({ tab: "tasks", taskId: task._id }),
+      actionUrl: taskPageDeepLink(task._id),
       metadata: {
         taskId: String(task._id),
         teamMemberId: String(req.params.teamMemberId),
@@ -136,18 +135,20 @@ export const commentOnTask = async (req, res) => {
   if (!task) {
     return apiError(res, "Task not found.", 404);
   }
+  if (!(await canAccessStartupTask(req, task))) {
+    return apiError(res, "Forbidden.", 403);
+  }
 
-  task.comments = [
-    ...(task.comments || []),
-    {
-      by: req.params.teamMemberId,
-      message: req.body?.message || "",
-      at: new Date().toISOString(),
-    },
-  ];
-
-  await task.save();
-  return apiSuccess(res, task);
+  try {
+    const comment = await createTaskComment({
+      task,
+      authorId: req.user.id,
+      body: req.body?.body || req.body?.message || req.body?.comment || "",
+    });
+    return apiSuccess(res, comment, 201);
+  } catch (err) {
+    return apiError(res, err.message, err.status || 500);
+  }
 };
 
 export const getActivity = async (req, res) => {

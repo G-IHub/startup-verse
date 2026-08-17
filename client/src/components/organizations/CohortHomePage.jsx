@@ -15,6 +15,7 @@ import {
   BrandProgress,
 } from "./_primitives";
 import { Button } from "../ui/button";
+import { Switch } from "../ui/switch";
 import { getFirstName } from "../../utils/nameHelpers";
 import {
   TrendingUp,
@@ -142,6 +143,8 @@ export default function CohortHomePage({
   organizationType,
   userName,
   onBack,
+  onListedChange,
+  listingBusy = false,
 }) {
   const stats = cohort.stats || {
     totalStartups: 0,
@@ -303,6 +306,39 @@ export default function CohortHomePage({
           onClick={() => onNavigate("portfolio")}
         />
       </div>
+
+      {isAdmin ? (
+        <SectionCard>
+          <SectionCard.Header
+            title="Program listing"
+            description="Listed programs appear in the founder directory so startups can request to join"
+            action={
+              <Switch
+                checked={Boolean(cohort.listed)}
+                disabled={listingBusy || !onListedChange}
+                onCheckedChange={(on) => onListedChange?.(Boolean(on))}
+                aria-label="List this program in the founder directory"
+              />
+            }
+          />
+          <SectionCard.Body>
+            <p className="font-body text-[13px] text-text-body">
+              {cohort.listed
+                ? "This program is listed. Founders can find it and request to join."
+                : "This program is private. Only invited startups can join."}
+            </p>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="mt-3"
+              onClick={() => onNavigate("join-requests")}
+            >
+              Review join requests
+            </Button>
+          </SectionCard.Body>
+        </SectionCard>
+      ) : null}
 
       <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
         <ActionPanel

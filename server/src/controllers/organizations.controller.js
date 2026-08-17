@@ -530,6 +530,9 @@ export const updateCohort = async (req, res) => {
     }
     cohort.status = body.status;
   }
+  if (has("listed")) {
+    cohort.listed = Boolean(body.listed);
+  }
 
   await cohort.save();
   const stats = await computeCohortStats(cohort._id);

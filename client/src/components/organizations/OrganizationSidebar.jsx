@@ -17,6 +17,8 @@ import {
   Settings,
   X,
   Sparkles,
+  Inbox,
+  StickyNote,
 } from "lucide-react";
 
 function formatCount(count) {
@@ -58,6 +60,8 @@ export default function OrganizationSidebar({
     { id: "deliverables", label: "Deliverables", icon: FileText },
     { id: "events", label: "Agenda", icon: Calendar },
     { id: "communication", label: "Communication", icon: Bell },
+    { id: "notes", label: "Notes", icon: StickyNote },
+    { id: "join-requests", label: "Join requests", icon: Inbox },
     { id: "mentors", label: "Mentors", icon: UserPlus },
     { id: "resources", label: "Library", icon: BookOpen },
     {

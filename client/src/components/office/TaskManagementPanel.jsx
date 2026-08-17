@@ -44,6 +44,7 @@ import {
   Trash2,
   PlayCircle,
   GripHorizontal,
+  Github,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -61,6 +62,7 @@ import * as teamMemberApi from "../../utils/api/teamMemberApi";
 import * as taskApi from "../../utils/api/taskApi";
 import { subscribeToTasks } from "../../utils/socketIoRealtime";
 import { useWeeklyLoopStore } from "../../state/useWeeklyLoopStore";
+import GitHubImportDialog from "./GitHubImportDialog";
 
 export function TaskManagementPanel({
   open,
@@ -93,6 +95,8 @@ export function TaskManagementPanel({
   const [activeOutcomeId, setActiveOutcomeId] = useState("");
   const [showMilestoneDialog, setShowMilestoneDialog] = useState(false);
   const [newMilestone, setNewMilestone] = useState({ title: "", description: "" });
+  const [showGithubImport, setShowGithubImport] = useState(false);
+  const [taskReloadNonce, setTaskReloadNonce] = useState(0);
 
   const defaultKanbanHeight = () =>
     Math.round(Math.min(window.innerHeight * 0.5, 420));
@@ -102,6 +106,11 @@ export function TaskManagementPanel({
   const isDraggingHandle = useRef(false);
   const panelRef = useRef(null);
   const normalizedUserId = String(user?._id ?? user?.id ?? "");
+
+  const openTaskPage = (id) => {
+    if (!id) return;
+    onNavigate?.("task-detail", { taskId: String(id) });
+  };
 
   const clampKanbanHeight = useCallback((raw) => {
     const maxH = Math.round(window.innerHeight * 0.7);
@@ -162,12 +171,9 @@ export function TaskManagementPanel({
       } else if (user.role === "founder") {
         founderIdValue = normalizedUserId;
         setFounderId(normalizedUserId);
-      } else if (user.role === "team-member" && user.startupId) {
-        founderIdValue = user.startupId;
-        setFounderId(user.startupId);
-      } else if (user.role === "team" && user.founderId) {
-        founderIdValue = user.founderId;
-        setFounderId(user.founderId);
+      } else if (user.role === "team-member" || user.role === "team") {
+        founderIdValue = String(user.founderId || user.startupId || "");
+        setFounderId(founderIdValue);
       }
       if (!founderIdValue) {
         console.warn(
@@ -277,7 +283,7 @@ export function TaskManagementPanel({
     loadData();
 
     // ✅ REALTIME: Removed task/team polling (was every 10s) - using real-time subscription
-  }, [open, normalizedUserId, user.role, user.startupId, user.founderId, founderIdOverride, startupId, strictMode]);
+  }, [open, normalizedUserId, user.role, user.startupId, user.founderId, founderIdOverride, startupId, strictMode, taskReloadNonce]);
 
   useEffect(() => {
     if (!open || !founderId) return;
@@ -998,6 +1004,18 @@ export function TaskManagementPanel({
                       <SelectItem value="blocked">Blocked</SelectItem>
                     </SelectContent>
                   </Select>
+                  {user.role === "founder" ? (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="h-9 shrink-0 border-primary/18 bg-white"
+                      onClick={() => setShowGithubImport(true)}
+                    >
+                      <Github className="mr-1.5 h-3.5 w-3.5" aria-hidden />
+                      Import
+                    </Button>
+                  ) : null}
                 </div>
                 {milestoneProgressRows.length > 0 && (
                   <div className="overflow-hidden rounded-xl border border-primary/18 bg-white shadow-sm">
@@ -1157,7 +1175,8 @@ export function TaskManagementPanel({
                         {group.tasks.map((task) => (
                           <Card
                             key={task.id}
-                            className={`rounded-xl border border-primary/18 bg-white shadow-sm transition-all hover:border-primary/30 hover:shadow-card border-l-[3px] ${getStatusColor(task.status)}`}
+                            onClick={() => openTaskPage(task.id)}
+                            className={`cursor-pointer rounded-xl border border-primary/18 bg-white shadow-sm transition-all hover:border-primary/30 hover:shadow-card border-l-[3px] ${getStatusColor(task.status)}`}
                           >
                             <CardContent className="space-y-2 p-3">
                               <div className="flex items-start justify-between gap-2">
@@ -1251,6 +1270,7 @@ export function TaskManagementPanel({
                                 founderId={founderId}
                                 teamMembers={teamMembers}
                                 onDragStart={handleDragStart}
+                                onOpenTask={openTaskPage}
                                 onToggle={handleToggleTask}
                                 onDelete={handleDeleteTask}
                                 onStatusChange={handleStatusChange}
@@ -1350,6 +1370,7 @@ export function TaskManagementPanel({
                                 founderId={founderId}
                                 teamMembers={teamMembers}
                                 onDragStart={handleDragStart}
+                                onOpenTask={openTaskPage}
                                 onToggle={handleToggleTask}
                                 onDelete={handleDeleteTask}
                                 onStatusChange={handleStatusChange}
@@ -1594,6 +1615,7 @@ function TaskCard({
   getStatusColor,
   canEdit,
   onBlock,
+  onOpenTask,
 }) {
   const [showAssignDialog, setShowAssignDialog] = useState(false);
   const [selectedAssignee, setSelectedAssignee] = useState(
@@ -1651,9 +1673,10 @@ function TaskCard({
           opacity: 1,
           y: 0,
         }}
-        className="cursor-move group"
+        className="cursor-pointer group"
       >
         <Card
+          onClick={() => onOpenTask?.(task.id)}
           className={`rounded-xl border border-primary/18 bg-white shadow-sm transition-all hover:border-primary/30 hover:shadow-card border-l-[3px] ${getStatusColor(task.status)}`}
         >
           <CardContent className="space-y-2 p-3">
@@ -1922,6 +1945,13 @@ function TaskCard({
           </div>
         </DialogContent>
       </Dialog>
+      {user.role === "founder" ? (
+        <GitHubImportDialog
+          open={showGithubImport}
+          onOpenChange={setShowGithubImport}
+          onImported={() => setTaskReloadNonce((n) => n + 1)}
+        />
+      ) : null}
     </>
   );
 }

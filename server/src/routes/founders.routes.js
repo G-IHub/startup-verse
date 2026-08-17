@@ -4,6 +4,7 @@ import requireAuth from "../middleware/requireAuth.js";
 import * as foundersController from "../controllers/founders.controller.js";
 import * as teamMembersController from "../controllers/teamMembers.controller.js";
 import * as mentorsController from "../controllers/mentors.controller.js";
+import * as taskDetailController from "../controllers/taskDetail.controller.js";
 
 const foundersRouter = Router();
 
@@ -24,12 +25,17 @@ foundersRouter.delete("/founders/:founderId/milestones/:milestoneId", requireAut
 
 foundersRouter.get("/founders/:founderId/tasks", requireAuth, asyncHandler(foundersController.getTasks));
 foundersRouter.post("/founders/:founderId/tasks", requireAuth, asyncHandler(foundersController.createTask));
+foundersRouter.get("/founders/:founderId/tasks/:taskId", requireAuth, asyncHandler(taskDetailController.getTask));
 foundersRouter.put("/founders/:founderId/tasks/:taskId", requireAuth, asyncHandler(foundersController.updateTask));
 foundersRouter.put("/founders/:founderId/tasks/:taskId/status", requireAuth, asyncHandler(foundersController.updateTaskStatus));
 foundersRouter.patch("/founders/:founderId/tasks/:taskId/status", requireAuth, asyncHandler(foundersController.updateTaskStatus));
 foundersRouter.put("/founders/:founderId/tasks/:taskId/assign", requireAuth, asyncHandler(foundersController.assignTask));
 foundersRouter.patch("/founders/:founderId/tasks/:taskId/assign", requireAuth, asyncHandler(foundersController.assignTask));
 foundersRouter.delete("/founders/:founderId/tasks/:taskId", requireAuth, asyncHandler(foundersController.deleteTask));
+foundersRouter.post("/founders/:founderId/tasks/:taskId/attachments", requireAuth, asyncHandler(taskDetailController.addTaskAttachment));
+foundersRouter.delete("/founders/:founderId/tasks/:taskId/attachments/:attachmentId", requireAuth, asyncHandler(taskDetailController.deleteTaskAttachment));
+foundersRouter.get("/founders/:founderId/tasks/:taskId/comments", requireAuth, asyncHandler(taskDetailController.listTaskComments));
+foundersRouter.post("/founders/:founderId/tasks/:taskId/comments", requireAuth, asyncHandler(taskDetailController.postTaskComment));
 
 foundersRouter.get("/founders/:founderId/weekly-outcomes", requireAuth, asyncHandler(foundersController.getWeeklyOutcomes));
 foundersRouter.post("/founders/:founderId/weekly-outcomes", requireAuth, asyncHandler(foundersController.createWeeklyOutcome));

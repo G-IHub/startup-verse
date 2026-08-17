@@ -31,8 +31,11 @@ import {
   getCohortMembers,
   generateCohortExport,
   downloadCSV,
+  updateCohort,
 } from "../../utils/organizationHelpersBackend";
 import { checkAdminStatus } from "../../utils/api/organizationApi";
+import ProgramJoinRequestsPanel from "./ProgramJoinRequestsPanel";
+import ProgramNotesPanel from "../program/ProgramNotesPanel";
 export default function CohortDashboardWithSidebar({
   cohortId,
   organizationId,
@@ -57,6 +60,7 @@ export default function CohortDashboardWithSidebar({
   const [error, setError] = useState(null);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const [isCreator, setIsCreator] = useState(false);
+  const [listingBusy, setListingBusy] = useState(false);
   useEffect(() => {
     // Reset to home page and reload when cohortId changes
     setCurrentPage("home");
@@ -146,6 +150,18 @@ export default function CohortDashboardWithSidebar({
             organizationType={organizationType}
             userName={userName}
             onBack={onBack}
+            listingBusy={listingBusy}
+            onListedChange={async (listed) => {
+              setListingBusy(true);
+              try {
+                const updated = await updateCohort(cohortId, { listed });
+                setCohort((prev) => ({ ...(prev || {}), ...updated, listed }));
+              } catch (err) {
+                console.error("Failed to update listing:", err);
+              } finally {
+                setListingBusy(false);
+              }
+            }}
           />
         );
       case "portfolio":
@@ -200,6 +216,15 @@ export default function CohortDashboardWithSidebar({
               founderName: s.founderName,
               startupName: s.startupName,
             }))}
+          />
+        );
+      case "notes":
+        return <ProgramNotesPanel cohortId={cohortId} />;
+      case "join-requests":
+        return (
+          <ProgramJoinRequestsPanel
+            organizationId={organizationId}
+            cohortId={cohortId}
           />
         );
       case "mentors":
@@ -315,6 +340,8 @@ export default function CohortDashboardWithSidebar({
       deliverables: "Deliverables & Submissions",
       events: "Cohort Agenda",
       communication: "Communication Center",
+      notes: "Program notes",
+      "join-requests": "Join requests",
       mentors: "Mentor Network",
       resources: "Resource Library",
       members: "Cohort Members",
@@ -331,6 +358,8 @@ export default function CohortDashboardWithSidebar({
       deliverables: "Review required submissions and startup work",
       events: "Coordinate cohort events and meetings",
       communication: "Send announcements and messages",
+      notes: "Share one notes thread with enrolled startups",
+      "join-requests": "Accept or decline founder requests to join",
       mentors: "Manage mentors and founder assignments",
       resources: "Curate learning materials and program resources",
       members: "Review founders and startups in this cohort",

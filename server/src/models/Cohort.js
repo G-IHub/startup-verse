@@ -27,6 +27,7 @@ const cohortSchema = new mongoose.Schema(
     // `{ deletedAt: null }`; display-only sites (e.g. submission lists)
     // intentionally do not, so historical references keep rendering names.
     deletedAt: { type: Date, default: null, index: true },
+    listed: { type: Boolean, default: false, index: true },
   },
   { timestamps: true },
 );

@@ -113,6 +113,7 @@ export function SimpleTeamMessaging({
   embedded = false,
   fullPage = false,
   strictMode = false,
+  composeTaskId = null,
 }) {
   const isMobile = useIsMobile();
   const [conversations, setConversations] = useState([]);
@@ -142,7 +143,10 @@ export function SimpleTeamMessaging({
   const [forwardOpen, setForwardOpen] = useState(false);
   const [selectionMode, setSelectionMode] = useState(false);
   const [selectionToolbar, setSelectionToolbar] = useState(null);
-  const { replyingTo, setReplyingTo, clearReply } = useReplyState();
+  const composeTaskIdRef = useRef(composeTaskId);
+  useEffect(() => {
+    composeTaskIdRef.current = composeTaskId;
+  }, [composeTaskId]);
 
   const openForward = (message) => {
     setForwardMessages(message ? [message] : []);
@@ -324,6 +328,10 @@ export function SimpleTeamMessaging({
     const recipient = conversations.find((c) => c.userId === selectedConversation);
     const optimisticId = `opt-${Date.now()}`;
     const mentionMetadata = buildMessageMentionMetadata(text, pendingMentions);
+    const taskMeta = composeTaskIdRef.current
+      ? { taskId: String(composeTaskIdRef.current) }
+      : {};
+    const mergedMetadata = { ...mentionMetadata, ...taskMeta };
     let attachmentPayload = null;
 
     if (pendingFile) {
@@ -339,7 +347,7 @@ export function SimpleTeamMessaging({
           timestamp: Date.now(),
           _uploading: true,
           attachments: [],
-          metadata: mentionMetadata,
+          metadata: mergedMetadata,
         },
       ]);
       setMessageInput("");
@@ -400,11 +408,12 @@ export function SimpleTeamMessaging({
           strict: strictMode,
           attachments: attachmentPayload ? [attachmentPayload] : [],
           ...(replyingTo?.id ? { replyToMessageId: replyingTo.id } : {}),
-          ...(Object.keys(mentionMetadata).length > 0
-            ? { metadata: mentionMetadata }
+          ...(Object.keys(mergedMetadata).length > 0
+            ? { metadata: mergedMetadata }
             : {}),
         },
       );
+      composeTaskIdRef.current = null;
       clearReply();
       onActivity?.(
         attachmentPayload ? "file-share" : "message-send",

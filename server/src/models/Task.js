@@ -40,6 +40,61 @@ const taskSchema = new mongoose.Schema(
       index: true,
     },
     comments: { type: [mongoose.Schema.Types.Mixed], default: [] },
+    links: {
+      type: [
+        {
+          url: {
+            type: String,
+            required: true,
+            trim: true,
+            maxlength: [2000, "Link URL cannot exceed 2000 characters"],
+          },
+          label: {
+            type: String,
+            default: "",
+            trim: true,
+            maxlength: [200, "Link label cannot exceed 200 characters"],
+          },
+        },
+      ],
+      default: [],
+    },
+    attachments: {
+      type: [
+        {
+          url: {
+            type: String,
+            required: true,
+            trim: true,
+            maxlength: [2000, "Attachment URL cannot exceed 2000 characters"],
+          },
+          name: { type: String, default: "", trim: true, maxlength: 300 },
+          mimeType: { type: String, default: "", trim: true, maxlength: 200 },
+          size: { type: Number, default: 0 },
+          uploadedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+          createdAt: { type: Date, default: Date.now },
+        },
+      ],
+      default: [],
+    },
+    githubIssueId: {
+      type: String,
+      default: "",
+      trim: true,
+      maxlength: [200, "GitHub issue id cannot exceed 200 characters"],
+    },
+    githubIssueUrl: {
+      type: String,
+      default: "",
+      trim: true,
+      maxlength: [1000, "GitHub issue URL cannot exceed 1000 characters"],
+    },
+    githubRepo: {
+      type: String,
+      default: "",
+      trim: true,
+      maxlength: [200, "GitHub repo cannot exceed 200 characters"],
+    },
     incentive: { 
       type: String, 
       default: "",
@@ -65,6 +120,14 @@ const taskSchema = new mongoose.Schema(
 );
 
 taskSchema.index({ founderId: 1, startupId: 1, createdAt: -1 });
+taskSchema.index(
+  { startupId: 1, githubIssueId: 1 },
+  {
+    unique: true,
+    sparse: true,
+    partialFilterExpression: { githubIssueId: { $type: "string", $gt: "" } },
+  },
+);
 
 // Mongoose 8+ / 9+: document middleware does not pass `next`; throw instead.
 taskSchema.pre("validate", function requireBlockerFieldsWhenBlocked() {

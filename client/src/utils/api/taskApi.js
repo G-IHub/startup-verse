@@ -162,6 +162,71 @@ export async function getTasks(founderId, params) {
 /**
  * Get tasks by assignee with pagination support
  */
+export async function getTask(founderId, taskId) {
+  const payload = await request(`/founders/${founderId}/tasks/${taskId}`, {
+    method: "GET",
+  });
+  return normalizeTask(payload?.data || payload);
+}
+
+export async function updateTaskBrief(founderId, taskId, patch) {
+  const payload = await request(`/founders/${founderId}/tasks/${taskId}`, {
+    method: "PUT",
+    body: JSON.stringify({ task: patch }),
+  });
+  return normalizeTask(payload?.data || payload);
+}
+
+export async function addTaskAttachment(founderId, taskId, attachment) {
+  const payload = await request(
+    `/founders/${founderId}/tasks/${taskId}/attachments`,
+    {
+      method: "POST",
+      body: JSON.stringify(attachment),
+    },
+  );
+  return normalizeTask(payload?.data || payload);
+}
+
+export async function deleteTaskAttachment(founderId, taskId, attachmentId) {
+  const payload = await request(
+    `/founders/${founderId}/tasks/${taskId}/attachments/${attachmentId}`,
+    { method: "DELETE" },
+  );
+  return normalizeTask(payload?.data || payload);
+}
+
+export async function getTaskComments(founderId, taskId, params = {}) {
+  const queryParams = new URLSearchParams();
+  if (params.page) queryParams.set("page", String(params.page));
+  if (params.pageSize) queryParams.set("pageSize", String(params.pageSize));
+  const query = queryParams.toString();
+  const payload = await request(
+    `/founders/${founderId}/tasks/${taskId}/comments${query ? `?${query}` : ""}`,
+    { method: "GET" },
+  );
+  const data = payload?.data || payload || {};
+  return {
+    comments: Array.isArray(data.comments) ? data.comments : [],
+    legacyComments: Array.isArray(data.legacyComments) ? data.legacyComments : [],
+    pagination: data.pagination || { page: 1, pageSize: 20, total: 0 },
+  };
+}
+
+export async function addTaskPageComment(founderId, taskId, body) {
+  const payload = await request(
+    `/founders/${founderId}/tasks/${taskId}/comments`,
+    {
+      method: "POST",
+      body: JSON.stringify({ body }),
+    },
+  );
+  return payload?.data || payload;
+}
+
+/**
+ * Get tasks by assignee with pagination support
+ */
 export async function getTasksByAssignee(assigneeId, params) {
   const queryParams = new URLSearchParams();
   if (params?.page) queryParams.set("page", params.page.toString());
