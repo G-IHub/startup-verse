@@ -23,8 +23,12 @@ function normalizeTask(task) {
 /**
  * Get all tasks for a founder
  */
-export async function getFounderTasks(founderId) {
-  const payload = await request(`/founders/${founderId}/tasks`, { method: "GET" });
+export async function getFounderTasks(founderId, options = {}) {
+  const bust = options.bustCache ? `?_=${Date.now()}` : "";
+  const payload = await request(`/founders/${founderId}/tasks${bust}`, {
+    method: "GET",
+    signal: options.signal,
+  });
   const tasks = normalizeTaskList(payload);
   return tasks.map(normalizeTask).filter(Boolean);
 }
@@ -76,8 +80,12 @@ export async function createFounderMilestone(founderId, milestone) {
 /**
  * Get tasks assigned to a team member
  */
-export async function getTeamMemberTasks(teamMemberId) {
-  const payload = await request(`/team-members/${teamMemberId}/tasks`, { method: "GET" });
+export async function getTeamMemberTasks(teamMemberId, options = {}) {
+  const bust = options.bustCache ? `?_=${Date.now()}` : "";
+  const payload = await request(`/team-members/${teamMemberId}/tasks${bust}`, {
+    method: "GET",
+    signal: options.signal,
+  });
   const tasks = normalizeTaskList(payload);
   return tasks.map(normalizeTask).filter(Boolean);
 }

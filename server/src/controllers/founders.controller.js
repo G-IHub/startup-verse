@@ -1170,6 +1170,7 @@ export const createWeeklyPlan = async (req, res) => {
     return apiError(res, milestoneValidation.message, 400);
   }
   const createdMilestones = [];
+  const createdTasks = [];
 
   const planStatusLower = String(plan.status || "active").toLowerCase();
   const planStatusCanonical =
@@ -1254,7 +1255,7 @@ export const createWeeklyPlan = async (req, res) => {
           typeof t === "object" && t !== null
             ? serializeTaskActionButton(t.actionButton)
             : "";
-        await Task.create({
+        const createdTask = await Task.create({
           founderId,
           startupId: startup._id,
           title: String(title).trim().slice(0, 200),
@@ -1266,6 +1267,7 @@ export const createWeeklyPlan = async (req, res) => {
           milestoneId: milestone._id,
           actionButton,
         });
+        createdTasks.push(createdTask);
       }
     }
 
@@ -1305,6 +1307,7 @@ export const createWeeklyPlan = async (req, res) => {
     {
       outcome,
       milestones: createdMilestones,
+      tasks: createdTasks,
     },
     existing ? 200 : 201,
   );

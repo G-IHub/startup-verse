@@ -92,7 +92,7 @@ export default function FounderMetricsRow({
         </div>
         <div className="min-w-0 flex-1">
           <p className="font-body text-[11px] font-medium uppercase tracking-[0.08em] text-text-muted">
-            Stage {stageId}/6
+            Journey · {stageId}/6
           </p>
           <p className="mt-1 truncate font-heading text-[16px] font-bold leading-tight text-text-heading">
             {stageName}

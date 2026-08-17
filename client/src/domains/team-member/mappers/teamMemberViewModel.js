@@ -57,6 +57,32 @@ function normalizePresence(row) {
   };
 }
 
+function normalizeWorkLog(row) {
+  if (!row || typeof row !== "object") return null;
+  const id = toId(row.id || row._id);
+  if (!id) return null;
+  return {
+    id,
+    title: String(row.title || "Untitled"),
+    description: String(row.description || ""),
+    linkUrl: String(row.linkUrl || ""),
+    image: row.image && row.image.url
+      ? {
+          url: String(row.image.url),
+          name: String(row.image.name || ""),
+          mimeType: String(row.image.mimeType || ""),
+          size: Number(row.image.size) || 0,
+        }
+      : null,
+    authorId: toId(row.authorId),
+    authorName: String(row.authorName || ""),
+    authorAvatar: String(row.authorAvatar || ""),
+    createdAt: toDate(row.createdAt),
+    updatedAt: toDate(row.updatedAt || row.createdAt),
+    editable: Boolean(row.editable),
+  };
+}
+
 function normalizeAgendaRow(row) {
   if (!row || typeof row !== "object") return null;
   const id = toId(row.id || row._id, `agenda-${Math.random().toString(36).slice(2, 8)}`);
@@ -147,6 +173,7 @@ export function mapTeamMemberHomeViewModel({
   statusRow = null,
   presenceRows = [],
   agendaRows = [],
+  workLogRows = [],
   fallbackUsers = [],
   fallbackTaskRows = [],
 }) {
@@ -244,6 +271,9 @@ export function mapTeamMemberHomeViewModel({
     teamContext,
     hasLivePresence: presence.length > 0,
     checkIn,
+    workLogs: (Array.isArray(workLogRows) ? workLogRows : [])
+      .map(normalizeWorkLog)
+      .filter(Boolean),
     statusOptions: STATUS_OPTIONS,
     metrics: {
       total: sortedTasks.length,

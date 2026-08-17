@@ -68,8 +68,8 @@ export default function TaskIncentiveModal({
     },
   ];
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 sv-modal-backdrop">
-      <Card className="sv-modal-panel max-h-[85vh] w-full max-w-lg overflow-y-auto rounded-[16px] border-0 shadow-modal">
+    <div className="pointer-events-auto absolute inset-0 z-20 flex items-center justify-center bg-[rgba(10,10,30,0.28)] p-4">
+      <Card className="max-h-[85vh] w-full max-w-lg overflow-y-auto rounded-[16px] border-0 bg-surface-card shadow-modal">
         <CardHeader className="pb-3">
           <div className="flex items-start justify-between">
             <div className="flex-1">

@@ -51,15 +51,27 @@ export const getProfile = async (req, res) => {
   return apiSuccess(res, profile);
 };
 
+function assignedToMatch(teamMemberId) {
+  const raw = String(teamMemberId || "").trim();
+  if (!raw) return { assignedTo: teamMemberId };
+  const ids = [raw];
+  if (mongoose.Types.ObjectId.isValid(raw)) {
+    ids.push(new mongoose.Types.ObjectId(raw));
+  }
+  return { assignedTo: { $in: ids } };
+}
+
 export const getTasks = async (req, res) => {
-  const tasks = await Task.find({ assignedTo: req.params.teamMemberId }).sort({ createdAt: -1 });
+  const tasks = await Task.find(assignedToMatch(req.params.teamMemberId)).sort({
+    createdAt: -1,
+  });
   return apiSuccess(res, tasks);
 };
 
 export const updateTask = async (req, res) => {
   const existingTask = await Task.findOne({
     _id: req.params.taskId,
-    assignedTo: req.params.teamMemberId,
+    ...assignedToMatch(req.params.teamMemberId),
   });
   if (!existingTask) {
     return apiError(res, "Task not found.", 404);
@@ -176,7 +188,7 @@ export const updateStatus = async (req, res) => {
 };
 
 export const getPerformance = async (req, res) => {
-  const tasks = await Task.find({ assignedTo: req.params.teamMemberId });
+  const tasks = await Task.find(assignedToMatch(req.params.teamMemberId));
   const completed = tasks.filter((task) => task.status === "completed").length;
 
   return apiSuccess(res, {

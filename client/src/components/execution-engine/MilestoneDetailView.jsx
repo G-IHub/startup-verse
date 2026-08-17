@@ -18,12 +18,6 @@ import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { Progress } from "../ui/progress";
 import { Checkbox } from "../ui/checkbox";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "../ui/dropdown-menu";
 import { Avatar, AvatarFallback, AvatarImage } from "../ui/avatar";
 import {
   CheckCircle2,
@@ -459,8 +453,9 @@ export default function MilestoneDetailView({
       >
         <DialogContent
           hideClose={committing}
-          className="sv-modal-panel flex max-h-[min(90vh,880px)] w-[calc(100%-1.5rem)] max-w-none flex-col gap-0 overflow-hidden rounded-card border border-surface-border bg-surface-card p-0 shadow-modal sm:w-[60vw] sm:max-w-[56rem]"
+          className="flex max-h-[min(90vh,880px)] w-[calc(100%-1.5rem)] max-w-none flex-col gap-0 overflow-hidden rounded-card border border-surface-border bg-surface-card p-0 shadow-modal sm:w-[60vw] sm:max-w-[56rem]"
         >
+          <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden">
           <DialogHeader className="shrink-0 space-y-1 border-b border-surface-border bg-surface-page/60 px-5 py-4 pr-12 text-left sm:px-6">
             <DialogTitle className="font-heading text-[17px] font-semibold leading-snug tracking-tight text-text-heading sm:text-lg">
               {outcome?.title || "Weekly outcome"}
@@ -829,45 +824,6 @@ export default function MilestoneDetailView({
                                           )}
                                       </div>
                                       <div className="flex shrink-0 flex-wrap items-center justify-end gap-0.5">
-                                        <DropdownMenu>
-                                          <DropdownMenuTrigger asChild>
-                                            <Button
-                                              size="sm"
-                                              variant="ghost"
-                                              className={`h-8 w-8 shrink-0 p-0 ${priorityFlagClass(p)}`}
-                                              aria-label="Set priority"
-                                              disabled={committing}
-                                            >
-                                              <Flag className="h-4 w-4" />
-                                            </Button>
-                                          </DropdownMenuTrigger>
-                                          <DropdownMenuContent align="end">
-                                            {PRIORITY_OPTIONS.map((opt) => (
-                                              <DropdownMenuItem
-                                                key={opt.value}
-                                                onClick={() =>
-                                                  setDraftTasks((prev) =>
-                                                    prev.map((row) =>
-                                                      taskIdStr(row) ===
-                                                      taskIdStr(task)
-                                                        ? {
-                                                            ...row,
-                                                            priority:
-                                                              opt.value,
-                                                          }
-                                                        : row,
-                                                    ),
-                                                  )
-                                                }
-                                              >
-                                                {opt.label}
-                                                {p === opt.value
-                                                  ? " (current)"
-                                                  : ""}
-                                              </DropdownMenuItem>
-                                            ))}
-                                          </DropdownMenuContent>
-                                        </DropdownMenu>
                                         {task.status !== "completed" &&
                                           (task.status === "blocked" ? (
                                             <Button
@@ -897,7 +853,7 @@ export default function MilestoneDetailView({
                                             <Button
                                               size="sm"
                                               variant="ghost"
-                                              className="h-8 w-8 p-0 text-status-warning hover:bg-status-warning/10"
+                                              className={`h-8 w-8 shrink-0 p-0 ${priorityFlagClass(p)}`}
                                               aria-label="Report blocker"
                                               disabled={committing}
                                               onClick={() =>
@@ -906,7 +862,7 @@ export default function MilestoneDetailView({
                                                 )
                                               }
                                             >
-                                              <AlertCircle className="h-4 w-4" />
+                                              <Flag className="h-4 w-4" />
                                             </Button>
                                           ))}
                                         {assignees.length > 0 && (
@@ -1102,11 +1058,9 @@ export default function MilestoneDetailView({
               {committing ? "Saving..." : "Confirm changes"}
             </Button>
           </DialogFooter>
-        </DialogContent>
-      </Dialog>
 
-      {isOpen && blockingTaskId && (
-        <div className="sv-modal-backdrop fixed inset-0 z-[60] flex items-center justify-center p-4">
+          {blockingTaskId ? (
+        <div className="pointer-events-auto absolute inset-0 z-20 flex items-center justify-center bg-[rgba(10,10,30,0.28)] p-4">
           <Card className="sv-modal-panel w-full rounded-card border border-surface-border shadow-modal sm:max-w-lg">
             <CardHeader className="border-b border-surface-border pb-3 pt-4">
               <CardTitle className="flex items-center gap-2 font-heading text-base text-text-heading">
@@ -1170,51 +1124,51 @@ export default function MilestoneDetailView({
             </CardContent>
           </Card>
         </div>
-      )}
+          ) : null}
 
-      {isOpen && assigningTask && (
-        <TaskAssignmentModal
-          isOpen={!!assigningTask}
-          onClose={() => setAssigningTaskId(null)}
-          task={assigningTask}
-          teamMembers={teamMembers}
-          founderId={founderId}
-          founderName={founderName}
-          founderAvatar={founderAvatar}
-          onAssign={(taskId, assignedTo, assignedToName, assignedToAvatar) => {
-            const tid = String(taskId ?? "").trim();
-            setDraftTasks((prev) =>
-              prev.map((row) =>
-                taskIdStr(row) === tid
-                  ? {
-                      ...row,
-                      assignedTo,
-                      assignedToName,
-                      assignedToAvatar,
-                    }
-                  : row,
-              ),
-            );
-          }}
-        />
-      )}
+          {assigningTask ? (
+            <TaskAssignmentModal
+              isOpen={!!assigningTask}
+              onClose={() => setAssigningTaskId(null)}
+              task={assigningTask}
+              teamMembers={teamMembers}
+              founderId={founderId}
+              founderName={founderName}
+              founderAvatar={founderAvatar}
+              onAssign={(taskId, assignedTo, assignedToName, assignedToAvatar) => {
+                const tid = String(taskId ?? "").trim();
+                setDraftTasks((prev) =>
+                  prev.map((row) =>
+                    taskIdStr(row) === tid
+                      ? {
+                          ...row,
+                          assignedTo,
+                          assignedToName,
+                          assignedToAvatar,
+                        }
+                      : row,
+                  ),
+                );
+              }}
+            />
+          ) : null}
 
-      {isOpen && incentiveTask && (
-        <TaskIncentiveModal
-          isOpen={!!incentiveTask}
-          onClose={() => setIncentiveTask(null)}
-          task={incentiveTask}
-          onIncentiveSet={(incentive) => {
-            if (incentiveTask && onSetTaskIncentive) {
-              onSetTaskIncentive(taskIdStr(incentiveTask), incentive);
-            }
-          }}
-        />
-      )}
+          {incentiveTask ? (
+            <TaskIncentiveModal
+              isOpen={!!incentiveTask}
+              onClose={() => setIncentiveTask(null)}
+              task={incentiveTask}
+              onIncentiveSet={(incentive) => {
+                if (incentiveTask && onSetTaskIncentive) {
+                  onSetTaskIncentive(taskIdStr(incentiveTask), incentive);
+                }
+              }}
+            />
+          ) : null}
 
-      {isOpen && deleteConfirm && (
+          {deleteConfirm ? (
         <div
-          className="sv-modal-backdrop fixed inset-0 z-[70] flex items-center justify-center p-3"
+          className="pointer-events-auto absolute inset-0 z-20 flex items-center justify-center bg-[rgba(10,10,30,0.28)] p-3"
           role="presentation"
           onClick={() => !committing && setDeleteConfirm(null)}
         >
@@ -1278,7 +1232,10 @@ export default function MilestoneDetailView({
             </div>
           </Card>
         </div>
-      )}
+          ) : null}
+          </div>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }

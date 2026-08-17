@@ -32,6 +32,8 @@ import {
   DialogTitle,
 } from "../ui/dialog";
 import { useTeamMemberHomeData } from "../../domains/team-member/hooks/useTeamMemberHomeData";
+import ExtraWorkTodayPanel from "../team-member/ExtraWorkTodayPanel";
+import ExtraWorkLogDialog from "../team-member/ExtraWorkLogDialog";
 
 const BLOCKER_REASONS = [
   { value: "waiting-on-others", label: "Waiting on others" },
@@ -166,6 +168,9 @@ export default function TeamMemberDashboard({ user, onNavigate }) {
     savingCheckIn,
     viewModel,
     saveCheckIn,
+    persistWorkLog,
+    deleteWorkLog,
+    savingWorkLog,
     updateTaskStatus,
     refresh,
   } = useTeamMemberHomeData({ user });
@@ -177,6 +182,9 @@ export default function TeamMemberDashboard({ user, onNavigate }) {
   const [blockerReason, setBlockerReason] = useState(BLOCKER_REASONS[0].value);
   const [blockerNote, setBlockerNote] = useState("");
   const [blocking, setBlocking] = useState(false);
+  const [workLogOpen, setWorkLogOpen] = useState(false);
+  const [workLogMode, setWorkLogMode] = useState("create");
+  const [activeWorkLog, setActiveWorkLog] = useState(null);
 
   useEffect(() => {
     setCheckInStatus(viewModel.checkIn.status || "available");
@@ -280,6 +288,20 @@ export default function TeamMemberDashboard({ user, onNavigate }) {
     }
 
     toast.error(result.error || "Could not save blocker");
+  };
+
+  const handleWorkLogSubmit = async (payload) => {
+    const result = await persistWorkLog(
+      payload,
+      workLogMode === "edit" ? activeWorkLog?.id : null,
+    );
+    if (result.success) {
+      toast.success(workLogMode === "edit" ? "Extra work updated." : "Extra work logged.");
+      setWorkLogOpen(false);
+      setActiveWorkLog(null);
+      return;
+    }
+    toast.error(result.error || "Could not save extra work.");
   };
 
   const handleCheckInSave = async () => {
@@ -405,8 +427,9 @@ export default function TeamMemberDashboard({ user, onNavigate }) {
       </section>
 
       <section className="grid gap-3 lg:grid-cols-3">
+        <div className="space-y-3 lg:col-span-2">
         {/* Active tasks — primary work panel */}
-        <div className={`${PANEL} lg:col-span-2`}>
+        <div className={PANEL}>
           <div className="space-y-3 px-4 py-4 sm:px-5">
             <SectionHeading
               title="Active Tasks"
@@ -549,6 +572,34 @@ export default function TeamMemberDashboard({ user, onNavigate }) {
               ))
             )}
           </div>
+        </div>
+
+        <ExtraWorkTodayPanel
+          logs={viewModel.workLogs || []}
+          onLog={() => {
+            setActiveWorkLog(null);
+            setWorkLogMode("create");
+            setWorkLogOpen(true);
+          }}
+          onOpen={(log) => {
+            setActiveWorkLog(log);
+            setWorkLogMode("view");
+            setWorkLogOpen(true);
+          }}
+          onEdit={(log) => {
+            setActiveWorkLog(log);
+            setWorkLogMode("edit");
+            setWorkLogOpen(true);
+          }}
+          onDelete={async (log) => {
+            const result = await deleteWorkLog(log.id);
+            if (result.success) {
+              toast.success("Extra work removed.");
+            } else {
+              toast.error(result.error || "Could not delete extra work.");
+            }
+          }}
+        />
         </div>
 
         {/* Sidebar: check-in + blockers + team + coming up in one panel */}
@@ -810,6 +861,18 @@ export default function TeamMemberDashboard({ user, onNavigate }) {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <ExtraWorkLogDialog
+        open={workLogOpen}
+        mode={workLogMode}
+        initialLog={activeWorkLog}
+        saving={savingWorkLog}
+        onOpenChange={(open) => {
+          setWorkLogOpen(open);
+          if (!open) setActiveWorkLog(null);
+        }}
+        onSubmit={handleWorkLogSubmit}
+      />
     </div>
   );
 }

@@ -1,5 +1,6 @@
 import { getResumeMaxBytes, isResumeScope } from "./resumeAttachments.js";
 import { getAvatarMaxBytes, isAvatarScope } from "./avatarAttachments.js";
+import { getWorkLogMaxBytes, isWorkLogScope } from "./workLogAttachments.js";
 
 const DEFAULT_MAX_BYTES = 10 * 1024 * 1024;
 const MESSAGES_MAX_BYTES = 40 * 1024 * 1024;
@@ -17,6 +18,7 @@ export function getMaxUploadBytesForScope(scope) {
   if (norm === "messages") return MESSAGES_MAX_BYTES;
   if (isResumeScope(norm)) return getResumeMaxBytes();
   if (isAvatarScope(norm)) return getAvatarMaxBytes();
+  if (isWorkLogScope(norm)) return getWorkLogMaxBytes();
   return DEFAULT_MAX_BYTES;
 }
 

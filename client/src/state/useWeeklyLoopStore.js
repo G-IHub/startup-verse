@@ -77,18 +77,31 @@ export const useWeeklyLoopStore = create((set, get) => ({
 
     try {
       const getCfg = noStoreGetConfig(bustCache);
-      const [outcomes, milestones, tasks, executionScore] = await Promise.all([
-        apiGet(`/founders/${id}/weekly-outcomes`, getCfg)
-          .then((data) => normalizeListPayload(data, "outcomes"))
-          .catch(() => []),
-        apiGet(`/founders/${id}/milestones`, getCfg)
-          .then((data) => normalizeListPayload(data, "milestones"))
-          .catch(() => []),
-        apiGet(`/founders/${id}/tasks`, getCfg)
-          .then((data) => normalizeListPayload(data, "tasks"))
-          .catch(() => []),
-        apiGet(`/execution-score/${id}`, getCfg).catch(() => null),
-      ]);
+      const previousTasks = asList(get().tasks);
+      const [outcomesRes, milestonesRes, tasksRes, executionScoreRes] =
+        await Promise.allSettled([
+          apiGet(`/founders/${id}/weekly-outcomes`, getCfg).then((data) =>
+            normalizeListPayload(data, "outcomes"),
+          ),
+          apiGet(`/founders/${id}/milestones`, getCfg).then((data) =>
+            normalizeListPayload(data, "milestones"),
+          ),
+          apiGet(`/founders/${id}/tasks`, getCfg).then((data) =>
+            normalizeListPayload(data, "tasks"),
+          ),
+          apiGet(`/execution-score/${id}`, getCfg),
+        ]);
+
+      const outcomes =
+        outcomesRes.status === "fulfilled" ? outcomesRes.value : [];
+      const milestones =
+        milestonesRes.status === "fulfilled" ? milestonesRes.value : [];
+      const tasksFailed = tasksRes.status === "rejected";
+      const tasks = tasksFailed ? previousTasks : tasksRes.value;
+      const executionScore =
+        executionScoreRes.status === "fulfilled"
+          ? executionScoreRes.value
+          : null;
 
       const viewModel = mapFounderWeeklyLoop({
         outcomes,
@@ -96,6 +109,12 @@ export const useWeeklyLoopStore = create((set, get) => ({
         tasks,
         executionScore,
       });
+
+      const loadError = tasksFailed
+        ? tasksRes.reason
+        : outcomesRes.status === "rejected"
+          ? outcomesRes.reason
+          : null;
 
       set({
         founderId: id,
@@ -106,7 +125,7 @@ export const useWeeklyLoopStore = create((set, get) => ({
         viewModel,
         loading: false,
         refreshing: false,
-        error: null,
+        error: loadError || null,
         lastLoadedAt: new Date().toISOString(),
       });
 
@@ -149,6 +168,7 @@ export const useWeeklyLoopStore = create((set, get) => ({
 
     const outcome = data?.outcome;
     const createdMilestones = asList(data?.milestones);
+    const createdTasks = asList(data?.tasks);
     if (outcome) {
       const prevOutcomes = asList(get().outcomes);
       const oid = String(outcome._id || outcome.id);
@@ -166,7 +186,16 @@ export const useWeeklyLoopStore = create((set, get) => ({
           ...nextMilestones.filter((m) => !newIds.has(String(m._id || m.id))),
         ];
       }
-      const nextTasks = asList(get().tasks);
+      let nextTasks = asList(get().tasks);
+      if (createdTasks.length) {
+        const newTaskIds = new Set(
+          createdTasks.map((t) => String(t._id || t.id)),
+        );
+        nextTasks = [
+          ...createdTasks,
+          ...nextTasks.filter((t) => !newTaskIds.has(String(t._id || t.id))),
+        ];
+      }
       const viewModel = mapFounderWeeklyLoop({
         outcomes: nextOutcomes,
         milestones: nextMilestones,
@@ -176,6 +205,7 @@ export const useWeeklyLoopStore = create((set, get) => ({
       set({
         outcomes: nextOutcomes,
         milestones: nextMilestones,
+        tasks: nextTasks,
         viewModel,
         lastLoadedAt: new Date().toISOString(),
       });

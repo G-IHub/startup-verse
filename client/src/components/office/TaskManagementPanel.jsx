@@ -62,6 +62,7 @@ import * as teamMemberApi from "../../utils/api/teamMemberApi";
 import * as taskApi from "../../utils/api/taskApi";
 import { subscribeToTasks } from "../../utils/socketIoRealtime";
 import { useWeeklyLoopStore } from "../../state/useWeeklyLoopStore";
+import { useOfficeStore } from "../../state/useOfficeStore";
 import GitHubImportDialog from "./GitHubImportDialog";
 
 export function TaskManagementPanel({
@@ -160,10 +161,10 @@ export function TaskManagementPanel({
   useEffect(() => {
     if (!open) return;
     if (!founderIdOverride && user.role === "founder" && !normalizedUserId) return;
-    const loadData = async () => {
-      setLoading(true);
+    let cancelled = false;
+    const abort = new AbortController();
 
-      // Determine the founder ID (we don't need the full founder object)
+    const loadData = async () => {
       let founderIdValue = "";
       if (founderIdOverride) {
         founderIdValue = founderIdOverride;
@@ -176,12 +177,18 @@ export function TaskManagementPanel({
         setFounderId(founderIdValue);
       }
       if (!founderIdValue) {
-        console.warn(
-          "No founder found for task management - user may not be linked to a startup yet",
-        );
         setLoading(false);
         setLocalTasks([]);
         return;
+      }
+
+      const officeTasks = useOfficeStore.getState().tasks;
+      const seeded = Array.isArray(officeTasks) ? officeTasks : [];
+      if (seeded.length > 0) {
+        setLocalTasks(seeded.map(normalizeTask));
+        setLoading(false);
+      } else {
+        setLoading(true);
       }
 
       if (user.role === "founder") {
@@ -190,10 +197,12 @@ export function TaskManagementPanel({
             taskApi.getFounderMilestones(founderIdValue),
             taskApi.getFounderWeeklyOutcomes(founderIdValue),
           ]);
+          if (cancelled) return;
           setMilestones(milestoneRows || []);
           const active = (outcomeRows || []).find((row) => row.status === "active");
           setActiveOutcomeId(active?.id || "");
         } catch (error) {
+          if (cancelled) return;
           setMilestones([]);
           setActiveOutcomeId("");
           if (process.env.NODE_ENV === "development") {
@@ -205,53 +214,58 @@ export function TaskManagementPanel({
         setActiveOutcomeId("");
       }
 
-      // Load tasks for the founder - BACKEND FIRST
       try {
         setLoadError("");
         let tasks = [];
+        const fetchOpts = { signal: abort.signal, bustCache: true };
         if (user.role === "founder") {
-          // Load founder's tasks from backend
-          const backendTasks = await taskApi.getFounderTasks(founderIdValue);
+          const backendTasks = await taskApi.getFounderTasks(
+            founderIdValue,
+            fetchOpts,
+          );
           tasks = backendTasks || [];
         } else if (user.role === "team-member" || user.role === "team") {
-          // Load team member's assigned tasks from backend
-          const backendTasks = await taskApi.getTeamMemberTasks(normalizedUserId);
+          const backendTasks = await taskApi.getTeamMemberTasks(
+            normalizedUserId,
+            { ...fetchOpts },
+          );
           tasks = backendTasks || [];
         }
+        if (cancelled) return;
         setLocalTasks((tasks || []).map(normalizeTask));
-        console.log(`✅ [TaskPanel] Loaded ${tasks.length} tasks from backend`);
       } catch (error) {
+        if (cancelled || error?.name === "AbortError") return;
         console.error(
           "❌ [TaskPanel] Error loading tasks from backend:",
           error,
         );
-        if (strictMode) {
-          setLoadError(error?.message || "Could not sync tasks from server.");
-          setLocalTasks([]);
-        } else {
+        setLoadError(error?.message || "Could not sync tasks from server.");
+        setLocalTasks((prev) => {
+          if (prev.length > 0) return prev;
+          const seededRows = Array.isArray(useOfficeStore.getState().tasks)
+            ? useOfficeStore.getState().tasks
+            : [];
+          if (seededRows.length > 0) return seededRows.map(normalizeTask);
+          if (strictMode) return [];
           const allTasks = getTasks(founderIdValue);
-          let filteredTasks = allTasks;
           if (user.role === "team-member" || user.role === "team") {
-            filteredTasks = allTasks.filter(
-              (t) => t.assignedTo === normalizedUserId || t.assigneeId === normalizedUserId,
-            );
+            return allTasks
+              .filter(
+                (t) =>
+                  String(t.assignedTo || "") === normalizedUserId ||
+                  String(t.assigneeId || "") === normalizedUserId,
+              )
+              .map(normalizeTask);
           }
-          setLoadError("Could not sync tasks from server. Showing cached tasks.");
-          setLocalTasks(filteredTasks.map(normalizeTask));
-        }
+          return allTasks.map(normalizeTask);
+        });
       }
 
-      // Load team members (for task assignment) from backend only
       try {
         const resolvedStartupId = startupId || founderIdValue;
-        console.log(
-          "🔍 [TaskPanel] Loading team members for startup:",
-          resolvedStartupId,
-        );
-
-        setTeamMembers([]);
         const backendTeamMembers =
           await teamMemberApi.getStartupTeamMembers(resolvedStartupId);
+        if (cancelled) return;
         const mappedMembers = (backendTeamMembers || [])
           .filter((m) => m.id !== founderIdValue && m.role !== "founder")
           .map((member) => ({
@@ -265,11 +279,8 @@ export function TaskManagementPanel({
             skills: member.skills || member.talentSkills || [],
           }));
         setTeamMembers(mappedMembers);
-        console.log(
-          "✅ [TaskPanel] Team members from backend:",
-          mappedMembers.length,
-        );
       } catch (error) {
+        if (cancelled) return;
         setTeamMembers([]);
         if (process.env.NODE_ENV === "development") {
           console.debug(
@@ -278,11 +289,13 @@ export function TaskManagementPanel({
           );
         }
       }
-      setLoading(false);
+      if (!cancelled) setLoading(false);
     };
     loadData();
-
-    // ✅ REALTIME: Removed task/team polling (was every 10s) - using real-time subscription
+    return () => {
+      cancelled = true;
+      abort.abort();
+    };
   }, [open, normalizedUserId, user.role, user.startupId, user.founderId, founderIdOverride, startupId, strictMode, taskReloadNonce]);
 
   useEffect(() => {
@@ -748,21 +761,15 @@ export function TaskManagementPanel({
   // Filter tasks — scoped to active tab
   const resolvedCurrentUserId = String(user?._id ?? user?.id ?? "");
   const tabScopedTasks = localTasks.filter((task) => {
+    const assigneeId = String(task.assignedTo || task.assigneeId || "");
     if (user.role !== "founder") {
-      // Team member: only tasks explicitly assigned to this user
-      return (
-        task.assignedTo === resolvedCurrentUserId ||
-        task.assigneeId === resolvedCurrentUserId
-      );
+      return Boolean(assigneeId) && assigneeId === resolvedCurrentUserId;
     }
-    // Founder — guard: if founderId not yet resolved, treat unassigned as mine only
-    const fid = founderId || resolvedCurrentUserId;
+    const fid = String(founderId || resolvedCurrentUserId);
     if (activeTab === "team-tasks") {
-      // Only tasks explicitly assigned to someone who is NOT the founder
-      return Boolean(task.assignedTo) && task.assignedTo !== fid;
+      return Boolean(assigneeId) && assigneeId !== fid;
     }
-    // My Tasks: only tasks explicitly assigned to the founder (unassigned → Office Home)
-    return Boolean(task.assignedTo) && task.assignedTo === fid;
+    return !assigneeId || assigneeId === fid;
   });
 
   const filteredTasks = tabScopedTasks.filter((task) => {
@@ -1153,7 +1160,7 @@ export function TaskManagementPanel({
                       {user.role === "founder" && activeTab === "team-tasks"
                         ? "No tasks have been assigned to teammates yet"
                         : user.role === "founder"
-                        ? "Tasks you add to milestones will appear here"
+                        ? "Unassigned tasks and tasks assigned to you appear here"
                         : "No tasks have been assigned to you yet"}
                     </p>
                   </div>
@@ -1597,6 +1604,13 @@ export function TaskManagementPanel({
           </DialogContent>
         </Dialog>
       )}
+      {user.role === "founder" ? (
+        <GitHubImportDialog
+          open={showGithubImport}
+          onOpenChange={setShowGithubImport}
+          onImported={() => setTaskReloadNonce((n) => n + 1)}
+        />
+      ) : null}
     </>
   );
 }
@@ -1945,13 +1959,6 @@ function TaskCard({
           </div>
         </DialogContent>
       </Dialog>
-      {user.role === "founder" ? (
-        <GitHubImportDialog
-          open={showGithubImport}
-          onOpenChange={setShowGithubImport}
-          onImported={() => setTaskReloadNonce((n) => n + 1)}
-        />
-      ) : null}
     </>
   );
 }

@@ -171,8 +171,6 @@ export async function getStartupTeamMembers(startupId, params = {}) {
  * Get tasks assigned to team member
  */
 export async function getTeamMemberTasks(teamMemberId, params = {}) {
-  console.log(`Fetching tasks for team member: ${teamMemberId}`);
-
   const queryString = buildQueryString(params);
   const result = await apiRequest(
     `/team-members/${teamMemberId}/tasks${queryString}`,
@@ -181,10 +179,11 @@ export async function getTeamMemberTasks(teamMemberId, params = {}) {
     },
   );
 
-  console.log(
-    `Tasks fetched: ${result.pagination?.total || result.count || result.length || 0} tasks assigned`,
-  );
-  return result.tasks || result.items || result || [];
+  if (Array.isArray(result)) return result;
+  if (Array.isArray(result?.tasks)) return result.tasks;
+  if (Array.isArray(result?.items)) return result.items;
+  if (Array.isArray(result?.data)) return result.data;
+  return [];
 }
 
 /**
@@ -236,6 +235,54 @@ export async function addTaskComment(teamMemberId, taskId, comment, userName) {
 
   console.log(`Comment added to task: ${taskId}`);
   return result.comment || result;
+}
+
+function localDayRange(date = new Date()) {
+  const start = new Date(date);
+  start.setHours(0, 0, 0, 0);
+  const end = new Date(start);
+  end.setDate(end.getDate() + 1);
+  return { from: start.toISOString(), to: end.toISOString() };
+}
+
+function unwrapWorkLogs(result) {
+  if (Array.isArray(result)) return result;
+  if (Array.isArray(result?.items)) return result.items;
+  if (Array.isArray(result?.data)) return result.data;
+  return [];
+}
+
+export async function getTeamMemberWorkLogs(teamMemberId, params = {}) {
+  const range = localDayRange();
+  const query = new URLSearchParams({
+    from: params.from || range.from,
+    to: params.to || range.to,
+  });
+  const result = await apiRequest(
+    `/team-members/${teamMemberId}/work-logs?${query.toString()}`,
+    { method: "GET" },
+  );
+  return unwrapWorkLogs(result);
+}
+
+export async function createTeamMemberWorkLog(teamMemberId, payload) {
+  return apiRequest(`/team-members/${teamMemberId}/work-logs`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function updateTeamMemberWorkLog(teamMemberId, workLogId, payload) {
+  return apiRequest(`/team-members/${teamMemberId}/work-logs/${workLogId}`, {
+    method: "PATCH",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function deleteTeamMemberWorkLog(teamMemberId, workLogId) {
+  return apiRequest(`/team-members/${teamMemberId}/work-logs/${workLogId}`, {
+    method: "DELETE",
+  });
 }
 
 // ==========================================
@@ -351,6 +398,11 @@ export default {
   getTeamMemberTasks,
   updateTaskStatus,
   addTaskComment,
+
+  getTeamMemberWorkLogs,
+  createTeamMemberWorkLog,
+  updateTeamMemberWorkLog,
+  deleteTeamMemberWorkLog,
 
   // Activity
   getTeamMemberActivity,

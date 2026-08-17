@@ -29,8 +29,6 @@ import MilestoneDetailView from "../execution-engine/MilestoneDetailView";
 import IntentCaptureModal from "../execution-engine/IntentCaptureModal";
 import { WeeklyReviewModal } from "../execution-engine/WeeklyReviewModal";
 import StageLearningModal from "../learning/StageLearningModal";
-import StageRoadmapModal from "../roadmap/StageRoadmapModal";
-import CohortMembershipBadge from "../organizations/CohortMembershipBadge";
 
 import { useHomeStore } from "../../state/useHomeStore";
 import { useStageTaskStore } from "../../state/useStageTaskStore";
@@ -83,10 +81,9 @@ import * as founderApi from "../../utils/api/founderApi";
 import { resolveUserAvatar } from "../../utils/resolveMediaUrl";
 import FounderHomeHero from "./founder/FounderHomeHero";
 import FounderMetricsRow from "./founder/FounderMetricsRow";
-import FounderQuickActions from "./founder/FounderQuickActions";
 import FounderHomeSkeleton from "./founder/FounderHomeSkeleton";
-import SectionCard from "../organizations/_primitives/SectionCard";
-import BrandProgress from "../organizations/_primitives/BrandProgress";
+import FounderWeeklyFocus from "./founder/FounderWeeklyFocus";
+import FounderExtraWorkCard from "./founder/FounderExtraWorkCard";
 
 // Stage-specific task definitions
 const STAGE_TASKS = {
@@ -807,7 +804,11 @@ export default function FounderDashboard({
       (current.milestones || []).map((m) => String(m.id || m._id || "")),
     );
     return all.filter((t) => {
-      const mid = String(t.milestoneId ?? "");
+      const midRaw = t.milestoneId;
+      const mid =
+        midRaw && typeof midRaw === "object"
+          ? String(midRaw._id || midRaw.id || "")
+          : String(midRaw ?? "");
       if (mid && milestoneIds.has(mid)) return true;
 
       const taskOutcomeId = String(
@@ -827,9 +828,6 @@ export default function FounderDashboard({
 
   // Stage Learning Modal State
   const [showStageLearningModal, setShowStageLearningModal] = useState(false);
-
-  // Stage Roadmap Modal State
-  const [showRoadmapModal, setShowRoadmapModal] = useState(false);
 
   // Orchestrate Home hydration through the Zustand stores.
   // Guarded by founderId so we never fire `/founders/undefined/...` requests.
@@ -1768,9 +1766,7 @@ export default function FounderDashboard({
           }
           founderNeedsLaunch={founderNeedsLaunch}
           founderLaunchLoading={founderLaunchLoading}
-          hasActiveOutcome={Boolean(
-            executionData?.currentOutcome && tasks.length > 0,
-          )}
+          hasActiveOutcome={Boolean(executionData?.currentOutcome)}
           onLaunch={() => onNavigate?.("post-startup")}
           onSetOutcome={requestWeeklyOutcome}
           onViewTasks={() => setShowMilestoneDetailView(true)}
@@ -1793,411 +1789,38 @@ export default function FounderDashboard({
               stageId={currentStageId}
               stageProgress={startupStageProgress}
               stageIcon={currentStage.icon}
-              onOpenRoadmap={() => setShowRoadmapModal(true)}
+              onOpenRoadmap={() => onNavigate?.("journey")}
               scoreSlot={<ExecutionScoreInlineCard userId={founderId} />}
             />
 
-            <SectionCard className="border border-surface-border bg-surface-card">
-              <SectionCard.Header
-                title="This Week's Focus"
-                description={
-                  executionData?.currentOutcome && tasks.length > 0
-                    ? executionData.currentOutcome.title
-                    : "Set an outcome, ship milestones, and complete the week."
-                }
-                action={
-                  <div className="flex flex-wrap items-center gap-2">
-                    {executionData?.currentOutcome?.isOrganizationDriven ? (
-                      <Badge
-                        variant="outline"
-                        className="border-primary/25 bg-primary-tint text-[11px] font-semibold text-primary"
-                      >
-                        <Building className="mr-1 h-3 w-3" />
-                        {executionData.currentOutcome.cohortName ||
-                          "Organization"}
-                      </Badge>
-                    ) : null}
-                    {executionData?.currentOutcome && tasks.length > 0 ? (
-                      <span className="rounded-pill bg-primary-tint px-2.5 py-1 font-body text-[11px] font-semibold text-primary">
-                        Week {(executionData?.weekHistory.length || 0) + 1}
-                      </span>
-                    ) : null}
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setShowStageLearningModal(true)}
-                      className="h-8 rounded-input border-surface-border font-body text-[12px] font-medium text-primary hover:bg-primary-tint"
-                    >
-                      Learn stage
-                      <ChevronRight className="ml-1 h-3.5 w-3.5" />
-                    </Button>
-                  </div>
-                }
-              >
-                {user.startupId || founderId ? (
-                  <div className="mt-3">
-                    <CohortMembershipBadge
-                      startupId={user.startupId || founderId}
-                      onNavigate={onNavigate}
-                    />
-                  </div>
-                ) : null}
-              </SectionCard.Header>
-              <SectionCard.Body className="space-y-4">
-                {weeklyOutcomeSubmitting ? (
-                  <div
-                    className="flex min-h-[140px] flex-col items-center justify-center gap-2 px-4 text-center"
-                    role="status"
-                    aria-live="polite"
-                  >
-                    <Loader2
-                      className="h-8 w-8 animate-spin text-primary"
-                      aria-hidden
-                    />
-                    <p className="font-body text-[13px] font-medium text-text-heading">
-                      Saving your weekly goal…
-                    </p>
-                    <p className="max-w-sm font-body text-[12px] text-text-muted">
-                      Updating your plan — this usually takes a few seconds.
-                    </p>
-                  </div>
-                ) : isLoadingExecutionData ? (
-                  <div className="space-y-3 py-2">
-                    {[1, 2, 3].map((i) => (
-                      <div
-                        key={i}
-                        className="space-y-2 rounded-input border border-surface-border p-3"
-                      >
-                        <div className="h-3 w-3/4 animate-pulse rounded bg-surface-border" />
-                        <div className="h-1.5 w-full animate-pulse rounded bg-surface-border" />
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <TooltipProvider>
-                    {executionData?.currentOutcome && tasks.length > 0 ? (
-                      <div className="space-y-4">
-                        <div className="space-y-3">
-                          <div className="flex items-center justify-between gap-2">
-                            <h4 className="font-body text-[11px] font-medium uppercase tracking-[0.08em] text-text-muted">
-                              Milestones
-                            </h4>
-                            <span className="rounded-pill border border-surface-border bg-surface-page px-2.5 py-1 font-body text-[11px] font-medium text-text-muted">
-                              {
-                                executionData.currentOutcome.milestones.filter(
-                                  (m) => m.tasksCompleted === m.totalTasks,
-                                ).length
-                              }
-                              /{executionData.currentOutcome.milestones.length}{" "}
-                              complete
-                            </span>
-                          </div>
-                          <div className="space-y-2">
-                            {executionData.currentOutcome.milestones.map(
-                              (milestone) => {
-                                const progress =
-                                  milestone.totalTasks > 0
-                                    ? (milestone.tasksCompleted /
-                                        milestone.totalTasks) *
-                                      100
-                                    : 0;
-                                const tone =
-                                  milestone.status === "completed"
-                                    ? "success"
-                                    : milestone.status === "in-progress"
-                                      ? "brand"
-                                      : "info";
-                                return (
-                                  <div
-                                    key={milestone.id}
-                                    className="space-y-2 rounded-input border border-surface-border bg-surface-page/40 p-3"
-                                  >
-                                    <div className="flex items-center justify-between gap-3">
-                                      <div className="min-w-0 flex-1">
-                                        <Tooltip>
-                                          <TooltipTrigger asChild={true}>
-                                            <button
-                                              type="button"
-                                              className="text-left focus:outline-none"
-                                            >
-                                              <p className="font-body text-[13px] font-semibold text-text-heading">
-                                                {milestone.title}
-                                              </p>
-                                            </button>
-                                          </TooltipTrigger>
-                                          <TooltipContent
-                                            side="bottom"
-                                            className="max-w-xs border border-border bg-popover text-popover-foreground"
-                                          >
-                                            <p className="text-xs text-white">
-                                              {milestone.description}
-                                            </p>
-                                          </TooltipContent>
-                                        </Tooltip>
-                                      </div>
-                                      <span className="shrink-0 rounded-pill border border-surface-border bg-white px-2 py-0.5 font-body text-[11px] font-medium text-text-muted">
-                                        {milestone.tasksCompleted}/
-                                        {milestone.totalTasks}
-                                      </span>
-                                    </div>
-                                    <BrandProgress
-                                      value={progress}
-                                      tone={
-                                        tone === "info" && progress === 0
-                                          ? "brand"
-                                          : tone
-                                      }
-                                      className="h-1.5"
-                                    />
-                                  </div>
-                                );
-                              },
-                            )}
-                          </div>
-                        </div>
-                        {deliverables.length > 0 && (
-                          <div className="space-y-3 border-t border-surface-border pt-4">
-                            <div className="flex items-center justify-between gap-2">
-                              <h4 className="flex items-center gap-1.5 font-body text-[11px] font-medium uppercase tracking-[0.08em] text-text-muted">
-                                <FileText className="h-3.5 w-3.5 text-primary" />
-                                Organization deliverables
-                              </h4>
-                              <span className="font-body text-[11px] text-text-muted">
-                                {
-                                  deliverables.filter((d) => d.mySubmission)
-                                    .length
-                                }
-                                /{deliverables.length} submitted
-                              </span>
-                            </div>
-                            <div className="space-y-2">
-                              {deliverables.map((deliverable) => {
-                                const daysUntil = Math.ceil(
-                                  (new Date(deliverable.dueDate).getTime() -
-                                    new Date().getTime()) /
-                                    (1000 * 60 * 60 * 24),
-                                );
-                                const isPastDue = daysUntil < 0;
-                                const isSubmitted = !!deliverable.mySubmission;
-                                const isSubmitting =
-                                  submittingDeliverable === deliverable.id;
-                                return (
-                                  <div
-                                    key={deliverable.id}
-                                    className="space-y-2 rounded-input border border-primary/20 bg-primary-tint/40 p-3"
-                                  >
-                                    <div className="flex items-start justify-between gap-2">
-                                      <div className="min-w-0 flex-1">
-                                        <p className="font-body text-[13px] font-semibold text-text-heading">
-                                          {deliverable.title}
-                                        </p>
-                                        <p className="mt-0.5 font-body text-[12px] text-text-muted">
-                                          {deliverable.cohortName}
-                                          {" · Due "}
-                                          {new Date(
-                                            deliverable.dueDate,
-                                          ).toLocaleDateString()}
-                                        </p>
-                                      </div>
-                                      {isSubmitted ? (
-                                        <Badge
-                                          variant="outline"
-                                          className="text-[11px] capitalize"
-                                        >
-                                          {deliverable.mySubmission.status}
-                                        </Badge>
-                                      ) : isPastDue ? (
-                                        <Badge
-                                          variant="outline"
-                                          className="border-status-error/25 bg-status-error/10 text-[11px] text-status-error"
-                                        >
-                                          Past due
-                                        </Badge>
-                                      ) : (
-                                        <Badge
-                                          variant="outline"
-                                          className="text-[11px]"
-                                        >
-                                          {daysUntil}d left
-                                        </Badge>
-                                      )}
-                                    </div>
-                                    {!isSubmitted && !isSubmitting && (
-                                      <Button
-                                        size="sm"
-                                        variant="outline"
-                                        onClick={() =>
-                                          setSubmittingDeliverable(
-                                            deliverable.id,
-                                          )
-                                        }
-                                        className="h-8 w-full rounded-input text-[12px]"
-                                      >
-                                        <Upload className="mr-1.5 h-3.5 w-3.5" />
-                                        Submit work
-                                      </Button>
-                                    )}
-                                    {isSubmitting && (
-                                      <div className="space-y-2 pt-1">
-                                        <Input
-                                          value={
-                                            deliverableSubmissionData.submissionUrl
-                                          }
-                                          onChange={(e) =>
-                                            setDeliverableSubmissionData({
-                                              ...deliverableSubmissionData,
-                                              submissionUrl: e.target.value,
-                                            })
-                                          }
-                                          placeholder="Submission URL"
-                                          className="h-9 text-[13px]"
-                                        />
-                                        <div className="flex gap-2">
-                                          <Button
-                                            size="sm"
-                                            onClick={async () => {
-                                              try {
-                                                const result =
-                                                  await submitDeliverableAction(
-                                                    deliverable.id,
-                                                    {
-                                                      founderId,
-                                                      submissionUrl:
-                                                        deliverableSubmissionData.submissionUrl,
-                                                      notes:
-                                                        deliverableSubmissionData.notes,
-                                                      attachments: [],
-                                                    },
-                                                  );
-                                                if (!result?.ok) {
-                                                  throw (
-                                                    result?.error ||
-                                                    new Error(
-                                                      "Failed to submit",
-                                                    )
-                                                  );
-                                                }
-                                                setDeliverableSubmissionData({
-                                                  submissionUrl: "",
-                                                  notes: "",
-                                                });
-                                                setSubmittingDeliverable(null);
-                                                toast.success(
-                                                  "Deliverable submitted!",
-                                                );
-                                              } catch (error) {
-                                                console.error(
-                                                  "Error submitting deliverable:",
-                                                  error,
-                                                );
-                                                toast.error("Failed to submit");
-                                              }
-                                            }}
-                                            disabled={
-                                              !deliverableSubmissionData.submissionUrl
-                                            }
-                                            className="h-8 flex-1 text-[12px]"
-                                          >
-                                            Submit
-                                          </Button>
-                                          <Button
-                                            size="sm"
-                                            variant="outline"
-                                            onClick={() => {
-                                              setSubmittingDeliverable(null);
-                                              setDeliverableSubmissionData({
-                                                submissionUrl: "",
-                                                notes: "",
-                                              });
-                                            }}
-                                            className="h-8 text-[12px]"
-                                          >
-                                            Cancel
-                                          </Button>
-                                        </div>
-                                      </div>
-                                    )}
-                                  </div>
-                                );
-                              })}
-                            </div>
-                          </div>
-                        )}
-                        <div className="flex flex-col gap-2 border-t border-surface-border pt-4 sm:flex-row">
-                          <Button
-                            size="sm"
-                            onClick={() => setShowMilestoneDetailView(true)}
-                            className="h-10 flex-1 rounded-input bg-primary font-body text-[13px] font-semibold text-white shadow-[0_4px_16px_rgba(58,90,254,0.25)] hover:bg-primary-hover"
-                          >
-                            <Eye className="mr-1.5 h-4 w-4" />
-                            View Tasks
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => setShowWeeklyReviewModal(true)}
-                            className="h-10 rounded-input border-surface-border bg-white font-body text-[13px] font-medium text-primary hover:bg-primary-tint sm:min-w-[160px]"
-                          >
-                            <CheckCircle2 className="mr-1.5 h-4 w-4" />
-                            Complete Week
-                          </Button>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="flex min-h-[160px] flex-col items-center justify-center px-4 py-8 text-center">
-                        {founderLaunchLoading ? (
-                          <>
-                            <Loader2 className="mb-3 h-8 w-8 animate-spin text-primary" />
-                            <p className="font-body text-[13px] text-text-muted">
-                              Checking your startup profile…
-                            </p>
-                          </>
-                        ) : founderNeedsLaunch ? (
-                          <>
-                            <Rocket className="mb-3 h-10 w-10 text-surface-border" />
-                            <h3 className="mb-1 font-heading text-[16px] font-semibold text-text-heading">
-                              Launch your startup first
-                            </h3>
-                            <p className="mb-4 max-w-md font-body text-[13px] text-text-body">
-                              Publish your startup post before setting weekly
-                              goals so your team can align with you.
-                            </p>
-                            <Button
-                              onClick={() => onNavigate?.("post-startup")}
-                              className="h-10 gap-2 rounded-input bg-primary font-body text-[13px] font-semibold text-white shadow-[0_4px_16px_rgba(58,90,254,0.25)] hover:bg-primary-hover"
-                            >
-                              <Rocket className="h-4 w-4" />
-                              Launch Startup
-                            </Button>
-                          </>
-                        ) : (
-                          <>
-                            <Target className="mb-3 h-10 w-10 text-surface-border" />
-                            <h3 className="mb-1 font-heading text-[16px] font-semibold text-text-heading">
-                              No weekly outcome set yet
-                            </h3>
-                            <p className="mb-4 max-w-md font-body text-[13px] text-text-body">
-                              Set a clear, achievable goal for this week to drive
-                              your startup forward.
-                            </p>
-                            <Button
-                              onClick={requestWeeklyOutcome}
-                              className="h-10 gap-2 rounded-input bg-primary font-body text-[13px] font-semibold text-white shadow-[0_4px_16px_rgba(58,90,254,0.25)] hover:bg-primary-hover"
-                            >
-                              <PlayCircle className="h-4 w-4" />
-                              Set This Week&apos;s Goal
-                            </Button>
-                          </>
-                        )}
-                      </div>
-                    )}
-                  </TooltipProvider>
-                )}
-              </SectionCard.Body>
-            </SectionCard>
-
-            <FounderQuickActions onNavigate={onNavigate} />
+            <div className="grid gap-3 lg:grid-cols-3">
+              <div className="lg:col-span-2">
+            <FounderWeeklyFocus
+              executionData={executionData}
+              tasks={tasks}
+              outcomeProgress={outcomeProgress}
+              weeklyOutcomeSubmitting={weeklyOutcomeSubmitting}
+              isLoadingExecutionData={isLoadingExecutionData}
+              founderLaunchLoading={founderLaunchLoading}
+              founderNeedsLaunch={founderNeedsLaunch}
+              deliverables={deliverables}
+              submittingDeliverable={submittingDeliverable}
+              setSubmittingDeliverable={setSubmittingDeliverable}
+              deliverableSubmissionData={deliverableSubmissionData}
+              setDeliverableSubmissionData={setDeliverableSubmissionData}
+              submitDeliverableAction={submitDeliverableAction}
+              founderId={founderId}
+              startupId={user.startupId}
+              onNavigate={onNavigate}
+              onOpenTasks={() => setShowMilestoneDetailView(true)}
+              onCompleteWeek={() => setShowWeeklyReviewModal(true)}
+              onLearnStage={() => setShowStageLearningModal(true)}
+              onSetOutcome={requestWeeklyOutcome}
+              onLaunchStartup={() => onNavigate?.("post-startup")}
+            />
+              </div>
+              <FounderExtraWorkCard founderId={founderId} />
+            </div>
 
             {founderId ? (
               <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
@@ -2240,13 +1863,6 @@ export default function FounderDashboard({
               onClose={() => setShowStageLearningModal(false)}
               stageName={currentStage.name}
               stageKey={currentStage.id.toString()}
-              founderId={founderId}
-            />
-            <StageRoadmapModal
-              isOpen={showRoadmapModal}
-              onClose={() => setShowRoadmapModal(false)}
-              journeyProgress={journeyProgress}
-              currentStageId={currentStageId}
               founderId={founderId}
             />
             <OutcomeSelectionModal

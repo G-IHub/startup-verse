@@ -92,7 +92,10 @@ function normalizeTasks(tasks = []) {
     id: toId(item),
     title: item.title || "Untitled task",
     status: normalizeTaskStatus(item.status),
-    milestoneId: String(item.milestoneId || ""),
+    milestoneId:
+      item.milestoneId && typeof item.milestoneId === "object"
+        ? String(item.milestoneId._id || item.milestoneId.id || "")
+        : String(item.milestoneId || ""),
     assignedTo,
     assignedToName:
       String(item.assignedToName || "").trim() || fromPopulate || "",

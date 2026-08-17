@@ -16,6 +16,10 @@ import {
   isAllowedAvatarMime,
   isAvatarScope,
 } from "../utils/avatarAttachments.js";
+import {
+  isAllowedWorkLogMime,
+  isWorkLogScope,
+} from "../utils/workLogAttachments.js";
 
 const MESSAGES_MAX_UPLOAD_BYTES = 40 * 1024 * 1024;
 
@@ -78,6 +82,13 @@ uploadsRouter.post(
       return apiError(
         res,
         "Avatar must be a JPEG, PNG, WebP, or GIF image (max 2MB).",
+        400,
+      );
+    }
+    if (isWorkLogScope(scope) && !isAllowedWorkLogMime(req.file.mimetype)) {
+      return apiError(
+        res,
+        "Work log image must be a JPEG, PNG, or WebP file (max 5MB).",
         400,
       );
     }

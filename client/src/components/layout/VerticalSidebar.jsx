@@ -22,6 +22,7 @@ import {
   MessageSquare,
   ChevronDown,
   StickyNote,
+  Map,
 } from "lucide-react";
 
 const PROGRAM_TAB_ICONS = {
@@ -139,6 +140,13 @@ export default function VerticalSidebar({
           roles: ["founder", "team-member", "team"],
         }]
       : []),
+    {
+      id: "journey",
+      icon: Map,
+      label: "Journey",
+      page: "journey",
+      roles: ["founder"],
+    },
   ];
 
   const primaryNavItems = allNavItems.filter((item) => item.roles.includes(user.role));
@@ -188,6 +196,17 @@ export default function VerticalSidebar({
     }
     if (item.id === "program") {
       return currentPage === "program";
+    }
+    if (item.id === "journey") {
+      return [
+        "journey",
+        "ideation",
+        "formation",
+        "team-building",
+        "product-dev",
+        "go-to-market",
+        "operations",
+      ].includes(currentPage);
     }
     if (item.page && item.view) {
       return currentPage === item.page && virtualOfficeView === item.view;

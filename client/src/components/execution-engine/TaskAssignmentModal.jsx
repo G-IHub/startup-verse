@@ -68,8 +68,8 @@ export default function TaskAssignmentModal({
   };
 
   return (
-    <div className="fixed inset-0 z-[70] flex items-center justify-center p-3 sv-modal-backdrop">
-      <Card className="sv-modal-panel flex max-h-[82vh] w-full max-w-[min(100%,22rem)] flex-col overflow-hidden rounded-[14px] border-0 shadow-modal sm:max-w-md">
+    <div className="pointer-events-auto absolute inset-0 z-20 flex items-center justify-center bg-[rgba(10,10,30,0.28)] p-3">
+      <Card className="flex max-h-[82vh] w-full max-w-[min(100%,22rem)] flex-col overflow-hidden rounded-[14px] border-0 bg-surface-card shadow-modal sm:max-w-md">
         <CardHeader className="flex-shrink-0 space-y-0 border-b border-primary/12 pb-3 pt-3">
           <div className="flex items-start justify-between gap-2">
             <div className="min-w-0 flex-1">

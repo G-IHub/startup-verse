@@ -288,3 +288,20 @@ export async function deletePost(founderId, postId) {
     method: "DELETE",
   });
 }
+
+export async function getFounderWorkLogs(founderId, params = {}) {
+  const start = new Date();
+  start.setHours(0, 0, 0, 0);
+  const end = new Date(start);
+  end.setDate(end.getDate() + 1);
+  const query = new URLSearchParams({
+    from: params.from || start.toISOString(),
+    to: params.to || end.toISOString(),
+  });
+  const result = await apiCall(
+    `/founders/${founderId}/work-logs?${query.toString()}`,
+  );
+  if (Array.isArray(result)) return result;
+  if (Array.isArray(result?.items)) return result.items;
+  return [];
+}
