@@ -3,6 +3,7 @@ import { Sparkles } from "lucide-react";
 import ExtraWorkLogDialog from "../../team-member/ExtraWorkLogDialog";
 import * as founderApi from "../../../utils/api/founderApi";
 import { resolveUserAvatar } from "../../../utils/resolveMediaUrl";
+import { startWorkLogRefresh } from "./workLogRefresh";
 
 const PANEL =
   "rounded-card border border-surface-border bg-surface-card shadow-soft";
@@ -31,16 +32,22 @@ export default function FounderExtraWorkCard({ founderId }) {
   useEffect(() => {
     if (!founderId) return undefined;
     let cancelled = false;
-    founderApi
-      .getFounderWorkLogs(founderId)
-      .then((rows) => {
-        if (!cancelled) setLogs(Array.isArray(rows) ? rows : []);
-      })
-      .catch(() => {
-        if (!cancelled) setLogs([]);
-      });
+    const refresh = () => {
+      founderApi
+        .getFounderWorkLogs(founderId)
+        .then((rows) => {
+          if (!cancelled) setLogs(Array.isArray(rows) ? rows : []);
+        })
+        .catch(() => {
+          // Keep the last successful result during a temporary request failure.
+        });
+    };
+
+    refresh();
+    const stopRefreshing = startWorkLogRefresh(refresh);
     return () => {
       cancelled = true;
+      stopRefreshing();
     };
   }, [founderId]);
 
