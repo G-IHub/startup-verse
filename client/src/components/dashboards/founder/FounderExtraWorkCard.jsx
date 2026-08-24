@@ -1,9 +1,13 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { Sparkles } from "lucide-react";
+import { Clock3, Image, Link2, Sparkles } from "lucide-react";
 import ExtraWorkLogDialog from "../../team-member/ExtraWorkLogDialog";
 import * as founderApi from "../../../utils/api/founderApi";
 import { resolveUserAvatar } from "../../../utils/resolveMediaUrl";
 import { startWorkLogRefresh } from "./workLogRefresh";
+import {
+  formatWorkLogTime,
+  getWorkLogAttachmentSummary,
+} from "./workLogPresentation";
 
 const PANEL =
   "rounded-card border border-surface-border bg-surface-card shadow-soft";
@@ -106,17 +110,46 @@ export default function FounderExtraWorkCard({ founderId }) {
                     </span>
                   </div>
                   <ul className="space-y-1">
-                    {group.logs.map((log) => (
-                      <li key={log.id}>
-                        <button
-                          type="button"
-                          onClick={() => setSelected(log)}
-                          className="w-full rounded-input px-2 py-1.5 text-left font-body text-[12px] text-text-body transition-colors hover:bg-primary-tint/50 hover:text-text-heading"
-                        >
-                          {log.title}
-                        </button>
-                      </li>
-                    ))}
+                    {group.logs.map((log) => {
+                      const attachments = getWorkLogAttachmentSummary(log);
+                      return (
+                        <li key={log.id}>
+                          <button
+                            type="button"
+                            onClick={() => setSelected(log)}
+                            className="w-full rounded-input border border-transparent bg-surface-card px-3 py-2.5 text-left transition-colors hover:border-primary/20 hover:bg-primary-tint/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                            aria-label={`View all details for ${log.title}`}
+                          >
+                            <span className="block font-heading text-[13px] font-semibold text-text-heading">
+                              {log.title}
+                            </span>
+                            <span className="mt-1 line-clamp-2 block font-body text-[12px] leading-relaxed text-text-body">
+                              {log.description}
+                            </span>
+                            <span className="mt-2 flex flex-wrap items-center gap-2 font-body text-[11px] text-text-muted">
+                              <span className="inline-flex items-center gap-1">
+                                <Clock3 className="h-3 w-3" aria-hidden="true" />
+                                <time dateTime={log.createdAt}>
+                                  {formatWorkLogTime(log.createdAt)}
+                                </time>
+                              </span>
+                              {attachments.includes("Photo") ? (
+                                <span className="inline-flex items-center gap-1">
+                                  <Image className="h-3 w-3" aria-hidden="true" />
+                                  Photo
+                                </span>
+                              ) : null}
+                              {attachments.includes("Link") ? (
+                                <span className="inline-flex items-center gap-1">
+                                  <Link2 className="h-3 w-3" aria-hidden="true" />
+                                  Link
+                                </span>
+                              ) : null}
+                            </span>
+                          </button>
+                        </li>
+                      );
+                    })}
                   </ul>
                 </li>
               );

@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { ImagePlus, Link2, Loader2, X } from "lucide-react";
+import { Clock3, ExternalLink, ImagePlus, Link2, Loader2, X } from "lucide-react";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { Textarea } from "../ui/textarea";
@@ -12,6 +12,7 @@ import {
   DialogTitle,
 } from "../ui/dialog";
 import { resolveMediaUrl } from "../../utils/resolveMediaUrl";
+import { formatWorkLogTime } from "../dashboards/founder/workLogPresentation";
 
 const ALLOWED_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
 const MAX_BYTES = 5 * 1024 * 1024;
@@ -119,7 +120,7 @@ export default function ExtraWorkLogDialog({
           <DialogDescription className="font-body text-sm text-text-body">
             {isView
               ? initialLog?.authorName
-                ? `${initialLog.authorName} logged this extra work.`
+                ? `${initialLog.authorName} logged this extra work at ${formatWorkLogTime(initialLog.createdAt)}.`
                 : "Work that was not on the assigned task list."
               : "Capture something you finished that was not assigned as a task."}
           </DialogDescription>
@@ -127,27 +128,56 @@ export default function ExtraWorkLogDialog({
 
         {isView ? (
           <div className="space-y-4">
-            <p className="whitespace-pre-wrap font-body text-[14px] leading-relaxed text-text-body">
-              {initialLog?.description}
-            </p>
+            <div className="rounded-input bg-surface-page p-3">
+              <p className="font-body text-[11px] font-semibold uppercase tracking-[0.08em] text-text-muted">
+                Description
+              </p>
+              <p className="mt-1.5 whitespace-pre-wrap font-body text-[14px] leading-relaxed text-text-body">
+                {initialLog?.description || "No description added."}
+              </p>
+            </div>
             {previewSrc ? (
-              <img
-                src={previewSrc}
-                alt=""
-                className="max-h-64 w-full rounded-input object-cover"
-              />
-            ) : null}
+              <figure className="space-y-2">
+                <figcaption className="font-body text-[11px] font-semibold uppercase tracking-[0.08em] text-text-muted">
+                  Photo
+                </figcaption>
+                <a href={previewSrc} target="_blank" rel="noreferrer">
+                  <img
+                    src={previewSrc}
+                    alt={`Extra work submitted by ${initialLog?.authorName || "team member"}`}
+                    className="max-h-80 w-full rounded-input object-contain"
+                  />
+                </a>
+              </figure>
+            ) : (
+              <p className="font-body text-[12px] text-text-muted">No photo added.</p>
+            )}
             {initialLog?.linkUrl ? (
-              <a
-                href={initialLog.linkUrl}
-                target="_blank"
-                rel="noreferrer"
-                className="inline-flex items-center gap-1.5 font-body text-[13px] font-semibold text-primary hover:underline"
-              >
-                <Link2 className="h-3.5 w-3.5" />
-                {formatLinkLabel(initialLog.linkUrl)}
-              </a>
-            ) : null}
+              <div className="rounded-input border border-surface-border p-3">
+                <p className="font-body text-[11px] font-semibold uppercase tracking-[0.08em] text-text-muted">
+                  Work link
+                </p>
+                <a
+                  href={initialLog.linkUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="mt-1.5 inline-flex max-w-full items-center gap-1.5 font-body text-[13px] font-semibold text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                >
+                  <Link2 className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                  <span className="truncate">{formatLinkLabel(initialLog.linkUrl)}</span>
+                  <ExternalLink className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                </a>
+              </div>
+            ) : (
+              <p className="font-body text-[12px] text-text-muted">No link added.</p>
+            )}
+            <div className="flex items-center gap-1.5 border-t border-surface-border pt-3 font-body text-[12px] text-text-muted">
+              <Clock3 className="h-3.5 w-3.5" aria-hidden="true" />
+              <span>Logged </span>
+              <time dateTime={initialLog?.createdAt}>
+                {formatWorkLogTime(initialLog?.createdAt)}
+              </time>
+            </div>
           </div>
         ) : (
           <form className="space-y-4" onSubmit={handleSubmit}>
