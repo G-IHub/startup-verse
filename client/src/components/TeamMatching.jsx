@@ -134,10 +134,36 @@ function TalentBrowseSkeleton({ count = 6 }) {
 
 function normalizeTalentProfile(profile) {
   if (!profile) return null;
-  if (
-    getTalentBrowseProfileCompletionPercent(profile) <
-    TALENT_BROWSE_MIN_COMPLETION
-  ) {
+  const browsePercent = getTalentBrowseProfileCompletionPercent(profile);
+  const uid = profile.userId;
+  if (browsePercent < TALENT_BROWSE_MIN_COMPLETION) {
+    // #region agent log
+    fetch("http://127.0.0.1:7693/ingest/705ddae2-d2f3-49e3-a30b-c6cd7f1197d9", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Debug-Session-Id": "b96660",
+      },
+      body: JSON.stringify({
+        sessionId: "b96660",
+        hypothesisId: "B",
+        location: "client/src/components/TeamMatching.jsx:normalizeTalentProfile",
+        message: "client dropped talent below browse min",
+        data: {
+          browsePercent,
+          userIdType: uid == null ? "null" : typeof uid,
+          userIdIsObject: Boolean(
+            uid && typeof uid === "object" && !Array.isArray(uid),
+          ),
+          hasEmail: Boolean(
+            uid && typeof uid === "object" ? uid.email : profile.email,
+          ),
+          fullName: String(profile.fullName || "").slice(0, 40),
+        },
+        timestamp: Date.now(),
+      }),
+    }).catch(() => {});
+    // #endregion
     return null;
   }
   const enriched = augmentTalentBrowseFields(profile);
@@ -338,10 +364,31 @@ export default function TeamMatching({ user, onNavigate }) {
       console.log("✅ [TeamMatching] Backend talent response:", data);
       const rawProfiles = data.data || data.profiles || [];
       if (!data.success || !Array.isArray(rawProfiles)) {
+        // #region agent log
+        fetch("http://127.0.0.1:7693/ingest/705ddae2-d2f3-49e3-a30b-c6cd7f1197d9", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "X-Debug-Session-Id": "b96660",
+          },
+          body: JSON.stringify({
+            sessionId: "b96660",
+            hypothesisId: "B",
+            location: "client/src/components/TeamMatching.jsx:loadTalentProfiles",
+            message: "talent profiles response not array",
+            data: {
+              success: data.success,
+              keys: data && typeof data === "object" ? Object.keys(data) : [],
+            },
+            timestamp: Date.now(),
+          }),
+        }).catch(() => {});
+        // #endregion
         setAvailableTalent([]);
         return;
       }
       let normalized = rawProfiles.map(normalizeTalentProfile).filter(Boolean);
+      const afterClientCompletion = normalized.length;
 
       if (user.role === "founder") {
         const founderKey = String(user._id ?? user.id ?? "");
@@ -353,6 +400,7 @@ export default function TeamMatching({ user, onNavigate }) {
               String(member.id || member.userId || member._id || ""),
             ),
           );
+          const beforeExclude = normalized.length;
           normalized = normalized.filter((talent) => {
             const talentUserId = String(
               talent.userId?._id ||
@@ -363,6 +411,31 @@ export default function TeamMatching({ user, onNavigate }) {
             );
             return talentUserId && !excludedIds.has(talentUserId);
           });
+          // #region agent log
+          fetch("http://127.0.0.1:7693/ingest/705ddae2-d2f3-49e3-a30b-c6cd7f1197d9", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "X-Debug-Session-Id": "b96660",
+            },
+            body: JSON.stringify({
+              sessionId: "b96660",
+              hypothesisId: "C",
+              location: "client/src/components/TeamMatching.jsx:loadTalentProfiles",
+              message: "client team exclusion",
+              data: {
+                rawCount: rawProfiles.length,
+                afterClientCompletion,
+                teamMemberCount: (teamMembers || []).length,
+                excludedIdCount: excludedIds.size,
+                beforeExclude,
+                afterExclude: normalized.length,
+                scopeId: String(scopeId).slice(0, 24),
+              },
+              timestamp: Date.now(),
+            }),
+          }).catch(() => {});
+          // #endregion
         } catch (error) {
           console.warn("[TeamMatching] Could not filter team members client-side:", error);
         }
@@ -796,6 +869,33 @@ export default function TeamMatching({ user, onNavigate }) {
         )) ||
       member.bio?.toLowerCase().includes(searchQuery.toLowerCase()),
   );
+  // #region agent log
+  if (user.role === "founder") {
+    fetch("http://127.0.0.1:7693/ingest/705ddae2-d2f3-49e3-a30b-c6cd7f1197d9", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Debug-Session-Id": "b96660",
+      },
+      body: JSON.stringify({
+        sessionId: "b96660",
+        hypothesisId: "D",
+        location: "client/src/components/TeamMatching.jsx:filteredTalent",
+        message: "founder browse list after search filter",
+        data: {
+          availableCount: availableTalent.length,
+          filteredCount: filteredTalent.length,
+          searchLen: String(searchQuery || "").length,
+          founderPostsStatus,
+          founderCanBrowseTalent:
+            user.role !== "founder" || founderPostsStatus === "has-post",
+          missingNameCount: availableTalent.filter((m) => !m?.name).length,
+        },
+        timestamp: Date.now(),
+      }),
+    }).catch(() => {});
+  }
+  // #endregion
   console.log(
     "[TeamMatching] 🎨 Rendering - availableTalent:",
     availableTalent.length,

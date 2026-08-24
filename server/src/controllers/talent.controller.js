@@ -173,9 +173,33 @@ export const getProfiles = async (req, res) => {
     .populate({ path: "userId", select: "name email avatarUrl" })
     .lean();
   let profiles = filterTalentProfilesForBrowse(raw);
+  const afterCompletion = profiles.length;
   if (req.user?.role === "founder" && req.user?.id) {
     profiles = await filterTalentProfilesForFounderBrowse(profiles, req.user.id);
   }
+  // #region agent log
+  fetch("http://127.0.0.1:7693/ingest/705ddae2-d2f3-49e3-a30b-c6cd7f1197d9", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "X-Debug-Session-Id": "b96660",
+    },
+    body: JSON.stringify({
+      sessionId: "b96660",
+      hypothesisId: "E",
+      location: "server/src/controllers/talent.controller.js:getProfiles",
+      message: "profiles endpoint counts",
+      data: {
+        route: "getProfiles",
+        rawLimit: raw.length,
+        afterCompletion,
+        afterFounderExclude: profiles.length,
+        role: req.user?.role || "",
+      },
+      timestamp: Date.now(),
+    }),
+  }).catch(() => {});
+  // #endregion
   return apiSuccess(res, profiles);
 };
 
@@ -186,9 +210,33 @@ export const browseTalent = async (req, res) => {
     .populate({ path: "userId", select: "name email avatarUrl" })
     .lean();
   let profiles = filterTalentProfilesForBrowse(raw);
+  const afterCompletion = profiles.length;
   if (req.user?.role === "founder" && req.user?.id) {
     profiles = await filterTalentProfilesForFounderBrowse(profiles, req.user.id);
   }
+  // #region agent log
+  fetch("http://127.0.0.1:7693/ingest/705ddae2-d2f3-49e3-a30b-c6cd7f1197d9", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "X-Debug-Session-Id": "b96660",
+    },
+    body: JSON.stringify({
+      sessionId: "b96660",
+      hypothesisId: "E",
+      location: "server/src/controllers/talent.controller.js:browseTalent",
+      message: "browse endpoint counts",
+      data: {
+        route: "browseTalent",
+        rawLimit: raw.length,
+        afterCompletion,
+        afterFounderExclude: profiles.length,
+        role: req.user?.role || "",
+      },
+      timestamp: Date.now(),
+    }),
+  }).catch(() => {});
+  // #endregion
   return apiSuccess(res, profiles);
 };
 

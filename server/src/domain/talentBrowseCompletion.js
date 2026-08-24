@@ -179,6 +179,50 @@ export function getTalentBrowseCompletionPercent(profile) {
 
 export function filterTalentProfilesForBrowse(profiles) {
   if (!Array.isArray(profiles)) return [];
+  const kept = [];
+  const dropped = [];
+  for (const p of profiles) {
+    const flat = talentBrowseProfileDocumentToFlat(p);
+    const percent = computeTalentProfileCompletionFromFlat(flat);
+    const uid = p?.userId;
+    const row = {
+      percent,
+      userIdType: uid == null ? "null" : typeof uid,
+      userIdIsObject: Boolean(uid && typeof uid === "object" && !Array.isArray(uid)),
+      hasEmail: Boolean(flat.email),
+      hasName: Boolean(flat.name),
+      hasTitle: Boolean(flat.professionalTitle),
+      hasYears: Boolean(flat.yearsOfExperience),
+      hasBio: Boolean(flat.bio),
+      hasExperienceField: Boolean(flat.experience),
+      skillsLen: Array.isArray(flat.skills) ? flat.skills.length : 0,
+    };
+    if (percent >= TALENT_BROWSE_MIN_COMPLETION) kept.push(row);
+    else dropped.push(row);
+  }
+  // #region agent log
+  fetch("http://127.0.0.1:7693/ingest/705ddae2-d2f3-49e3-a30b-c6cd7f1197d9", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "X-Debug-Session-Id": "b96660",
+    },
+    body: JSON.stringify({
+      sessionId: "b96660",
+      hypothesisId: "A",
+      location: "server/src/domain/talentBrowseCompletion.js:filterTalentProfilesForBrowse",
+      message: "browse completion filter",
+      data: {
+        rawCount: profiles.length,
+        keptCount: kept.length,
+        droppedCount: dropped.length,
+        droppedSample: dropped.slice(0, 12),
+        keptSample: kept.slice(0, 8),
+      },
+      timestamp: Date.now(),
+    }),
+  }).catch(() => {});
+  // #endregion
   return profiles.filter(
     (p) => getTalentBrowseCompletionPercent(p) >= TALENT_BROWSE_MIN_COMPLETION,
   );
