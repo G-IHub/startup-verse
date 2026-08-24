@@ -143,6 +143,7 @@ export function SimpleTeamMessaging({
   const [forwardOpen, setForwardOpen] = useState(false);
   const [selectionMode, setSelectionMode] = useState(false);
   const [selectionToolbar, setSelectionToolbar] = useState(null);
+  const { replyingTo, setReplyingTo, clearReply } = useReplyState();
   const composeTaskIdRef = useRef(composeTaskId);
   useEffect(() => {
     composeTaskIdRef.current = composeTaskId;
