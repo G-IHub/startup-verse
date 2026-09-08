@@ -3,6 +3,36 @@ export default {
   theme: {
     extend: {
       colors: {
+        /* ── V2 Autonomous OS Design System ─────────────────────────────────
+         *  These tokens power the new V2 screens. The existing tokens below
+         *  remain untouched so V1 screens keep working during migration.
+         * ─────────────────────────────────────────────────────────────────── */
+        v2: {
+          /* Brand blues */
+          blue:        "#1B4FD8",
+          "blue-tint": "#E6F1FB",
+          "blue-dark": "#0C447C",
+          /* Purple — AI Staff, score, execution */
+          purple:        "#534AB7",
+          "purple-tint": "#EEEDFE",
+          "purple-dark": "#3C3489",
+          /* Green — wins, completion, positive */
+          green:        "#1D9E75",
+          "green-tint": "#EAF3DE",
+          "green-dark": "#27500A",
+          /* Amber — mentors, warnings */
+          amber:        "#BA7517",
+          "amber-tint": "#FAEEDA",
+          "amber-dark": "#633806",
+          /* Neutrals */
+          surface:  "#FFFFFF",
+          page:     "#F9FAFB",
+          border:   "#E5E7EB",
+          muted:    "#6B7280",
+          subtle:   "#9CA3AF",
+          heading:  "#111827",
+          body:     "#374151",
+        },
         primary: {
           DEFAULT: "#3a5afe",
           foreground: "#ffffff",
