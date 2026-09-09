@@ -28,6 +28,11 @@ import {
   V2Dot,
 } from "../shared/v2-primitives";
 
+// ── Top bar helpers ──────────────────────────────────────────────────────
+function currentDayName() {
+  return new Date().toLocaleDateString("en-US", { weekday: "long" });
+}
+
 // ── Existing state stores (reused as-is) ─────────────────────────────────
 import { useHomeStore } from "../../state/useHomeStore";
 import { useExecutionScoreStore } from "../../state/useExecutionScoreStore";
@@ -341,7 +346,12 @@ export default function V2FounderDashboard({ user, onPageChange }) {
   // ─────────────────────────────────────────────────────────────────────
   if (homeLoading && !scoreData) {
     return (
-      <V2AppLayout user={user} currentPage="dashboard" onPageChange={onPageChange}>
+      <V2AppLayout
+        user={user}
+        currentPage="dashboard"
+        onPageChange={onPageChange}
+        topbarTitle="Founder Dashboard"
+      >
         <div className="flex h-full items-center justify-center">
           <div className="flex flex-col items-center gap-3">
             <div className="h-10 w-10 animate-spin rounded-full border-4 border-v2-border border-t-v2-blue" />
@@ -351,6 +361,24 @@ export default function V2FounderDashboard({ user, onPageChange }) {
       </V2AppLayout>
     );
   }
+
+  // ── Top bar ─────────────────────────────────────────────────────────────
+  const topbarChips = [
+    <V2Chip key="stage" variant="blue" dot>
+      {startupName} · Stage {stageId}
+    </V2Chip>,
+  ];
+  const topbarActions = (
+    <>
+      <V2Chip variant="grey">Week {outcome?.weekNumber ?? 1} · {currentDayName()}</V2Chip>
+      <V2Btn variant="secondary" size="sm" onClick={() => onPageChange("startup-office")}>
+        Open Virtual Office
+      </V2Btn>
+      <V2Btn variant="primary" size="sm" onClick={() => onPageChange("execution-engine")}>
+        Set weekly goal
+      </V2Btn>
+    </>
+  );
 
   // ─────────────────────────────────────────────────────────────────────
   // RIGHT PANEL
@@ -372,6 +400,9 @@ export default function V2FounderDashboard({ user, onPageChange }) {
       currentPage="dashboard"
       onPageChange={onPageChange}
       rightPanel={rightPanel}
+      topbarTitle="Founder Dashboard"
+      topbarChips={topbarChips}
+      topbarActions={topbarActions}
     >
       <div className="flex flex-col gap-5 p-5">
 

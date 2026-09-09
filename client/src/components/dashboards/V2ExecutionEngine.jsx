@@ -12,7 +12,7 @@
  *   updateMilestone(id, patch) — update milestone fields
  */
 
-import React, { useEffect, useState, useMemo, useCallback } from "react";
+import React, { useEffect, useState, useMemo, useCallback, useRef } from "react";
 import { cn } from "../ui/utils";
 
 import V2AppLayout from "../layout/V2AppLayout";
@@ -28,6 +28,7 @@ import {
 
 import { useWeeklyLoopStore } from "../../state/useWeeklyLoopStore";
 import { useExecutionScoreStore } from "../../state/useExecutionScoreStore";
+import { useJourneyStore } from "../../state/useJourneyStore";
 
 import {
   Target,
@@ -107,7 +108,7 @@ function mileIcon(m) {
 // WEEKLY GOAL CARD
 // ─────────────────────────────────────────────────────────────────────────
 
-function WeeklyGoalCard({ outcome, milestoneProgress, onSave, saving }) {
+function WeeklyGoalCard({ outcome, milestoneProgress, onSave, saving, editTrigger }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState("");
 
@@ -115,6 +116,16 @@ function WeeklyGoalCard({ outcome, milestoneProgress, onSave, saving }) {
     setDraft(outcome?.goal ?? "");
     setEditing(true);
   };
+
+  // Lets the top bar's "New week goal" button open edit mode from outside.
+  const lastEditTrigger = useRef(editTrigger);
+  useEffect(() => {
+    if (editTrigger !== lastEditTrigger.current) {
+      lastEditTrigger.current = editTrigger;
+      handleEdit();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editTrigger]);
 
   const handleSave = async () => {
     const text = draft.trim();
@@ -469,7 +480,6 @@ function ExecutionRightPanel({ scoreData, outcomes, milestoneProgress, onPageCha
 
 export default function V2ExecutionEngine({ user, onPageChange }) {
   const userId    = String(user?._id ?? user?.id ?? "");
-  const firstName = user?.name?.split(" ")[0] ?? "Founder";
 
   // ── Store wiring ──────────────────────────────────────────────────────
   const loadLoop      = useWeeklyLoopStore((s) => s.load);
@@ -484,14 +494,24 @@ export default function V2ExecutionEngine({ user, onPageChange }) {
   const updateMilestone = useWeeklyLoopStore((s) => s.updateMilestone);
 
   const scoreData     = useExecutionScoreStore((s) => s.score);
+  const journeyProgress = useJourneyStore((s) => s.progress);
 
   const activeOutcome     = viewModel?.activeOutcome ?? null;
   const milestoneProgress = viewModel?.metrics?.milestoneProgress ?? 0;
+
+  // ── Top bar data ──────────────────────────────────────────────────────
+  const stageId     = journeyProgress?.currentStage ?? 1;
+  const startupName = user?.startup?.name ?? "Your Startup";
+  const streak      = scoreData?.streak ?? scoreData?.currentStreak ?? 0;
+  const weekNumber  = activeOutcome?.weekNumber ?? 1;
+  const dayOfWeek   = new Date().getDay(); // 0 = Sunday
+  const daysToSunday = dayOfWeek === 0 ? 0 : 7 - dayOfWeek;
 
   // ── Local UI state ────────────────────────────────────────────────────
   const [taskFilter, setTaskFilter]   = useState("all");
   const [goalSaving, setGoalSaving]   = useState(false);
   const [togglingId, setTogglingId]   = useState(null);
+  const [goalEditTrigger, setGoalEditTrigger] = useState(0);
 
   // ── Load data ─────────────────────────────────────────────────────────
   useEffect(() => {
@@ -549,7 +569,12 @@ export default function V2ExecutionEngine({ user, onPageChange }) {
   // ── Loading state ─────────────────────────────────────────────────────
   if (loopLoading && milestones.length === 0 && tasks.length === 0) {
     return (
-      <V2AppLayout user={user} currentPage="execution-engine" onPageChange={onPageChange}>
+      <V2AppLayout
+        user={user}
+        currentPage="execution-engine"
+        onPageChange={onPageChange}
+        topbarTitle="Execution Engine"
+      >
         <div className="flex h-full items-center justify-center">
           <div className="flex flex-col items-center gap-3">
             <div className="h-10 w-10 animate-spin rounded-full border-4 border-v2-border border-t-v2-purple" />
@@ -560,6 +585,36 @@ export default function V2ExecutionEngine({ user, onPageChange }) {
     );
   }
 
+  // ── Top bar ─────────────────────────────────────────────────────────────
+  const topbarChips = [
+    <V2Chip key="stage" variant="blue" dot>
+      {startupName} · Stage {stageId}
+    </V2Chip>,
+    <V2Chip key="streak" variant="green" dot>
+      Week {weekNumber} active · {streak}-week streak
+    </V2Chip>,
+  ];
+  const topbarActions = (
+    <>
+      <V2Chip variant="grey">
+        {daysToSunday === 0
+          ? "Due today"
+          : `Sunday deadline · ${daysToSunday} day${daysToSunday === 1 ? "" : "s"} left`}
+      </V2Chip>
+      {loopRefreshing ? <RefreshCw className="h-4 w-4 animate-spin text-v2-muted" /> : null}
+      <V2Btn variant="secondary" size="sm">
+        History
+      </V2Btn>
+      <V2Btn
+        variant="primary"
+        size="sm"
+        onClick={() => setGoalEditTrigger((n) => n + 1)}
+      >
+        New week goal
+      </V2Btn>
+    </>
+  );
+
   return (
     <V2AppLayout
       user={user}
@@ -567,12 +622,8 @@ export default function V2ExecutionEngine({ user, onPageChange }) {
       onPageChange={onPageChange}
       rightPanel={rightPanel}
       topbarTitle="Execution Engine"
-      topbarSubtitle={`${firstName}'s weekly execution hub`}
-      topbarActions={
-        loopRefreshing
-          ? <RefreshCw className="h-4 w-4 animate-spin text-v2-muted" />
-          : null
-      }
+      topbarChips={topbarChips}
+      topbarActions={topbarActions}
     >
       <div className="flex flex-col gap-5 p-5">
 
@@ -582,6 +633,7 @@ export default function V2ExecutionEngine({ user, onPageChange }) {
           milestoneProgress={milestoneProgress}
           onSave={handleSaveGoal}
           saving={goalSaving}
+          editTrigger={goalEditTrigger}
         />
 
         {/* ── Milestones ───────────────────────────────────────────────── */}

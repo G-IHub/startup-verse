@@ -21,28 +21,40 @@ import { cn } from "../ui/utils";
 import V2Sidebar from "./V2Sidebar";
 
 /* ── Top bar inside main column ──────────────────────────────────────── */
-function V2Topbar({ title, subtitle, actions }) {
+/**
+ * Breadcrumb + title + chips (left), chips + buttons (right) — matches the
+ * `.topbar` pattern in the StartupVerse V2 HTML mockups (e.g.
+ * `StartupVerse › Founder Dashboard · [stage chip]` ... `[week chip] [btn] [btn]`).
+ */
+function V2Topbar({ breadcrumb = "StartupVerse", title, chips = [], actions }) {
   return (
     <div
       className={cn(
-        "flex h-14 shrink-0 items-center justify-between",
+        "flex h-14 shrink-0 items-center justify-between gap-3",
         "border-b border-v2-border bg-v2-surface px-5",
       )}
     >
-      <div className="min-w-0 flex-1">
+      <div className="flex min-w-0 flex-1 items-center gap-2 overflow-hidden">
+        <span className="shrink-0 font-body text-[12px] text-v2-muted">
+          {breadcrumb}
+        </span>
         {title ? (
-          <h1 className="truncate font-heading text-[15px] font-semibold text-v2-heading leading-tight">
-            {title}
-          </h1>
+          <>
+            <span className="shrink-0 font-body text-[12px] text-v2-subtle">›</span>
+            <h1 className="shrink-0 truncate font-heading text-[14px] font-medium text-v2-heading">
+              {title}
+            </h1>
+          </>
         ) : null}
-        {subtitle ? (
-          <p className="truncate font-body text-[11px] text-v2-muted leading-tight">
-            {subtitle}
-          </p>
+        {chips.length > 0 ? (
+          <>
+            <span className="shrink-0 font-body text-[12px] text-v2-subtle">·</span>
+            <div className="flex items-center gap-1.5 overflow-x-auto">{chips}</div>
+          </>
         ) : null}
       </div>
       {actions ? (
-        <div className="flex items-center gap-2 pl-3">{actions}</div>
+        <div className="flex shrink-0 items-center gap-2 pl-3">{actions}</div>
       ) : null}
     </div>
   );
@@ -71,8 +83,9 @@ export default function V2AppLayout({
   onPageChange,
   children,
   rightPanel = null,
+  topbarBreadcrumb,
   topbarTitle,
-  topbarSubtitle,
+  topbarChips,
   topbarActions,
   className,
 }) {
@@ -93,10 +106,11 @@ export default function V2AppLayout({
       {/* Col 2 — main content (fills remaining width) */}
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
         {/* Optional top bar */}
-        {(topbarTitle || topbarActions) ? (
+        {(topbarTitle || topbarChips?.length || topbarActions) ? (
           <V2Topbar
+            breadcrumb={topbarBreadcrumb}
             title={topbarTitle}
-            subtitle={topbarSubtitle}
+            chips={topbarChips}
             actions={topbarActions}
           />
         ) : null}
