@@ -40,6 +40,7 @@ import { useWeeklyLoopStore } from "../../state/useWeeklyLoopStore";
 import { useTeamStore } from "../../state/useTeamStore";
 import { useJourneyStore } from "../../state/useJourneyStore";
 import { useStageTaskStore } from "../../state/useStageTaskStore";
+import { useMembershipsStore } from "../../state/useMembershipsStore";
 import { JOURNEY_STAGES } from "../../utils/journeyProgress";
 import { STAGE_TASKS } from "../../domains/founder/stageTasks";
 
@@ -73,6 +74,31 @@ function scoreColor(score) {
   if (score >= 60) return "text-v2-purple";
   if (score >= 40) return "text-v2-amber";
   return "text-red-500";
+}
+
+/** Purely a derived label for the real score — same buckets as scoreColor. */
+function scoreLabel(score) {
+  if (score >= 80) return "Strong Executor";
+  if (score >= 60) return "Solid Progress";
+  if (score >= 40) return "Building Momentum";
+  return "Just Getting Started";
+}
+
+/** Real week number within a real cohort's real date range — no invented data. */
+function cohortWeekInfo(cohort) {
+  if (!cohort?.startDate) return null;
+  const start = new Date(cohort.startDate);
+  if (Number.isNaN(start.getTime())) return null;
+  const now = new Date();
+  const weekNumber = Math.max(1, Math.floor((now - start) / (7 * 24 * 60 * 60 * 1000)) + 1);
+  if (cohort.endDate) {
+    const end = new Date(cohort.endDate);
+    if (!Number.isNaN(end.getTime())) {
+      const totalWeeks = Math.max(1, Math.ceil((end - start) / (7 * 24 * 60 * 60 * 1000)));
+      return `${cohort.name} · Week ${Math.min(weekNumber, totalWeeks)} of ${totalWeeks}`;
+    }
+  }
+  return `${cohort.name} · Week ${weekNumber}`;
 }
 
 function taskStatusChip(status) {
@@ -459,6 +485,9 @@ export default function V2FounderDashboard({ user, onPageChange }) {
   const startup     = user?.startup ?? null;
   const startupName = startup?.name ?? "Your Startup";
 
+  const primaryCohort = useMembershipsStore((s) => s.primaryCohort);
+  const cohortLabel = cohortWeekInfo(primaryCohort);
+
   useEffect(() => {
     if (userId) loadAll({ userId });
   }, [userId, loadAll]);
@@ -538,53 +567,64 @@ export default function V2FounderDashboard({ user, onPageChange }) {
     >
       <div className="flex flex-col gap-5 p-5">
 
-        {/* ── Welcome banner ──────────────────────────────────────────── */}
-        <V2Card className="flex items-start justify-between gap-4">
+        {/* ── Hero ─────────────────────────────────────────────────────── */}
+        <V2Card className="grid grid-cols-1 gap-5 md:grid-cols-[1fr_auto] md:items-center">
           <div>
-            {/* Eyebrow */}
-            <div className="mb-2 inline-flex items-center gap-1.5 rounded-full bg-v2-purple-tint px-2.5 py-1">
-              <Zap className="h-3 w-3 text-v2-purple" />
-              <span className="font-body text-[10px] font-semibold text-v2-purple uppercase tracking-wide">
-                Execution Mode
-              </span>
-            </div>
+            {/* Eyebrow — real cohort name + week, when the founder is in a cohort */}
+            {cohortLabel ? (
+              <div className="mb-2 inline-flex items-center gap-1.5 rounded-full bg-v2-blue-tint px-2.5 py-1">
+                <span className="h-[5px] w-[5px] rounded-full bg-v2-blue" />
+                <span className="font-body text-[10px] font-semibold text-v2-blue-dark">
+                  {cohortLabel}
+                </span>
+              </div>
+            ) : null}
+
             <h2 className="font-heading text-[20px] font-bold text-v2-heading leading-tight">
-              Good morning, {firstName} 👋
+              Good morning, {firstName}
             </h2>
-            <p className="mt-1 font-body text-[13px] text-v2-muted">
-              {startupName} · Stage {stageId}/6 · {stageName}
+            <p className="mt-1 font-body text-[13px] text-v2-muted leading-relaxed">
+              {startupName} is executing.{" "}
+              {streak > 0
+                ? `You have a ${streak}-week streak. Keep this week's momentum going.`
+                : "Complete this week's goal to start your streak."}
             </p>
+
+            {/* Embedded weekly goal — click through to the execution engine */}
+            <button
+              type="button"
+              onClick={() => onPageChange("execution-engine")}
+              className="mt-4 w-full rounded-[10px] border border-v2-border bg-v2-page px-3.5 py-3 text-left transition-colors hover:border-v2-purple-tint hover:bg-v2-purple-tint/30"
+            >
+              <p className="font-body text-[10px] font-semibold uppercase tracking-wide text-v2-subtle">
+                This Week's Goal
+              </p>
+              <p className="mt-1 font-body text-[13px] font-medium text-v2-heading leading-snug">
+                {outcome?.goal ?? "No goal set this week — tap to set one."}
+              </p>
+            </button>
           </div>
-          <V2Btn
-            variant="purple"
-            size="sm"
-            onClick={() => onPageChange("execution-engine")}
-          >
-            <Zap className="h-3.5 w-3.5" />
-            Open Execution Engine
-          </V2Btn>
+
+          {/* Score ring — the one big ring for the whole page */}
+          <div className="flex flex-col items-center gap-2 md:pl-2">
+            <V2ScoreRing score={score} size={96} strokeWidth={7} />
+            <span className="rounded-full bg-v2-blue-tint px-2.5 py-1 font-body text-[11px] font-medium text-v2-blue-dark">
+              {scoreLabel(score)}
+              {scoreData?.weeklyChange ? ` · ${scoreData.weeklyChange > 0 ? "+" : ""}${scoreData.weeklyChange} this week` : ""}
+            </span>
+          </div>
         </V2Card>
 
         {/* ── Metric tiles ────────────────────────────────────────────── */}
         <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
-          {/* Score tile */}
-          <V2Card className="col-span-2 flex items-center gap-4 xl:col-span-1">
-            <V2ScoreRing score={score} size={64} strokeWidth={5} />
-            <div>
-              <p className="font-body text-[10px] font-semibold uppercase tracking-wide text-v2-muted">
-                Score
-              </p>
-              <p className={cn("font-heading text-[26px] font-bold leading-none", scoreColor(score))}>
-                {score}
-              </p>
-              {scoreData?.weeklyChange !== 0 ? (
-                <p className={cn("font-body text-[10px]",
-                  (scoreData?.weeklyChange ?? 0) > 0 ? "text-v2-green" : "text-red-500")}>
-                  {(scoreData?.weeklyChange ?? 0) > 0 ? "▲" : "▼"} {Math.abs(scoreData?.weeklyChange ?? 0)} this week
-                </p>
-              ) : null}
-            </div>
-          </V2Card>
+          <MetricTile
+            icon={Zap}
+            label="Score"
+            value={score}
+            sub={scoreData?.weeklyChange ? `${scoreData.weeklyChange > 0 ? "+" : ""}${scoreData.weeklyChange} this week` : "No change yet"}
+            iconBg="bg-v2-blue-tint"
+            iconColor={scoreColor(score)}
+          />
 
           <MetricTile
             icon={Target}

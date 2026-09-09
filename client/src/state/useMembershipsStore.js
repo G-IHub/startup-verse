@@ -31,6 +31,7 @@ function readCohortId(row) {
 const initialState = {
   founderId: null,
   memberships: [],
+  primaryCohort: null, // { id, name, startDate, endDate } — real data, fetched lazily
   loading: false,
   error: null,
   lastLoadedAt: null,
@@ -54,10 +55,37 @@ export const useMembershipsStore = create((set, get) => ({
         error: null,
         lastLoadedAt: new Date().toISOString(),
       });
+
+      const primaryCohortId = readCohortId(memberships[0]);
+      if (primaryCohortId) {
+        get().loadPrimaryCohortDetails(primaryCohortId);
+      }
+
       return memberships;
     } catch (error) {
       set({ loading: false, error, memberships: [] });
       return [];
+    }
+  },
+
+  /** Fetches the cohort's own name/dates — separate from the lightweight
+   *  membership-id list above, so a failure here doesn't block it. */
+  async loadPrimaryCohortDetails(cohortId) {
+    if (!cohortId) return null;
+    try {
+      const data = await apiGet(`/cohorts/${cohortId}`);
+      const cohort = data?.cohort || data;
+      if (!cohort?.name) return null;
+      const primaryCohort = {
+        id: cohortId,
+        name: cohort.name,
+        startDate: cohort.startDate || null,
+        endDate: cohort.endDate || null,
+      };
+      set({ primaryCohort });
+      return primaryCohort;
+    } catch {
+      return null;
     }
   },
 
