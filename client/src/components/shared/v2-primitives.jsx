@@ -3,6 +3,13 @@
  * Shared atomic components used across all V2 screens.
  * Matches the design system defined in the HTML mockups.
  *
+ * Typography scale (matches mockup):
+ *   Section heads   14px semi-bold
+ *   Body / labels   13–14px
+ *   Small labels    12px
+ *   Chips           12px medium
+ *   Buttons sm      13px  md 13px  lg 14px
+ *
  * Exports:
  *   V2Card        — white bordered card
  *   V2Chip        — inline status chip (color variants)
@@ -22,7 +29,7 @@ export function V2Card({ children, className, ...props }) {
   return (
     <div
       className={cn(
-        "rounded-[14px] border border-v2-border bg-v2-surface p-4",
+        "rounded-[14px] border border-v2-border bg-v2-surface p-5",
         className,
       )}
       {...props}
@@ -35,12 +42,12 @@ export function V2Card({ children, className, ...props }) {
 /* ── Section header inside a card ────────────────────────────────────── */
 export function V2SectionHead({ title, action, className }) {
   return (
-    <div className={cn("mb-3 flex items-center justify-between", className)}>
-      <span className="font-body text-[12px] font-semibold text-v2-heading">
+    <div className={cn("mb-4 flex items-center justify-between", className)}>
+      <span className="font-body text-[14px] font-semibold text-v2-heading">
         {title}
       </span>
       {action ? (
-        <span className="font-body text-[11px] text-v2-muted">{action}</span>
+        <span className="font-body text-[12px] text-v2-muted">{action}</span>
       ) : null}
     </div>
   );
@@ -60,8 +67,8 @@ export function V2Chip({ children, variant = "grey", dot = false, className }) {
   return (
     <span
       className={cn(
-        "inline-flex items-center gap-1 whitespace-nowrap rounded-full px-2.5 py-0.5",
-        "font-body text-[11px] font-medium leading-none",
+        "inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-3 py-1",
+        "font-body text-[12px] font-medium leading-none",
         CHIP_VARIANTS[variant] ?? CHIP_VARIANTS.grey,
         className,
       )}
@@ -69,7 +76,7 @@ export function V2Chip({ children, variant = "grey", dot = false, className }) {
       {dot ? (
         <span
           className={cn(
-            "h-[5px] w-[5px] rounded-full",
+            "h-[6px] w-[6px] shrink-0 rounded-full",
             variant === "green"  ? "bg-v2-green"  :
             variant === "blue"   ? "bg-v2-blue"   :
             variant === "purple" ? "bg-v2-purple" :
@@ -88,8 +95,8 @@ export function V2Badge({ children, variant = "blue", className }) {
   return (
     <span
       className={cn(
-        "inline-flex min-w-[18px] items-center justify-center rounded-full px-1.5 py-0.5",
-        "font-body text-[10px] font-semibold leading-none",
+        "inline-flex min-w-[20px] items-center justify-center rounded-full px-2 py-0.5",
+        "font-body text-[11px] font-semibold leading-none",
         CHIP_VARIANTS[variant] ?? CHIP_VARIANTS.blue,
         className,
       )}
@@ -148,7 +155,7 @@ export function V2ScoreRing({ score = 0, size = 80, strokeWidth = 6, className }
         </span>
         <span
           className="font-body text-v2-muted leading-none"
-          style={{ fontSize: size * 0.12 }}
+          style={{ fontSize: size * 0.13 }}
         >
           score
         </span>
@@ -181,9 +188,9 @@ export function V2Btn({
         "font-body font-medium leading-none transition-colors duration-150",
         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-v2-blue/30",
         "disabled:pointer-events-none disabled:opacity-50",
-        size === "sm" ? "px-3 py-1.5 text-[11px]" :
-        size === "lg" ? "px-5 py-2.5 text-[14px]" :
-                        "px-4 py-2 text-[12px]",
+        size === "sm" ? "px-3.5 py-2 text-[13px]" :
+        size === "lg" ? "px-6 py-3 text-[14px]"   :
+                        "px-4 py-2.5 text-[13px]",
         BTN_VARIANTS[variant] ?? BTN_VARIANTS.secondary,
         className,
       )}
