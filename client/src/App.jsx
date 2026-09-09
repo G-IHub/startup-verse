@@ -39,6 +39,8 @@ import {
   DASHBOARD_ROUTE_PATHS,
 } from "./app/dashboardPaths";
 const DashboardHybrid = lazy(() => import("./components/DashboardHybrid"));
+// V2 Autonomous OS shell — mounts at /v2 and /v2/*
+const V2DashboardShell = lazy(() => import("./components/V2DashboardShell"));
 const ProfileCompletionForm = lazy(
   () => import("./components/ProfileCompletionForm"),
 );
@@ -525,6 +527,20 @@ function AppContent() {
       <LoadingSpinner />
     );
 
+  // V2 Autonomous OS shell — served at /v2 and /v2/*
+  const v2ShellElement =
+    user ? (
+      <Suspense fallback={<LoadingSpinner />}>
+        <V2DashboardShell
+          user={user}
+          onLogout={handleLogout}
+          onUpdateUser={handleUpdateUser}
+        />
+      </Suspense>
+    ) : (
+      <LoadingSpinner />
+    );
+
   const marketingTree = (
     <>
       {currentView === APP_VIEWS.home && (
@@ -735,6 +751,9 @@ function AppContent() {
           {DASHBOARD_ROUTE_PATHS.map((p) => (
             <Route key={p} path={p} element={dashboardHybridElement} />
           ))}
+          {/* V2 Autonomous OS — single shell handles all /v2/* sub-paths */}
+          <Route path="/v2" element={v2ShellElement} />
+          <Route path="/v2/*" element={v2ShellElement} />
         </Route>
         <Route path="/" element={marketingTree} />
         <Route path="*" element={<UnknownPathFallback />} />

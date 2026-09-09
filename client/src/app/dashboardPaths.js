@@ -72,6 +72,8 @@ export const DASHBOARD_PATH_PREFIXES = Object.freeze(
       "startup-detail",
       "talent-profile",
       "compensation-demo",
+      // V2 Autonomous OS — all sub-paths share the "v2" prefix
+      "v2",
     ],
   ),
 );
@@ -401,6 +403,18 @@ export function dashboardStateToPath(state) {
 
 /** Paths registered as `<Route>` elements for the dashboard shell (Phase 1 + internal pages). */
 export const DASHBOARD_ROUTE_PATHS = Object.freeze([
+  // ── V2 Autonomous OS ──────────────────────────────────────────────────────
+  // Listed first so path guards hit them quickly; the V2 shell handles all
+  // sub-routes internally via V2DashboardShell (App.jsx uses /v2 + /v2/*).
+  "/v2",
+  "/v2/execution",
+  "/v2/office",
+  "/v2/community",
+  "/v2/journey",
+  "/v2/ai-staff",
+  "/v2/blueprints",
+  "/v2/mentors",
+  // ── V1 shell paths ────────────────────────────────────────────────────────
   "/home",
   "/office",
   "/office/tasks/:taskId",
