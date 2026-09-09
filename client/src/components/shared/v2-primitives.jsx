@@ -29,7 +29,7 @@ export function V2Card({ children, className, ...props }) {
   return (
     <div
       className={cn(
-        "rounded-[14px] border border-v2-border bg-v2-surface p-5",
+        "rounded-[14px] border border-v2-border bg-v2-surface p-4",
         className,
       )}
       {...props}
@@ -42,7 +42,7 @@ export function V2Card({ children, className, ...props }) {
 /* ── Section header inside a card ────────────────────────────────────── */
 export function V2SectionHead({ title, action, className }) {
   return (
-    <div className={cn("mb-4 flex items-center justify-between", className)}>
+    <div className={cn("mb-3 flex items-center justify-between", className)}>
       <span className="font-body text-[12px] font-medium text-v2-heading">
         {title}
       </span>

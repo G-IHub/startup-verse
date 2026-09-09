@@ -361,10 +361,10 @@ function DashboardRightPanel({ scoreData, teamMembers, onPageChange }) {
   const change = scoreData?.weeklyChange ?? 0;
 
   return (
-    <div className="flex flex-col gap-4 p-4">
+    <div className="flex flex-col gap-3 p-3">
 
       {/* Score card */}
-      <V2Card className="flex flex-col items-center gap-3 py-5">
+      <V2Card className="flex flex-col items-center gap-3 py-4">
         <V2ScoreRing score={score} size={88} />
         <div className="text-center">
           <p className="font-body text-[11px] font-medium uppercase tracking-wide text-v2-muted">
@@ -576,7 +576,7 @@ export default function V2FounderDashboard({ user, onPageChange }) {
       topbarChips={topbarChips}
       topbarActions={topbarActions}
     >
-      <div className="flex flex-col gap-5 p-5">
+      <div className="flex flex-col gap-4 p-4">
 
         {/* ── Hero ─────────────────────────────────────────────────────── */}
         <V2Card>
@@ -681,7 +681,7 @@ export default function V2FounderDashboard({ user, onPageChange }) {
         />
 
         {/* ── Weekly goal + milestones ─────────────────────────────────── */}
-        <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+        <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">
 
           {/* Weekly goal card */}
           <V2Card>

@@ -625,7 +625,7 @@ export default function V2ExecutionEngine({ user, onPageChange }) {
       topbarChips={topbarChips}
       topbarActions={topbarActions}
     >
-      <div className="flex flex-col gap-5 p-5">
+      <div className="flex flex-col gap-4 p-4">
 
         {/* ── Weekly Goal ──────────────────────────────────────────────── */}
         <WeeklyGoalCard
