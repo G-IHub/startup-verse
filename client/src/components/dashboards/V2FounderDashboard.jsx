@@ -39,6 +39,9 @@ import { useExecutionScoreStore } from "../../state/useExecutionScoreStore";
 import { useWeeklyLoopStore } from "../../state/useWeeklyLoopStore";
 import { useTeamStore } from "../../state/useTeamStore";
 import { useJourneyStore } from "../../state/useJourneyStore";
+import { useStageTaskStore } from "../../state/useStageTaskStore";
+import { JOURNEY_STAGES } from "../../utils/journeyProgress";
+import { STAGE_TASKS } from "../../domains/founder/stageTasks";
 
 // ── Icons ─────────────────────────────────────────────────────────────────
 import {
@@ -57,6 +60,8 @@ import {
   Map,
   ArrowUp,
   ArrowDown,
+  Check,
+  Lock,
 } from "lucide-react";
 
 // ─────────────────────────────────────────────────────────────────────────
@@ -160,6 +165,131 @@ function MilestoneRow({ milestone, onOpen }) {
       </div>
       <ChevronRight className="h-3.5 w-3.5 shrink-0 text-v2-muted" />
     </button>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// FOUNDER JOURNEY STAGE TRACKER
+// ─────────────────────────────────────────────────────────────────────────
+
+/** Splits a stage's checklist into complete / in-progress / remaining using
+ *  the founder's real saved responses (useStageTaskStore) — no fabricated
+ *  numbers. "In progress" = has saved text but not marked complete. */
+function useStageCriteriaCounts(stageId) {
+  const responses = useStageTaskStore((s) => s.responses);
+  return useMemo(() => {
+    const tasks = STAGE_TASKS[stageId] || [];
+    const stageResponses = responses[String(stageId)] || {};
+    let complete = 0;
+    let inProgress = 0;
+    for (const task of tasks) {
+      const r = stageResponses[task.id];
+      if (r?.completedAt) complete += 1;
+      else if (r?.text?.trim()) inProgress += 1;
+    }
+    return {
+      total: tasks.length,
+      complete,
+      inProgress,
+      remaining: Math.max(0, tasks.length - complete - inProgress),
+    };
+  }, [responses, stageId]);
+}
+
+function FounderJourneyTracker({ stageId, completedStages, completionPercentage, onViewCriteria }) {
+  const criteria = useStageCriteriaCounts(stageId);
+
+  return (
+    <V2Card>
+      <V2SectionHead
+        title={`Founder Journey — Stage ${stageId} of ${JOURNEY_STAGES.length}`}
+        action={
+          <button
+            type="button"
+            onClick={onViewCriteria}
+            className="font-body text-[10px] text-v2-blue hover:underline"
+          >
+            View stage criteria →
+          </button>
+        }
+      />
+
+      {/* Step circles + connectors */}
+      <div className="flex items-start">
+        {JOURNEY_STAGES.map((stage, idx) => {
+          const isDone = completedStages.includes(stage.id) || stage.id < stageId;
+          const isActive = stage.id === stageId;
+          const isLocked = !isDone && !isActive;
+
+          return (
+            <React.Fragment key={stage.id}>
+              <div className="flex flex-1 flex-col items-center gap-1.5 px-1">
+                <div
+                  className={cn(
+                    "flex h-8 w-8 shrink-0 items-center justify-center rounded-full border-[1.5px]",
+                    "font-body text-[12px] font-medium",
+                    isDone && "border-v2-blue bg-v2-blue text-white",
+                    isActive && "border-v2-blue bg-v2-blue-tint text-v2-blue-dark",
+                    isLocked && "border-v2-border bg-v2-page text-v2-subtle",
+                  )}
+                >
+                  {isDone ? <Check className="h-3.5 w-3.5" /> : isLocked ? <Lock className="h-3 w-3" /> : stage.id}
+                </div>
+                <span
+                  className={cn(
+                    "text-center font-body text-[9px] leading-tight",
+                    isActive ? "font-medium text-v2-blue-dark" : "text-v2-subtle",
+                  )}
+                >
+                  {stage.name}
+                </span>
+              </div>
+              {idx < JOURNEY_STAGES.length - 1 ? (
+                <div
+                  className={cn(
+                    "mt-4 h-[1.5px] w-4 shrink-0",
+                    stage.id < stageId || completedStages.includes(stage.id)
+                      ? "bg-v2-blue"
+                      : "bg-v2-border",
+                  )}
+                />
+              ) : null}
+            </React.Fragment>
+          );
+        })}
+      </div>
+
+      {/* Stage completion progress */}
+      <div className="mt-4">
+        <div className="mb-1 flex items-center justify-between">
+          <span className="font-body text-[11px] text-v2-muted">
+            Stage {stageId} completion progress
+          </span>
+          <span className="font-body text-[11px] font-medium text-v2-blue-dark">
+            {completionPercentage}%
+          </span>
+        </div>
+        <div className="h-1.5 w-full rounded-full bg-v2-border">
+          <div
+            className="h-full rounded-full bg-v2-blue transition-all duration-500"
+            style={{ width: `${completionPercentage}%` }}
+          />
+        </div>
+        {criteria.total > 0 ? (
+          <div className="mt-2 flex gap-4">
+            <span className="font-body text-[10px] text-v2-subtle">
+              <span className="font-medium text-v2-green">{criteria.complete}</span> criteria complete
+            </span>
+            <span className="font-body text-[10px] text-v2-subtle">
+              <span className="font-medium text-v2-heading">{criteria.inProgress}</span> in progress
+            </span>
+            <span className="font-body text-[10px] text-v2-subtle">
+              <span className="font-medium text-v2-subtle">{criteria.remaining}</span> remaining
+            </span>
+          </div>
+        ) : null}
+      </div>
+    </V2Card>
   );
 }
 
@@ -323,6 +453,8 @@ export default function V2FounderDashboard({ user, onPageChange }) {
   const journeyProgress = useJourneyStore((s) => s.progress);
   const stageId     = journeyProgress?.currentStage ?? 1;
   const stageName   = `Stage ${stageId}`;
+  const completedStages = journeyProgress?.completedStages ?? [];
+  const stageCompletionPct = journeyProgress?.stageData?.[stageId]?.completionPercentage ?? 0;
 
   const startup     = user?.startup ?? null;
   const startupName = startup?.name ?? "Your Startup";
@@ -481,6 +613,14 @@ export default function V2FounderDashboard({ user, onPageChange }) {
             iconColor="text-v2-green"
           />
         </div>
+
+        {/* ── Founder journey stage tracker ───────────────────────────────── */}
+        <FounderJourneyTracker
+          stageId={stageId}
+          completedStages={completedStages}
+          completionPercentage={stageCompletionPct}
+          onViewCriteria={() => onPageChange("journey")}
+        />
 
         {/* ── Weekly goal + milestones ─────────────────────────────────── */}
         <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
