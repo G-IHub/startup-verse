@@ -67,7 +67,7 @@ export function V2Chip({ children, variant = "grey", dot = false, className }) {
   return (
     <span
       className={cn(
-        "inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-3 py-1",
+        "inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-[10px] py-[5px]",
         "font-body text-[11px] font-medium leading-none",
         CHIP_VARIANTS[variant] ?? CHIP_VARIANTS.grey,
         className,
@@ -188,9 +188,9 @@ export function V2Btn({
         "font-body font-medium leading-none transition-colors duration-150",
         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-v2-blue/30",
         "disabled:pointer-events-none disabled:opacity-50",
-        size === "sm" ? "px-3.5 py-2 text-[12px]" :
-        size === "lg" ? "px-6 py-3 text-[13px]"   :
-                        "px-4 py-2.5 text-[12px]",
+        size === "sm" ? "px-[14px] py-[6px] text-[11px]" :
+        size === "lg" ? "px-6 py-[10px] text-[13px]"    :
+                        "px-4 py-2 text-[12px]",
         BTN_VARIANTS[variant] ?? BTN_VARIANTS.secondary,
         className,
       )}
