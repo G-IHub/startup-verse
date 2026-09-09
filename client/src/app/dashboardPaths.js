@@ -403,18 +403,11 @@ export function dashboardStateToPath(state) {
 
 /** Paths registered as `<Route>` elements for the dashboard shell (Phase 1 + internal pages). */
 export const DASHBOARD_ROUTE_PATHS = Object.freeze([
-  // ── V2 Autonomous OS ──────────────────────────────────────────────────────
-  // Listed first so path guards hit them quickly; the V2 shell handles all
-  // sub-routes internally via V2DashboardShell (App.jsx uses /v2 + /v2/*).
-  "/v2",
-  "/v2/execution",
-  "/v2/office",
-  "/v2/community",
-  "/v2/journey",
-  "/v2/ai-staff",
-  "/v2/blueprints",
-  "/v2/mentors",
-  // ── V1 shell paths ────────────────────────────────────────────────────────
+  // V2 Autonomous OS paths are intentionally NOT listed here — this array
+  // generates <Route> elements pointing at the V1 dashboardHybridElement.
+  // V2 is routed separately in App.jsx via dedicated /v2 + /v2/* routes to
+  // v2ShellElement. Guard coverage for the "v2" prefix lives in
+  // DASHBOARD_PATH_PREFIXES above, not here.
   "/home",
   "/office",
   "/office/tasks/:taskId",
