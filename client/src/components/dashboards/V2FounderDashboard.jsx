@@ -120,14 +120,14 @@ function MetricTile({ icon: Icon, label, value, sub, iconBg = "bg-v2-blue-tint",
         <Icon className={cn("h-4 w-4", iconColor)} />
       </div>
       <div className="min-w-0">
-        <p className="font-body text-[12px] font-semibold uppercase tracking-wide text-v2-muted">
+        <p className="font-body text-[11px] text-v2-muted">
           {label}
         </p>
-        <p className="font-heading text-[40px] font-bold leading-none text-v2-heading">
+        <p className="font-heading text-[24px] font-medium leading-none text-v2-heading">
           {value}
         </p>
         {sub ? (
-          <p className="mt-0.5 font-body text-[13px] text-v2-muted">{sub}</p>
+          <p className="mt-0.5 font-body text-[10px] text-v2-muted">{sub}</p>
         ) : null}
       </div>
     </V2Card>
@@ -142,8 +142,8 @@ function BreakdownRow({ label, value, max = 100 }) {
   return (
     <div>
       <div className="mb-1 flex justify-between">
-        <span className="font-body text-[12px] text-v2-muted">{label}</span>
-        <span className="font-body text-[12px] font-medium text-v2-heading">{value}</span>
+        <span className="font-body text-[10px] text-v2-muted">{label}</span>
+        <span className="font-body text-[10px] font-medium text-v2-heading">{value}</span>
       </div>
       <div className="h-1.5 w-full rounded-full bg-v2-border">
         <div
@@ -172,11 +172,11 @@ function MilestoneRow({ milestone, onOpen }) {
     >
       <span className="shrink-0">{milestoneIcon(milestone.status)}</span>
       <div className="min-w-0 flex-1">
-        <p className="truncate font-body text-[13px] font-medium text-v2-heading">
+        <p className="truncate font-body text-[12px] font-medium text-v2-heading">
           {milestone.title}
         </p>
         {total > 0 ? (
-          <p className="font-body text-[12px] text-v2-muted">
+          <p className="font-body text-[10px] text-v2-muted">
             {done}/{total} tasks · {pct}%
           </p>
         ) : null}
@@ -225,7 +225,7 @@ function FounderJourneyTracker({ stageId, completedStages, completionPercentage,
           <button
             type="button"
             onClick={onViewCriteria}
-            className="font-body text-[12px] text-v2-blue hover:underline"
+            className="font-body text-[11px] text-v2-blue hover:underline"
           >
             View stage criteria →
           </button>
@@ -255,7 +255,7 @@ function FounderJourneyTracker({ stageId, completedStages, completionPercentage,
                 </div>
                 <span
                   className={cn(
-                    "text-center font-body text-[10px] leading-tight",
+                    "text-center font-body text-[9px] leading-tight",
                     isActive ? "font-medium text-v2-blue-dark" : "text-v2-subtle",
                   )}
                 >
@@ -280,10 +280,10 @@ function FounderJourneyTracker({ stageId, completedStages, completionPercentage,
       {/* Stage completion progress */}
       <div className="mt-4">
         <div className="mb-1 flex items-center justify-between">
-          <span className="font-body text-[12px] text-v2-muted">
+          <span className="font-body text-[11px] text-v2-muted">
             Stage {stageId} completion progress
           </span>
-          <span className="font-body text-[12px] font-medium text-v2-blue-dark">
+          <span className="font-body text-[11px] font-medium text-v2-blue-dark">
             {completionPercentage}%
           </span>
         </div>
@@ -295,13 +295,13 @@ function FounderJourneyTracker({ stageId, completedStages, completionPercentage,
         </div>
         {criteria.total > 0 ? (
           <div className="mt-2 flex gap-4">
-            <span className="font-body text-[11px] text-v2-subtle">
+            <span className="font-body text-[10px] text-v2-subtle">
               <span className="font-medium text-v2-green">{criteria.complete}</span> criteria complete
             </span>
-            <span className="font-body text-[11px] text-v2-subtle">
+            <span className="font-body text-[10px] text-v2-subtle">
               <span className="font-medium text-v2-heading">{criteria.inProgress}</span> in progress
             </span>
-            <span className="font-body text-[11px] text-v2-subtle">
+            <span className="font-body text-[10px] text-v2-subtle">
               <span className="font-medium text-v2-subtle">{criteria.remaining}</span> remaining
             </span>
           </div>
@@ -320,11 +320,11 @@ function TaskRow({ task }) {
   return (
     <div className="flex items-center gap-3 rounded-[10px] px-3 py-2.5 transition-colors hover:bg-v2-page">
       <div className="min-w-0 flex-1">
-        <p className="truncate font-body text-[13px] font-medium text-v2-heading">
+        <p className="truncate font-body text-[12px] font-medium text-v2-heading">
           {task.title}
         </p>
         {task.assigneeName ? (
-          <p className="font-body text-[12px] text-v2-muted">→ {task.assigneeName}</p>
+          <p className="font-body text-[11px] text-v2-muted">→ {task.assigneeName}</p>
         ) : null}
       </div>
       <V2Chip variant={chip.variant} dot>{chip.label}</V2Chip>
@@ -348,11 +348,11 @@ function DashboardRightPanel({ scoreData, teamMembers, onPageChange }) {
       <V2Card className="flex flex-col items-center gap-3 py-5">
         <V2ScoreRing score={score} size={88} />
         <div className="text-center">
-          <p className="font-body text-[12px] font-semibold uppercase tracking-wide text-v2-muted">
+          <p className="font-body text-[11px] font-medium uppercase tracking-wide text-v2-muted">
             Execution Score
           </p>
           {change !== 0 ? (
-            <div className={cn("mt-1 flex items-center justify-center gap-1 font-body text-[12px] font-medium",
+            <div className={cn("mt-1 flex items-center justify-center gap-1 font-body text-[11px] font-medium",
               change > 0 ? "text-v2-green" : "text-red-500")}>
               {change > 0 ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />}
               {Math.abs(change)} pts this week
@@ -381,7 +381,7 @@ function DashboardRightPanel({ scoreData, teamMembers, onPageChange }) {
               <button
                 type="button"
                 onClick={() => onPageChange("startup-office")}
-                className="font-body text-[12px] text-v2-blue hover:underline"
+                className="font-body text-[11px] text-v2-blue hover:underline"
               >
                 View office →
               </button>
@@ -395,7 +395,7 @@ function DashboardRightPanel({ scoreData, teamMembers, onPageChange }) {
                   <p className="truncate font-body text-[12px] font-medium text-v2-heading">
                     {m.name}
                   </p>
-                  <p className="font-body text-[12px] text-v2-muted capitalize">
+                  <p className="font-body text-[10px] text-v2-muted capitalize">
                     {m.role ?? "Team Member"}
                   </p>
                 </div>
@@ -508,7 +508,7 @@ export default function V2FounderDashboard({ user, onPageChange }) {
         <div className="flex h-full items-center justify-center">
           <div className="flex flex-col items-center gap-3">
             <div className="h-10 w-10 animate-spin rounded-full border-4 border-v2-border border-t-v2-blue" />
-            <p className="font-body text-[13px] text-v2-muted">Loading your dashboard…</p>
+            <p className="font-body text-[12px] text-v2-muted">Loading your dashboard…</p>
           </div>
         </div>
       </V2AppLayout>
@@ -565,16 +565,16 @@ export default function V2FounderDashboard({ user, onPageChange }) {
           {cohortLabel ? (
             <div className="mb-2 inline-flex items-center gap-1.5 rounded-full bg-v2-blue-tint px-2.5 py-1">
               <span className="h-[5px] w-[5px] rounded-full bg-v2-blue" />
-              <span className="font-body text-[12px] font-semibold text-v2-blue-dark">
+              <span className="font-body text-[11px] font-medium text-v2-blue-dark">
                 {cohortLabel}
               </span>
             </div>
           ) : null}
 
-          <h2 className="font-heading text-[32px] font-bold text-v2-heading leading-tight">
+          <h2 className="font-heading text-[22px] font-medium text-v2-heading leading-tight">
             Good morning, {firstName}
           </h2>
-          <p className="mt-1 font-body text-[15px] text-v2-muted leading-relaxed">
+          <p className="mt-1 font-body text-[13px] text-v2-muted leading-relaxed">
             {startupName} is executing.{" "}
             {streak > 0
               ? `You have a ${streak}-week streak. Keep this week's momentum going.`
@@ -587,10 +587,10 @@ export default function V2FounderDashboard({ user, onPageChange }) {
             onClick={() => onPageChange("execution-engine")}
             className="mt-4 w-full rounded-[10px] border border-v2-border bg-v2-page px-3.5 py-3 text-left transition-colors hover:border-v2-purple-tint hover:bg-v2-purple-tint/30"
           >
-            <p className="font-body text-[12px] font-semibold uppercase tracking-wide text-v2-subtle">
+            <p className="font-body text-[10px] font-medium uppercase tracking-wide text-v2-subtle">
               This Week's Goal
             </p>
-            <p className="mt-1 font-body text-[15px] font-medium text-v2-heading leading-snug">
+            <p className="mt-1 font-body text-[13px] font-medium text-v2-heading leading-snug">
               {outcome?.goal ?? "No goal set this week — tap to set one."}
             </p>
           </button>
@@ -654,7 +654,7 @@ export default function V2FounderDashboard({ user, onPageChange }) {
                 <button
                   type="button"
                   onClick={() => onPageChange("execution-engine")}
-                  className="font-body text-[12px] text-v2-blue hover:underline"
+                  className="font-body text-[11px] text-v2-blue hover:underline"
                 >
                   Manage →
                 </button>
@@ -663,7 +663,7 @@ export default function V2FounderDashboard({ user, onPageChange }) {
             {outcome ? (
               <div>
                 <div className="mb-3 rounded-[10px] bg-v2-purple-tint px-4 py-3">
-                  <p className="font-body text-[15px] font-medium text-v2-purple-dark leading-snug">
+                  <p className="font-body text-[13px] font-medium text-v2-purple-dark leading-snug">
                     {outcome.goal}
                   </p>
                 </div>
@@ -675,7 +675,7 @@ export default function V2FounderDashboard({ user, onPageChange }) {
                       style={{ width: `${weekPct}%` }}
                     />
                   </div>
-                  <span className="font-body text-[12px] font-medium text-v2-muted w-8 text-right">
+                  <span className="font-body text-[11px] font-medium text-v2-muted w-8 text-right">
                     {weekPct}%
                   </span>
                 </div>
@@ -686,8 +686,8 @@ export default function V2FounderDashboard({ user, onPageChange }) {
                   <Target className="h-5 w-5 text-v2-blue" />
                 </div>
                 <div>
-                  <p className="font-body text-[15px] font-medium text-v2-heading">No goal set this week</p>
-                  <p className="font-body text-[13px] text-v2-muted mt-0.5">Set a clear outcome to drive execution</p>
+                  <p className="font-body text-[13px] font-medium text-v2-heading">No goal set this week</p>
+                  <p className="font-body text-[11px] text-v2-muted mt-0.5">Set a clear outcome to drive execution</p>
                 </div>
                 <V2Btn variant="primary" size="sm" onClick={() => onPageChange("execution-engine")}>
                   <Plus className="h-3.5 w-3.5" />
@@ -705,7 +705,7 @@ export default function V2FounderDashboard({ user, onPageChange }) {
                 <button
                   type="button"
                   onClick={() => onPageChange("execution-engine")}
-                  className="font-body text-[12px] text-v2-blue hover:underline"
+                  className="font-body text-[11px] text-v2-blue hover:underline"
                 >
                   View all →
                 </button>
@@ -723,7 +723,7 @@ export default function V2FounderDashboard({ user, onPageChange }) {
               </div>
             ) : (
               <div className="py-6 text-center">
-                <p className="font-body text-[13px] text-v2-muted">No milestones yet.</p>
+                <p className="font-body text-[12px] text-v2-muted">No milestones yet.</p>
                 <V2Btn variant="secondary" size="sm" className="mt-3" onClick={() => onPageChange("execution-engine")}>
                   <Plus className="h-3.5 w-3.5" />
                   Add Milestone
@@ -741,7 +741,7 @@ export default function V2FounderDashboard({ user, onPageChange }) {
               <button
                 type="button"
                 onClick={() => onPageChange("execution-engine")}
-                className="font-body text-[12px] text-v2-blue hover:underline"
+                className="font-body text-[11px] text-v2-blue hover:underline"
               >
                 View all tasks →
               </button>
@@ -756,11 +756,11 @@ export default function V2FounderDashboard({ user, onPageChange }) {
           ) : (
             <div className="py-4 text-center">
               {tasks.length > 0 ? (
-                <p className="font-body text-[13px] text-v2-green">
+                <p className="font-body text-[12px] text-v2-green">
                   ✅ All tasks completed this week!
                 </p>
               ) : (
-                <p className="font-body text-[13px] text-v2-muted">
+                <p className="font-body text-[12px] text-v2-muted">
                   No tasks yet. Set a goal and create milestones to generate tasks.
                 </p>
               )}
@@ -776,10 +776,10 @@ export default function V2FounderDashboard({ user, onPageChange }) {
                 <Bot className="h-5 w-5" />
               </div>
               <div>
-                <p className="font-body text-[15px] font-semibold text-v2-purple-dark">
+                <p className="font-body text-[13px] font-medium text-v2-purple-dark">
                   Your AI Staff is ready to work
                 </p>
-                <p className="font-body text-[13px] text-v2-muted">
+                <p className="font-body text-[11px] text-v2-muted">
                   AI PM · AI Marketing · AI Growth — context-aware, working 24/7
                 </p>
               </div>

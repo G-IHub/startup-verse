@@ -43,11 +43,11 @@ export function V2Card({ children, className, ...props }) {
 export function V2SectionHead({ title, action, className }) {
   return (
     <div className={cn("mb-4 flex items-center justify-between", className)}>
-      <span className="font-body text-[14px] font-semibold text-v2-heading">
+      <span className="font-body text-[12px] font-medium text-v2-heading">
         {title}
       </span>
       {action ? (
-        <span className="font-body text-[12px] text-v2-muted">{action}</span>
+        <span className="font-body text-[11px] text-v2-muted">{action}</span>
       ) : null}
     </div>
   );
@@ -68,7 +68,7 @@ export function V2Chip({ children, variant = "grey", dot = false, className }) {
     <span
       className={cn(
         "inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-3 py-1",
-        "font-body text-[12px] font-medium leading-none",
+        "font-body text-[11px] font-medium leading-none",
         CHIP_VARIANTS[variant] ?? CHIP_VARIANTS.grey,
         className,
       )}
@@ -96,7 +96,7 @@ export function V2Badge({ children, variant = "blue", className }) {
     <span
       className={cn(
         "inline-flex min-w-[20px] items-center justify-center rounded-full px-2 py-0.5",
-        "font-body text-[11px] font-semibold leading-none",
+        "font-body text-[10px] font-semibold leading-none",
         CHIP_VARIANTS[variant] ?? CHIP_VARIANTS.blue,
         className,
       )}
@@ -188,9 +188,9 @@ export function V2Btn({
         "font-body font-medium leading-none transition-colors duration-150",
         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-v2-blue/30",
         "disabled:pointer-events-none disabled:opacity-50",
-        size === "sm" ? "px-3.5 py-2 text-[13px]" :
-        size === "lg" ? "px-6 py-3 text-[14px]"   :
-                        "px-4 py-2.5 text-[13px]",
+        size === "sm" ? "px-3.5 py-2 text-[12px]" :
+        size === "lg" ? "px-6 py-3 text-[13px]"   :
+                        "px-4 py-2.5 text-[12px]",
         BTN_VARIANTS[variant] ?? BTN_VARIANTS.secondary,
         className,
       )}

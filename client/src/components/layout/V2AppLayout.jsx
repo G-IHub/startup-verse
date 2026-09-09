@@ -35,20 +35,20 @@ function V2Topbar({ breadcrumb = "StartupVerse", title, chips = [], actions }) {
       )}
     >
       <div className="flex min-w-0 flex-1 items-center gap-2 overflow-hidden">
-        <span className="shrink-0 font-body text-[13px] text-v2-muted">
+        <span className="shrink-0 font-body text-[12px] text-v2-muted">
           {breadcrumb}
         </span>
         {title ? (
           <>
-            <span className="shrink-0 font-body text-[13px] text-v2-subtle">›</span>
-            <h1 className="shrink-0 truncate font-heading text-[17px] font-semibold text-v2-heading">
+            <span className="shrink-0 font-body text-[12px] text-v2-subtle">›</span>
+            <h1 className="shrink-0 truncate font-heading text-[14px] font-medium text-v2-heading">
               {title}
             </h1>
           </>
         ) : null}
         {chips.length > 0 ? (
           <>
-            <span className="shrink-0 font-body text-[13px] text-v2-subtle">·</span>
+            <span className="shrink-0 font-body text-[12px] text-v2-subtle">·</span>
             <div className="flex items-center gap-1.5 overflow-x-auto">{chips}</div>
           </>
         ) : null}
