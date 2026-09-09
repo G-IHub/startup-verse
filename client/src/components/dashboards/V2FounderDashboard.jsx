@@ -76,14 +76,6 @@ function scoreColor(score) {
   return "text-red-500";
 }
 
-/** Purely a derived label for the real score — same buckets as scoreColor. */
-function scoreLabel(score) {
-  if (score >= 80) return "Strong Executor";
-  if (score >= 60) return "Solid Progress";
-  if (score >= 40) return "Building Momentum";
-  return "Just Getting Started";
-}
-
 /** Real week number within a real cohort's real date range — no invented data. */
 function cohortWeekInfo(cohort) {
   if (!cohort?.startDate) return null;
@@ -568,51 +560,40 @@ export default function V2FounderDashboard({ user, onPageChange }) {
       <div className="flex flex-col gap-5 p-5">
 
         {/* ── Hero ─────────────────────────────────────────────────────── */}
-        <V2Card className="grid grid-cols-1 gap-5 md:grid-cols-[1fr_auto] md:items-center">
-          <div>
-            {/* Eyebrow — real cohort name + week, when the founder is in a cohort */}
-            {cohortLabel ? (
-              <div className="mb-2 inline-flex items-center gap-1.5 rounded-full bg-v2-blue-tint px-2.5 py-1">
-                <span className="h-[5px] w-[5px] rounded-full bg-v2-blue" />
-                <span className="font-body text-[10px] font-semibold text-v2-blue-dark">
-                  {cohortLabel}
-                </span>
-              </div>
-            ) : null}
+        <V2Card>
+          {/* Eyebrow — real cohort name + week, when the founder is in a cohort */}
+          {cohortLabel ? (
+            <div className="mb-2 inline-flex items-center gap-1.5 rounded-full bg-v2-blue-tint px-2.5 py-1">
+              <span className="h-[5px] w-[5px] rounded-full bg-v2-blue" />
+              <span className="font-body text-[10px] font-semibold text-v2-blue-dark">
+                {cohortLabel}
+              </span>
+            </div>
+          ) : null}
 
-            <h2 className="font-heading text-[20px] font-bold text-v2-heading leading-tight">
-              Good morning, {firstName}
-            </h2>
-            <p className="mt-1 font-body text-[13px] text-v2-muted leading-relaxed">
-              {startupName} is executing.{" "}
-              {streak > 0
-                ? `You have a ${streak}-week streak. Keep this week's momentum going.`
-                : "Complete this week's goal to start your streak."}
+          <h2 className="font-heading text-[20px] font-bold text-v2-heading leading-tight">
+            Good morning, {firstName}
+          </h2>
+          <p className="mt-1 font-body text-[13px] text-v2-muted leading-relaxed">
+            {startupName} is executing.{" "}
+            {streak > 0
+              ? `You have a ${streak}-week streak. Keep this week's momentum going.`
+              : "Complete this week's goal to start your streak."}
+          </p>
+
+          {/* Embedded weekly goal — click through to the execution engine */}
+          <button
+            type="button"
+            onClick={() => onPageChange("execution-engine")}
+            className="mt-4 w-full rounded-[10px] border border-v2-border bg-v2-page px-3.5 py-3 text-left transition-colors hover:border-v2-purple-tint hover:bg-v2-purple-tint/30"
+          >
+            <p className="font-body text-[10px] font-semibold uppercase tracking-wide text-v2-subtle">
+              This Week's Goal
             </p>
-
-            {/* Embedded weekly goal — click through to the execution engine */}
-            <button
-              type="button"
-              onClick={() => onPageChange("execution-engine")}
-              className="mt-4 w-full rounded-[10px] border border-v2-border bg-v2-page px-3.5 py-3 text-left transition-colors hover:border-v2-purple-tint hover:bg-v2-purple-tint/30"
-            >
-              <p className="font-body text-[10px] font-semibold uppercase tracking-wide text-v2-subtle">
-                This Week's Goal
-              </p>
-              <p className="mt-1 font-body text-[13px] font-medium text-v2-heading leading-snug">
-                {outcome?.goal ?? "No goal set this week — tap to set one."}
-              </p>
-            </button>
-          </div>
-
-          {/* Score ring — the one big ring for the whole page */}
-          <div className="flex flex-col items-center gap-2 md:pl-2">
-            <V2ScoreRing score={score} size={96} strokeWidth={7} />
-            <span className="rounded-full bg-v2-blue-tint px-2.5 py-1 font-body text-[11px] font-medium text-v2-blue-dark">
-              {scoreLabel(score)}
-              {scoreData?.weeklyChange ? ` · ${scoreData.weeklyChange > 0 ? "+" : ""}${scoreData.weeklyChange} this week` : ""}
-            </span>
-          </div>
+            <p className="mt-1 font-body text-[13px] font-medium text-v2-heading leading-snug">
+              {outcome?.goal ?? "No goal set this week — tap to set one."}
+            </p>
+          </button>
         </V2Card>
 
         {/* ── Metric tiles ────────────────────────────────────────────── */}
