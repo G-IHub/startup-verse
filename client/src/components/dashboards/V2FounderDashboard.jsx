@@ -113,23 +113,42 @@ function milestoneIcon(status) {
 // METRIC TILE
 // ─────────────────────────────────────────────────────────────────────────
 
-function MetricTile({ icon: Icon, label, value, sub, iconBg = "bg-v2-blue-tint", iconColor = "text-v2-blue" }) {
+function MetricTile({
+  icon: Icon,
+  label,
+  value,
+  delta,
+  iconBg = "bg-v2-blue-tint",
+  iconColor = "text-v2-blue",
+  valueColor = "text-v2-heading",
+  deltaBg = "bg-v2-blue-tint",
+  deltaTextColor = "text-v2-blue-dark",
+}) {
   return (
-    <V2Card className="flex items-center gap-3">
-      <div className={cn("flex h-10 w-10 shrink-0 items-center justify-center rounded-[10px]", iconBg)}>
+    <V2Card className="rounded-[12px] p-[14px]">
+      {/* Icon square — 32×32, rounded-8, coloured bg */}
+      <div className={cn("mb-2.5 flex h-8 w-8 items-center justify-center rounded-[8px]", iconBg)}>
         <Icon className={cn("h-4 w-4", iconColor)} />
       </div>
-      <div className="min-w-0">
-        <p className="font-body text-[11px] text-v2-muted">
-          {label}
-        </p>
-        <p className="font-heading text-[24px] font-medium leading-none text-v2-heading">
-          {value}
-        </p>
-        {sub ? (
-          <p className="mt-0.5 font-body text-[10px] text-v2-muted">{sub}</p>
-        ) : null}
-      </div>
+      {/* Big value */}
+      <p className={cn("font-heading text-[24px] font-medium leading-none", valueColor)}>
+        {value}
+      </p>
+      {/* Label */}
+      <p className="mt-1 font-body text-[11px] text-v2-muted">
+        {label}
+      </p>
+      {/* Delta pill */}
+      {delta ? (
+        <div className={cn(
+          "mt-1 inline-flex items-center gap-1 rounded-[10px] px-1.5 py-0.5",
+          "font-body text-[10px]",
+          deltaBg,
+          deltaTextColor,
+        )}>
+          {delta}
+        </div>
+      ) : null}
     </V2Card>
   );
 }
@@ -598,40 +617,58 @@ export default function V2FounderDashboard({ user, onPageChange }) {
 
         {/* ── Metric tiles ────────────────────────────────────────────── */}
         <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
+          {/* Execution score */}
           <MetricTile
-            icon={Zap}
-            label="Score"
+            icon={TrendingUp}
+            label="Execution score"
             value={score}
-            sub={scoreData?.weeklyChange ? `${scoreData.weeklyChange > 0 ? "+" : ""}${scoreData.weeklyChange} this week` : "No change yet"}
-            iconBg="bg-v2-blue-tint"
-            iconColor={scoreColor(score)}
-          />
-
-          <MetricTile
-            icon={Target}
-            label="This Week"
-            value={`${weekPct}%`}
-            sub={outcome?.goal ? `"${outcome.goal.slice(0, 28)}…"` : "No goal set yet"}
+            delta={scoreData?.weeklyChange
+              ? `${scoreData.weeklyChange > 0 ? "+" : ""}${scoreData.weeklyChange} from last week`
+              : "No change yet"}
             iconBg="bg-v2-blue-tint"
             iconColor="text-v2-blue"
+            valueColor="text-v2-blue"
+            deltaBg="bg-v2-blue-tint"
+            deltaTextColor="text-v2-blue-dark"
           />
 
+          {/* Execution streak */}
           <MetricTile
-            icon={Flame}
-            label="Streak"
-            value={streak}
-            sub={streak === 1 ? "week running" : streak === 0 ? "Start this week" : "weeks running"}
-            iconBg="bg-v2-amber-tint"
-            iconColor="text-v2-amber"
-          />
-
-          <MetricTile
-            icon={CheckCircle2}
-            label="Tasks Done"
-            value={completedCount}
-            sub={`${tasks.length} total tasks`}
+            icon={Clock}
+            label="Execution streak"
+            value={streak > 0 ? `${streak} wk${streak !== 1 ? "s" : ""}` : "0 wks"}
+            delta={streak > 0 ? "Keep the streak going" : "Start this week"}
             iconBg="bg-v2-green-tint"
             iconColor="text-v2-green"
+            valueColor="text-v2-green"
+            deltaBg="bg-v2-green-tint"
+            deltaTextColor="text-v2-green-dark"
+          />
+
+          {/* Tasks this week */}
+          <MetricTile
+            icon={CheckCircle2}
+            label="Tasks this week"
+            value={`${completedCount} / ${tasks.length}`}
+            delta={`${Math.max(0, tasks.length - completedCount)} remaining`}
+            iconBg="bg-v2-purple-tint"
+            iconColor="text-v2-purple"
+            valueColor="text-v2-heading"
+            deltaBg="bg-v2-purple-tint"
+            deltaTextColor="text-v2-purple-dark"
+          />
+
+          {/* Week progress */}
+          <MetricTile
+            icon={Target}
+            label="Week progress"
+            value={`${weekPct}%`}
+            delta={outcome?.goal ? `"${outcome.goal.slice(0, 22)}…"` : "No goal set yet"}
+            iconBg="bg-v2-amber-tint"
+            iconColor="text-v2-amber"
+            valueColor="text-v2-amber"
+            deltaBg="bg-v2-amber-tint"
+            deltaTextColor="text-v2-amber-dark"
           />
         </div>
 
