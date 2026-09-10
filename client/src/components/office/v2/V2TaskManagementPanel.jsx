@@ -787,7 +787,7 @@ export function V2TaskManagementPanel({
               exit={{ x: "100%" }}
               transition={{ type: "spring", damping: 30, stiffness: 280 }}
               ref={panelRef}
-              className="fixed right-0 top-0 z-[70] flex h-full w-full flex-col overflow-hidden border-l border-v2-border bg-white md:w-[520px]"
+              className="fixed right-0 top-0 z-[70] flex h-full w-full flex-col overflow-hidden border-l border-v2-border bg-white md:w-[680px]"
             >
               <div className="min-h-0 flex-1 overflow-y-auto">
                 <div className="flex flex-col gap-3 px-[18px] pt-4">
