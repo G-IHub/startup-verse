@@ -2,7 +2,6 @@ import React, { useState, useEffect, useRef, useCallback } from "react";
 import { Button } from "../../ui/button";
 import { Card, CardContent } from "../../ui/card";
 import UserAvatar from "../../shared/UserAvatar";
-import { Badge } from "../../ui/badge";
 import { Input } from "../../ui/input";
 import { Label } from "../../ui/label";
 import { Textarea } from "../../ui/textarea";
@@ -30,6 +29,7 @@ import {
 import { motion, AnimatePresence } from "motion/react";
 import {
   X,
+  Plus,
   Search,
   Filter,
   Clock,
@@ -44,6 +44,7 @@ import {
   PlayCircle,
   GripHorizontal,
   Github,
+  ArrowUpRight,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -65,21 +66,19 @@ import { useOfficeStore } from "../../../state/useOfficeStore";
 import V2GitHubImportDialog from "./V2GitHubImportDialog";
 
 /**
- * V2 restyle of office/TaskManagementPanel.jsx — same real slide-out task
- * Kanban (backend-wired via taskApi/teamMemberApi, real drag-and-drop, real
- * milestone progress), V2 (v2-blue/v2-purple/v2-green/v2-amber) tokens
- * instead of V1's primary/accent/surface tokens. All data logic is copied
- * verbatim from the V1 file; only className tokens changed. The two V1
- * "quick create" dialogs (task/milestone) were dead code there too
- * (guarded by a literal `{false && ...}`) and are dropped here rather than
- * restyled.
+ * V2 restyle of office/TaskManagementPanel.jsx, rebuilt to match the
+ * StartupVerse_Task_Manager.html mockup exactly (520px right-side panel,
+ * compact 3-status board, condensed task cards). Same real data logic as
+ * the previous V2 pass (task CRUD, milestone sync, drag-and-drop,
+ * notifications) — this iteration changes layout/visuals and, per explicit
+ * decision, re-enables real task creation ("+ Add task" / FAB), which was
+ * dead code in V1's own file.
  */
 export function V2TaskManagementPanel({
   open,
   onClose,
   user,
   onPlaySound,
-  openAddDialog,
   initialTaskId,
   strictMode = false,
   startupId,
@@ -91,11 +90,8 @@ export function V2TaskManagementPanel({
   const [teamMembers, setTeamMembers] = useState([]);
   const [founderId, setFounderId] = useState("");
   const [activeTab, setActiveTab] = useState("my-tasks");
-  const [showCreateDialog, setShowCreateDialog] = useState(
-    openAddDialog || false,
-  );
+  const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
-  const [filterPriority, setFilterPriority] = useState("all");
   const [filterStatus, setFilterStatus] = useState("all");
   const [draggedTask, setDraggedTask] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -107,13 +103,13 @@ export function V2TaskManagementPanel({
   const [taskReloadNonce, setTaskReloadNonce] = useState(0);
 
   const defaultKanbanHeight = () =>
-    Math.round(Math.min(window.innerHeight * 0.5, 420));
+    Math.round(Math.min(window.innerHeight * 0.55, 460));
 
   const [kanbanHeight, setKanbanHeight] = useState(defaultKanbanHeight);
-  const kanbanHeightRef = useRef(kanbanHeight);
   const isDraggingHandle = useRef(false);
   const panelRef = useRef(null);
   const normalizedUserId = String(user?._id ?? user?.id ?? "");
+  const isFounder = user.role === "founder";
 
   const openTaskPage = (id) => {
     if (!id) return;
@@ -121,8 +117,8 @@ export function V2TaskManagementPanel({
   };
 
   const clampKanbanHeight = useCallback((raw) => {
-    const maxH = Math.round(window.innerHeight * 0.7);
-    return Math.max(180, Math.min(maxH, raw));
+    const maxH = Math.round(window.innerHeight * 0.75);
+    return Math.max(200, Math.min(maxH, raw));
   }, []);
 
   const onHandlePointerDown = useCallback((e) => {
@@ -133,9 +129,7 @@ export function V2TaskManagementPanel({
 
   const onHandlePointerMove = useCallback((e) => {
     if (!isDraggingHandle.current) return;
-    const next = clampKanbanHeight(window.innerHeight - e.clientY);
-    kanbanHeightRef.current = next;
-    setKanbanHeight(next);
+    setKanbanHeight(clampKanbanHeight(window.innerHeight - e.clientY));
   }, [clampKanbanHeight]);
 
   const onHandlePointerUp = useCallback(() => {
@@ -156,13 +150,6 @@ export function V2TaskManagementPanel({
       blockerNote: task?.blockerNote || task?.blockedNote || "",
     };
   };
-
-  // Sync openAddDialog from props
-  useEffect(() => {
-    if (openAddDialog !== undefined) {
-      setShowCreateDialog(openAddDialog);
-    }
-  }, [openAddDialog]);
 
   // Load tasks and team members
   useEffect(() => {
@@ -330,24 +317,16 @@ export function V2TaskManagementPanel({
     return () => unsubscribe?.();
   }, [open, founderId, normalizedUserId, user.role]);
 
-  // Handle initialTaskId - scroll to and highlight the task
   useEffect(() => {
     if (initialTaskId && open && localTasks.length > 0) {
       setTimeout(() => {
         const taskElement = document.getElementById(`v2-task-${initialTaskId}`);
         if (taskElement) {
           setTaskNotFound(false);
-          taskElement.scrollIntoView({
-            behavior: "smooth",
-            block: "center",
-          });
+          taskElement.scrollIntoView({ behavior: "smooth", block: "center" });
           taskElement.classList.add("ring-2", "ring-v2-blue", "ring-offset-2");
           setTimeout(() => {
-            taskElement.classList.remove(
-              "ring-2",
-              "ring-v2-blue",
-              "ring-offset-2",
-            );
+            taskElement.classList.remove("ring-2", "ring-v2-blue", "ring-offset-2");
           }, 2000);
         } else {
           setTaskNotFound(true);
@@ -356,14 +335,68 @@ export function V2TaskManagementPanel({
     }
   }, [initialTaskId, open, localTasks]);
 
-  // New task form state (kept for parity with V1; the create dialog itself
-  // is dead code there too — see file header note)
   const [newTask, setNewTask] = useState({
     title: "",
     description: "",
     milestoneId: "",
     assigneeId: "",
   });
+
+  const resetNewTask = () =>
+    setNewTask({ title: "", description: "", milestoneId: "", assigneeId: "" });
+
+  const handleCreateTask = async () => {
+    if (!newTask.title.trim()) {
+      toast.error("Please enter a task title");
+      return;
+    }
+    if (!founderId) {
+      toast.error("No founder found");
+      return;
+    }
+    if (isFounder && !newTask.milestoneId) {
+      toast.error("Select a milestone before creating a task");
+      return;
+    }
+    const assignee = teamMembers.find((m) => m.id === newTask.assigneeId);
+    const task = {
+      id: `task-${Date.now()}`,
+      title: newTask.title,
+      description: newTask.description,
+      status: "pending",
+      milestoneId: newTask.milestoneId || null,
+      milestoneName:
+        milestones.find((m) => String(m.id) === String(newTask.milestoneId))
+          ?.title || "",
+      assignedTo: assignee?.id,
+      assignedToName: assignee?.name,
+      createdAt: new Date().toISOString(),
+    };
+    const updatedTasks = [task, ...localTasks];
+    setLocalTasks(updatedTasks);
+    if (strictMode) {
+      try {
+        const created = await taskApi.saveTask(founderId, task);
+        setLocalTasks((prev) =>
+          prev.map((row) => (row.id === task.id ? normalizeTask(created) : row)),
+        );
+      } catch (error) {
+        setLoadError(error?.message || "Task creation failed.");
+        return;
+      }
+    } else {
+      saveTasks(founderId, updatedTasks);
+    }
+    if (!strictMode) {
+      syncTasksToMilestones(founderId);
+    }
+    onTasksSynced?.();
+    setShowCreateDialog(false);
+    resetNewTask();
+    toast.success("Task created successfully!");
+    onPlaySound?.();
+    createTaskAssignedNotification(task, assignee?.name || "Unassigned");
+  };
 
   const handleToggleTask = async (taskId) => {
     if (!founderId) return;
@@ -436,7 +469,6 @@ export function V2TaskManagementPanel({
     } else {
       saveTasks(founderId, updatedTasks);
     }
-
     if (!strictMode) {
       syncTasksToMilestones(founderId);
     }
@@ -522,12 +554,7 @@ export function V2TaskManagementPanel({
     const previousTasks = localTasks;
     const updatedTasks = localTasks.map((t) =>
       t.id === taskId
-        ? {
-            ...t,
-            status: "blocked",
-            blockerReason: reason,
-            blockerNote: note,
-          }
+        ? { ...t, status: "blocked", blockerReason: reason, blockerNote: note }
         : t,
     );
     const applyBlockedSuccess = () => {
@@ -575,12 +602,8 @@ export function V2TaskManagementPanel({
         });
     }
   };
-  const handleDragStart = (task) => {
-    setDraggedTask(task);
-  };
-  const handleDragOver = (e) => {
-    e.preventDefault();
-  };
+  const handleDragStart = (task) => setDraggedTask(task);
+  const handleDragOver = (e) => e.preventDefault();
   const handleDrop = (status) => {
     if (draggedTask && founderId) {
       const updatedTasks = localTasks.map((t) =>
@@ -614,49 +637,29 @@ export function V2TaskManagementPanel({
       }
       setDraggedTask(null);
       const statusLabel =
-        status === "in-progress"
-          ? "In Progress"
-          : status === "pending"
-            ? "Pending"
-            : "Completed";
+        status === "in-progress" ? "In Progress" : status === "pending" ? "Pending" : "Completed";
       toast.success(`Task moved to ${statusLabel}`);
       onPlaySound?.();
       if (status === "completed") {
         const task = updatedTasks.find((t) => t.id === draggedTask.id);
-        if (task) {
-          createTaskCompletedNotification(task);
-        }
+        if (task) createTaskCompletedNotification(task);
       }
     }
   };
+
   const getStatusIcon = (status) => {
     switch (status) {
       case "completed":
-        return <CheckCircle2 className="h-3.5 w-3.5 text-v2-green" />;
+        return <CheckCircle2 className="h-3 w-3" aria-hidden />;
       case "in-progress":
-        return <Clock className="h-3.5 w-3.5 text-v2-blue" />;
+        return <Clock className="h-3 w-3" aria-hidden />;
       case "blocked":
-        return <Ban className="h-3.5 w-3.5 text-v2-amber-dark" />;
-      case "pending":
-        return <Circle className="h-3.5 w-3.5 text-v2-muted/60" />;
+        return <Ban className="h-3 w-3" aria-hidden />;
       default:
-        return <Circle className="h-3.5 w-3.5 text-v2-muted/60" />;
-    }
-  };
-  const getStatusColor = (status) => {
-    switch (status) {
-      case "completed":
-        return "border-l-v2-green";
-      case "in-progress":
-        return "border-l-v2-blue";
-      case "blocked":
-        return "border-l-v2-amber";
-      default:
-        return "border-l-v2-border";
+        return <Circle className="h-3 w-3" aria-hidden />;
     }
   };
 
-  // Filter tasks — scoped to active tab
   const resolvedCurrentUserId = String(user?._id ?? user?.id ?? "");
   const tabScopedTasks = localTasks.filter((task) => {
     const assigneeId = String(task.assignedTo || task.assigneeId || "");
@@ -673,17 +676,13 @@ export function V2TaskManagementPanel({
   const filteredTasks = tabScopedTasks.filter((task) => {
     const matchesSearch =
       task.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (task.description || "")
-        .toLowerCase()
-        .includes(searchQuery.toLowerCase());
-    const matchesStatus =
-      filterStatus === "all" || task.status === filterStatus;
+      (task.description || "").toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesStatus = filterStatus === "all" || task.status === filterStatus;
     return matchesSearch && matchesStatus;
   });
 
   const canEditTask = user.role === "founder";
 
-  // Group team tasks by assignee (for Team Tasks tab)
   const teamTasksByAssignee = (() => {
     const groups = new Map();
     filteredTasks.forEach((task) => {
@@ -695,55 +694,81 @@ export function V2TaskManagementPanel({
     return Array.from(groups.values());
   })();
   const pendingTasks = filteredTasks.filter((t) => t.status === "pending");
-  const inProgressTasks = filteredTasks.filter(
-    (t) => t.status === "in-progress",
-  );
+  const inProgressTasks = filteredTasks.filter((t) => t.status === "in-progress");
   const completedTasks = filteredTasks.filter((t) => t.status === "completed");
   const blockedTasks = filteredTasks.filter((t) => t.status === "blocked");
-  const milestoneProgressRows = milestones.map((milestone) => {
+
+  const totalMilestones = milestones.length;
+  const completeMilestones = milestones.filter((m) => {
     const related = localTasks.filter(
-      (task) => String(task.milestoneId || "") === String(milestone.id || ""),
+      (task) => String(task.milestoneId || "") === String(m.id || ""),
     );
-    const total = related.length || Number(milestone.totalTasks || 0);
+    const total = related.length || Number(m.totalTasks || 0);
     const done =
       related.filter((task) => String(task.status || "") === "completed").length ||
-      Number(milestone.tasksCompleted || 0);
-    return {
-      id: String(milestone.id || ""),
-      title: milestone.title || "Milestone",
-      total,
-      done,
-    };
-  });
+      Number(m.tasksCompleted || 0);
+    return total > 0 && done >= total;
+  }).length;
+
   const columns = [
     {
       id: "pending",
-      title: "To Do",
+      title: "To do",
       tasks: pendingTasks,
-      headerClass: "bg-v2-blue-tint text-v2-blue-dark",
+      dotClass: "bg-gray-300",
+      titleClass: "text-v2-muted",
+      badgeClass: "bg-white border border-v2-border text-v2-muted",
+      leftBorder: "",
     },
     {
       id: "in-progress",
-      title: "In Progress",
+      title: "In progress",
       tasks: inProgressTasks,
-      headerClass: "bg-v2-purple-tint text-v2-purple-dark",
+      dotClass: "bg-v2-blue",
+      titleClass: "text-v2-blue-dark",
+      badgeClass: "bg-v2-blue-tint text-v2-blue-dark",
+      leftBorder: "border-l-[2.5px] border-l-v2-blue",
     },
     {
       id: "completed",
       title: "Done",
       tasks: completedTasks,
-      headerClass: "bg-v2-green-tint text-v2-green-dark",
+      dotClass: "bg-v2-green",
+      titleClass: "text-v2-green-dark",
+      badgeClass: "bg-v2-green-tint text-v2-green-dark",
+      leftBorder: "border-l-[2.5px] border-l-v2-green",
     },
   ];
-
   if (blockedTasks.length > 0) {
     columns.push({
       id: "blocked",
       title: "Blocked",
       tasks: blockedTasks,
-      headerClass: "bg-v2-amber-tint text-v2-amber-dark",
+      dotClass: "bg-v2-amber",
+      titleClass: "text-v2-amber-dark",
+      badgeClass: "bg-v2-amber-tint text-v2-amber-dark",
+      leftBorder: "border-l-[2.5px] border-l-v2-amber",
     });
   }
+
+  const subCount =
+    activeTab === "team-tasks"
+      ? (() => {
+          const fid = founderId || resolvedCurrentUserId;
+          const n = localTasks.filter((t) => Boolean(t.assignedTo) && t.assignedTo !== fid).length;
+          return `${n} task${n !== 1 ? "s" : ""} assigned to teammates`;
+        })()
+      : (() => {
+          const fid = founderId || resolvedCurrentUserId;
+          const n = localTasks.filter((t) => Boolean(t.assignedTo) && t.assignedTo === fid).length;
+          return `${n} task${n !== 1 ? "s" : ""} assigned to you`;
+        })();
+
+  const openCreateDialog = () => {
+    resetNewTask();
+    setShowCreateDialog(true);
+  };
+
   return (
     <>
       <AnimatePresence>
@@ -760,252 +785,135 @@ export function V2TaskManagementPanel({
               initial={{ x: "100%" }}
               animate={{ x: 0 }}
               exit={{ x: "100%" }}
-              transition={{
-                type: "spring",
-                damping: 28,
-                stiffness: 260,
-              }}
+              transition={{ type: "spring", damping: 30, stiffness: 280 }}
               ref={panelRef}
-              className="fixed right-0 top-0 z-[70] flex h-full w-full flex-col overflow-hidden rounded-none border-y border-l border-v2-border bg-v2-surface text-v2-muted shadow-lg md:w-[min(900px,92vw)] md:rounded-l-[14px]"
+              className="fixed right-0 top-0 z-[70] flex h-full w-full flex-col overflow-hidden border-l border-v2-border bg-white md:w-[520px]"
             >
-              <div className="min-h-0 flex-1 overflow-y-auto bg-v2-surface">
-              <div className="border-b border-v2-border bg-v2-page px-3 pb-3 pt-3">
-                <div className="mb-3 flex items-center justify-between gap-2">
-                  <div className="flex min-w-0 items-center gap-2">
-                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-v2-blue-tint text-v2-blue">
-                      <Target className="h-4 w-4" aria-hidden />
-                    </span>
-                    <div className="min-w-0">
-                      <h3 className="truncate font-heading text-[15px] font-semibold tracking-tight text-v2-heading md:text-base">
-                        Task management
-                      </h3>
-                      {user.role === "team-member" && (
-                        <Badge
-                          variant="outline"
-                          className="mt-0.5 border-v2-border text-[10px] font-medium text-v2-muted"
-                        >
-                          Your tasks only
-                        </Badge>
-                      )}
+              <div className="min-h-0 flex-1 overflow-y-auto">
+                <div className="flex flex-col gap-3 px-[18px] pt-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2 text-[16px] font-medium text-v2-heading">
+                      <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-v2-blue-tint text-v2-blue">
+                        <Target className="h-3.5 w-3.5" aria-hidden />
+                      </span>
+                      Task management
                     </div>
+                    <button
+                      type="button"
+                      onClick={onClose}
+                      aria-label="Close"
+                      className="flex h-7 w-7 items-center justify-center rounded-md border border-v2-border bg-white text-v2-muted hover:bg-v2-page"
+                    >
+                      <X className="h-4 w-4" aria-hidden />
+                    </button>
                   </div>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    type="button"
-                    onClick={onClose}
-                    className="h-8 w-8 shrink-0 rounded-md text-v2-muted hover:bg-transparent hover:text-v2-heading"
-                    aria-label="Close"
-                  >
-                    <X className="h-4 w-4" />
-                  </Button>
+
+                  {isFounder && (
+                    <div className="flex items-center gap-0.5 rounded-lg bg-gray-100 p-[3px]">
+                      <button
+                        type="button"
+                        onClick={() => setActiveTab("my-tasks")}
+                        className={`flex-1 rounded-md py-1.5 text-[13px] font-medium transition-colors ${
+                          activeTab === "my-tasks"
+                            ? "border border-v2-border bg-white text-v2-heading"
+                            : "text-v2-muted"
+                        }`}
+                      >
+                        My tasks
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setActiveTab("team-tasks")}
+                        className={`flex-1 rounded-md py-1.5 text-[13px] font-medium transition-colors ${
+                          activeTab === "team-tasks"
+                            ? "border border-v2-border bg-white text-v2-heading"
+                            : "text-v2-muted"
+                        }`}
+                      >
+                        Team tasks
+                      </button>
+                    </div>
+                  )}
+                  <p className="-mt-1 text-[12px] text-v2-muted">{subCount}</p>
                 </div>
 
-                {user.role === "founder" && (
-                  <div className="mb-1 flex items-center gap-1 rounded-lg bg-v2-blue-tint/60 p-1">
-                    <button
-                      type="button"
-                      onClick={() => setActiveTab("my-tasks")}
-                      className={`flex-1 rounded-md px-3 py-2 text-xs font-semibold transition-colors ${
-                        activeTab === "my-tasks"
-                          ? "bg-v2-surface text-v2-blue shadow-sm ring-1 ring-v2-border"
-                          : "text-v2-muted hover:text-v2-heading"
-                      }`}
-                    >
-                      My tasks
-                      {(() => { const fid = founderId || resolvedCurrentUserId; const n = localTasks.filter((t) => Boolean(t.assignedTo) && t.assignedTo === fid).length; return n > 0 ? <span className="ml-1.5 rounded-full bg-v2-blue-tint px-1.5 py-0.5 text-[10px] tabular-nums text-v2-blue-dark">{n}</span> : null; })()}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setActiveTab("team-tasks")}
-                      className={`flex-1 rounded-md px-3 py-2 text-xs font-semibold transition-colors ${
-                        activeTab === "team-tasks"
-                          ? "bg-v2-surface text-v2-blue shadow-sm ring-1 ring-v2-border"
-                          : "text-v2-muted hover:text-v2-heading"
-                      }`}
-                    >
-                      Team tasks
-                      {(() => { const fid = founderId || resolvedCurrentUserId; const n = localTasks.filter((t) => Boolean(t.assignedTo) && t.assignedTo !== fid).length; return n > 0 ? <span className="ml-1.5 rounded-full bg-v2-blue-tint px-1.5 py-0.5 text-[10px] tabular-nums text-v2-blue-dark">{n}</span> : null; })()}
-                    </button>
-                  </div>
-                )}
-
-                <p className="text-xs text-v2-muted">
-                  {(() => {
-                    const fid = founderId || resolvedCurrentUserId;
-                    if (activeTab === "team-tasks") {
-                      const n = localTasks.filter((t) => Boolean(t.assignedTo) && t.assignedTo !== fid).length;
-                      return `${n} task${n !== 1 ? "s" : ""} assigned to teammates`;
-                    }
-                    const n = localTasks.filter((t) => Boolean(t.assignedTo) && t.assignedTo === fid).length;
-                    return `${n} task${n !== 1 ? "s" : ""} assigned to you`;
-                  })()}
-                </p>
-              </div>
-              <div className="space-y-3 border-b border-v2-border bg-v2-page px-3 py-4 md:px-4">
                 {loadError ? (
-                  <div className="text-xs text-red-600 bg-red-50 border border-red-200 rounded p-2">
+                  <div className="mx-[18px] mt-2 rounded-lg border border-red-200 bg-red-50 p-2 text-xs text-red-600">
                     {loadError}
                   </div>
                 ) : null}
                 {taskNotFound ? (
-                  <div className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded p-2">
+                  <div className="mx-[18px] mt-2 rounded-lg border border-amber-200 bg-amber-50 p-2 text-xs text-amber-700">
                     The linked task could not be found. It may have been deleted or moved.
                   </div>
                 ) : null}
 
-                {user.role === "founder" && (
-                  <div className="flex items-start gap-2.5 rounded-lg border border-v2-blue/20 bg-v2-blue-tint px-3 py-2.5">
-                    <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-v2-blue" aria-hidden />
-                    <p className="flex-1 text-[12px] font-medium leading-snug text-v2-blue-dark">
+                {isFounder && (
+                  <div className="mx-[18px] mt-3 flex items-center justify-between gap-2.5 rounded-lg bg-v2-blue-tint px-3.5 py-2.5">
+                    <div className="flex items-center gap-1.5 text-[12px] text-v2-blue-dark">
+                      <AlertCircle className="h-3.5 w-3.5 shrink-0" aria-hidden />
                       Tasks come from your weekly milestones on the founder dashboard.
-                    </p>
+                    </div>
                     {onNavigate && (
-                      <Button
+                      <button
                         type="button"
-                        variant="ghost"
-                        size="sm"
-                        className="h-8 shrink-0 px-2 text-xs font-semibold text-v2-blue-dark hover:bg-v2-blue-tint"
                         onClick={() => { onClose?.(); onNavigate("dashboard"); }}
+                        className="flex shrink-0 items-center gap-0.5 text-[12px] font-medium text-v2-blue-dark underline"
                       >
-                        Open dashboard
-                      </Button>
+                        Open dashboard <ArrowUpRight className="h-3 w-3" aria-hidden />
+                      </button>
                     )}
                   </div>
                 )}
 
-                <div className="flex items-center gap-2">
-                  <div className="relative flex-1">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-v2-muted" />
-                    <Input
-                      placeholder="Search tasks…"
+                <div className="flex items-center gap-2 px-[18px] pt-3">
+                  <div className="flex h-8 flex-1 items-center gap-2 rounded-lg border border-v2-border bg-gray-50 px-2.5">
+                    <Search className="h-3.5 w-3.5 shrink-0 text-gray-400" aria-hidden />
+                    <input
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
-                      className="h-9 border-v2-border bg-v2-surface pl-9 hover:border-v2-blue/40 focus-visible:border-v2-blue"
+                      placeholder="Search tasks..."
+                      className="w-full bg-transparent text-[13px] text-v2-heading placeholder:text-gray-400 outline-none"
                     />
                   </div>
                   <Select value={filterStatus} onValueChange={setFilterStatus}>
-                    <SelectTrigger className="h-9 w-[8.5rem] border-v2-border bg-v2-surface hover:border-v2-blue/40">
-                      <Filter className="w-3.5 h-3.5 mr-1" />
-                      <SelectValue placeholder="Status" />
+                    <SelectTrigger className="h-8 w-auto gap-1.5 border-v2-border bg-white px-2.5 text-[12px] text-v2-muted">
+                      <Filter className="h-3 w-3" aria-hidden />
+                      <SelectValue placeholder="All status" />
                     </SelectTrigger>
                     <SelectContent className="z-[75]">
-                      <SelectItem value="all">All Status</SelectItem>
-                      <SelectItem value="pending">Pending</SelectItem>
-                      <SelectItem value="in-progress">In Progress</SelectItem>
-                      <SelectItem value="completed">Completed</SelectItem>
+                      <SelectItem value="all">All status</SelectItem>
+                      <SelectItem value="pending">To do</SelectItem>
+                      <SelectItem value="in-progress">In progress</SelectItem>
+                      <SelectItem value="completed">Done</SelectItem>
                       <SelectItem value="blocked">Blocked</SelectItem>
                     </SelectContent>
                   </Select>
-                  {user.role === "founder" ? (
-                    <Button
+                  {isFounder ? (
+                    <button
                       type="button"
-                      variant="outline"
-                      size="sm"
-                      className="h-9 shrink-0 border-v2-border bg-v2-surface"
                       onClick={() => setShowGithubImport(true)}
+                      className="flex h-8 shrink-0 items-center gap-1.5 rounded-lg border border-v2-border bg-white px-2.5 text-[12px] text-v2-muted hover:bg-v2-page"
                     >
-                      <Github className="mr-1.5 h-3.5 w-3.5" aria-hidden />
+                      <Github className="h-3.5 w-3.5" aria-hidden />
                       Import
-                    </Button>
+                    </button>
                   ) : null}
                 </div>
-                {milestoneProgressRows.length > 0 && (
-                  <div className="overflow-hidden rounded-xl border border-v2-border bg-v2-surface shadow-sm">
-                    <div className="flex items-center justify-between border-b border-v2-border bg-v2-blue-tint px-3 py-2.5 md:px-4 md:py-3">
-                      <div className="flex items-center gap-2">
-                        <Target className="h-3.5 w-3.5 text-v2-blue" aria-hidden />
-                        <span className="text-[11px] font-semibold uppercase tracking-wide text-v2-muted md:text-xs">
-                          Weekly milestones
-                        </span>
-                      </div>
-                      <span className="text-[10px] font-medium tabular-nums text-v2-muted">
-                        {milestoneProgressRows.filter((r) => r.total > 0 && r.done >= r.total).length}/{milestoneProgressRows.length} complete
-                      </span>
-                    </div>
-                    <div className="divide-y divide-v2-border bg-v2-surface">
-                      {milestoneProgressRows.map((row) => {
-                        const pct =
-                          row.total > 0
-                            ? Math.max(0, Math.min(100, Math.round((row.done / row.total) * 100)))
-                            : 0;
-                        const isDone = row.total > 0 && row.done >= row.total;
-                        const isPartial = row.done > 0 && !isDone;
-                        const barColor = isDone
-                          ? "bg-v2-green"
-                          : isPartial
-                          ? "bg-v2-blue"
-                          : "bg-v2-border";
-                        const pillStyle = isDone
-                          ? "border border-v2-green/30 bg-v2-green-tint text-v2-green-dark"
-                          : isPartial
-                          ? "border border-v2-blue/25 bg-v2-blue-tint text-v2-blue-dark"
-                          : "border border-v2-border bg-v2-page text-v2-muted";
-                        return (
-                          <div
-                            key={row.id}
-                            className="space-y-2 bg-v2-surface px-3 py-2.5 md:px-4 md:py-3"
-                          >
-                            <div className="flex items-start justify-between gap-3">
-                              <div className="flex min-w-0 items-center gap-2">
-                                <div className={`mt-0.5 h-2 w-2 shrink-0 rounded-full ${isDone ? "bg-v2-green" : isPartial ? "bg-v2-blue" : "bg-v2-border"}`} />
-                                <span className="truncate text-xs font-medium leading-tight text-v2-heading">{row.title}</span>
-                              </div>
-                              <div className="flex items-center gap-2 flex-shrink-0">
-                                <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${pillStyle}`}>
-                                  {pct}%
-                                </span>
-                                <span className="text-[10px] text-v2-muted tabular-nums">
-                                  {row.done}/{row.total}
-                                </span>
-                              </div>
-                            </div>
-                            <div className="h-1 w-full overflow-hidden rounded-full bg-v2-border/60">
-                              <div
-                                className={`h-full rounded-full transition-all duration-500 ${barColor}`}
-                                style={{ width: `${pct}%` }}
-                              />
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
+
+                {totalMilestones > 0 && (
+                  <div className="flex items-center justify-between px-[18px] pb-1.5 pt-3">
+                    <span className="flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-wide text-v2-muted">
+                      <Target className="h-3 w-3" aria-hidden />
+                      Weekly milestones
+                    </span>
+                    <span className="text-[11px] text-gray-400">
+                      {completeMilestones}/{totalMilestones} complete
+                    </span>
                   </div>
                 )}
-                <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs">
-                  <div className="flex items-center gap-1.5">
-                    <Circle className="h-3 w-3 text-v2-muted/70" />
-                    <span className="font-medium text-v2-muted">
-                      {pendingTasks.length}
-                      {" To do"}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-1.5">
-                    <Clock className="h-3 w-3 text-v2-blue" />
-                    <span className="font-medium text-v2-muted">
-                      {inProgressTasks.length}
-                      {" In progress"}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-1.5">
-                    <CheckCircle2 className="h-3 w-3 text-v2-green" />
-                    <span className="font-medium text-v2-muted">
-                      {completedTasks.length}
-                      {" Done"}
-                    </span>
-                  </div>
-                  {blockedTasks.length > 0 && (
-                    <div className="flex items-center gap-1.5">
-                      <Ban className="h-3 w-3 text-v2-amber-dark" />
-                      <span className="font-medium text-v2-muted">
-                        {blockedTasks.length}
-                        {" Blocked"}
-                      </span>
-                    </div>
-                  )}
-                </div>
               </div>
-              </div>
+
               <div
                 role="separator"
                 aria-label="Drag up to expand task board"
@@ -1013,360 +921,278 @@ export function V2TaskManagementPanel({
                 onPointerMove={onHandlePointerMove}
                 onPointerUp={onHandlePointerUp}
                 onPointerCancel={onHandlePointerUp}
-                className="group relative flex h-8 w-full shrink-0 cursor-ns-resize select-none items-center justify-center border-y border-v2-border bg-v2-page transition-colors hover:bg-v2-blue-tint active:bg-v2-blue-tint"
+                className="flex h-7 w-full shrink-0 cursor-ns-resize select-none items-center justify-center gap-1.5 text-[11px] text-gray-400 hover:text-v2-muted"
               >
-                <div className="flex items-center gap-1.5 rounded-full border border-v2-border bg-v2-surface px-3 py-1 shadow-sm transition-all group-hover:border-v2-blue/40 group-hover:shadow-md">
-                  <GripHorizontal className="h-3.5 w-3.5 text-v2-muted transition-colors group-hover:text-v2-blue" aria-hidden />
-                  <span className="select-none text-[10px] font-semibold text-v2-muted transition-colors group-hover:text-v2-blue">
-                    Drag to resize board
-                  </span>
-                </div>
+                <GripHorizontal className="h-3 w-3" aria-hidden />
+                Drag to resize board
               </div>
-              <div
-                className="shrink-0 overflow-hidden bg-v2-page"
-                style={{ height: kanbanHeight }}
-              >
-              {loading ? (
-                <div className="flex h-full items-center justify-center">
-                  <div className="text-center space-y-3">
-                    <div className="w-8 h-8 border-4 border-v2-blue border-t-transparent rounded-full animate-spin mx-auto" />
-                    <p className="text-sm text-v2-muted">
-                      Loading tasks...
-                    </p>
+
+              <div className="shrink-0 overflow-hidden px-[18px] pb-[18px]" style={{ height: kanbanHeight }}>
+                {loading ? (
+                  <div className="flex h-full items-center justify-center">
+                    <div className="h-6 w-6 animate-spin rounded-full border-2 border-v2-blue border-t-transparent" />
                   </div>
-                </div>
-              ) : filteredTasks.length === 0 ? (
-                <div className="flex h-full items-center justify-center">
-                  <div className="text-center space-y-3 p-8">
-                    <Target className="w-16 h-16 mx-auto text-v2-muted opacity-20" />
-                    <p className="text-lg font-medium text-v2-muted">
-                      No tasks found
-                    </p>
-                    <p className="text-sm text-v2-muted max-w-sm">
+                ) : filteredTasks.length === 0 ? (
+                  <div className="flex h-full items-center justify-center text-center">
+                    <p className="text-[12px] text-v2-muted">
                       {user.role === "founder" && activeTab === "team-tasks"
                         ? "No tasks have been assigned to teammates yet"
-                        : user.role === "founder"
-                        ? "Unassigned tasks and tasks assigned to you appear here"
-                        : "No tasks have been assigned to you yet"}
+                        : "No tasks found"}
                     </p>
                   </div>
-                </div>
-              ) : activeTab === "team-tasks" ? (
-                <div className="h-full space-y-6 overflow-y-auto bg-v2-page p-4">
-                  {teamTasksByAssignee.map((group) => (
-                    <div key={group.id}>
-                      <div className="mb-2 flex items-center gap-2">
-                        <div className="flex h-8 w-8 items-center justify-center rounded-full border border-v2-border bg-v2-blue-tint text-[11px] font-semibold text-v2-blue-dark">
-                          {group.name.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase()}
-                        </div>
-                        <span className="text-sm font-semibold text-v2-heading">{group.name}</span>
-                        <Badge variant="secondary" className="h-5 border border-v2-border bg-v2-surface px-1.5 text-[10px] font-semibold">
-                          {group.tasks.length} task{group.tasks.length !== 1 ? "s" : ""}
-                        </Badge>
-                      </div>
-                      <div className="space-y-2 pl-9">
-                        {group.tasks.map((task) => (
-                          <Card
-                            key={task.id}
-                            onClick={() => openTaskPage(task.id)}
-                            className={`cursor-pointer rounded-xl border border-v2-border bg-v2-surface shadow-sm transition-all hover:border-v2-blue/40 hover:shadow-md border-l-[3px] ${getStatusColor(task.status)}`}
-                          >
-                            <CardContent className="space-y-2 p-3">
-                              <div className="flex items-start justify-between gap-2">
-                                <h4 className="flex-1 text-xs font-semibold leading-snug text-v2-heading">{task.title}</h4>
-                                <div className="flex items-center gap-1.5 shrink-0">
-                                  <Badge variant={task.status === "completed" ? "default" : task.status === "blocked" ? "destructive" : "secondary"} className="text-[10px] h-5">
-                                    {task.status === "in-progress" ? "In Progress" : task.status === "pending" ? "To Do" : task.status.charAt(0).toUpperCase() + task.status.slice(1)}
-                                  </Badge>
-                                  {canEditTask && (
-                                    <DropdownMenu>
-                                      <DropdownMenuTrigger asChild={true}>
-                                        <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={(e) => e.stopPropagation()}>
-                                          <MoreVertical className="w-3.5 h-3.5" />
-                                        </Button>
-                                      </DropdownMenuTrigger>
-                                      <DropdownMenuContent align="end" className="w-40 z-[75]">
-                                        <DropdownMenuItem onClick={() => handleStatusChange(task.id, "pending")}>
-                                          <Circle className="w-3.5 h-3.5 mr-2 text-gray-400" />Mark as To Do
-                                        </DropdownMenuItem>
-                                        <DropdownMenuItem onClick={() => handleStatusChange(task.id, "in-progress")}>
-                                          <PlayCircle className="w-3.5 h-3.5 mr-2 text-v2-blue" />Start Progress
-                                        </DropdownMenuItem>
-                                        <DropdownMenuItem onClick={() => handleStatusChange(task.id, "completed")}>
-                                          <CheckCircle2 className="w-3.5 h-3.5 mr-2 text-v2-green" />Mark Complete
-                                        </DropdownMenuItem>
-                                        <DropdownMenuSeparator />
-                                        <DropdownMenuItem onClick={() => handleDeleteTask(task.id)} className="text-red-600 focus:text-red-600">
-                                          <Trash2 className="w-3.5 h-3.5 mr-2" />Delete Task
-                                        </DropdownMenuItem>
-                                      </DropdownMenuContent>
-                                    </DropdownMenu>
-                                  )}
-                                </div>
-                              </div>
-                              {task.description && (
-                                <p className="text-[10px] text-v2-muted line-clamp-2">{task.description}</p>
-                              )}
-                              {task.status === "blocked" && task.blockerNote && (
-                                <div className="p-2 bg-red-50 border border-red-200 rounded text-[10px]">
-                                  <div className="flex items-center gap-1 text-red-700 font-medium mb-1">
-                                    <AlertCircle className="w-3 h-3" />
-                                    <span>Blocked: {task.blockerNote}</span>
-                                  </div>
-                                </div>
-                              )}
-                              <div className="flex items-center justify-between gap-2 border-t border-v2-border pt-2 text-[11px] text-v2-muted">
-                                <span className="min-w-0 truncate">{task.milestoneName || "No milestone"}</span>
-                                {task.dueDate && <span>Due {new Date(task.dueDate).toLocaleDateString()}</span>}
-                              </div>
-                            </CardContent>
-                          </Card>
-                        ))}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="flex h-full flex-col overflow-hidden bg-v2-page p-3 md:p-4">
-                  <div className="flex flex-1 snap-x snap-mandatory gap-3 overflow-x-auto md:hidden">
-                    {columns.map((column) => (
-                      <div
-                        key={column.id}
-                        className="flex min-h-0 w-[72vw] shrink-0 snap-start flex-col overflow-hidden rounded-xl border border-v2-border bg-v2-surface shadow-sm"
-                        onDragOver={handleDragOver}
-                        onDrop={() => handleDrop(column.id)}
-                      >
-                        <div
-                          className={`flex shrink-0 items-center border-b border-v2-border px-3 py-2.5 ${column.headerClass}`}
-                        >
-                          <div className="flex w-full items-center justify-between gap-2">
-                            <div className="flex min-w-0 items-center gap-2">
-                              {getStatusIcon(column.id)}
-                              <span className="truncate text-xs font-semibold">
-                                {column.title}
-                              </span>
-                            </div>
-                            <Badge
-                              variant="secondary"
-                              className="h-5 shrink-0 border border-v2-border bg-v2-surface/90 px-1.5 text-[10px] font-semibold tabular-nums text-v2-muted"
-                            >
-                              {column.tasks.length}
-                            </Badge>
+                ) : activeTab === "team-tasks" ? (
+                  <div className="h-full space-y-5 overflow-y-auto">
+                    {teamTasksByAssignee.map((group) => (
+                      <div key={group.id}>
+                        <div className="mb-2 flex items-center gap-2">
+                          <div className="flex h-6 w-6 items-center justify-center rounded-full bg-v2-blue-tint text-[10px] font-semibold text-v2-blue-dark">
+                            {group.name.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase()}
                           </div>
+                          <span className="text-[12px] font-medium text-v2-heading">{group.name}</span>
+                          <span className="text-[11px] text-gray-400">{group.tasks.length}</span>
                         </div>
-                        <div className="min-h-0 flex-1 overflow-y-auto bg-v2-page p-2">
-                          <div className="space-y-2">
-                            {column.tasks.map((task) => (
-                              <V2TaskCard
-                                key={task.id}
-                                task={task}
-                                founderId={founderId}
-                                teamMembers={teamMembers}
-                                onDragStart={handleDragStart}
-                                onOpenTask={openTaskPage}
-                                onToggle={handleToggleTask}
-                                onDelete={handleDeleteTask}
-                                onStatusChange={handleStatusChange}
-                                onAssign={(taskId, assigneeId) => {
-                                  const updatedTasks = localTasks.map((t) =>
-                                    t.id === taskId
-                                      ? {
-                                          ...t,
-                                          assignedTo: assigneeId,
-                                          assignedToName: teamMembers.find(
-                                            (m) => m.id === assigneeId,
-                                          )?.name,
-                                        }
-                                      : t,
-                                  );
-                                  setLocalTasks(updatedTasks);
-                                  if (strictMode) {
-                                    const assigneeName = teamMembers.find(
-                                      (m) => m.id === assigneeId,
-                                    )?.name;
-                                    taskApi
-                                      .assignTask(
-                                        founderId,
-                                        taskId,
-                                        assigneeId,
-                                        assigneeName,
-                                      )
-                                      .then(() => onTasksSynced?.())
-                                      .catch((error) =>
-                                        setLoadError(
-                                          error?.message || "Task assignment failed.",
-                                        ),
-                                      );
-                                  } else {
-                                    saveTasks(founderId, updatedTasks);
-                                  }
-                                  toast.success(
-                                    `Task assigned to ${teamMembers.find((m) => m.id === assigneeId)?.name}`,
-                                  );
-                                  onPlaySound?.();
-                                  createTaskAssignedNotification(
-                                    task,
-                                    teamMembers.find((m) => m.id === assigneeId)
-                                      ?.name || "Unassigned",
-                                  );
-                                }}
-                                getStatusColor={getStatusColor}
-                                canEdit={user.role === "founder"}
-                                onBlock={handleBlockTask}
-                              />
-                            ))}
-                            {column.tasks.length === 0 && (
-                              <div className="rounded-lg border border-dashed border-v2-border bg-v2-surface py-8 text-center text-xs text-v2-muted">
-                                <Circle className="mx-auto mb-2 h-8 w-8 text-v2-blue/25" aria-hidden />
-                                <p className="font-medium">No tasks</p>
-                              </div>
-                            )}
-                          </div>
+                        <div className="space-y-1.5 pl-8">
+                          {group.tasks.map((task) => (
+                            <V2TaskCard
+                              key={task.id}
+                              task={task}
+                              teamMembers={teamMembers}
+                              onDragStart={handleDragStart}
+                              onOpenTask={openTaskPage}
+                              onToggle={handleToggleTask}
+                              onDelete={handleDeleteTask}
+                              onStatusChange={handleStatusChange}
+                              onAssign={(taskId, assigneeId) => {
+                                const updatedTasks = localTasks.map((t) =>
+                                  t.id === taskId
+                                    ? {
+                                        ...t,
+                                        assignedTo: assigneeId,
+                                        assignedToName: teamMembers.find((m) => m.id === assigneeId)?.name,
+                                      }
+                                    : t,
+                                );
+                                setLocalTasks(updatedTasks);
+                                if (strictMode) {
+                                  const assigneeName = teamMembers.find((m) => m.id === assigneeId)?.name;
+                                  taskApi
+                                    .assignTask(founderId, taskId, assigneeId, assigneeName)
+                                    .then(() => onTasksSynced?.())
+                                    .catch((error) => setLoadError(error?.message || "Task assignment failed."));
+                                } else {
+                                  saveTasks(founderId, updatedTasks);
+                                }
+                                toast.success(`Task assigned to ${teamMembers.find((m) => m.id === assigneeId)?.name}`);
+                                onPlaySound?.();
+                                createTaskAssignedNotification(task, teamMembers.find((m) => m.id === assigneeId)?.name || "Unassigned");
+                              }}
+                              canEdit={canEditTask}
+                              onBlock={handleBlockTask}
+                            />
+                          ))}
                         </div>
                       </div>
                     ))}
                   </div>
+                ) : (
                   <div
-                    className={`hidden min-h-0 flex-1 gap-3 md:grid ${columns.length === 4 ? "grid-cols-4" : "grid-cols-3"}`}
+                    className={`grid h-full min-h-0 gap-2.5 ${columns.length === 4 ? "grid-cols-4" : "grid-cols-3"}`}
                   >
                     {columns.map((column) => (
                       <div
                         key={column.id}
-                        className="flex min-h-0 flex-col overflow-hidden rounded-xl border border-v2-border bg-v2-surface shadow-sm"
+                        className="flex min-h-0 flex-col gap-2 overflow-hidden rounded-[10px] bg-gray-50 p-2.5"
                         onDragOver={handleDragOver}
                         onDrop={() => handleDrop(column.id)}
                       >
-                        <div
-                          className={`flex shrink-0 items-center border-b border-v2-border px-3 py-2.5 ${column.headerClass}`}
-                        >
-                          <div className="flex w-full items-center justify-between gap-2">
-                            <div className="flex min-w-0 items-center gap-2">
-                              {getStatusIcon(column.id)}
-                              <span className="truncate text-xs font-semibold">
-                                {column.title}
-                              </span>
-                            </div>
-                            <Badge
-                              variant="secondary"
-                              className="h-5 shrink-0 border border-v2-border bg-v2-surface/90 px-1.5 text-[10px] font-semibold tabular-nums text-v2-muted"
-                            >
-                              {column.tasks.length}
-                            </Badge>
-                          </div>
+                        <div className="flex shrink-0 items-center justify-between">
+                          <span className={`flex items-center gap-1.5 text-[12px] font-medium ${column.titleClass}`}>
+                            {getStatusIcon(column.id)}
+                            {column.title}
+                          </span>
+                          <span className={`flex h-[18px] min-w-[18px] items-center justify-center rounded-[5px] px-1 text-[10px] font-medium ${column.badgeClass}`}>
+                            {column.tasks.length}
+                          </span>
                         </div>
-                        <div className="min-h-0 flex-1 overflow-y-auto bg-v2-page p-2">
-                          <div className="space-y-2">
-                            {column.tasks.map((task) => (
-                              <V2TaskCard
-                                key={task.id}
-                                task={task}
-                                founderId={founderId}
-                                teamMembers={teamMembers}
-                                onDragStart={handleDragStart}
-                                onOpenTask={openTaskPage}
-                                onToggle={handleToggleTask}
-                                onDelete={handleDeleteTask}
-                                onStatusChange={handleStatusChange}
-                                onAssign={(taskId, assigneeId) => {
-                                  const updatedTasks = localTasks.map((t) =>
-                                    t.id === taskId
-                                      ? {
-                                          ...t,
-                                          assignedTo: assigneeId,
-                                          assignedToName: teamMembers.find(
-                                            (m) => m.id === assigneeId,
-                                          )?.name,
-                                        }
-                                      : t,
-                                  );
-                                  setLocalTasks(updatedTasks);
-                                  if (strictMode) {
-                                    const assigneeName = teamMembers.find(
-                                      (m) => m.id === assigneeId,
-                                    )?.name;
-                                    taskApi
-                                      .assignTask(
-                                        founderId,
-                                        taskId,
-                                        assigneeId,
-                                        assigneeName,
-                                      )
-                                      .then(() => onTasksSynced?.())
-                                      .catch((error) =>
-                                        setLoadError(
-                                          error?.message || "Task assignment failed.",
-                                        ),
-                                      );
-                                  } else {
-                                    saveTasks(founderId, updatedTasks);
-                                  }
-                                  toast.success(
-                                    `Task assigned to ${teamMembers.find((m) => m.id === assigneeId)?.name}`,
-                                  );
-                                  onPlaySound?.();
-                                  createTaskAssignedNotification(
-                                    task,
-                                    teamMembers.find((m) => m.id === assigneeId)
-                                      ?.name || "Unassigned",
-                                  );
-                                }}
-                                getStatusColor={getStatusColor}
-                                canEdit={user.role === "founder"}
-                                onBlock={handleBlockTask}
-                              />
-                            ))}
-                            {column.tasks.length === 0 && (
-                              <div className="rounded-lg border border-dashed border-v2-border bg-v2-surface py-8 text-center text-xs text-v2-muted">
-                                <Circle className="mx-auto mb-2 h-8 w-8 text-v2-blue/25" aria-hidden />
-                                <p className="font-medium">No tasks</p>
-                              </div>
-                            )}
-                          </div>
+                        <div className="min-h-0 flex-1 space-y-2 overflow-y-auto">
+                          {column.tasks.map((task) => (
+                            <V2TaskCard
+                              key={task.id}
+                              task={task}
+                              teamMembers={teamMembers}
+                              leftBorderClass={column.leftBorder}
+                              onDragStart={handleDragStart}
+                              onOpenTask={openTaskPage}
+                              onToggle={handleToggleTask}
+                              onDelete={handleDeleteTask}
+                              onStatusChange={handleStatusChange}
+                              onAssign={(taskId, assigneeId) => {
+                                const updatedTasks = localTasks.map((t) =>
+                                  t.id === taskId
+                                    ? {
+                                        ...t,
+                                        assignedTo: assigneeId,
+                                        assignedToName: teamMembers.find((m) => m.id === assigneeId)?.name,
+                                      }
+                                    : t,
+                                );
+                                setLocalTasks(updatedTasks);
+                                if (strictMode) {
+                                  const assigneeName = teamMembers.find((m) => m.id === assigneeId)?.name;
+                                  taskApi
+                                    .assignTask(founderId, taskId, assigneeId, assigneeName)
+                                    .then(() => onTasksSynced?.())
+                                    .catch((error) => setLoadError(error?.message || "Task assignment failed."));
+                                } else {
+                                  saveTasks(founderId, updatedTasks);
+                                }
+                                toast.success(`Task assigned to ${teamMembers.find((m) => m.id === assigneeId)?.name}`);
+                                onPlaySound?.();
+                                createTaskAssignedNotification(task, teamMembers.find((m) => m.id === assigneeId)?.name || "Unassigned");
+                              }}
+                              canEdit={canEditTask}
+                              onBlock={handleBlockTask}
+                            />
+                          ))}
+                          {isFounder && (
+                            <button
+                              type="button"
+                              onClick={openCreateDialog}
+                              className="flex w-full items-center gap-1.5 rounded-md px-1 py-1.5 text-[12px] text-gray-400 hover:bg-gray-100 hover:text-v2-muted"
+                            >
+                              <Plus className="h-3.5 w-3.5" aria-hidden />
+                              Add task
+                            </button>
+                          )}
                         </div>
                       </div>
                     ))}
                   </div>
-                </div>
-              )}
+                )}
               </div>
+
+              {isFounder && (
+                <button
+                  type="button"
+                  onClick={openCreateDialog}
+                  aria-label="Add task"
+                  className="absolute bottom-6 right-6 flex h-9 w-9 items-center justify-center rounded-full bg-v2-blue text-white shadow-lg hover:bg-v2-blue-dark"
+                >
+                  <Plus className="h-5 w-5" aria-hidden />
+                </button>
+              )}
             </motion.div>
           </>
         )}
       </AnimatePresence>
-      {user.role === "founder" ? (
-        <V2GitHubImportDialog
-          open={showGithubImport}
-          onOpenChange={setShowGithubImport}
-          onImported={() => setTaskReloadNonce((n) => n + 1)}
-        />
+
+      {isFounder ? (
+        <>
+          <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
+            <DialogContent className="max-w-md z-[80]">
+              <DialogHeader>
+                <DialogTitle>Create New Task</DialogTitle>
+                <DialogDescription>Add a new task to your board</DialogDescription>
+              </DialogHeader>
+              <div className="space-y-4">
+                <div>
+                  <Label className="text-xs">Task Title *</Label>
+                  <Input
+                    placeholder="Enter task title..."
+                    value={newTask.title}
+                    onChange={(e) => setNewTask({ ...newTask, title: e.target.value })}
+                    className="mt-1"
+                  />
+                </div>
+                <div>
+                  <Label className="text-xs">Description</Label>
+                  <Textarea
+                    placeholder="Enter task description..."
+                    value={newTask.description}
+                    onChange={(e) => setNewTask({ ...newTask, description: e.target.value })}
+                    className="mt-1 h-20"
+                  />
+                </div>
+                <div>
+                  <Label className="text-xs">Milestone *</Label>
+                  <Select
+                    value={newTask.milestoneId}
+                    onValueChange={(v) => setNewTask({ ...newTask, milestoneId: v })}
+                  >
+                    <SelectTrigger className="mt-1">
+                      <SelectValue placeholder="Select milestone..." />
+                    </SelectTrigger>
+                    <SelectContent className="z-[85]">
+                      {milestones.map((milestone) => (
+                        <SelectItem key={milestone.id} value={milestone.id}>
+                          {milestone.title}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label className="text-xs">Assign To</Label>
+                  <Select
+                    value={newTask.assigneeId}
+                    onValueChange={(v) => setNewTask({ ...newTask, assigneeId: v })}
+                  >
+                    <SelectTrigger className="mt-1">
+                      <SelectValue placeholder="Select team member..." />
+                    </SelectTrigger>
+                    <SelectContent className="z-[85]">
+                      {teamMembers.map((member) => (
+                        <SelectItem key={member.id} value={member.id}>
+                          <div className="flex items-center gap-2">
+                            <UserAvatar user={member} name={member.name} className="h-5 w-5" fallbackClassName="text-[9px]" />
+                            <span>{member.name}</span>
+                          </div>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="flex gap-2 pt-2">
+                  <Button variant="outline" onClick={() => setShowCreateDialog(false)} className="flex-1">
+                    Cancel
+                  </Button>
+                  <Button onClick={handleCreateTask} className="flex-1 bg-v2-blue hover:bg-v2-blue-dark">
+                    Create Task
+                  </Button>
+                </div>
+              </div>
+            </DialogContent>
+          </Dialog>
+          <V2GitHubImportDialog
+            open={showGithubImport}
+            onOpenChange={setShowGithubImport}
+            onImported={() => setTaskReloadNonce((n) => n + 1)}
+          />
+        </>
       ) : null}
     </>
   );
 }
 
-// Task Card Component
-
 function V2TaskCard({
   task,
-  founderId,
   teamMembers,
+  leftBorderClass = "",
   onDragStart,
   onToggle,
   onDelete,
   onStatusChange,
   onAssign,
-  getStatusColor,
   canEdit,
   onBlock,
   onOpenTask,
 }) {
   const [showAssignDialog, setShowAssignDialog] = useState(false);
-  const [selectedAssignee, setSelectedAssignee] = useState(
-    task.assignedTo || "",
-  );
+  const [selectedAssignee, setSelectedAssignee] = useState(task.assignedTo || "");
   const [showBlockDialog, setShowBlockDialog] = useState(false);
   const [blockReason, setBlockReason] = useState("");
   const [blockNote, setBlockNote] = useState("");
+
   const handleAssign = () => {
     onAssign(task.id, selectedAssignee);
     setShowAssignDialog(false);
@@ -1380,213 +1206,119 @@ function V2TaskCard({
     }
   };
   const blockerReasons = [
-    {
-      value: "scope",
-      label: "Scope too large",
-      description: "This task needs to be broken down",
-    },
-    {
-      value: "unclear",
-      label: "Unclear requirements",
-      description: "I need more clarity on what to do",
-    },
-    {
-      value: "dependency",
-      label: "Blocked by dependency",
-      description: "Waiting on another task or person",
-    },
-    {
-      value: "skill-gap",
-      label: "Skill gap",
-      description: "I need help or training for this",
-    },
+    { value: "scope", label: "Scope too large", description: "This task needs to be broken down" },
+    { value: "unclear", label: "Unclear requirements", description: "I need more clarity on what to do" },
+    { value: "dependency", label: "Blocked by dependency", description: "Waiting on another task or person" },
+    { value: "skill-gap", label: "Skill gap", description: "I need help or training for this" },
   ];
+
+  const statusDotClass =
+    task.status === "completed"
+      ? "bg-v2-green"
+      : task.status === "in-progress"
+        ? "bg-v2-blue"
+        : task.status === "blocked"
+          ? "bg-v2-amber"
+          : "bg-gray-300";
+
   return (
     <>
       <motion.div
         id={`v2-task-${task.id}`}
-        draggable={true}
+        draggable
         onDragStart={() => onDragStart(task)}
-        layout={true}
-        initial={{ opacity: 0, y: 20 }}
+        layout
+        initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
-        className="cursor-pointer group"
+        className="group"
       >
         <Card
           onClick={() => onOpenTask?.(task.id)}
-          className={`rounded-xl border border-v2-border bg-v2-surface shadow-sm transition-all hover:border-v2-blue/40 hover:shadow-md border-l-[3px] ${getStatusColor(task.status)}`}
+          className={`relative cursor-pointer rounded-lg border border-v2-border bg-white p-2.5 shadow-none transition-colors hover:border-gray-300 ${leftBorderClass}`}
         >
-          <CardContent className="space-y-2 p-3">
-            <div className="flex items-start justify-between gap-2">
-              <h4 className="flex-1 text-xs font-semibold leading-snug text-v2-heading">
-                {task.title}
-              </h4>
-              <div className="flex items-center gap-1">
-                {task.status !== "blocked" && (
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild={true}>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="h-6 w-6 p-0"
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        <MoreVertical className="w-3.5 h-3.5" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" className="w-40 z-[75]">
-                      {task.status !== "pending" && (
-                        <DropdownMenuItem
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onStatusChange(task.id, "pending");
-                          }}
-                        >
-                          <Circle className="w-3.5 h-3.5 mr-2 text-gray-400" />
-                          Mark as To Do
-                        </DropdownMenuItem>
-                      )}
-                      {task.status !== "in-progress" && (
-                        <DropdownMenuItem
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onStatusChange(task.id, "in-progress");
-                          }}
-                        >
-                          <PlayCircle className="w-3.5 h-3.5 mr-2 text-v2-blue" />
-                          Start Progress
-                        </DropdownMenuItem>
-                      )}
-                      {task.status !== "completed" && (
-                        <DropdownMenuItem
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onStatusChange(task.id, "completed");
-                          }}
-                        >
-                          <CheckCircle2 className="w-3.5 h-3.5 mr-2 text-v2-green" />
-                          Mark Complete
-                        </DropdownMenuItem>
-                      )}
-                      {task.status !== "completed" && onBlock && (
-                        <>
-                          <DropdownMenuSeparator />
-                          <DropdownMenuItem
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setShowBlockDialog(true);
-                            }}
-                          >
-                            <Ban className="w-3.5 h-3.5 mr-2 text-red-600" />
-                            Report Blocker
-                          </DropdownMenuItem>
-                        </>
-                      )}
-                      {canEdit && (
-                        <>
-                          <DropdownMenuSeparator />
-                          <DropdownMenuItem
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setSelectedAssignee(task.assignedTo || "");
-                              setShowAssignDialog(true);
-                            }}
-                          >
-                            <User className="w-3.5 h-3.5 mr-2 text-v2-blue" />
-                            Assign To
-                          </DropdownMenuItem>
-                          <DropdownMenuSeparator />
-                          <DropdownMenuItem
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              onDelete(task.id);
-                            }}
-                            className="text-red-600 focus:text-red-600"
-                          >
-                            <Trash2 className="w-3.5 h-3.5 mr-2" />
-                            Delete Task
-                          </DropdownMenuItem>
-                        </>
-                      )}
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                )}
-              </div>
+          <CardContent className="space-y-1.5 p-0">
+            <div className="pr-4 text-[12px] font-medium leading-snug text-v2-heading">
+              {task.title}
             </div>
-            {task.description && (
-              <p className="text-[10px] text-v2-muted line-clamp-2">
-                {task.description}
-              </p>
-            )}
+            <div className="flex items-center gap-1.5 text-[11px] text-gray-400">
+              <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${statusDotClass}`} aria-hidden />
+              {task.assignedToName || "Unassigned"}
+            </div>
             {task.status === "blocked" && task.blockerNote && (
-              <div className="p-2 bg-red-50 border border-red-200 rounded text-[10px]">
-                <div className="flex items-center gap-1 text-red-700 font-medium mb-1">
-                  <AlertCircle className="w-3 h-3" />
-                  <span>Blocked</span>
-                </div>
-                <p className="text-red-600">
-                  {task.blockerNote}
-                </p>
+              <div className="rounded border border-red-200 bg-red-50 p-1.5 text-[10px] text-red-700">
+                Blocked: {task.blockerNote}
               </div>
             )}
-            <div className="flex items-center justify-between gap-2 border-t border-v2-border pt-2 text-[11px]">
-              {task.assignedToName ? (
-                <div className="flex min-w-0 items-center gap-1.5">
-                  <UserAvatar
-                    user={teamMembers.find(
-                      (m) => String(m.id) === String(task.assignedTo),
-                    )}
-                    name={task.assignedToName}
-                    className="h-6 w-6 border border-v2-border"
-                    fallbackClassName="bg-v2-blue-tint text-[8px] font-semibold text-v2-blue-dark"
-                  />
-                  <span className="max-w-[120px] truncate font-medium text-v2-muted">
-                    {task.assignedToName}
-                  </span>
-                </div>
-              ) : (
-                <span className="font-body font-medium not-italic text-v2-muted">
-                  Unassigned
-                </span>
-              )}
-              {task.milestoneName && (
-                <Badge
-                  variant="outline"
-                  className="h-5 max-w-[46%] shrink-0 truncate border-v2-border px-1.5 text-[9px] font-medium text-v2-muted"
-                >
-                  {task.milestoneName}
-                </Badge>
-              )}
-            </div>
           </CardContent>
+          <div className="absolute right-2 top-2 opacity-0 transition-opacity group-hover:opacity-100">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  type="button"
+                  onClick={(e) => e.stopPropagation()}
+                  className="flex h-5 w-5 items-center justify-center rounded text-gray-400 hover:bg-gray-100"
+                >
+                  <MoreVertical className="h-3.5 w-3.5" aria-hidden />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-40 z-[75]">
+                {task.status !== "pending" && (
+                  <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onStatusChange(task.id, "pending"); }}>
+                    <Circle className="w-3.5 h-3.5 mr-2 text-gray-400" />Mark as To Do
+                  </DropdownMenuItem>
+                )}
+                {task.status !== "in-progress" && (
+                  <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onStatusChange(task.id, "in-progress"); }}>
+                    <PlayCircle className="w-3.5 h-3.5 mr-2 text-v2-blue" />Start Progress
+                  </DropdownMenuItem>
+                )}
+                {task.status !== "completed" && (
+                  <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onStatusChange(task.id, "completed"); }}>
+                    <CheckCircle2 className="w-3.5 h-3.5 mr-2 text-v2-green" />Mark Complete
+                  </DropdownMenuItem>
+                )}
+                {task.status !== "completed" && onBlock && (
+                  <>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onClick={(e) => { e.stopPropagation(); setShowBlockDialog(true); }}>
+                      <Ban className="w-3.5 h-3.5 mr-2 text-red-600" />Report Blocker
+                    </DropdownMenuItem>
+                  </>
+                )}
+                {canEdit && (
+                  <>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onClick={(e) => { e.stopPropagation(); setSelectedAssignee(task.assignedTo || ""); setShowAssignDialog(true); }}>
+                      <User className="w-3.5 h-3.5 mr-2 text-v2-blue" />Assign To
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onDelete(task.id); }} className="text-red-600 focus:text-red-600">
+                      <Trash2 className="w-3.5 h-3.5 mr-2" />Delete Task
+                    </DropdownMenuItem>
+                  </>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
         </Card>
       </motion.div>
+
       <Dialog open={showAssignDialog} onOpenChange={setShowAssignDialog}>
-        <DialogContent
-          className="max-w-sm z-[80]"
-          onClick={(e) => e.stopPropagation()}
-        >
+        <DialogContent className="max-w-sm z-[80]" onClick={(e) => e.stopPropagation()}>
           <DialogHeader>
             <DialogTitle>Assign Task</DialogTitle>
-            <DialogDescription>
-              Assign "{task.title}" to a team member
-            </DialogDescription>
+            <DialogDescription>Assign "{task.title}" to a team member</DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div>
               <Label className="text-xs">Team Member</Label>
-              <Select
-                value={selectedAssignee}
-                onValueChange={setSelectedAssignee}
-              >
+              <Select value={selectedAssignee} onValueChange={setSelectedAssignee}>
                 <SelectTrigger className="mt-1">
                   <SelectValue placeholder="Select team member..." />
                 </SelectTrigger>
                 <SelectContent className="z-[85]">
                   <SelectItem value="unassigned">
-                    <span className="font-medium text-v2-muted">
-                      Unassigned
-                    </span>
+                    <span className="font-medium text-v2-muted">Unassigned</span>
                   </SelectItem>
                   {teamMembers.map((member) => (
                     <SelectItem key={member.id} value={member.id}>
@@ -1600,33 +1332,18 @@ function V2TaskCard({
               </Select>
             </div>
             <div className="flex gap-2 pt-2">
-              <Button
-                variant="outline"
-                onClick={() => setShowAssignDialog(false)}
-                className="flex-1"
-              >
-                Cancel
-              </Button>
-              <Button
-                onClick={handleAssign}
-                className="flex-1 bg-v2-blue hover:bg-v2-blue-dark"
-              >
-                Assign
-              </Button>
+              <Button variant="outline" onClick={() => setShowAssignDialog(false)} className="flex-1">Cancel</Button>
+              <Button onClick={handleAssign} className="flex-1 bg-v2-blue hover:bg-v2-blue-dark">Assign</Button>
             </div>
           </div>
         </DialogContent>
       </Dialog>
+
       <Dialog open={showBlockDialog} onOpenChange={setShowBlockDialog}>
-        <DialogContent
-          className="max-w-sm z-[80]"
-          onClick={(e) => e.stopPropagation()}
-        >
+        <DialogContent className="max-w-sm z-[80]" onClick={(e) => e.stopPropagation()}>
           <DialogHeader>
             <DialogTitle>Report Blocker</DialogTitle>
-            <DialogDescription>
-              Report a blocker for "{task.title}"
-            </DialogDescription>
+            <DialogDescription>Report a blocker for "{task.title}"</DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div>
@@ -1639,16 +1356,10 @@ function V2TaskCard({
                   {blockerReasons.map((reason) => (
                     <SelectItem key={reason.value} value={reason.value}>
                       <div className="flex items-center gap-2">
-                        <UserAvatar
-                          name={reason.label}
-                          className="h-5 w-5"
-                          fallbackClassName="text-[9px]"
-                        />
+                        <UserAvatar name={reason.label} className="h-5 w-5" fallbackClassName="text-[9px]" />
                         <span>{reason.label}</span>
                       </div>
-                      <p className="text-[10px] text-v2-muted mt-1">
-                        {reason.description}
-                      </p>
+                      <p className="text-[10px] text-v2-muted mt-1">{reason.description}</p>
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -1664,13 +1375,7 @@ function V2TaskCard({
               />
             </div>
             <div className="flex gap-2 pt-2">
-              <Button
-                variant="outline"
-                onClick={() => setShowBlockDialog(false)}
-                className="flex-1"
-              >
-                Cancel
-              </Button>
+              <Button variant="outline" onClick={() => setShowBlockDialog(false)} className="flex-1">Cancel</Button>
               <Button
                 onClick={handleBlock}
                 disabled={!blockReason || !blockNote.trim()}
