@@ -180,7 +180,11 @@ export default function V2DashboardShell({ user, onLogout, onUpdateUser }) {
   }
 
   return (
-    <CallCoordinatorProvider user={user} officeBasePath="/v2/office">
+    <CallCoordinatorProvider
+      user={user}
+      officeBasePath="/v2/office"
+      renderOverlay={false}
+    >
       <Suspense fallback={<V2Loading />}>
         {screen}
       </Suspense>

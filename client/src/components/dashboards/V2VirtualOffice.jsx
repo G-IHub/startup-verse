@@ -1,14 +1,14 @@
 /**
  * V2VirtualOffice
  * ─────────────────────────────────────────────────────────────────────────────
- * V2 redesign of the Virtual Office, phase A: everything backed by real data
- * via the existing useOfficeStore (zero new API calls) — presence bar, real
- * tasks, real activity feed, and a right panel with Team / Wins tabs.
+ * V2 redesign of the Virtual Office: everything backed by real data via the
+ * existing useOfficeStore (zero new API calls) — presence bar, real tasks,
+ * real activity feed, a right panel with Team / Wins tabs, real 1:1 team
+ * chat (SimpleTeamMessaging, embedded), and real LiveKit video calling
+ * rendered inline with a pop-out-to-full-page option, fully V2-styled (see
+ * client/src/components/calls/v2/ and CLAUDE.md).
  *
- * NOT in this phase (see CLAUDE.md for why): the mockup's embedded video
- * call grid (V1 has a full LiveKit-backed `calls/` module, but as a separate
- * view, not composed inline here yet), the "Team chat" panel (no startup-wide
- * group chat store exists at this layer), and "Check in for today" (no
+ * Still not built (see CLAUDE.md for why): "Check in for today" (no
  * check-in backend exists anywhere in the app).
  */
 
@@ -31,6 +31,7 @@ import { useWeeklyLoopStore } from "../../state/useWeeklyLoopStore";
 import { SimpleTeamMessaging } from "../office/SimpleTeamMessaging";
 import { buildFounderChatRoster } from "../../utils/chatRosterBuilder";
 import { useCallCoordinator } from "../../contexts/CallCoordinatorContext";
+import V2CallRoom from "../calls/v2/V2CallRoom";
 
 import { Users, ListChecks, UserPlus, ChevronRight, Video, PhoneCall } from "lucide-react";
 
@@ -50,7 +51,13 @@ function timeAgo(date) {
 }
 
 function presenceStatus(row) {
-  if (row.isOnline) return { label: row.statusText || row.activity || "Online", variant: "green" };
+  if (row.isOnline) {
+    // row.activity can be an object (metadata.lastFeedActivity) or a plain
+    // string depending on source — never render it raw.
+    const activityLabel =
+      typeof row.activity === "string" ? row.activity : row.activity?.message;
+    return { label: row.statusText || activityLabel || "Online", variant: "green" };
+  }
   return { label: row.statusText || "Offline", variant: "grey" };
 }
 
@@ -136,14 +143,69 @@ function TodaysTasksCard({ tasks, onManage }) {
 
 // ─────────────────────────────────────────────────────────────────────────
 // LIVE SESSION — real LiveKit calls via the shared CallCoordinator.
-// A full-screen call overlay (not an inline video grid) — see CLAUDE.md for
-// why: matches the one real, tested call system already used elsewhere in
-// the app, and is the better UX fit for a focused meeting vs. ambient video.
+// Renders inline (a V2-styled call view sized to the dashboard card) by
+// default, matching the mockup's "video composed inline" concept, with a
+// pop-out icon (in V2CallRoom's header) to expand into a full-page V2 view
+// within the app. Both presentations use the same V2Call* component tree —
+// see CLAUDE.md for the CallCoordinatorProvider `renderOverlay={false}` /
+// `CallRoomComponent` wiring that makes this possible without touching V1.
 // ─────────────────────────────────────────────────────────────────────────
 
 function LiveSessionCard() {
-  const { teamLiveCall, activeCall, startTeamCall, joinCall, loading } = useCallCoordinator();
+  const {
+    teamLiveCall,
+    activeCall,
+    startTeamCall,
+    joinCall,
+    leaveCall,
+    loading,
+    currentUserId,
+    userName,
+    userRole,
+    startupId,
+    teamRoster,
+    callTitle,
+  } = useCallCoordinator();
   const isLive = Boolean(teamLiveCall) && !activeCall;
+  const [poppedOut, setPoppedOut] = useState(false);
+
+  useEffect(() => {
+    if (!activeCall) setPoppedOut(false);
+  }, [activeCall]);
+
+  if (activeCall) {
+    const callRoomProps = {
+      token: activeCall.token,
+      roomName: activeCall.roomName,
+      callType: activeCall.callType,
+      callTitle,
+      currentUserId,
+      initiatorId: activeCall.initiatorId,
+      startupId: activeCall.startupId || startupId,
+      userName,
+      userRole,
+      teamRoster,
+      onTogglePopout: () => setPoppedOut((v) => !v),
+      onLeave: leaveCall,
+    };
+
+    // Only one V2CallRoom (and therefore one LiveKitRoom connection) may be
+    // mounted at a time — mounting both inline and fullpage simultaneously
+    // opens two connections with the same token and gets the call dropped.
+    if (poppedOut) {
+      return (
+        <div className="fixed inset-0 z-[999] h-dvh w-full">
+          <V2CallRoom {...callRoomProps} variant="fullpage" />
+        </div>
+      );
+    }
+
+    return (
+      <V2Card className="flex h-[520px] flex-col p-0">
+        <V2CallRoom {...callRoomProps} variant="inline" />
+      </V2Card>
+    );
+  }
 
   return (
     <V2Card className="flex flex-1 flex-col items-center justify-center gap-3 py-10 text-center">

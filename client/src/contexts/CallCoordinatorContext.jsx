@@ -41,7 +41,13 @@ function normalizeTeamLiveCall(data) {
   };
 }
 
-export function CallCoordinatorProvider({ user, children, officeBasePath = "/office" }) {
+export function CallCoordinatorProvider({
+  user,
+  children,
+  officeBasePath = "/office",
+  renderOverlay = true,
+  CallRoomComponent = CallRoom,
+}) {
   const { createCall, joinCall, inviteToCall, endCall, loading, error } = useCallToken();
   const { isLoading: authLoading } = useAuth();
   const navigate = useNavigate();
@@ -387,6 +393,10 @@ export function CallCoordinatorProvider({ user, children, officeBasePath = "/off
     setTeamRoster(Array.isArray(roster) ? roster : []);
   }, []);
 
+  const callTitle = activeCall
+    ? `Team ${activeCall.callType === "video" ? "Video" : "Voice"} Call`
+    : "";
+
   const value = useMemo(
     () => ({
       activeCall,
@@ -400,6 +410,15 @@ export function CallCoordinatorProvider({ user, children, officeBasePath = "/off
       registerTeamRoster,
       loading,
       error,
+      // Exposed so a consumer with renderOverlay=false can render its own
+      // CallRoomComponent (e.g. a V2-styled inline/pop-out view) instead of
+      // relying on this provider's own fixed full-screen overlay below.
+      currentUserId,
+      userName: user?.name,
+      userRole: user?.role,
+      startupId,
+      teamRoster,
+      callTitle,
     }),
     [
       activeCall,
@@ -412,6 +431,12 @@ export function CallCoordinatorProvider({ user, children, officeBasePath = "/off
       registerTeamRoster,
       loading,
       error,
+      currentUserId,
+      user?.name,
+      user?.role,
+      startupId,
+      teamRoster,
+      callTitle,
     ],
   );
 
@@ -421,10 +446,6 @@ export function CallCoordinatorProvider({ user, children, officeBasePath = "/off
     teamLiveCall.roomName !== bannerDismissedRoom
       ? teamLiveCall
       : null;
-
-  const callTitle = activeCall
-    ? `Team ${activeCall.callType === "video" ? "Video" : "Voice"} Call`
-    : "";
 
   return (
     <CallCoordinatorContext.Provider value={value}>
@@ -441,14 +462,14 @@ export function CallCoordinatorProvider({ user, children, officeBasePath = "/off
         }
         onDismiss={() => setBannerDismissedRoom(bannerCall?.roomName || "")}
       />
-      {restoringCall && isOfficeCallPath(location.pathname, officeBasePath) && !activeCall && (
+      {renderOverlay && restoringCall && isOfficeCallPath(location.pathname, officeBasePath) && !activeCall && (
         <div className="fixed inset-0 z-[998] flex items-center justify-center bg-surface-page/90 backdrop-blur-sm">
           <p className="font-body text-sm text-text-heading">Rejoining call…</p>
         </div>
       )}
-      {activeCall && !restoringCall && (
+      {renderOverlay && activeCall && !restoringCall && (
         <div className="fixed inset-0 z-[999] h-dvh w-full">
-          <CallRoom
+          <CallRoomComponent
             token={activeCall.token}
             roomName={activeCall.roomName}
             callType={activeCall.callType}
