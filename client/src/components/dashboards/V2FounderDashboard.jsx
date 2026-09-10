@@ -435,13 +435,15 @@ function WeeklyExecutionLoopCard({ tasks, onGoToEngine }) {
 // STREAK CALENDAR CARD
 // ─────────────────────────────────────────────────────────────────────────
 
-function StreakCalendarCard({ streak, currentWeekNum, tasks, milestones }) {
+function StreakCalendarCard({ streak, currentWeekNum, tasks, milestoneProgress }) {
   const taskPct = tasks.length > 0
     ? Math.round(tasks.filter((t) => t.status === "completed").length / tasks.length * 100)
     : 0;
-  const milestonePct = milestones.length > 0
-    ? Math.round(milestones.filter((m) => m.status === "completed").length / milestones.length * 100)
-    : 0;
+  // Same canonical value the Execution Engine's right panel uses
+  // (viewModel.metrics.milestoneProgress) — milestone.status is never
+  // actually set to "completed" by anything, so deriving it locally from
+  // that field always reads 0% regardless of real progress.
+  const milestonePct = milestoneProgress ?? 0;
 
   return (
     <V2Card>
@@ -972,7 +974,7 @@ export default function V2FounderDashboard({ user, onPageChange }) {
                 streak={streak}
                 currentWeekNum={outcome?.weekNumber ?? 1}
                 tasks={tasks}
-                milestones={milestones}
+                milestoneProgress={weekPct}
               />
             </div>
             <TaskBoardCard
