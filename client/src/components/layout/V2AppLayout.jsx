@@ -1,7 +1,7 @@
 /**
  * V2AppLayout — 3-column grid layout for the V2 Autonomous OS design.
  *
- * Layout: 72px sidebar | 1fr main content | 288px right panel
+ * Layout: 72px sidebar | 1fr main content | 320px right panel
  *
  * Usage:
  *   <V2AppLayout
@@ -66,7 +66,7 @@ function V2RightPanel({ children }) {
   return (
     <aside
       className={cn(
-        "hidden w-[288px] shrink-0 flex-col overflow-y-auto xl:flex",
+        "hidden w-[320px] shrink-0 flex-col overflow-y-auto xl:flex",
         "border-l border-v2-border bg-v2-surface",
       )}
       aria-label="Context panel"

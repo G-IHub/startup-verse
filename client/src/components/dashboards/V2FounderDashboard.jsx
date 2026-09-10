@@ -342,12 +342,290 @@ function TaskRow({ task }) {
         <p className="truncate font-body text-[12px] font-medium text-v2-heading">
           {task.title}
         </p>
-        {task.assigneeName ? (
-          <p className="font-body text-[11px] text-v2-muted">→ {task.assigneeName}</p>
+        {task.assignedToName ? (
+          <p className="font-body text-[11px] text-v2-muted">→ {task.assignedToName}</p>
         ) : null}
       </div>
       <V2Chip variant={chip.variant} dot>{chip.label}</V2Chip>
     </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// TASK CHECK (checkbox for execution loop)
+// ─────────────────────────────────────────────────────────────────────────
+
+function TaskCheck({ status }) {
+  if (status === "completed") {
+    return (
+      <div className="flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-[5px] border-[1.5px] border-v2-blue bg-v2-blue">
+        <Check className="h-2.5 w-2.5 text-white" />
+      </div>
+    );
+  }
+  if (status === "in-progress") {
+    return <div className="h-[18px] w-[18px] shrink-0 rounded-[5px] border-[1.5px] border-v2-blue" />;
+  }
+  if (status === "blocked") {
+    return <div className="h-[18px] w-[18px] shrink-0 rounded-[5px] border-[1.5px] border-red-400 bg-red-50" />;
+  }
+  return <div className="h-[18px] w-[18px] shrink-0 rounded-[5px] border-[1.5px] border-v2-border" />;
+}
+
+function loopBadge(status) {
+  const map = {
+    completed:    { label: "Done",    bg: "bg-v2-green-tint",  color: "text-v2-green-dark"  },
+    "in-progress":{ label: "Active",  bg: "bg-v2-blue-tint",   color: "text-v2-blue-dark"   },
+    blocked:      { label: "Blocked", bg: "bg-red-50",         color: "text-red-600"         },
+    pending:      { label: "Pending", bg: "bg-gray-100",       color: "text-gray-500"        },
+  };
+  return map[status] ?? map.pending;
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// WEEKLY EXECUTION LOOP CARD
+// ─────────────────────────────────────────────────────────────────────────
+
+function WeeklyExecutionLoopCard({ tasks, onGoToEngine }) {
+  const loopTasks = tasks.slice(0, 5);
+  return (
+    <V2Card>
+      <V2SectionHead
+        title="Weekly execution loop"
+        action={
+          <button type="button" onClick={onGoToEngine} className="font-body text-[11px] text-v2-blue hover:underline">
+            Full view →
+          </button>
+        }
+      />
+      {loopTasks.length > 0 ? (
+        <div className="flex flex-col">
+          {loopTasks.map((task) => {
+            const badge = loopBadge(task.status);
+            const done = task.status === "completed";
+            return (
+              <div key={task._id ?? task.id} className="flex items-center gap-2 border-b border-v2-border py-2 last:border-0">
+                <TaskCheck status={task.status} />
+                <span className={cn("flex-1 font-body text-[12px]", done ? "text-v2-muted line-through" : "text-v2-heading")}>
+                  {task.title}
+                </span>
+                <span className={cn("inline-flex items-center rounded-[10px] px-2 py-0.5 font-body text-[10px] font-medium", badge.bg, badge.color)}>
+                  {badge.label}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      ) : (
+        <p className="py-4 text-center font-body text-[12px] text-v2-muted">No tasks this week yet.</p>
+      )}
+      <button
+        type="button"
+        onClick={onGoToEngine}
+        className="mt-2 flex w-full items-center justify-between rounded-[8px] border border-v2-border bg-v2-page px-3 py-2 font-body text-[12px] text-v2-muted transition-colors hover:bg-v2-border/30"
+      >
+        <span>Log weekly outcome</span>
+        <span>→</span>
+      </button>
+    </V2Card>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// STREAK CALENDAR CARD
+// ─────────────────────────────────────────────────────────────────────────
+
+function StreakCalendarCard({ streak, currentWeekNum, tasks, milestones }) {
+  const taskPct = tasks.length > 0
+    ? Math.round(tasks.filter((t) => t.status === "completed").length / tasks.length * 100)
+    : 0;
+  const milestonePct = milestones.length > 0
+    ? Math.round(milestones.filter((m) => m.status === "completed").length / milestones.length * 100)
+    : 0;
+
+  return (
+    <V2Card>
+      <V2SectionHead title="Streak calendar" />
+      <p className="mb-2 text-center font-body text-[10px] text-v2-muted">12-week execution history</p>
+      <div className="grid grid-cols-6 gap-[3px]">
+        {Array.from({ length: 12 }, (_, i) => {
+          const w = i + 1;
+          const isDone = streak > 0 && w < currentWeekNum && w >= currentWeekNum - streak;
+          const isToday = w === currentWeekNum;
+          return (
+            <div
+              key={w}
+              className={cn(
+                "flex aspect-square items-center justify-center rounded font-body text-[9px] font-medium",
+                isDone  ? "bg-v2-blue text-white" :
+                isToday ? "border border-v2-blue bg-v2-blue-tint text-v2-blue-dark" :
+                          "bg-gray-100 text-v2-muted",
+              )}
+            >
+              W{w}
+            </div>
+          );
+        })}
+      </div>
+      <div className="mt-3 flex flex-col gap-2 border-t border-v2-border pt-3">
+        {[
+          { label: "Tasks",      pct: taskPct,      color: "bg-v2-blue"  },
+          { label: "Milestones", pct: milestonePct, color: "bg-v2-green" },
+          { label: "Deliverable",pct: 0,            color: "bg-v2-amber" },
+        ].map(({ label, pct, color }) => (
+          <div key={label} className="flex items-center gap-2">
+            <span className="w-16 shrink-0 font-body text-[10px] text-v2-muted">{label}</span>
+            <div className="h-1.5 flex-1 rounded-full bg-v2-border">
+              <div className={cn("h-full rounded-full transition-all duration-500", color)} style={{ width: `${pct}%` }} />
+            </div>
+            <span className="w-7 text-right font-body text-[10px] text-v2-muted">{pct}%</span>
+          </div>
+        ))}
+      </div>
+    </V2Card>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// TASK BOARD CARD
+// ─────────────────────────────────────────────────────────────────────────
+
+function TaskBoardRow({ task, strikethrough }) {
+  const dotBg =
+    task.status === "in-progress" ? "bg-v2-blue"  :
+    task.status === "blocked"     ? "bg-red-500"  :
+    task.status === "completed"   ? "bg-v2-green" : "bg-gray-300";
+
+  return (
+    <div className="flex items-center gap-2 border-b border-v2-border py-1.5 last:border-0">
+      <div className={cn("h-1.5 w-1.5 shrink-0 rounded-full", dotBg)} />
+      <span className={cn("flex-1 font-body text-[11px]", strikethrough ? "text-v2-muted line-through" : "text-v2-heading")}>
+        {task.title}
+      </span>
+      {task.assignedToName ? (
+        <V2Avatar name={task.assignedToName} size={20} />
+      ) : null}
+    </div>
+  );
+}
+
+function TaskBoardCard({ tasks, onManage }) {
+  const inProgress = tasks.filter((t) => ["in-progress", "blocked"].includes(t.status)).slice(0, 4);
+  const done       = tasks.filter((t) => t.status === "completed").slice(0, 4);
+
+  return (
+    <V2Card>
+      <V2SectionHead
+        title="Task board"
+        action={
+          <button type="button" onClick={onManage} className="font-body text-[11px] text-v2-blue hover:underline">
+            Manage tasks →
+          </button>
+        }
+      />
+      <div className="grid grid-cols-2 gap-4">
+        <div>
+          <p className="mb-1.5 font-body text-[10px] font-medium uppercase tracking-wide text-v2-muted">In progress</p>
+          {inProgress.length > 0
+            ? inProgress.map((t) => <TaskBoardRow key={t._id ?? t.id} task={t} />)
+            : <p className="font-body text-[11px] text-v2-muted">None active</p>}
+        </div>
+        <div>
+          <p className="mb-1.5 font-body text-[10px] font-medium uppercase tracking-wide text-v2-muted">Done this week</p>
+          {done.length > 0
+            ? done.map((t) => <TaskBoardRow key={t._id ?? t.id} task={t} strikethrough />)
+            : <p className="font-body text-[11px] text-v2-muted">None yet</p>}
+        </div>
+      </div>
+    </V2Card>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// MY TEAM CARD (main content)
+// ─────────────────────────────────────────────────────────────────────────
+
+function TeamMainCard({ teamMembers, onFindTalent }) {
+  return (
+    <V2Card>
+      <V2SectionHead
+        title="My team"
+        action={
+          <button type="button" onClick={onFindTalent} className="font-body text-[11px] text-v2-blue hover:underline">
+            Find talent →
+          </button>
+        }
+      />
+      {teamMembers.length > 0 ? (
+        <div className="flex flex-col">
+          {teamMembers.slice(0, 5).map((m) => (
+            <div key={m._id ?? m.id} className="flex items-center gap-2 py-1.5">
+              <div className="relative shrink-0">
+                <V2Avatar name={m.name} size={30} />
+                <span className={cn(
+                  "absolute -bottom-0.5 -right-0.5 h-2 w-2 rounded-full border-[1.5px] border-white",
+                  m.isOnline ? "bg-v2-green" : "bg-gray-400",
+                )} />
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="truncate font-body text-[12px] font-medium text-v2-heading">{m.name}</p>
+                <p className="font-body text-[10px] text-v2-muted capitalize">{m.role ?? "Team Member"}</p>
+              </div>
+              <span className={cn(
+                "inline-flex items-center rounded-[10px] px-2 py-0.5 font-body text-[10px] font-medium",
+                m.isOnline ? "bg-v2-green-tint text-v2-green-dark" : "bg-gray-100 text-gray-500",
+              )}>
+                {m.isOnline ? "Online" : "Offline"}
+              </span>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <p className="py-2 font-body text-[12px] text-v2-muted">No team members yet.</p>
+      )}
+    </V2Card>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// AI STAFF CARD
+// ─────────────────────────────────────────────────────────────────────────
+
+const AI_STAFF_LIST = [
+  { id: "pm", initials: "PM", name: "AI Product Manager", task: "Building sprint plan",       active: true,  bg: "bg-v2-blue-tint",   color: "text-v2-blue-dark"   },
+  { id: "mk", initials: "MK", name: "AI Marketing Agent", task: "Launch copy draft ready",    active: true,  bg: "bg-v2-green-tint",  color: "text-v2-green-dark"  },
+  { id: "ga", initials: "GA", name: "AI Growth Analyst",  task: "Awaiting traction data",     active: false, bg: "bg-gray-100",       color: "text-gray-500"       },
+];
+
+function AIStaffCard({ onHire }) {
+  return (
+    <V2Card>
+      <V2SectionHead
+        title="AI staff"
+        action={
+          <button type="button" onClick={onHire} className="font-body text-[11px] text-v2-blue hover:underline">
+            Hire staff →
+          </button>
+        }
+      />
+      <div className="flex flex-col">
+        {AI_STAFF_LIST.map((agent) => (
+          <div key={agent.id} className="flex items-center gap-2 border-b border-v2-border py-2 last:border-0">
+            <div className={cn("flex h-7 w-7 shrink-0 items-center justify-center rounded-[7px] font-body text-[9px] font-medium", agent.bg, agent.color)}>
+              {agent.initials}
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="font-body text-[12px] font-medium text-v2-heading">{agent.name}</p>
+              <p className="font-body text-[10px] text-v2-muted">{agent.task}</p>
+            </div>
+            <div className={cn("h-1.5 w-1.5 shrink-0 rounded-full", agent.active ? "bg-v2-green" : "bg-gray-300")} />
+          </div>
+        ))}
+      </div>
+      <div className="mt-2 rounded-[8px] border border-dashed border-v2-border px-3 py-2 text-center cursor-pointer hover:bg-v2-page" onClick={onHire}>
+        <span className="font-body text-[11px] text-v2-muted">+ Hire AI Finance Officer</span>
+      </div>
+    </V2Card>
   );
 }
 
@@ -680,153 +958,39 @@ export default function V2FounderDashboard({ user, onPageChange }) {
           onViewCriteria={() => onPageChange("journey")}
         />
 
-        {/* ── Weekly goal + milestones ─────────────────────────────────── */}
-        <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">
+        {/* ── Bottom: 2fr left | 1fr right ───────────────────────────── */}
+        <div className="grid gap-3" style={{ gridTemplateColumns: "2fr 1fr" }}>
 
-          {/* Weekly goal card */}
-          <V2Card>
-            <V2SectionHead
-              title="This Week's Goal"
-              action={
-                <button
-                  type="button"
-                  onClick={() => onPageChange("execution-engine")}
-                  className="font-body text-[11px] text-v2-blue hover:underline"
-                >
-                  Manage →
-                </button>
-              }
+          {/* Left 2fr: execution loop + streak calendar, then task board */}
+          <div className="flex flex-col gap-3">
+            <div className="grid grid-cols-2 gap-3">
+              <WeeklyExecutionLoopCard
+                tasks={tasks}
+                onGoToEngine={() => onPageChange("execution-engine")}
+              />
+              <StreakCalendarCard
+                streak={streak}
+                currentWeekNum={outcome?.weekNumber ?? 1}
+                tasks={tasks}
+                milestones={milestones}
+              />
+            </div>
+            <TaskBoardCard
+              tasks={tasks}
+              onManage={() => onPageChange("execution-engine")}
             />
-            {outcome ? (
-              <div>
-                <div className="mb-3 rounded-[10px] bg-v2-purple-tint px-4 py-3">
-                  <p className="font-body text-[13px] font-medium text-v2-purple-dark leading-snug">
-                    {outcome.goal}
-                  </p>
-                </div>
-                {/* Progress bar */}
-                <div className="flex items-center gap-2">
-                  <div className="flex-1 h-2 rounded-full bg-v2-border">
-                    <div
-                      className="h-full rounded-full bg-v2-purple transition-all duration-500"
-                      style={{ width: `${weekPct}%` }}
-                    />
-                  </div>
-                  <span className="font-body text-[11px] font-medium text-v2-muted w-8 text-right">
-                    {weekPct}%
-                  </span>
-                </div>
-              </div>
-            ) : (
-              <div className="flex flex-col items-center gap-3 py-6 text-center">
-                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-v2-blue-tint">
-                  <Target className="h-5 w-5 text-v2-blue" />
-                </div>
-                <div>
-                  <p className="font-body text-[13px] font-medium text-v2-heading">No goal set this week</p>
-                  <p className="font-body text-[11px] text-v2-muted mt-0.5">Set a clear outcome to drive execution</p>
-                </div>
-                <V2Btn variant="primary" size="sm" onClick={() => onPageChange("execution-engine")}>
-                  <Plus className="h-3.5 w-3.5" />
-                  Set This Week's Goal
-                </V2Btn>
-              </div>
-            )}
-          </V2Card>
-
-          {/* Milestones card */}
-          <V2Card>
-            <V2SectionHead
-              title="Milestones"
-              action={
-                <button
-                  type="button"
-                  onClick={() => onPageChange("execution-engine")}
-                  className="font-body text-[11px] text-v2-blue hover:underline"
-                >
-                  View all →
-                </button>
-              }
-            />
-            {milestones.length > 0 ? (
-              <div className="flex flex-col divide-y divide-v2-border">
-                {milestones.slice(0, 4).map((m) => (
-                  <MilestoneRow
-                    key={m._id ?? m.id}
-                    milestone={m}
-                    onOpen={() => onPageChange("execution-engine")}
-                  />
-                ))}
-              </div>
-            ) : (
-              <div className="py-6 text-center">
-                <p className="font-body text-[12px] text-v2-muted">No milestones yet.</p>
-                <V2Btn variant="secondary" size="sm" className="mt-3" onClick={() => onPageChange("execution-engine")}>
-                  <Plus className="h-3.5 w-3.5" />
-                  Add Milestone
-                </V2Btn>
-              </div>
-            )}
-          </V2Card>
-        </div>
-
-        {/* ── Active tasks ─────────────────────────────────────────────── */}
-        <V2Card>
-          <V2SectionHead
-            title="Active Tasks"
-            action={
-              <button
-                type="button"
-                onClick={() => onPageChange("execution-engine")}
-                className="font-body text-[11px] text-v2-blue hover:underline"
-              >
-                View all tasks →
-              </button>
-            }
-          />
-          {activeTasks.length > 0 ? (
-            <div className="flex flex-col divide-y divide-v2-border">
-              {activeTasks.map((t) => (
-                <TaskRow key={t._id ?? t.id} task={t} />
-              ))}
-            </div>
-          ) : (
-            <div className="py-4 text-center">
-              {tasks.length > 0 ? (
-                <p className="font-body text-[12px] text-v2-green">
-                  ✅ All tasks completed this week!
-                </p>
-              ) : (
-                <p className="font-body text-[12px] text-v2-muted">
-                  No tasks yet. Set a goal and create milestones to generate tasks.
-                </p>
-              )}
-            </div>
-          )}
-        </V2Card>
-
-        {/* ── AI Staff nudge (if not hired) ────────────────────────────── */}
-        <V2Card className="border-v2-purple-tint bg-gradient-to-r from-v2-purple-tint to-v2-blue-tint">
-          <div className="flex items-center justify-between gap-4">
-            <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-[10px] bg-v2-purple text-white">
-                <Bot className="h-5 w-5" />
-              </div>
-              <div>
-                <p className="font-body text-[13px] font-medium text-v2-purple-dark">
-                  Your AI Staff is ready to work
-                </p>
-                <p className="font-body text-[11px] text-v2-muted">
-                  AI PM · AI Marketing · AI Growth — context-aware, working 24/7
-                </p>
-              </div>
-            </div>
-            <V2Btn variant="purple" size="sm" onClick={() => onPageChange("ai-staff")}>
-              <TrendingUp className="h-3.5 w-3.5" />
-              Hire AI Staff
-            </V2Btn>
           </div>
-        </V2Card>
+
+          {/* Right 1fr: team + AI staff */}
+          <div className="flex flex-col gap-3">
+            <TeamMainCard
+              teamMembers={teamMembers}
+              onFindTalent={() => onPageChange("startup-office")}
+            />
+            <AIStaffCard onHire={() => onPageChange("ai-staff")} />
+          </div>
+
+        </div>
 
       </div>
     </V2AppLayout>
