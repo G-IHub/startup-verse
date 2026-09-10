@@ -4,9 +4,11 @@
  * V2 redesign of the Virtual Office: everything backed by real data via the
  * existing useOfficeStore (zero new API calls) — presence bar, real tasks,
  * real activity feed, a right panel with Team / Wins tabs, real 1:1 team
- * chat (SimpleTeamMessaging, embedded), and real LiveKit video calling
- * rendered inline with a pop-out-to-full-page option, fully V2-styled (see
- * client/src/components/calls/v2/ and CLAUDE.md).
+ * chat (SimpleTeamMessaging, embedded), real LiveKit video calling rendered
+ * inline with a pop-out-to-full-page option, and a real slide-out task
+ * management Kanban ("View all tasks" / "Manage"), all fully V2-styled (see
+ * client/src/components/calls/v2/, client/src/components/office/v2/, and
+ * CLAUDE.md).
  *
  * Still not built (see CLAUDE.md for why): "Check in for today" (no
  * check-in backend exists anywhere in the app).
@@ -32,6 +34,7 @@ import { SimpleTeamMessaging } from "../office/SimpleTeamMessaging";
 import { buildFounderChatRoster } from "../../utils/chatRosterBuilder";
 import { useCallCoordinator } from "../../contexts/CallCoordinatorContext";
 import V2CallRoom from "../calls/v2/V2CallRoom";
+import { V2TaskManagementPanel } from "../office/v2/V2TaskManagementPanel";
 
 import { Users, ListChecks, UserPlus, ChevronRight, Video, PhoneCall } from "lucide-react";
 
@@ -481,6 +484,8 @@ export default function V2VirtualOffice({ user, onPageChange }) {
   const tasks = useOfficeStore((s) => s.tasks);
   const createWin = useOfficeStore((s) => s.createWin);
   const startupId = useOfficeStore((s) => s.startupId);
+  const founderId = useOfficeStore((s) => s.founderId);
+  const refreshOffice = useOfficeStore((s) => s.refresh);
 
   const viewModel = useWeeklyLoopStore((s) => s.viewModel);
   const loadWeeklyLoop = useWeeklyLoopStore((s) => s.load);
@@ -490,6 +495,14 @@ export default function V2VirtualOffice({ user, onPageChange }) {
   const startupName = user?.startup?.name ?? "Your Startup";
   const onlineCount = presenceRows.filter((r) => r.isOnline).length;
   const userId = String(user?._id ?? user?.id ?? "");
+
+  const [taskPanelOpen, setTaskPanelOpen] = useState(false);
+  // V2 has no per-task detail route yet — send "task-detail" clicks to the
+  // Execution Engine (where real task detail lives) instead of a dead link.
+  const handleTaskPanelNavigate = (target) => {
+    setTaskPanelOpen(false);
+    onPageChange(target === "dashboard" ? "dashboard" : "execution-engine");
+  };
 
   useEffect(() => {
     if (user) loadWorkspace(user);
@@ -520,7 +533,7 @@ export default function V2VirtualOffice({ user, onPageChange }) {
 
   const topbarActions = (
     <>
-      <V2Btn variant="secondary" size="sm" onClick={() => onPageChange("execution-engine")}>
+      <V2Btn variant="secondary" size="sm" onClick={() => setTaskPanelOpen(true)}>
         <ListChecks className="h-3.5 w-3.5" />
         View all tasks
       </V2Btn>
@@ -560,13 +573,24 @@ export default function V2VirtualOffice({ user, onPageChange }) {
         <div className="grid grid-cols-1 gap-4 xl:grid-cols-[1fr_320px]">
           <LiveSessionCard />
           <div className="flex flex-col gap-4">
-            <TodaysTasksCard tasks={tasks} onManage={() => onPageChange("execution-engine")} />
+            <TodaysTasksCard tasks={tasks} onManage={() => setTaskPanelOpen(true)} />
             <TeamChatCard user={user} startupId={startupId} teamMembers={teamMembers} />
           </div>
         </div>
 
         <ActivityFeedCard activities={activities} />
       </div>
+
+      <V2TaskManagementPanel
+        open={taskPanelOpen}
+        onClose={() => setTaskPanelOpen(false)}
+        user={user}
+        startupId={startupId}
+        founderIdOverride={founderId || userId}
+        strictMode
+        onTasksSynced={() => refreshOffice(user)}
+        onNavigate={handleTaskPanelNavigate}
+      />
     </V2AppLayout>
   );
 }
