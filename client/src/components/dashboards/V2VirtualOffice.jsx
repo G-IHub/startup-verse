@@ -28,6 +28,8 @@ import {
 
 import { useOfficeStore } from "../../state/useOfficeStore";
 import { useWeeklyLoopStore } from "../../state/useWeeklyLoopStore";
+import { SimpleTeamMessaging } from "../office/SimpleTeamMessaging";
+import { buildFounderChatRoster } from "../../utils/chatRosterBuilder";
 
 import { Users, ListChecks, Sparkles, UserPlus, ChevronRight } from "lucide-react";
 
@@ -132,7 +134,7 @@ function TodaysTasksCard({ tasks, onManage }) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────
-// PHASE B PLACEHOLDER (video + chat)
+// PHASE B — video still pending (no local LiveKit credentials to verify with)
 // ─────────────────────────────────────────────────────────────────────────
 
 function LiveSessionPlaceholder() {
@@ -142,11 +144,50 @@ function LiveSessionPlaceholder() {
         <Sparkles className="h-5 w-5 text-v2-blue" />
       </div>
       <div>
-        <p className="font-heading text-[14px] font-semibold text-v2-heading">Live video + team chat coming next</p>
+        <p className="font-heading text-[14px] font-semibold text-v2-heading">Live video coming next</p>
         <p className="mt-1 max-w-[320px] font-body text-[12px] text-v2-muted">
           Video calls already work elsewhere in the app (LiveKit-backed) — composing them inline
-          here, plus a real team chat panel, is the next build phase.
+          here is next, once local LiveKit credentials are available to verify against.
         </p>
+      </div>
+    </V2Card>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// TEAM CHAT — real 1:1 messaging (SimpleTeamMessaging), embedded
+// ─────────────────────────────────────────────────────────────────────────
+
+function TeamChatCard({ user, startupId, teamMembers }) {
+  const currentUserId = String(user?._id ?? user?.id ?? "");
+  const roster = useMemo(
+    () => buildFounderChatRoster(currentUserId, [], [], teamMembers),
+    [currentUserId, teamMembers],
+  );
+
+  return (
+    <V2Card className="flex flex-col p-0">
+      <div className="flex items-center justify-between border-b border-v2-border px-4 py-3">
+        <span className="font-body text-[12px] font-semibold text-v2-heading">Team chat</span>
+        <span className="font-body text-[10px] text-v2-subtle">1:1 — pick a teammate</span>
+      </div>
+      <div className="h-[520px] overflow-hidden">
+        {roster.length === 0 ? (
+          <div className="flex h-full items-center justify-center px-4 text-center">
+            <p className="font-body text-[12px] text-v2-muted">
+              No team members to message yet. Invite someone to start chatting.
+            </p>
+          </div>
+        ) : (
+          <SimpleTeamMessaging
+            currentUserId={currentUserId}
+            currentUserName={user?.name ?? ""}
+            currentUserRole={user?.role ?? "founder"}
+            startupId={startupId}
+            teamMembers={roster}
+            embedded
+          />
+        )}
       </div>
     </V2Card>
   );
@@ -418,7 +459,10 @@ export default function V2VirtualOffice({ user, onPageChange }) {
 
         <div className="grid grid-cols-1 gap-4 xl:grid-cols-[1fr_320px]">
           <LiveSessionPlaceholder />
-          <TodaysTasksCard tasks={tasks} onManage={() => onPageChange("execution-engine")} />
+          <div className="flex flex-col gap-4">
+            <TodaysTasksCard tasks={tasks} onManage={() => onPageChange("execution-engine")} />
+            <TeamChatCard user={user} startupId={startupId} teamMembers={teamMembers} />
+          </div>
         </div>
 
         <ActivityFeedCard activities={activities} />
