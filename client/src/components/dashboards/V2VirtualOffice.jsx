@@ -30,8 +30,9 @@ import { useOfficeStore } from "../../state/useOfficeStore";
 import { useWeeklyLoopStore } from "../../state/useWeeklyLoopStore";
 import { SimpleTeamMessaging } from "../office/SimpleTeamMessaging";
 import { buildFounderChatRoster } from "../../utils/chatRosterBuilder";
+import { useCallCoordinator } from "../../contexts/CallCoordinatorContext";
 
-import { Users, ListChecks, Sparkles, UserPlus, ChevronRight } from "lucide-react";
+import { Users, ListChecks, UserPlus, ChevronRight, Video, PhoneCall } from "lucide-react";
 
 // ─────────────────────────────────────────────────────────────────────────
 // HELPERS
@@ -134,22 +135,59 @@ function TodaysTasksCard({ tasks, onManage }) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────
-// PHASE B — video still pending (no local LiveKit credentials to verify with)
+// LIVE SESSION — real LiveKit calls via the shared CallCoordinator.
+// A full-screen call overlay (not an inline video grid) — see CLAUDE.md for
+// why: matches the one real, tested call system already used elsewhere in
+// the app, and is the better UX fit for a focused meeting vs. ambient video.
 // ─────────────────────────────────────────────────────────────────────────
 
-function LiveSessionPlaceholder() {
+function LiveSessionCard() {
+  const { teamLiveCall, activeCall, startTeamCall, joinCall, loading } = useCallCoordinator();
+  const isLive = Boolean(teamLiveCall) && !activeCall;
+
   return (
-    <V2Card className="flex flex-1 flex-col items-center justify-center gap-3 border-dashed py-10 text-center">
-      <div className="flex h-12 w-12 items-center justify-center rounded-full bg-v2-blue-tint">
-        <Sparkles className="h-5 w-5 text-v2-blue" />
+    <V2Card className="flex flex-1 flex-col items-center justify-center gap-3 py-10 text-center">
+      <div className={cn(
+        "flex h-12 w-12 items-center justify-center rounded-full",
+        isLive ? "bg-v2-green-tint" : "bg-v2-blue-tint",
+      )}>
+        {isLive ? <PhoneCall className="h-5 w-5 text-v2-green" /> : <Video className="h-5 w-5 text-v2-blue" />}
       </div>
-      <div>
-        <p className="font-heading text-[14px] font-semibold text-v2-heading">Live video coming next</p>
-        <p className="mt-1 max-w-[320px] font-body text-[12px] text-v2-muted">
-          Video calls already work elsewhere in the app (LiveKit-backed) — composing them inline
-          here is next, once local LiveKit credentials are available to verify against.
-        </p>
-      </div>
+      {isLive ? (
+        <div>
+          <p className="font-heading text-[14px] font-semibold text-v2-heading">
+            {teamLiveCall.initiatorName} started a call
+          </p>
+          <p className="mt-1 font-body text-[12px] text-v2-muted">Join to see and hear the team live.</p>
+          <V2Btn
+            variant="primary"
+            size="sm"
+            className="mt-3"
+            onClick={() => joinCall(teamLiveCall.roomName, teamLiveCall.callType)}
+            disabled={loading}
+          >
+            <PhoneCall className="h-3.5 w-3.5" />
+            Join call
+          </V2Btn>
+        </div>
+      ) : (
+        <div>
+          <p className="font-heading text-[14px] font-semibold text-v2-heading">No live session right now</p>
+          <p className="mt-1 max-w-[320px] font-body text-[12px] text-v2-muted">
+            Start a video call and everyone currently in the office gets notified.
+          </p>
+          <V2Btn
+            variant="primary"
+            size="sm"
+            className="mt-3"
+            onClick={() => startTeamCall("video")}
+            disabled={loading}
+          >
+            <Video className="h-3.5 w-3.5" />
+            Start video call
+          </V2Btn>
+        </div>
+      )}
     </V2Card>
   );
 }
@@ -458,7 +496,7 @@ export default function V2VirtualOffice({ user, onPageChange }) {
         <PresenceBar presenceRows={presenceRows} />
 
         <div className="grid grid-cols-1 gap-4 xl:grid-cols-[1fr_320px]">
-          <LiveSessionPlaceholder />
+          <LiveSessionCard />
           <div className="flex flex-col gap-4">
             <TodaysTasksCard tasks={tasks} onManage={() => onPageChange("execution-engine")} />
             <TeamChatCard user={user} startupId={startupId} teamMembers={teamMembers} />

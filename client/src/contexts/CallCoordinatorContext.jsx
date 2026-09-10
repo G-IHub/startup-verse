@@ -41,7 +41,7 @@ function normalizeTeamLiveCall(data) {
   };
 }
 
-export function CallCoordinatorProvider({ user, children }) {
+export function CallCoordinatorProvider({ user, children, officeBasePath = "/office" }) {
   const { createCall, joinCall, inviteToCall, endCall, loading, error } = useCallToken();
   const { isLoading: authLoading } = useAuth();
   const navigate = useNavigate();
@@ -62,20 +62,20 @@ export function CallCoordinatorProvider({ user, children }) {
   const syncCallUrl = useCallback(
     (call) => {
       if (!call?.roomName) return;
-      const targetPath = buildOfficeCallPath(call.roomName, call.callType);
+      const targetPath = buildOfficeCallPath(call.roomName, call.callType, officeBasePath);
       const current = `${location.pathname}${location.search}`;
       if (current === targetPath) return;
       skipNextUrlSyncRef.current = true;
       navigate(targetPath, { replace: true });
     },
-    [location.pathname, location.search, navigate],
+    [location.pathname, location.search, navigate, officeBasePath],
   );
 
   const clearCallUrl = useCallback(() => {
-    if (!isOfficeCallPath(location.pathname)) return;
+    if (!isOfficeCallPath(location.pathname, officeBasePath)) return;
     skipNextUrlSyncRef.current = true;
-    navigate("/office", { replace: true });
-  }, [location.pathname, navigate]);
+    navigate(officeBasePath, { replace: true });
+  }, [location.pathname, navigate, officeBasePath]);
 
   useEffect(() => {
     if (!currentUserId) return undefined;
@@ -208,7 +208,7 @@ export function CallCoordinatorProvider({ user, children }) {
       return;
     }
 
-    const onCallRoute = isOfficeCallPath(location.pathname);
+    const onCallRoute = isOfficeCallPath(location.pathname, officeBasePath);
     if (!onCallRoute) {
       writeStoredActiveCall(null);
     }
@@ -217,7 +217,7 @@ export function CallCoordinatorProvider({ user, children }) {
       clearCallUrl();
       hadActiveCallRef.current = false;
     }
-  }, [activeCall, clearCallUrl, location.pathname, syncCallUrl]);
+  }, [activeCall, clearCallUrl, location.pathname, syncCallUrl, officeBasePath]);
 
   useEffect(() => {
     if (skipNextUrlSyncRef.current) {
@@ -226,7 +226,7 @@ export function CallCoordinatorProvider({ user, children }) {
     }
     if (authLoading || !currentUserId || activeCall) return;
 
-    const fromUrl = parseOfficeCallRoute(location.pathname, location.search);
+    const fromUrl = parseOfficeCallRoute(location.pathname, location.search, officeBasePath);
     const stored = readStoredActiveCall();
     const roomName = fromUrl?.roomName || stored?.roomName;
     if (!roomName) return;
@@ -256,7 +256,7 @@ export function CallCoordinatorProvider({ user, children }) {
         clearStoredActiveCall();
         if (fromUrl?.roomName) {
           skipNextUrlSyncRef.current = true;
-          navigate("/office", { replace: true });
+          navigate(officeBasePath, { replace: true });
         }
       } finally {
         if (!cancelled) setRestoringCall(false);
@@ -275,6 +275,7 @@ export function CallCoordinatorProvider({ user, children }) {
     location.pathname,
     location.search,
     navigate,
+    officeBasePath,
   ]);
 
   const startTeamCall = useCallback(
@@ -440,7 +441,7 @@ export function CallCoordinatorProvider({ user, children }) {
         }
         onDismiss={() => setBannerDismissedRoom(bannerCall?.roomName || "")}
       />
-      {restoringCall && isOfficeCallPath(location.pathname) && !activeCall && (
+      {restoringCall && isOfficeCallPath(location.pathname, officeBasePath) && !activeCall && (
         <div className="fixed inset-0 z-[998] flex items-center justify-center bg-surface-page/90 backdrop-blur-sm">
           <p className="font-body text-sm text-text-heading">Rejoining call…</p>
         </div>

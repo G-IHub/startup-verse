@@ -20,6 +20,7 @@
 
 import React, { Suspense, lazy, useCallback } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
+import { CallCoordinatorProvider } from "../contexts/CallCoordinatorContext";
 
 // ── V2 screens (lazy-loaded) ───────────────────────────────────────────────
 const V2FounderDashboard = lazy(
@@ -179,8 +180,10 @@ export default function V2DashboardShell({ user, onLogout, onUpdateUser }) {
   }
 
   return (
-    <Suspense fallback={<V2Loading />}>
-      {screen}
-    </Suspense>
+    <CallCoordinatorProvider user={user} officeBasePath="/v2/office">
+      <Suspense fallback={<V2Loading />}>
+        {screen}
+      </Suspense>
+    </CallCoordinatorProvider>
   );
 }
