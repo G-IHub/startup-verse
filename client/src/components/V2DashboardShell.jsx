@@ -28,6 +28,9 @@ const V2FounderDashboard = lazy(
 const V2ExecutionEngine = lazy(
   () => import("./dashboards/V2ExecutionEngine"),
 );
+const V2VirtualOffice = lazy(
+  () => import("./dashboards/V2VirtualOffice"),
+);
 
 // ── Placeholder for screens not yet built ─────────────────────────────────
 function V2ComingSoon({ label, user, onPageChange }) {
@@ -138,12 +141,7 @@ export default function V2DashboardShell({ user, onLogout, onUpdateUser }) {
       break;
 
     case "startup-office":
-      screen = (
-        <V2ComingSoon
-          label="Virtual Office"
-          {...sharedProps}
-        />
-      );
+      screen = <V2VirtualOffice {...sharedProps} />;
       break;
 
     case "community":
