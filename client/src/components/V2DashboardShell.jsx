@@ -14,6 +14,7 @@
  *   /v2/ai-staff        → ai-staff
  *   /v2/blueprints      → blueprints
  *   /v2/mentors         → mentors
+ *   /v2/talent          → talent
  *
  * V1 screens are completely untouched — they remain under /home, /office, etc.
  */
@@ -31,6 +32,9 @@ const V2ExecutionEngine = lazy(
 );
 const V2VirtualOffice = lazy(
   () => import("./dashboards/V2VirtualOffice"),
+);
+const V2TalentMarketplace = lazy(
+  () => import("./dashboards/V2TalentMarketplace"),
 );
 
 // ── Placeholder for screens not yet built ─────────────────────────────────
@@ -73,6 +77,7 @@ const PAGE_TO_PATH = {
   "ai-staff":         "/v2/ai-staff",
   "blueprints":       "/v2/blueprints",
   "mentors":          "/v2/mentors",
+  "talent":           "/v2/talent",
 };
 
 const PATH_TO_PAGE = Object.fromEntries(
@@ -173,6 +178,10 @@ export default function V2DashboardShell({ user, onLogout, onUpdateUser }) {
       screen = (
         <V2ComingSoon label="Mentors" {...sharedProps} />
       );
+      break;
+
+    case "talent":
+      screen = <V2TalentMarketplace {...sharedProps} />;
       break;
 
     default:
