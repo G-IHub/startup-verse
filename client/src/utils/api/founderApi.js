@@ -289,6 +289,12 @@ export async function deletePost(founderId, postId) {
   });
 }
 
+/** Applications submitted by talent to any of this founder's posted roles. */
+export async function getFounderApplications(founderId, params = {}) {
+  const queryString = buildQueryString(params);
+  return apiCall(`/founders/${founderId}/applications${queryString}`);
+}
+
 export async function getFounderWorkLogs(founderId, params = {}) {
   const start = new Date();
   start.setHours(0, 0, 0, 0);

@@ -8,6 +8,7 @@ import WeeklyOutcome from "../models/WeeklyOutcome.js";
 import { validateWeeklyPlanMilestonesInput } from "../domain/weeklyPlanMilestoneValidation.js";
 import StartupPost from "../models/StartupPost.js";
 import FounderTalentInvitation from "../models/FounderTalentInvitation.js";
+import TalentApplication from "../models/TalentApplication.js";
 import Announcement from "../models/Announcement.js";
 import Event from "../models/Event.js";
 import Activity from "../models/Activity.js";
@@ -1620,6 +1621,18 @@ export const deletePost = async (req, res) => {
     founderId: req.params.founderId,
   });
   return apiSuccess(res, { deleted: true });
+};
+
+/** Applications submitted (by talent) to any of this founder's posted roles. */
+export const getApplicationsForFounder = async (req, res) => {
+  if (!founderGuard(req, req.params.founderId)) {
+    return apiError(res, "Forbidden.", 403);
+  }
+  const applications = await TalentApplication.find({ founderId: req.params.founderId })
+    .sort({ createdAt: -1 })
+    .populate("talentId", "name email")
+    .lean();
+  return apiSuccess(res, applications);
 };
 
 export const getInvitations = async (req, res) => {

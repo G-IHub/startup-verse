@@ -37,6 +37,10 @@ export const STARTUP_POST_COMPENSATION_PHILOSOPHIES = [
 
 export const STARTUP_POST_VISIBILITIES = ["public", "team", "private"];
 
+export const OFFER_STATUSES = ["pending", "accepted", "declined", "expired", "withdrawn"];
+export const OFFER_KPI_TIERS = ["Star", "Strong", "Meets"];
+export const OFFER_ROLE_TYPES = ["Full-time", "Part-time", "Contract", "Co-founder"];
+
 /** Organization-assigned cohort deliverable template kinds */
 export const DELIVERABLE_TYPES = [
   "general",
