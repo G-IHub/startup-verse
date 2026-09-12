@@ -31,7 +31,7 @@ const PRIMARY_NAV = [
 
 const SECONDARY_NAV = [
   { id: "journey",          icon: Map,           label: "Journey Stages",   page: "journey" },
-  { id: "team",             icon: UserCheck,     label: "Team",             page: "startup-office" },
+  { id: "team",             icon: UserCheck,     label: "Team",             page: "team" },
   { id: "talent",           icon: Briefcase,     label: "Talent Marketplace", page: "talent" },
   { id: "ai-staff",         icon: Bot,           label: "AI Staff",         page: "ai-staff" },
   { id: "blueprints",       icon: BookOpen,      label: "Blueprint Library",page: "blueprints" },

@@ -34,6 +34,7 @@ import performanceRouter from "./performance.routes.js";
 import membershipsRouter from "./memberships.routes.js";
 import publicRouter from "./public.routes.js";
 import offersRouter from "./offers.routes.js";
+import payrollRouter from "./payroll.routes.js";
 
 const apiRouter = Router();
 
@@ -59,6 +60,7 @@ apiRouter.use(githubRouter);
 apiRouter.use(programsRouter);
 apiRouter.use(talentRouter);
 apiRouter.use(offersRouter);
+apiRouter.use(payrollRouter);
 apiRouter.use(teamMembersRouter);
 apiRouter.use(cronRouter);
 apiRouter.use(eventsRouter);

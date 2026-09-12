@@ -22,4 +22,15 @@ teamMembersRouter.post("/team-members/:teamMemberId/status", requireAuth, requir
 teamMembersRouter.get("/team-members/:teamMemberId/performance", requireAuth, requireSelfOrAdmin("teamMemberId"), asyncHandler(teamMembersController.getPerformance));
 teamMembersRouter.post("/team-members/:userId/leave", requireAuth, asyncHandler(teamMembersController.leaveStartup));
 
+// Founder-scoped analog of :teamMemberId/performance — a founder isn't
+// "self" for any of their team members, so the self-or-admin route above
+// can't serve the Team page; this one checks founder ownership instead.
+teamMembersRouter.get("/founders/:founderId/team-performance", requireAuth, asyncHandler(teamMembersController.getFounderTeamPerformance));
+
+// Real onboarding checklist, per team member.
+teamMembersRouter.get("/team-members/:teamMemberId/onboarding-checklist", requireAuth, asyncHandler(teamMembersController.getOnboardingChecklist));
+teamMembersRouter.post("/team-members/:teamMemberId/onboarding-checklist", requireAuth, asyncHandler(teamMembersController.upsertOnboardingChecklist));
+teamMembersRouter.patch("/team-members/:teamMemberId/onboarding-checklist/tasks/:taskId", requireAuth, asyncHandler(teamMembersController.updateOnboardingChecklistTask));
+teamMembersRouter.patch("/team-members/:teamMemberId/compensation", requireAuth, asyncHandler(teamMembersController.updateCompensation));
+
 export default teamMembersRouter;

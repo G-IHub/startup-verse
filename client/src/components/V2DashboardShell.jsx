@@ -36,6 +36,9 @@ const V2VirtualOffice = lazy(
 const V2TalentMarketplace = lazy(
   () => import("./dashboards/V2TalentMarketplace"),
 );
+const V2Team = lazy(
+  () => import("./dashboards/V2Team"),
+);
 
 // ── Placeholder for screens not yet built ─────────────────────────────────
 function V2ComingSoon({ label, user, onPageChange }) {
@@ -78,6 +81,7 @@ const PAGE_TO_PATH = {
   "blueprints":       "/v2/blueprints",
   "mentors":          "/v2/mentors",
   "talent":           "/v2/talent",
+  "team":             "/v2/team",
 };
 
 const PATH_TO_PAGE = Object.fromEntries(
@@ -182,6 +186,10 @@ export default function V2DashboardShell({ user, onLogout, onUpdateUser }) {
 
     case "talent":
       screen = <V2TalentMarketplace {...sharedProps} />;
+      break;
+
+    case "team":
+      screen = <V2Team {...sharedProps} />;
       break;
 
     default:

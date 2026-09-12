@@ -6,6 +6,7 @@ import Task from "../models/Task.js";
 import User from "../models/User.js";
 import Activity from "../models/Activity.js";
 import Startup from "../models/Startup.js";
+import OnboardingChecklist from "../models/OnboardingChecklist.js";
 import { emitRealtime } from "../services/realtime.service.js";
 import { SOCKET_EVENTS } from "../realtime/events.js";
 import { startupRoom } from "../realtime/rooms.js";
@@ -271,6 +272,7 @@ export const getFounderTeamMembers = async (req, res) => {
       startupId: 1,
       founderId: 1,
       onboardingComplete: 1,
+      createdAt: 1,
     },
   ).sort({ createdAt: -1 });
 
@@ -290,6 +292,8 @@ export const getFounderTeamMembers = async (req, res) => {
       title: profile.title || "",
       skills: Array.isArray(profile.skills) ? profile.skills : [],
       bio: profile.bio || "",
+      compensation: profile.compensation || null,
+      createdAt: m.createdAt || null,
       startupId: String(m.startupId || startupId || founderId),
       founderId: String(founderId),
       isOnline: false,
@@ -396,4 +400,164 @@ export const leaveStartup = async (req, res) => {
   } finally {
     await session.endSession();
   }
+};
+
+function founderGuard(req, founderId) {
+  return req.user.isAdmin === true || req.user.id === String(founderId);
+}
+
+const COMPENSATION_TYPES = new Set(["equity", "fixed", "hourly", "equity-fixed", "unpaid"]);
+
+/**
+ * Founder-only compensation update for an ALREADY-onboarded team member.
+ * The full onboarding-time validator (isValidCompensationConfig in
+ * invitations.controller.js) is private to that file and tied to the
+ * onboarding transaction — this is deliberately a lighter real check
+ * (correct type + the one required numeric field per type), not a
+ * fabricated no-op, for the Team page's "edit compensation" action.
+ */
+export const updateCompensation = async (req, res) => {
+  const { teamMemberId } = req.params;
+  const profile = await TeamMemberProfile.findOne({ userId: teamMemberId });
+  if (!profile) {
+    return apiError(res, "Team member profile not found.", 404);
+  }
+  if (!founderGuard(req, profile.founderId)) {
+    return apiError(res, "Forbidden.", 403);
+  }
+
+  const config = req.body?.compensationConfig;
+  if (!config || !COMPENSATION_TYPES.has(config.type)) {
+    return apiError(res, `compensationConfig.type must be one of: ${[...COMPENSATION_TYPES].join(", ")}`, 400);
+  }
+  if (config.type === "fixed" && !(Number(config.fixed?.amount) > 0)) {
+    return apiError(res, "fixed.amount must be a positive number.", 400);
+  }
+  if (config.type === "equity" && !(Number(config.equity?.totalEquity) > 0)) {
+    return apiError(res, "equity.totalEquity must be a positive number.", 400);
+  }
+  if (config.type === "equity-fixed" && !(Number(config.fixed?.amount) > 0 && Number(config.equity?.totalEquity) > 0)) {
+    return apiError(res, "Both fixed.amount and equity.totalEquity are required for equity-fixed.", 400);
+  }
+
+  profile.compensation = config;
+  await profile.save();
+  return apiSuccess(res, profile);
+};
+
+/**
+ * Founder-scoped analog of getPerformance (which is self-or-admin only, so
+ * a founder can't call it for their own team members). Reuses the exact
+ * same real completion-rate computation, just for every team member under
+ * one founder in one call — real data, not a fabricated "KPI score": the
+ * client is expected to label this honestly (e.g. "Completion rate").
+ */
+export const getFounderTeamPerformance = async (req, res) => {
+  const founderId = req.params.founderId;
+  if (!founderGuard(req, founderId)) {
+    return apiError(res, "Forbidden.", 403);
+  }
+
+  const members = await User.find(
+    { founderId, role: { $in: ["team-member", "team"] } },
+    { _id: 1 },
+  ).lean();
+  const memberIds = members.map((m) => String(m._id));
+  if (memberIds.length === 0) {
+    return apiSuccess(res, []);
+  }
+
+  const tasks = await Task.find({ assignedTo: { $in: memberIds } }, { assignedTo: 1, status: 1 }).lean();
+  const byMember = new Map(memberIds.map((id) => [id, { total: 0, completed: 0 }]));
+  for (const task of tasks) {
+    const key = String(task.assignedTo || "");
+    const bucket = byMember.get(key);
+    if (!bucket) continue;
+    bucket.total += 1;
+    if (task.status === "completed") bucket.completed += 1;
+  }
+
+  const result = memberIds.map((teamMemberId) => {
+    const bucket = byMember.get(teamMemberId) || { total: 0, completed: 0 };
+    return {
+      teamMemberId,
+      totalTasks: bucket.total,
+      completedTasks: bucket.completed,
+      completionRate: bucket.total ? Number((bucket.completed / bucket.total).toFixed(2)) : 0,
+    };
+  });
+
+  return apiSuccess(res, result);
+};
+
+// ── Onboarding checklist (real, per team member; founder-managed) ─────────
+
+const DEFAULT_ONBOARDING_TASKS = [
+  "Sign employment agreement",
+  "Complete identity verification",
+  "Set up your StartupVerse team member account",
+  "Attend onboarding call with founder",
+  "Review startup roadmap and quarterly goals",
+  "Set your first week's targets",
+];
+
+export const getOnboardingChecklist = async (req, res) => {
+  const { teamMemberId } = req.params;
+  const checklist = await OnboardingChecklist.findOne({ teamMemberId }).lean();
+  if (!checklist) {
+    return apiSuccess(res, null);
+  }
+  if (req.user.isAdmin !== true && req.user.id !== String(checklist.founderId) && req.user.id !== String(teamMemberId)) {
+    return apiError(res, "Forbidden.", 403);
+  }
+  return apiSuccess(res, checklist);
+};
+
+/** Founder creates or replaces the checklist (e.g. when adding a new member). */
+export const upsertOnboardingChecklist = async (req, res) => {
+  const { teamMemberId } = req.params;
+  const founderId = req.body?.founderId || req.user.id;
+  if (!founderGuard(req, founderId)) {
+    return apiError(res, "Forbidden.", 403);
+  }
+
+  const rawTasks = Array.isArray(req.body?.tasks) && req.body.tasks.length > 0
+    ? req.body.tasks
+    : DEFAULT_ONBOARDING_TASKS.map((title) => ({ title }));
+  const tasks = rawTasks
+    .map((t) => ({ title: String(t.title || t || "").trim().slice(0, 300), done: Boolean(t.done) }))
+    .filter((t) => t.title);
+
+  const checklist = await OnboardingChecklist.findOneAndUpdate(
+    { teamMemberId },
+    { teamMemberId, founderId, startupId: req.body?.startupId || null, tasks },
+    { upsert: true, new: true, runValidators: true },
+  );
+  return apiSuccess(res, checklist, 201);
+};
+
+/** Toggle (or edit) one task's done state. Founder or the team member themselves may call this. */
+export const updateOnboardingChecklistTask = async (req, res) => {
+  const { teamMemberId, taskId } = req.params;
+  const checklist = await OnboardingChecklist.findOne({ teamMemberId });
+  if (!checklist) {
+    return apiError(res, "Checklist not found.", 404);
+  }
+  if (req.user.isAdmin !== true && req.user.id !== String(checklist.founderId) && req.user.id !== String(teamMemberId)) {
+    return apiError(res, "Forbidden.", 403);
+  }
+
+  const task = checklist.tasks.id(taskId);
+  if (!task) {
+    return apiError(res, "Task not found.", 404);
+  }
+  if (req.body?.done != null) {
+    task.done = Boolean(req.body.done);
+    task.completedAt = task.done ? new Date() : null;
+  }
+  if (req.body?.title != null) {
+    task.title = String(req.body.title).trim().slice(0, 300);
+  }
+  await checklist.save();
+  return apiSuccess(res, checklist);
 };
