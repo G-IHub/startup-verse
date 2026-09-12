@@ -11,9 +11,11 @@
  *     (GET /founders/:founderId/team-performance, new) instead, honestly
  *     labeled "Completion rate", never "KPI score".
  *   - Compensation: real TeamMemberProfile.compensation, set via the real
- *     (V1-styled, reused as-is) CompensationSetupWizard. A real bug was
- *     fixed this session where the wizard's config was built but never
- *     actually sent to the backend on initial onboarding — see CLAUDE.md.
+ *     compensation wizard (V2CompensationSetupWizard — a V2-styled twin of
+ *     compensation/CompensationSetupWizard.jsx, same state/logic, restyled
+ *     presentation only). A real bug was fixed this session where the
+ *     wizard's config was built but never actually sent to the backend on
+ *     initial onboarding — see CLAUDE.md.
  *   - Onboarding checklist: real, new OnboardingChecklist model/endpoints —
  *     previously only 3 booleans existed, no per-task tracking.
  *   - Payroll: real, new PayrollRecord model + endpoints. "Mark paid" is
@@ -31,8 +33,8 @@ import { cn } from "../ui/utils";
 import { toast } from "sonner";
 
 import V2AppLayout from "../layout/V2AppLayout";
-import { V2Card, V2Chip, V2Avatar, V2Btn, V2Dot } from "../shared/v2-primitives";
-import CompensationSetupWizard from "../compensation/CompensationSetupWizard";
+import { V2Card, V2Chip, V2Avatar, V2Btn, V2Dot, V2SectionHead } from "../shared/v2-primitives";
+import CompensationSetupWizard from "../compensation/v2/V2CompensationSetupWizard";
 
 import { useOfficeStore } from "../../state/useOfficeStore";
 import * as teamMemberApi from "../../utils/api/teamMemberApi";
@@ -55,6 +57,15 @@ function rateBarColor(rate) {
   if (rate >= 0.6) return "bg-v2-blue";
   if (rate >= 0.3) return "bg-v2-amber";
   return "bg-red-400";
+}
+
+function timeAgo(dateStr) {
+  if (!dateStr) return "";
+  const diffMs = Date.now() - new Date(dateStr).getTime();
+  const days = Math.floor(diffMs / 86400000);
+  if (days <= 0) return "Posted today";
+  if (days === 1) return "Posted yesterday";
+  return `Posted ${days} days ago`;
 }
 
 function compensationSummary(comp) {
@@ -463,6 +474,140 @@ function PaystackPayModal({ record, onClose, onSubmit, submitting }) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────
+// RIGHT PANEL
+// ─────────────────────────────────────────────────────────────────────────
+
+function TeamRightPanel({
+  members,
+  performanceByMember,
+  avgCompletion,
+  equitySummary,
+  openRoleRows,
+  payrollRecords,
+  onOpenMember,
+  onFilterLow,
+  onOpenPayroll,
+  onPageChange,
+}) {
+  const healthRows = useMemo(() => {
+    return [...members]
+      .map((m) => ({ member: m, perf: performanceByMember[String(m._id ?? m.id)] }))
+      .filter((r) => r.perf && r.perf.totalTasks > 0)
+      .sort((a, b) => a.perf.completionRate - b.perf.completionRate)
+      .slice(0, 6);
+  }, [members, performanceByMember]);
+
+  const payrollTotal = payrollRecords.reduce((sum, r) => sum + (r.amount || 0), 0);
+  const payrollPaid = payrollRecords.filter((r) => r.status === "paid").length;
+  const payrollPct = payrollRecords.length ? Math.round((payrollPaid / payrollRecords.length) * 100) : 0;
+
+  return (
+    <div className="flex flex-col gap-3 p-3">
+      <V2Card>
+        <V2SectionHead
+          title="Team completion health"
+          action={<button type="button" onClick={onFilterLow} className="text-v2-blue hover:underline">Filter low</button>}
+        />
+        {healthRows.length === 0 ? (
+          <p className="font-body text-[11px] text-v2-subtle">No task data yet.</p>
+        ) : (
+          <div className="flex flex-col">
+            {healthRows.map(({ member, perf }) => (
+              <button
+                key={String(member._id ?? member.id)}
+                type="button"
+                onClick={() => onOpenMember(member)}
+                className="flex items-center gap-2 border-b border-v2-border py-1.5 text-left last:border-0 hover:opacity-80"
+              >
+                <V2Avatar name={member.name} size={24} />
+                <span className="flex-1 truncate font-body text-[11px] font-medium text-v2-heading">{member.name}</span>
+                <span className={cn("font-body text-[11px] font-medium", rateColor(perf.completionRate))}>
+                  {Math.round(perf.completionRate * 100)}
+                </span>
+              </button>
+            ))}
+          </div>
+        )}
+        <div className="mt-2 flex items-center justify-between border-t border-v2-border pt-2">
+          <span className="font-body text-[11px] text-v2-muted">Team average</span>
+          <span className="font-body text-[13px] font-medium text-v2-blue">{Math.round(avgCompletion * 100)}</span>
+        </div>
+      </V2Card>
+
+      <V2Card>
+        <V2SectionHead title="Equity allocated" />
+        {equitySummary.holders.length === 0 ? (
+          <p className="font-body text-[11px] text-v2-subtle">No equity compensation set up yet.</p>
+        ) : (
+          <>
+            <div className="mb-2 flex items-baseline gap-1.5">
+              <span className="font-heading text-[20px] font-medium text-v2-heading">{equitySummary.totalAllocated.toFixed(1)}%</span>
+              <span className="font-body text-[11px] text-v2-subtle">allocated across {equitySummary.holders.length} member{equitySummary.holders.length === 1 ? "" : "s"}</span>
+            </div>
+            <div className="flex flex-col gap-1">
+              {equitySummary.holders.map((h) => (
+                <div key={h.id} className="flex items-center justify-between font-body text-[11px]">
+                  <span className="truncate text-v2-muted">{h.name}</span>
+                  <span className="font-medium text-v2-heading">{h.pct}%</span>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
+        <p className="mt-2 font-body text-[10px] text-v2-subtle">
+          Total pool size and vesting-to-date aren't tracked yet — this is each member's allocated %, summed.
+        </p>
+      </V2Card>
+
+      <V2Card>
+        <V2SectionHead
+          title="Open roles"
+          action={onPageChange ? <button type="button" onClick={() => onPageChange("talent")} className="text-v2-blue hover:underline">View all</button> : null}
+        />
+        {openRoleRows.length === 0 ? (
+          <p className="font-body text-[11px] text-v2-subtle">No open roles posted.</p>
+        ) : (
+          <div className="flex flex-col">
+            {openRoleRows.slice(0, 4).map((r) => (
+              <div key={r.key} className="flex items-start gap-2 border-b border-v2-border py-1.5 last:border-0">
+                <V2Dot variant="amber" className="mt-1" />
+                <div className="min-w-0">
+                  <p className="truncate font-body text-[11px] font-medium text-v2-heading">{r.role}</p>
+                  <p className="font-body text-[10px] text-v2-subtle">
+                    {r.interested} interested · {timeAgo(r.postedAt)}
+                  </p>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+        <V2Btn variant="primary" size="sm" className="mt-2 w-full justify-center" onClick={() => onPageChange && onPageChange("talent")}>
+          Post a new role
+        </V2Btn>
+      </V2Card>
+
+      <V2Card>
+        <V2SectionHead title="Payroll · this period" />
+        <p className="font-heading text-[20px] font-medium text-v2-heading">
+          {payrollRecords.length ? `${payrollRecords[0]?.currency || "NGN"} ${payrollTotal.toLocaleString()}` : "—"}
+        </p>
+        <p className="mb-2 font-body text-[11px] text-v2-muted">
+          {payrollRecords.length ? `${payrollPaid} of ${payrollRecords.length} payments processed` : "No payroll generated yet"}
+        </p>
+        {payrollRecords.length > 0 ? (
+          <div className="mb-2 h-1 overflow-hidden rounded-full bg-v2-border">
+            <div className="h-full rounded-full bg-v2-blue" style={{ width: `${payrollPct}%` }} />
+          </div>
+        ) : null}
+        <V2Btn variant="secondary" size="sm" className="w-full justify-center" onClick={onOpenPayroll}>
+          View full payroll
+        </V2Btn>
+      </V2Card>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────
 // MAIN COMPONENT
 // ─────────────────────────────────────────────────────────────────────────
 
@@ -501,10 +646,12 @@ export default function V2Team({ user, onPageChange }) {
     (async () => {
       setLoading(true);
       try {
-        const [rosterResult, perfResult, postsResult] = await Promise.allSettled([
+        const now = new Date();
+        const [rosterResult, perfResult, postsResult, payrollResult] = await Promise.allSettled([
           teamMemberApi.getStartupTeamMembers(startupId || resolvedFounderId),
           teamMemberApi.getFounderTeamPerformance(resolvedFounderId),
           founderApi.getFounderPosts(resolvedFounderId),
+          payrollApi.getPayroll(resolvedFounderId, { periodMonth: now.getMonth() + 1, periodYear: now.getFullYear() }),
         ]);
         if (cancelled) return;
 
@@ -521,6 +668,8 @@ export default function V2Team({ user, onPageChange }) {
           ? (Array.isArray(postsResult.value) ? postsResult.value : postsResult.value?.posts || [])
           : [];
         setMyPosts(postsList);
+
+        if (payrollResult.status === "fulfilled") setPayrollRecords(payrollResult.value || []);
 
         const checklists = await Promise.allSettled(
           roster.map((m) => teamMemberApi.getOnboardingChecklist(String(m._id ?? m.id))),
@@ -563,6 +712,34 @@ export default function V2Team({ user, onPageChange }) {
     }),
     [members, performanceByMember],
   );
+
+  const equitySummary = useMemo(() => {
+    const holders = members
+      .map((m) => {
+        const comp = m.compensation;
+        const pct = (comp?.type === "equity" || comp?.type === "equity-fixed") ? Number(comp.equity?.totalEquity) : null;
+        return pct != null && !Number.isNaN(pct) ? { id: String(m._id ?? m.id), name: m.name, pct } : null;
+      })
+      .filter(Boolean)
+      .sort((a, b) => b.pct - a.pct);
+    const totalAllocated = holders.reduce((sum, h) => sum + h.pct, 0);
+    return { holders, totalAllocated };
+  }, [members]);
+
+  const openRoleRows = useMemo(() => {
+    const rows = [];
+    for (const post of myPosts) {
+      for (const role of post.lookingFor || []) {
+        rows.push({
+          key: `${post._id || post.id}-${role}`,
+          role,
+          interested: post.interested || 0,
+          postedAt: post.createdAt,
+        });
+      }
+    }
+    return rows;
+  }, [myPosts]);
 
   const activeMember = useMemo(
     () => members.find((m) => String(m._id ?? m.id) === String(activeMemberId)) || null,
@@ -729,6 +906,20 @@ export default function V2Team({ user, onPageChange }) {
             <UserPlus className="h-3.5 w-3.5" /> Invite member
           </V2Btn>
         </>
+      }
+      rightPanel={
+        <TeamRightPanel
+          members={members}
+          performanceByMember={performanceByMember}
+          avgCompletion={avgCompletion}
+          equitySummary={equitySummary}
+          openRoleRows={openRoleRows}
+          payrollRecords={payrollRecords}
+          onOpenMember={(m) => setActiveMemberId(String(m._id ?? m.id))}
+          onFilterLow={() => lowPerformers[0] && setActiveMemberId(String(lowPerformers[0]._id ?? lowPerformers[0].id))}
+          onOpenPayroll={handleOpenPayroll}
+          onPageChange={onPageChange}
+        />
       }
     >
       <div className="flex flex-col gap-4 p-4">
