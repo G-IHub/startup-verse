@@ -14,7 +14,7 @@
 
 import React, { useState } from "react";
 import { cn } from "../ui/utils";
-import { Bot, Users, Plug } from "lucide-react";
+import { Bot, Users, Plug, MessageSquare } from "lucide-react";
 import V2AppLayout from "../layout/V2AppLayout";
 import V2AgentWorkroom from "./V2AgentWorkroom";
 import V2AIStaffManage from "./V2AIStaffManage";
@@ -33,6 +33,7 @@ import V2ProductViewer from "./V2ProductViewer";
 const TABS = [
   { id: "workroom",      label: "Workroom",      Icon: Bot },
   { id: "manage-staff",  label: "Manage Staff",  Icon: Users },
+  { id: "chat",          label: "Chat",          Icon: MessageSquare },
   { id: "integrations",  label: "Integrations",  Icon: Plug },
 ];
 
@@ -84,10 +85,11 @@ export default function V2AIStaffShell({ user, onPageChange, ...rest }) {
     if (page === "manage-staff")  { setSubPage(null); setTab("manage-staff");  return; }
     if (page === "workroom")      { setSubPage(null); setTab("workroom");      return; }
     if (page === "integrations")  { setSubPage(null); setTab("integrations");  return; }
+    if (page === "chat" || page === "ai-staff-chat") { setSubPage(null); setTab("chat"); return; }
     // Known sub-pages stay inside the shell
     const internalPages = ["approval-queue","autonomy-settings","audit-trail",
       "agent-marketing","agent-sales","agent-finance","agent-legal",
-      "ai-staff-chat","product-viewer"];
+      "product-viewer"];
     if (internalPages.includes(page)) { setSubPage(page); return; }
     // Everything else → top-level routing
     onPageChange?.(page);
@@ -112,8 +114,6 @@ export default function V2AIStaffShell({ user, onPageChange, ...rest }) {
         return <V2AIFinanceWorkspace onBack={handleBack} onNavigate={handleNavigate} />;
       case "agent-legal":
         return <V2AILegalWorkspace onBack={handleBack} onNavigate={handleNavigate} />;
-      case "ai-staff-chat":
-        return <V2AIStaffChat onBack={handleBack} onNavigate={handleNavigate} />;
       case "product-viewer":
         return <V2ProductViewer onBack={handleBack} />;
       default:
@@ -184,6 +184,8 @@ export default function V2AIStaffShell({ user, onPageChange, ...rest }) {
               onBack={() => setTab("workroom")}
               onNavigate={handleNavigate}
             />
+          ) : tab === "chat" ? (
+            <V2AIStaffChat onNavigate={handleNavigate} />
           ) : (
             <V2AIStaffManage
               user={user}

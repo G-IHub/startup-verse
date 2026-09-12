@@ -324,8 +324,12 @@ export default function V2AIStaffChat({ onBack, onNavigate }) {
         {/* Topbar */}
         <div className="flex shrink-0 items-center justify-between gap-3 border-b border-v2-border bg-white px-5 py-3">
           <div className="flex flex-wrap items-center gap-2">
-            <button type="button" onClick={onBack} className="font-body text-[12px] text-v2-muted hover:text-v2-heading transition-colors">← Back</button>
-            <span className="text-gray-300">·</span>
+            {onBack && (
+              <>
+                <button type="button" onClick={onBack} className="font-body text-[12px] text-v2-muted hover:text-v2-heading transition-colors">← Back</button>
+                <span className="text-gray-300">·</span>
+              </>
+            )}
             <span className="font-body text-[12px] text-v2-muted">AI Staff</span>
             <span className="text-gray-300">›</span>
             <span className="font-body text-[13px] font-medium text-v2-heading">{activeStaffObj?.label}</span>
