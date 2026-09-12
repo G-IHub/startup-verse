@@ -44,6 +44,13 @@ const HIRED = [
     task: "Drafted a standard NDA for next week's backend engineer interview from the approved template. No legal document sends without your sign-off.",
     output: "NDA ready to send to the candidate. 7 active contracts on file, 0 open compliance flags as of this morning's check.",
   },
+  {
+    id: "sa", initials: "SA", name: "AI Sales", role: "Pipeline · Outreach · Conversion",
+    bg: "#E6F1FB", color: "#0C447C", price: "$20/mo", priceBg: "#E6F1FB", priceColor: "#0C447C",
+    status: "waiting", statusLabel: "Blocked — outreach needs your approval", statusColor: "#633806", statusDot: "#BA7517",
+    task: "Personalised and queued 10 clinic outreach messages for Lagos Island + VI using the Vezeeta supply-first script. Sending is external-facing, so it always waits for you.",
+    output: "10 clinic messages ready to send, plus the live pipeline: 3 replied, 1 demo booked this week.",
+  },
 ];
 
 const AVAILABLE_PHASES = [
@@ -53,7 +60,6 @@ const AVAILABLE_PHASES = [
     lockLabel: null,
     staff: [
       { initials: "DEV", name: "AI Developer Agent",   role: "Code review · Tech decisions · Docs",    bg: "#EEEDFE", color: "#3C3489", price: "$25/mo", task: "Reviews code architecture, suggests tech stack decisions, writes technical documentation, flags complexity risks." },
-      { initials: "SA",  name: "AI Sales Agent",       role: "Pipeline · Outreach · Conversion",        bg: "#EAF3DE", color: "#27500A", price: "$20/mo", task: "Builds outreach sequences, drafts sales scripts, tracks pipeline conversations, and suggests when to follow up." },
     ],
   },
   {
@@ -243,7 +249,7 @@ export default function V2AIStaffManage({ onChat, onNavigate }) {
           <div className="mb-3 flex items-end justify-between">
             <div>
               <div className="font-heading text-[13px] font-semibold text-v2-heading">Your hired AI staff</div>
-              <div className="mt-0.5 font-body text-[11px] text-v2-muted">5 roles active · All aware of HealthTrack context</div>
+              <div className="mt-0.5 font-body text-[11px] text-v2-muted">6 roles active · All aware of HealthTrack context</div>
             </div>
             <span className="rounded-full bg-[#EEEDFE] px-2.5 py-1 font-body text-[10px] font-medium text-v2-purple">Phase 1 · Active</span>
           </div>
@@ -257,7 +263,7 @@ export default function V2AIStaffManage({ onChat, onNavigate }) {
           <div className="mb-4 flex items-end justify-between">
             <div>
               <div className="font-heading text-[13px] font-semibold text-v2-heading">Available to hire</div>
-              <div className="mt-0.5 font-body text-[11px] text-v2-muted">7 roles ready · Phase 2 available now</div>
+              <div className="mt-0.5 font-body text-[11px] text-v2-muted">6 roles ready · Phase 2 available now</div>
             </div>
             <span className="rounded-full bg-[#FAEEDA] px-2.5 py-1 font-body text-[10px] font-medium text-[#633806]">Phase 2 · Available now</span>
           </div>
@@ -321,6 +327,7 @@ export default function V2AIStaffManage({ onChat, onNavigate }) {
             { label: "AI Growth Analyst",  val: "$10" },
             { label: "AI Finance",         val: "$15" },
             { label: "AI Legal",           val: "$20" },
+            { label: "AI Sales",           val: "$20" },
           ].map((r) => (
             <div key={r.label} className="flex items-center justify-between py-1">
               <span className="font-body text-[11px] text-v2-muted">{r.label}</span>
@@ -330,7 +337,7 @@ export default function V2AIStaffManage({ onChat, onNavigate }) {
           <div className="my-1 h-px bg-gray-200" />
           <div className="flex items-center justify-between py-1">
             <span className="font-body text-[11px] font-semibold text-v2-heading">Current total</span>
-            <span className="font-body text-[11px] font-semibold text-v2-purple">$90/mo</span>
+            <span className="font-body text-[11px] font-semibold text-v2-purple">$110/mo</span>
           </div>
           <div className="flex items-center justify-between py-1">
             <span className="font-body text-[11px] text-v2-muted">Full bundle (13 roles)</span>
