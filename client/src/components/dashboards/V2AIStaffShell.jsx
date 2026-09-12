@@ -76,10 +76,22 @@ const SUB_PAGE_LABELS = {
   "product-viewer":   "Product Viewer",
 };
 
+/* ── Toast (tab-bar-level actions, e.g. Chat's Download/Share) ──────────── */
+function ShellToast({ msg }) {
+  if (!msg) return null;
+  return (
+    <div className="pointer-events-none fixed bottom-6 left-1/2 z-[60] -translate-x-1/2 rounded-full bg-gray-900 px-5 py-2.5 font-body text-[12px] font-medium text-white shadow-lg">
+      {msg}
+    </div>
+  );
+}
+
 /* ── Shell ──────────────────────────────────────────────────────────────── */
 export default function V2AIStaffShell({ user, onPageChange, ...rest }) {
   const [tab, setTab]         = useState("workroom");
   const [subPage, setSubPage] = useState(null); // null = show main tabs
+  const [toast, setToast]     = useState("");
+  const showToast = (msg) => { setToast(msg); setTimeout(() => setToast(""), 2400); };
 
   const handleNavigate = (page) => {
     if (page === "manage-staff")  { setSubPage(null); setTab("manage-staff");  return; }
@@ -165,6 +177,25 @@ export default function V2AIStaffShell({ user, onPageChange, ...rest }) {
                 Hire staff ↗
               </button>
             )}
+
+            {tab === "chat" && (
+              <div className="ml-auto mb-1.5 flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => showToast("Outputs downloaded")}
+                  className="rounded-full border border-v2-border bg-white px-3 py-1.5 font-body text-[11px] font-medium text-v2-heading hover:bg-gray-50 transition-colors"
+                >
+                  Download outputs
+                </button>
+                <button
+                  type="button"
+                  onClick={() => showToast("Shared with team")}
+                  className="rounded-full bg-v2-purple px-3 py-1.5 font-body text-[11px] font-medium text-white hover:opacity-90 transition-opacity"
+                >
+                  Share with team
+                </button>
+              </div>
+            )}
           </div>
         )}
 
@@ -197,6 +228,8 @@ export default function V2AIStaffShell({ user, onPageChange, ...rest }) {
         </div>
 
       </div>
+
+      <ShellToast msg={toast} />
     </V2AppLayout>
   );
 }

@@ -293,7 +293,7 @@ function PlaceholderChat({ staff }) {
 }
 
 /* ── Main ─────────────────────────────────────────────────────────────────── */
-export default function V2AIStaffChat({ onBack, onNavigate }) {
+export default function V2AIStaffChat({ onNavigate }) {
   const [activeStaff, setActiveStaff] = useState("pm");
   const [toast, setToast] = useState("");
   const [contextOn, setContextOn] = useState(true);
@@ -320,26 +320,6 @@ export default function V2AIStaffChat({ onBack, onNavigate }) {
 
       {/* ── Main chat column ── */}
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-
-        {/* Topbar */}
-        <div className="flex shrink-0 items-center justify-between gap-3 border-b border-v2-border bg-white px-5 py-3">
-          <div className="flex flex-wrap items-center gap-2">
-            {onBack && (
-              <>
-                <button type="button" onClick={onBack} className="font-body text-[12px] text-v2-muted hover:text-v2-heading transition-colors">← Back</button>
-                <span className="text-gray-300">·</span>
-              </>
-            )}
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-[#EEEDFE] px-2.5 py-1 font-body text-[11px] font-medium text-[#3C3489]">
-              <span className="h-[5px] w-[5px] rounded-full bg-[#534AB7]" />Chat session · Week 5
-            </span>
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-[#EAF3DE] px-2.5 py-1 font-body text-[11px] font-medium text-[#27500A]">Context loaded · HealthTrack</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <button type="button" onClick={() => showToast("Outputs downloaded")} className="rounded-full border border-v2-border bg-white px-3 py-1.5 font-body text-[12px] font-medium text-v2-heading hover:bg-gray-50 transition-colors">Download outputs</button>
-            <button type="button" onClick={() => showToast("Shared with team")} className="rounded-full bg-v2-purple px-3 py-1.5 font-body text-[12px] font-medium text-white hover:opacity-90 transition-opacity">Share with team</button>
-          </div>
-        </div>
 
         {/* Staff switcher */}
         <div className="flex shrink-0 items-center gap-2.5 overflow-x-auto border-b border-v2-border bg-white px-5 py-2.5">
