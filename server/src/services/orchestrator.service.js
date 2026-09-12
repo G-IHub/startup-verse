@@ -35,14 +35,33 @@ function resolveApprover(approverRule, founderId) {
   return founderId;
 }
 
-function publishEvent(event) {
+/**
+ * Populates actionTypeId (and its agentId) before building the DTO, so a
+ * live socket push carries the same rich display data as the REST list
+ * endpoint (agent name, action label, risk category) instead of just an id
+ * the client can't render anything meaningful from.
+ */
+async function publishEvent(event) {
+  await event.populate({
+    path: "actionTypeId",
+    select: "actionKey label riskCategory agentId",
+    populate: { path: "agentId", select: "name agentKey" },
+  });
+  const actionType = event.actionTypeId;
+  const agent = actionType?.agentId;
   const dto = {
     id: String(event._id),
     founderId: String(event.founderId),
     startupId: event.startupId ? String(event.startupId) : null,
     actorType: event.actorType,
     actorId: event.actorId,
-    actionTypeId: String(event.actionTypeId),
+    actionTypeId: actionType ? {
+      id: String(actionType._id),
+      actionKey: actionType.actionKey,
+      label: actionType.label,
+      riskCategory: actionType.riskCategory,
+      agentId: agent ? { id: String(agent._id), name: agent.name, agentKey: agent.agentKey } : null,
+    } : null,
     targetType: event.targetType,
     targetId: event.targetId,
     payload: event.payload,
@@ -96,7 +115,7 @@ export async function proposeAction({ founderId, startupId, actorType, actorId, 
   if (actionType.riskCategory === "sensitive_locked" || (actionType.riskCategory === "reversible" && mode === "ask_first")) {
     const approverId = resolveApprover(actionType.approverRule, founderId);
     const event = await AgentEvent.create({ ...baseDoc, status: "pending_approval", approverId });
-    const dto = publishEvent(event);
+    const dto = await publishEvent(event);
     return { event: dto, executed: false };
   }
 
@@ -105,7 +124,7 @@ export async function proposeAction({ founderId, startupId, actorType, actorId, 
   // Phase 0 has no real integration adapters yet, so "execute" just means
   // "log it as done" — real adapters plug in here per-agent in later phases.
   const event = await AgentEvent.create({ ...baseDoc, status: "autonomous_completed" });
-  const dto = publishEvent(event);
+  const dto = await publishEvent(event);
   return { event: dto, executed: true };
 }
 
@@ -140,7 +159,7 @@ export async function resolveApproval({ eventId, decision, approverId }) {
   pending.approverId = approverId;
   pending.resolvedAt = new Date();
   await pending.save();
-  const resolvedDto = publishEvent(pending);
+  const resolvedDto = await publishEvent(pending);
 
   if (decision === "declined") {
     return { resolved: resolvedDto, execution: null };
@@ -159,7 +178,7 @@ export async function resolveApproval({ eventId, decision, approverId }) {
     status: "human_completed",
     parentEventId: pending._id,
   });
-  const executionDto = publishEvent(executionEvent);
+  const executionDto = await publishEvent(executionEvent);
 
   return { resolved: resolvedDto, execution: executionDto };
 }

@@ -1,11 +1,22 @@
 /**
  * V2ApprovalQueue — full approval queue page for AI Staff
  * Accessed from Workroom topbar "Approval queue" button or ApprovalCard "Open full queue" link
+ *
+ * Real data as of docs/ai-agent-roadmap.md Phase 0: reads AgentEvent rows via
+ * agentOrchestrationApi (status=pending_approval → queue, everything else →
+ * history), live-updated over Socket.IO (subscribeToAgentEvents). Approve/
+ * Decline call the real resolveApproval endpoint. No real agents exist yet in
+ * this environment, so an empty queue here is the correct, honest state, not
+ * a bug — it fills in once Phase 1 gives an agent something real to propose.
  */
 
-import React, { useState, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { cn } from "../ui/utils";
 import { Search, CheckCircle2 } from "lucide-react";
+import { useOfficeStore } from "../../state/useOfficeStore";
+import { getAgentEvents, resolveAgentEvent } from "../../utils/api/agentOrchestrationApi";
+import { subscribeToAgentEvents } from "../../utils/socketIoRealtime";
+import { paletteForAgent, initialsForAgent, formatEventTime, riskDisplay } from "../../utils/agentDisplay";
 
 /* ── Agent → real workspace page, mirrors the mockup's clickable avatars ───── */
 const AGENT_WORKSPACE_PAGE = {
@@ -15,78 +26,54 @@ const AGENT_WORKSPACE_PAGE = {
   "AI Legal": "agent-legal",
 };
 
-/* ── Static data ─────────────────────────────────────────────────────────── */
-const QUEUE_ITEMS = [
-  {
-    id: "q1", view: "you", risk: "low",
-    agent: { initials: "SA", bg: "#E6F1FB", color: "#0C447C" },
-    title: "Send 10 clinic outreach messages",
-    riskLabel: "Low risk", riskBg: "#f3f4f6", riskColor: "#6b7280",
-    desc: "AI Sales personalised and queued all 10 — Lagos Island + VI, using the Vezeeta supply-first script. Held because sending is external-facing.",
-    agentName: "AI Sales", waitingOn: "you", time: "7:52am today",
-    primaryLabel: "Send all →", primaryAction: "Sent 10 clinic messages",
-  },
-  {
-    id: "q2", view: "you", risk: "high",
-    agent: { initials: "DEV", bg: "#f3f4f6", color: "#6b7280" },
-    title: "Merge PR #15 — pricing page",
-    riskLabel: "Touches billing", riskBg: "#FCEBEB", riskColor: "#791F1F",
-    desc: "Updates the Stripe price IDs. AI Developer flagged this itself and won't merge without a human, regardless of autonomy setting.",
-    agentName: "AI Developer", waitingOn: "you", time: "8:32am today",
-    primaryLabel: "Approve merge", primaryAction: "Merged PR #15",
-  },
-  {
-    id: "q3", view: "you", risk: "low",
-    agent: { initials: "PM", bg: "#EEEDFE", color: "#534AB7" },
-    title: "Week 5 sprint plan",
-    riskLabel: "Low risk", riskBg: "#f3f4f6", riskColor: "#6b7280",
-    desc: "4 milestones, 11 tasks, rebuilt around the cleared landing-page blocker and this week's validated interview signal.",
-    agentName: "AI Product Manager", waitingOn: "you", time: "8:15am today",
-    primaryLabel: "Push to engine", primaryAction: "Pushed sprint plan to Execution Engine",
-  },
-  {
-    id: "q4", view: "you", risk: "high",
-    agent: { initials: "FIN", bg: "#FAEEDA", color: "#633806" },
-    title: "Send invoice INV-1042 — Reddington Clinic",
-    riskLabel: "Touches money", riskBg: "#FCEBEB", riskColor: "#791F1F",
-    desc: "₦180,000 for the pilot integration setup fee, per the signed scope. AI Finance drafted it from the agreed terms — all payment requests always escalate.",
-    agentName: "AI Finance", waitingOn: "you", time: "9:02am today",
-    primaryLabel: "Approve & send", primaryAction: "Sent invoice INV-1042",
-  },
-  {
-    id: "q5", view: "you", risk: "high",
-    agent: { initials: "LGL", bg: "#FCEBEB", color: "#791F1F" },
-    title: "Send NDA to candidate — backend hire",
-    riskLabel: "Legal document", riskBg: "#FCEBEB", riskColor: "#791F1F",
-    desc: "Standard StartupVerse-template NDA drafted for a candidate interview next week. AI Legal never sends any legal document without sign-off.",
-    agentName: "AI Legal", waitingOn: "you", time: "9:10am today",
-    primaryLabel: "Approve & send", primaryAction: "Sent NDA to candidate",
-  },
-  {
-    id: "q6", view: "team", risk: "low", isFyi: true,
-    agent: { initials: "CA", bg: "#FAEEDA", color: "#633806" },
-    title: "Nurture email tone review",
-    riskLabel: "FYI only", riskBg: "#f3f4f6", riskColor: "#6b7280",
-    desc: "Routed to Chidinma, not you — brand-voice calls go to whoever holds the marketing role.",
-    agentName: "AI Marketing", waitingOn: "Chidinma A.", time: "7:58am today",
-    primaryLabel: "Nudge →", primaryAction: null,
-  },
-];
+/* ── Mapping real AgentEvent rows → display items ──────────────────────────── */
+function toQueueItem(event, currentUserId) {
+  const actionType = event.actionTypeId || {};
+  const agent = actionType.agentId || {};
+  const agentName = agent.name || "Unknown agent";
+  const palette = paletteForAgent(agent.id || agent.agentKey || agentName);
+  const risk = riskDisplay(actionType.riskCategory);
+  const isYou = !event.approverId || String(event.approverId) === String(currentUserId);
+  return {
+    id: event.id,
+    view: isYou ? "you" : "team",
+    isFyi: !isYou,
+    risk: actionType.riskCategory === "sensitive_locked" ? "high" : "low",
+    agent: { initials: initialsForAgent(agentName), bg: palette.bg, color: palette.color },
+    title: actionType.label || `${event.targetType || "Action"} pending review`,
+    riskLabel: risk.label, riskBg: risk.bg, riskColor: risk.color,
+    desc: `Proposed by ${event.actorType === "agent" ? agentName : "a teammate"}${
+      event.targetType ? ` · target: ${event.targetType}${event.targetId ? ` (${event.targetId})` : ""}` : ""
+    }.`,
+    agentName,
+    waitingOn: isYou ? "you" : "a teammate",
+    time: formatEventTime(event.createdAt),
+    createdAt: event.createdAt,
+    payload: event.payload,
+  };
+}
 
-const HISTORY = [
-  { icon: "✓", iconBg: "#EAF3DE", title: "Merged PR #14 — landing page hero",         sub: "AI Developer · approved by you · 6:22am today",     status: "Approved",   statusBg: "#EAF3DE", statusColor: "#27500A" },
-  { icon: "✓", iconBg: "#EAF3DE", title: "Published landing page to production",        sub: "James S. · human action · 7:03am today",            status: "Completed",  statusBg: "#EAF3DE", statusColor: "#27500A" },
-  { icon: "✕", iconBg: "#FCEBEB", title: "Boost budget for sponsored clinic posts — ₦40,000", sub: "AI Marketing · declined by you · Yesterday",   status: "Declined",   statusBg: "#FCEBEB", statusColor: "#791F1F" },
-  { icon: "✓", iconBg: "#EAF3DE", title: "Week 4 sprint plan",                          sub: "AI Product Manager · approved by you · 3 days ago", status: "Approved",   statusBg: "#EAF3DE", statusColor: "#27500A" },
-];
+const HISTORY_STATUS_META = {
+  autonomous_completed: { icon: "✓", iconBg: "#EAF3DE", status: "Autonomous", statusBg: "#EAF3DE", statusColor: "#27500A" },
+  approved: { icon: "✓", iconBg: "#EAF3DE", status: "Approved", statusBg: "#EAF3DE", statusColor: "#27500A" },
+  declined: { icon: "✕", iconBg: "#FCEBEB", status: "Declined", statusBg: "#FCEBEB", statusColor: "#791F1F" },
+  human_completed: { icon: "✓", iconBg: "#EAF3DE", status: "Completed", statusBg: "#EAF3DE", statusColor: "#27500A" },
+};
 
-const AGENT_BREAKDOWN = [
-  { initials: "SA",  bg: "#E6F1FB", color: "#0C447C", name: "AI Sales",            count: "1 item" },
-  { initials: "DEV", bg: "#f3f4f6", color: "#6b7280", name: "AI Developer",        count: "1 item" },
-  { initials: "PM",  bg: "#EEEDFE", color: "#534AB7", name: "AI Product Manager",  count: "1 item" },
-  { initials: "FIN", bg: "#FAEEDA", color: "#633806", name: "AI Finance",          count: "1 item" },
-  { initials: "LGL", bg: "#FCEBEB", color: "#791F1F", name: "AI Legal",            count: "1 item" },
-];
+function toHistoryItem(event) {
+  const actionType = event.actionTypeId || {};
+  const agent = actionType.agentId || {};
+  const agentName = agent.name || "Unknown agent";
+  const meta = HISTORY_STATUS_META[event.status] || { icon: "•", iconBg: "#f3f4f6", status: event.status, statusBg: "#f3f4f6", statusColor: "#6b7280" };
+  const actorDesc = event.actorType === "human" ? "human action" : meta.status.toLowerCase();
+  return {
+    id: event.id,
+    icon: meta.icon, iconBg: meta.iconBg,
+    title: actionType.label || `${event.targetType || "Agent action"}`,
+    sub: `${agentName} · ${actorDesc} · ${formatEventTime(event.resolvedAt || event.createdAt)}`,
+    status: meta.status, statusBg: meta.statusBg, statusColor: meta.statusColor,
+  };
+}
 
 /* ── Helpers ──────────────────────────────────────────────────────────────── */
 function Av({ initials, bg, color, size = 28, onClick, title }) {
@@ -121,27 +108,111 @@ function Toast({ msg }) {
 }
 
 /* ── Main component ──────────────────────────────────────────────────────── */
-export default function V2ApprovalQueue({ onBack, onNavigate }) {
+export default function V2ApprovalQueue({ user, onBack, onNavigate }) {
+  const founderId = useOfficeStore((s) => s.founderId);
+  const loadWorkspace = useOfficeStore((s) => s.loadWorkspace);
+  const resolvedFounderId = founderId || String(user?._id ?? user?.id ?? "");
+  const currentUserId = String(user?._id ?? user?.id ?? resolvedFounderId ?? "");
+
+  const [events, setEvents] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
   const [viewTab, setViewTab] = useState("all");
   const [riskFilter, setRiskFilter] = useState("all");
   const [search, setSearch] = useState("");
-  const [items, setItems] = useState(QUEUE_ITEMS);
   const [selected, setSelected] = useState(new Set());
+  const [busyIds, setBusyIds] = useState(new Set());
   const [toast, setToast] = useState("");
 
   const showToast = (msg) => { setToast(msg); setTimeout(() => setToast(""), 2500); };
 
-  const approve = (id, action) => {
-    setItems((prev) => prev.filter((i) => i.id !== id));
-    setSelected((prev) => { const s = new Set(prev); s.delete(id); return s; });
-    if (action) showToast("✓ " + action);
+  useEffect(() => { if (user) loadWorkspace(user); }, [user, loadWorkspace]);
+
+  const upsertEvent = useCallback((incoming) => {
+    if (!incoming?.id) return;
+    setEvents((prev) => {
+      const idx = prev.findIndex((e) => e.id === incoming.id);
+      const next = idx === -1 ? [incoming, ...prev] : prev.map((e) => (e.id === incoming.id ? { ...e, ...incoming } : e));
+      return next.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+    });
+  }, []);
+
+  useEffect(() => {
+    if (!resolvedFounderId) return;
+    let cancelled = false;
+    setLoading(true);
+    getAgentEvents(resolvedFounderId)
+      .then((rows) => { if (!cancelled) { setEvents(rows || []); setError(""); } })
+      .catch((err) => { if (!cancelled) setError(err?.message || "Could not load the approval queue."); })
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
+  }, [resolvedFounderId]);
+
+  useEffect(() => {
+    if (!resolvedFounderId) return undefined;
+    return subscribeToAgentEvents(resolvedFounderId, upsertEvent);
+  }, [resolvedFounderId, upsertEvent]);
+
+  const pendingEvents = useMemo(() => events.filter((e) => e.status === "pending_approval"), [events]);
+  const historyEvents = useMemo(() => events.filter((e) => e.status !== "pending_approval"), [events]);
+
+  const items = useMemo(() => pendingEvents.map((e) => toQueueItem(e, currentUserId)), [pendingEvents, currentUserId]);
+  const history = useMemo(() => historyEvents.slice(0, 30).map(toHistoryItem), [historyEvents]);
+
+  const agentBreakdown = useMemo(() => {
+    const byAgent = new Map();
+    items.forEach((item) => {
+      const entry = byAgent.get(item.agentName) || { ...item.agent, name: item.agentName, count: 0 };
+      entry.count += 1;
+      byAgent.set(item.agentName, entry);
+    });
+    return Array.from(byAgent.values());
+  }, [items]);
+
+  const avgWaitLabel = useMemo(() => {
+    if (items.length === 0) return "—";
+    const now = Date.now();
+    const totalMs = items.reduce((sum, item) => sum + Math.max(0, now - new Date(item.createdAt).getTime()), 0);
+    const avgMin = Math.round(totalMs / items.length / 60000);
+    if (avgMin < 1) return "<1 min";
+    if (avgMin < 60) return `${avgMin} min`;
+    return `${Math.round(avgMin / 60)}h`;
+  }, [items]);
+
+  const resolve = async (id, decision, successMsg) => {
+    setBusyIds((prev) => new Set(prev).add(id));
+    try {
+      const { resolved, execution } = await resolveAgentEvent(id, decision);
+      if (resolved) upsertEvent(resolved);
+      if (execution) upsertEvent(execution);
+      showToast(successMsg);
+    } catch (err) {
+      showToast(err?.message || "Could not update that item.");
+    } finally {
+      setBusyIds((prev) => { const s = new Set(prev); s.delete(id); return s; });
+      setSelected((prev) => { const s = new Set(prev); s.delete(id); return s; });
+    }
   };
 
-  const bulkApprove = () => {
-    const toApprove = items.filter((i) => selected.has(i.id) && !i.isFyi);
-    setItems((prev) => prev.filter((i) => !selected.has(i.id)));
+  const bulkApprove = async () => {
+    const ids = items.filter((i) => selected.has(i.id) && i.view === "you").map((i) => i.id);
+    if (ids.length === 0) return;
     setSelected(new Set());
-    if (toApprove.length) showToast(`✓ Approved ${toApprove.length} item${toApprove.length > 1 ? "s" : ""}`);
+    let succeeded = 0;
+    for (const id of ids) {
+      setBusyIds((prev) => new Set(prev).add(id));
+      try {
+        const { resolved, execution } = await resolveAgentEvent(id, "approved");
+        if (resolved) upsertEvent(resolved);
+        if (execution) upsertEvent(execution);
+        succeeded += 1;
+      } catch {
+        // A single failure shouldn't stop the rest; reflected in the final count.
+      } finally {
+        setBusyIds((prev) => { const s = new Set(prev); s.delete(id); return s; });
+      }
+    }
+    showToast(succeeded ? `✓ Approved ${succeeded} item${succeeded > 1 ? "s" : ""}` : "Could not approve the selected items.");
   };
 
   const toggleSelect = (id) => {
@@ -152,11 +223,16 @@ export default function V2ApprovalQueue({ onBack, onNavigate }) {
     });
   };
 
+  const reviewItem = (item) => {
+    const hasPayload = item.payload && typeof item.payload === "object" && Object.keys(item.payload).length > 0;
+    showToast(hasPayload ? `Payload: ${JSON.stringify(item.payload).slice(0, 140)}` : "No additional detail attached to this action yet.");
+  };
+
   const visible = useMemo(() => {
     let list = items;
-    if (viewTab === "you")   list = list.filter((i) => i.view === "you");
-    if (viewTab === "team")  list = list.filter((i) => i.view === "team");
-    if (riskFilter === "low")  list = list.filter((i) => i.risk === "low");
+    if (viewTab === "you") list = list.filter((i) => i.view === "you");
+    if (viewTab === "team") list = list.filter((i) => i.view === "team");
+    if (riskFilter === "low") list = list.filter((i) => i.risk === "low");
     if (riskFilter === "high") list = list.filter((i) => i.risk === "high");
     if (search) {
       const q = search.toLowerCase();
@@ -199,6 +275,10 @@ export default function V2ApprovalQueue({ onBack, onNavigate }) {
         </div>
 
         <div className="space-y-3 p-5">
+
+          {error && (
+            <div className="rounded-2xl border border-[#791F1F]/20 bg-[#FCEBEB] p-3 font-body text-[11px] text-[#791F1F]">{error}</div>
+          )}
 
           {/* Filter bar */}
           <div className="flex flex-wrap items-center justify-between gap-3">
@@ -252,14 +332,19 @@ export default function V2ApprovalQueue({ onBack, onNavigate }) {
           {/* Queue list */}
           {viewTab !== "history" && (
             <div className="space-y-2.5">
-              {visible.length === 0 && (
+              {loading && (
+                <div className="rounded-2xl border border-v2-border bg-white p-12 text-center font-body text-[12px] text-v2-muted">
+                  Loading approval queue…
+                </div>
+              )}
+              {!loading && visible.length === 0 && (
                 <div className="rounded-2xl border border-v2-border bg-white p-12 text-center">
                   <div className="text-[32px]">✅</div>
                   <div className="mt-2 font-heading text-[14px] font-medium text-v2-heading">Queue clear</div>
                   <div className="mt-1 font-body text-[12px] text-v2-muted">Nothing waiting on you right now — agents will keep working and escalate here if that changes.</div>
                 </div>
               )}
-              {visible.map((item) => (
+              {!loading && visible.map((item) => (
                 <div key={item.id} className={cn("rounded-2xl border bg-white p-3.5 flex gap-3 items-start transition-shadow hover:shadow-sm", item.isFyi ? "opacity-80 border-v2-border" : "border-v2-border")}>
                   {/* Checkbox */}
                   {!item.isFyi ? (
@@ -304,17 +389,22 @@ export default function V2ApprovalQueue({ onBack, onNavigate }) {
                   </div>
 
                   <div className="flex shrink-0 items-center gap-2">
-                    <button type="button" className="rounded-[9px] border border-gray-200 bg-white px-3 py-1.5 font-body text-[11px] font-medium text-v2-heading hover:bg-gray-50 transition-colors">
+                    <button type="button" onClick={() => reviewItem(item)} className="rounded-[9px] border border-gray-200 bg-white px-3 py-1.5 font-body text-[11px] font-medium text-v2-heading hover:bg-gray-50 transition-colors">
                       Review
                     </button>
-                    {!item.isFyi ? (
-                      <button type="button" onClick={() => approve(item.id, item.primaryAction)} className="rounded-[9px] bg-v2-green px-3 py-1.5 font-body text-[11px] font-medium text-white hover:opacity-90 transition-opacity whitespace-nowrap">
-                        {item.primaryLabel}
-                      </button>
+                    {busyIds.has(item.id) ? (
+                      <span className="font-body text-[11px] text-v2-muted">Working…</span>
+                    ) : item.isFyi ? (
+                      <span className="rounded-[9px] bg-gray-100 px-3 py-1.5 font-body text-[11px] font-medium text-v2-muted whitespace-nowrap">Waiting on a teammate</span>
                     ) : (
-                      <button type="button" onClick={() => showToast("Reminder sent to Chidinma")} className="rounded-[9px] bg-[#EEEDFE] px-3 py-1.5 font-body text-[11px] font-medium text-v2-purple hover:opacity-90 transition-opacity">
-                        Nudge →
-                      </button>
+                      <>
+                        <button type="button" onClick={() => resolve(item.id, "declined", "Declined")} className="rounded-[9px] border border-gray-200 bg-white px-3 py-1.5 font-body text-[11px] font-medium text-v2-heading hover:bg-gray-50 transition-colors">
+                          Decline
+                        </button>
+                        <button type="button" onClick={() => resolve(item.id, "approved", "Approved")} className="rounded-[9px] bg-v2-green px-3 py-1.5 font-body text-[11px] font-medium text-white hover:opacity-90 transition-opacity whitespace-nowrap">
+                          Approve →
+                        </button>
+                      </>
                     )}
                   </div>
                 </div>
@@ -328,8 +418,17 @@ export default function V2ApprovalQueue({ onBack, onNavigate }) {
               <div className="text-right">
                 <button type="button" onClick={() => onNavigate?.("audit-trail")} className="font-body text-[11px] text-v2-blue hover:underline">Open full Audit Trail →</button>
               </div>
-              {HISTORY.map((h, i) => (
-                <div key={i} className="flex items-center gap-3 rounded-2xl border border-v2-border bg-white p-3.5">
+              {loading && (
+                <div className="rounded-2xl border border-v2-border bg-white p-12 text-center font-body text-[12px] text-v2-muted">Loading history…</div>
+              )}
+              {!loading && history.length === 0 && (
+                <div className="rounded-2xl border border-v2-border bg-white p-12 text-center">
+                  <div className="font-heading text-[14px] font-medium text-v2-heading">No history yet</div>
+                  <div className="mt-1 font-body text-[12px] text-v2-muted">Resolved and autonomous actions will show up here as agents start doing real work.</div>
+                </div>
+              )}
+              {history.map((h) => (
+                <div key={h.id} className="flex items-center gap-3 rounded-2xl border border-v2-border bg-white p-3.5">
                   <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg font-body text-[11px]" style={{ background: h.iconBg }}>{h.icon}</div>
                   <div className="min-w-0 flex-1">
                     <div className="font-body text-[12px] font-medium text-v2-heading">{h.title}</div>
@@ -352,8 +451,8 @@ export default function V2ApprovalQueue({ onBack, onNavigate }) {
           {[
             { k: "Total pending",        v: `${items.length} items` },
             { k: "Needs you",            v: `${needsYouCount} items` },
-            { k: "Waiting on teammates", v: `${teamCount} item` },
-            { k: "Avg wait time",        v: "23 min" },
+            { k: "Waiting on teammates", v: `${teamCount} item${teamCount === 1 ? "" : "s"}` },
+            { k: "Avg wait time",        v: avgWaitLabel },
           ].map((r) => (
             <div key={r.k} className="flex items-center justify-between border-b border-gray-100 py-1 last:border-b-0">
               <span className="font-body text-[10px] text-v2-muted">{r.k}</span>
@@ -365,11 +464,14 @@ export default function V2ApprovalQueue({ onBack, onNavigate }) {
         {/* Agent breakdown */}
         <div className="rounded-2xl bg-v2-page p-3">
           <div className="mb-2 font-heading text-[11px] font-semibold text-v2-heading">By agent</div>
-          {AGENT_BREAKDOWN.map((a) => (
-            <div key={a.initials} className="flex items-center gap-2 border-b border-gray-100 py-1.5 last:border-b-0">
+          {agentBreakdown.length === 0 && (
+            <div className="py-1.5 font-body text-[10px] text-v2-muted">Nothing pending right now.</div>
+          )}
+          {agentBreakdown.map((a) => (
+            <div key={a.name} className="flex items-center gap-2 border-b border-gray-100 py-1.5 last:border-b-0">
               <div className="flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-[7px] font-body text-[8px] font-semibold" style={{ background: a.bg, color: a.color }}>{a.initials}</div>
               <span className="flex-1 font-body text-[10px] text-gray-600">{a.name}</span>
-              <span className="font-body text-[10px] font-medium text-v2-heading">{a.count}</span>
+              <span className="font-body text-[10px] font-medium text-v2-heading">{a.count} item{a.count === 1 ? "" : "s"}</span>
             </div>
           ))}
         </div>

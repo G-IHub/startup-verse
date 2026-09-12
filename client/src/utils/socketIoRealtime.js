@@ -823,6 +823,30 @@ export async function broadcastUnreadCountUpdate() {
 }
 
 // ========================================
+// AI STAFF ORCHESTRATION — agent-event:updated
+// Mirrors server/src/services/orchestrator.service.js publishEvent(), which
+// emits the raw AgentEvent DTO (not wrapped in a { agentEvent: ... } object)
+// to the founder's user room, per docs/ai-agent-roadmap.md Phase 0.
+// ========================================
+
+export function subscribeToAgentEvents(founderId, onUpdate) {
+  const socket = SocketEngine.getSocket();
+  const roomId = userSocketRoom(founderId);
+
+  const onEventUpdated = (event) => {
+    if (event) onUpdate(event);
+  };
+
+  joinRoom(roomId);
+  socket.on("agent-event:updated", onEventUpdated);
+
+  return () => {
+    socket.off("agent-event:updated", onEventUpdated);
+    leaveRoom(roomId);
+  };
+}
+
+// ========================================
 // CLEANUP
 // ========================================
 

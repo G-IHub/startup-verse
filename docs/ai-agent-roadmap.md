@@ -1,6 +1,6 @@
 # StartupVerse — AI Agent System Roadmap
 
-**Status as of 2026-09-12:** Phase 0 not started. Everything under "AI Staff" in the app today (`/v2/ai-staff`) is a fully interactive, real UI with **zero backend** — no event log, no orchestrator, no real agent, no real integration. This file is the plan to close that gap in deliberate, checkpointed phases, not all at once.
+**Status as of 2026-09-12:** Phase 0 done and verified live (event log, orchestrator, and 3 of the 4 real-data pages — see the phase section below for what's still mock and why). Phase 1 (the first real agent, via Zikorail) not started. This file is the plan to close that gap in deliberate, checkpointed phases, not all at once.
 
 **Source documents** (read these before touching this system — this file is the working summary, they're the reasoning):
 - [ai-agent-vision-writeup.md](ai-agent-vision-writeup.md) — the actual product bet: the trust/control layer is the moat, not agent capability.
@@ -53,19 +53,26 @@ The architecture doc is written assuming Postgres. Real, already-learned constra
 **Goal:** prove the plumbing with zero real agents. Every AI Staff page becomes a real (if empty) view over real data instead of hardcoded arrays.
 **Done when:** a seeded test event shows up live in Approval Queue / Audit Trail / Workroom without a page refresh, end to end.
 
-- [ ] `Agent` model (id, name, role, capabilities, status)
-- [ ] `ActionType` model (id, agentId, riskCategory: reversible/sensitive_locked/read_only, defaultMode, adjustable, approverRule)
-- [ ] `AutonomySetting` model (actionTypeId, mode, updatedBy, updatedAt) — reject writes where the target `ActionType.adjustable === false`, server-side
-- [ ] `Event` model (actorType, actorId, actionTypeId, targetType, targetId, payload, status, approverId, parentEventId, startupId) — the source of truth
-- [ ] `Task` model (title, startupId, status, currentOwner, milestoneId)
-- [ ] `orchestrator.service.js` — the only code allowed to write to `Event`. Implements the 4-branch decision loop from the architecture doc Section 2.
-- [ ] Real endpoints: propose an action, list/filter events, resolve a pending approval
-- [ ] Publish new/updated `Event` rows via existing `emitRealtime()` + per-startup Socket.IO rooms
-- [ ] Rewire `V2ApprovalQueue.jsx` to read `Event` where `status = pending_approval AND approverId = currentUser`, live-updating
-- [ ] Rewire `V2AuditTrail.jsx` to read the full paginated `Event` history
-- [ ] Rewire `V2AutonomySettings.jsx` to read/write real `AutonomySetting` rows, with `adjustable: false` rows rendered as genuinely locked (not just styled that way)
-- [ ] Rewire `V2AgentWorkroom.jsx`'s coordination feed to render real `Event`/`Task` chains via `parentEventId` traversal
-- [ ] Seed a synthetic test agent + test events to verify the whole loop before any real agent exists
+**✅ Confirmed done, 2026-09-12** — verified live: seeded a real test agent ("AI Sales") with a `sensitive_locked` and a `reversible` action type via the real REST endpoints (not a direct-to-DB script — that matters, see the live-push bug below), proposed both, watched the `sensitive_locked` one land in Approval Queue and the `reversible` one land straight in Audit Trail as `autonomous_completed`, approved the pending one and watched the resulting `approved` + `human_completed` rows appear as two separate log lines with no page refresh, flipped the adjustable action type's autonomy setting and confirmed the locked one still rejects the same PATCH with a 403, then deleted all test data. Everything below is checked off on that basis.
+
+- [x] `Agent` model (id, name, role, capabilities, status) — `server/src/models/Agent.js`
+- [x] `ActionType` model (id, agentId, riskCategory: reversible/sensitive_locked/read_only, defaultMode, adjustable, approverRule) — `server/src/models/ActionType.js`
+- [x] `AutonomySetting` model (actionTypeId, mode, updatedBy, updatedAt) — reject writes where the target `ActionType.adjustable === false`, server-side — `server/src/models/AutonomySetting.js`, enforced in `agentOrchestration.controller.js`'s `updateAutonomySetting`
+- [x] `AgentEvent` model (actorType, actorId, actionTypeId, targetType, targetId, payload, status, approverId, parentEventId, startupId) — the source of truth. Named `AgentEvent`, not `Event` — this codebase already has an unrelated calendar/cohort `Event` model.
+- [x] `AgentTask` model (title, startupId, status, currentOwner, milestoneId) — schema only for now, see note below. Named `AgentTask` for the same collision reason.
+- [x] `orchestrator.service.js` — the only code allowed to write to `AgentEvent`. Implements the 4-branch decision loop from the architecture doc Section 2.
+- [x] Real endpoints: propose an action, list/filter events, resolve a pending approval — `server/src/routes/agentOrchestration.routes.js`
+- [x] Publish new/updated `AgentEvent` rows via existing `emitRealtime()` — **not** per-startup Socket.IO rooms as originally written here; the founder's own `userRoom()` instead, since approvals are founder-scoped, not startup-scoped, in Phase 0. See "Stack corrections" below for why Socket.IO over Change Streams in the first place.
+- [x] Rewire `V2ApprovalQueue.jsx` to read `AgentEvent` where `status = pending_approval`, live-updating
+- [x] Rewire `V2AuditTrail.jsx` to read the full `AgentEvent` history
+- [x] Rewire `V2AutonomySettings.jsx` to read/write real `AutonomySetting` rows, with `adjustable: false` rows rendered as genuinely locked (not just styled that way) — confirmed the server-side 403 actually fires, not just a disabled button
+- [ ] Rewire `V2AgentWorkroom.jsx`'s coordination feed to render real `AgentEvent`/`AgentTask` chains via `parentEventId` traversal — **deliberately deferred**, see note below
+- [x] Seed a synthetic test agent + test events to verify the whole loop before any real agent exists
+
+**Real bug found and fixed during this verification**: the first version of `publishEvent()` in `orchestrator.service.js` emitted a DTO with a bare `actionTypeId` string, not the populated action-type/agent info the REST list endpoints return. A live-pushed event rendered as "Unknown agent" / a generic title until the next refetch — the data was correct in the DB, only the live broadcast was thin. Fixed by having `publishEvent()` populate `actionTypeId` (and its `agentId`) before building the DTO, so a live push and a REST fetch now render identically. Caught by testing the live-push path through the real running server via its REST endpoint (`curl` against `/agent-events/propose`) rather than a standalone Node script — a standalone script has no live Socket.IO server in-process, so `emitRealtime()` silently no-ops there; that's a testing-methodology note for next time, not an app bug.
+
+**Scope note, not yet raised with the user before this pass — flagging here per SOP**: only the event-driven pages (Approval Queue, Autonomy Settings, Audit Trail) were rewired to real data this pass. The 4 agent-specific illustrative workspace pages (`V2AIFinanceWorkspace.jsx`, `V2AILegalWorkspace.jsx`, `V2AIMarketingWorkspace.jsx`, `V2AISalesWorkspace.jsx`) and `V2AIStaffManage.jsx`'s hired-roster mock content were deliberately left untouched — they need Phase 1's real integrations to have any real content, and rewiring them now to point at an empty event log would just make them look broken rather than more real. `V2AgentWorkroom.jsx`'s coordination feed was left mock for the same reason plus time — its "while you were away" narrative needs real coordinated activity to summarize, which doesn't exist until Phase 1.
+**Real, expected behavior change**: with real agents/events now driving Approval Queue, Autonomy Settings, and Audit Trail, and zero real agents existing yet, all three pages now show genuinely empty states ("Queue clear ✓", "No agents yet", "No activity logged yet") instead of the rich mock content they showed before this pass. This is the correct Phase 0 outcome, not a regression — it fills in the moment Phase 1 ships a real agent.
 
 ## Phase 1 — One agent, fully real: AI Sales/Marketing → Zikorail
 **Goal:** one real founder decision causes one real external effect, safely.

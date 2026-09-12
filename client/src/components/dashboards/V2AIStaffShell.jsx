@@ -113,11 +113,11 @@ export default function V2AIStaffShell({ user, onPageChange, ...rest }) {
   const renderSubPage = () => {
     switch (subPage) {
       case "approval-queue":
-        return <V2ApprovalQueue onBack={handleBack} onNavigate={handleNavigate} />;
+        return <V2ApprovalQueue user={user} onBack={handleBack} onNavigate={handleNavigate} />;
       case "autonomy-settings":
-        return <V2AutonomySettings onBack={handleBack} onNavigate={handleNavigate} />;
+        return <V2AutonomySettings user={user} onBack={handleBack} onNavigate={handleNavigate} />;
       case "audit-trail":
-        return <V2AuditTrail onBack={handleBack} onNavigate={handleNavigate} />;
+        return <V2AuditTrail user={user} onBack={handleBack} onNavigate={handleNavigate} />;
       case "agent-marketing":
         return <V2AIMarketingWorkspace onBack={handleBack} onNavigate={handleNavigate} />;
       case "agent-sales":

@@ -1,46 +1,74 @@
 /**
  * V2AuditTrail — searchable, filterable log of every agent + human action
+ *
+ * Real data as of docs/ai-agent-roadmap.md Phase 0: reads every AgentEvent
+ * (any status, not just pending) via agentOrchestrationApi, live-updated over
+ * Socket.IO. No real agents exist yet in this environment, so an empty log
+ * here is the correct, honest Phase 0 state — it fills in the moment a real
+ * agent starts acting.
  */
 
-import React, { useState, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { cn } from "../ui/utils";
 import { Search } from "lucide-react";
+import { useOfficeStore } from "../../state/useOfficeStore";
+import { getAgentEvents } from "../../utils/api/agentOrchestrationApi";
+import { subscribeToAgentEvents } from "../../utils/socketIoRealtime";
+import { paletteForAgent, initialsForAgent, formatEventTime } from "../../utils/agentDisplay";
 
-/* ── Log data ─────────────────────────────────────────────────────────────── */
-const LOG_ENTRIES = [
-  { id: "l1",  time: "9:10am", range: ["today","week"], actor: "lgl",      actorType: "agent",  av: { initials: "LGL", bg: "#FCEBEB", color: "#791F1F" }, name: "AI Legal",           desc: "Drafted NDA for backend candidate, escalated to founder",                           status: "awaiting-you",      statusLabel: "Awaiting you",      statusBg: "#FCEBEB", statusColor: "#791F1F",  link: "AI Legal" },
-  { id: "l2",  time: "9:02am", range: ["today","week"], actor: "fin",      actorType: "agent",  av: { initials: "FIN", bg: "#FAEEDA", color: "#633806" }, name: "AI Finance",         desc: "Drafted invoice INV-1042 for Reddington Clinic, ₦180,000 — escalated to founder",  status: "awaiting-you",      statusLabel: "Awaiting you",      statusBg: "#FCEBEB", statusColor: "#791F1F",  link: "Approval Queue" },
-  { id: "l3",  time: "8:32am", range: ["today","week"], actor: "dev",      actorType: "agent",  av: { initials: "DEV", bg: "#f3f4f6", color: "#6b7280" }, name: "AI Developer",       desc: "Flagged PR #15 as billing-related, held from merging without approval",             status: "awaiting-you",      statusLabel: "Awaiting you",      statusBg: "#FCEBEB", statusColor: "#791F1F",  link: "Approval Queue" },
-  { id: "l4",  time: "8:15am", range: ["today","week"], actor: "pm",       actorType: "agent",  av: { initials: "PM",  bg: "#EEEDFE", color: "#534AB7" }, name: "AI Product Manager", desc: "Rebuilt Week 5 priority stack, queued for founder review",                          status: "awaiting-you",      statusLabel: "Awaiting you",      statusBg: "#FCEBEB", statusColor: "#791F1F",  link: "Approval Queue" },
-  { id: "l5",  time: "8:10am", range: ["today","week"], actor: "ga",       actorType: "agent",  av: { initials: "GA",  bg: "#E6F1FB", color: "#0C447C" }, name: "AI Growth Analyst",  desc: "Flagged 8/8 interview validation rate as unusually strong, passed to AI PM",       status: "autonomous",        statusLabel: "Autonomous",        statusBg: "#f3f4f6", statusColor: "#6b7280",  link: "Workroom" },
-  { id: "l6",  time: "7:58am", range: ["today","week"], actor: "mk",       actorType: "agent",  av: { initials: "MK",  bg: "#EAF3DE", color: "#27500A" }, name: "AI Marketing",       desc: "Routed Week 5 nurture email to Chidinma for brand-voice review",                   status: "awaiting-team",     statusLabel: "Awaiting Chidinma", statusBg: "#FCF7EC", statusColor: "#633806",  link: "Approval Queue" },
-  { id: "l7",  time: "7:52am", range: ["today","week"], actor: "sa",       actorType: "agent",  av: { initials: "SA",  bg: "#E6F1FB", color: "#0C447C" }, name: "AI Sales",           desc: "Personalised and queued 10 clinic outreach messages, escalated send decision",     status: "awaiting-you",      statusLabel: "Awaiting you",      statusBg: "#FCEBEB", statusColor: "#791F1F",  link: "Approval Queue" },
-  { id: "l8",  time: "7:40am", range: ["today","week"], actor: "mk",       actorType: "agent",  av: { initials: "MK",  bg: "#EAF3DE", color: "#27500A" }, name: "AI Marketing",       desc: "Drafted 10 clinic outreach messages using Vezeeta Blueprint script",               status: "autonomous",        statusLabel: "Autonomous",        statusBg: "#f3f4f6", statusColor: "#6b7280",  link: "Workroom" },
-  { id: "l9",  time: "7:03am", range: ["today","week"], actor: "james",    actorType: "human",  av: { initials: "JS",  bg: "#E6F1FB", color: "#0C447C" }, name: "James S.",           desc: "Published landing page to production, marked Milestone M1 complete",               status: "human",             statusLabel: "Human action",      statusBg: "#EAF3DE", statusColor: "#27500A",  link: "Workroom" },
-  { id: "l10", time: "6:22am", range: ["today","week"], actor: "dev",      actorType: "agent",  av: { initials: "DEV", bg: "#f3f4f6", color: "#6b7280" }, name: "AI Developer",       desc: "Merged PR #14 and deployed to staging, handed off to James for publish",           status: "autonomous",        statusLabel: "Autonomous",        statusBg: "#f3f4f6", statusColor: "#6b7280",  link: "Workroom" },
-  { id: "l11", time: "6:14am", range: ["today","week"], actor: "dev",      actorType: "agent",  av: { initials: "DS",  bg: "#FAEEDA", color: "#633806" }, name: "AI Designer",        desc: "Approved hero-final-v3.png + 2 more, handed PR #14 back to AI Developer",         status: "autonomous",        statusLabel: "Autonomous",        statusBg: "#f3f4f6", statusColor: "#6b7280",  link: "Workroom" },
-  { id: "l12", time: "6:02am", range: ["today","week"], actor: "dev",      actorType: "agent",  av: { initials: "DEV", bg: "#f3f4f6", color: "#6b7280" }, name: "AI Developer",       desc: "Opened PR #14 (landing page hero) and tagged AI Designer for asset review",       status: "autonomous",        statusLabel: "Autonomous",        statusBg: "#f3f4f6", statusColor: "#6b7280",  link: "Workroom" },
-  { id: "l13", time: "Yesterday", range: ["week"],      actor: "mk",       actorType: "agent",  av: { initials: "MK",  bg: "#EAF3DE", color: "#27500A" }, name: "AI Marketing",       desc: "Declined to boost social spend — ₦40,000 budget increase request rejected by founder", status: "declined",       statusLabel: "Declined",          statusBg: "#FCEBEB", statusColor: "#791F1F",  link: "Workroom" },
-  { id: "l14", time: "Yesterday", range: ["week"],      actor: "ga",       actorType: "agent",  av: { initials: "GA",  bg: "#E6F1FB", color: "#0C447C" }, name: "AI Growth Analyst",  desc: "Interview validation rate: 100% on 8 interviews — above average, recommend more",  status: "autonomous",        statusLabel: "Autonomous",        statusBg: "#f3f4f6", statusColor: "#6b7280",  link: "Workroom" },
-  { id: "l15", time: "3 days ago", range: [],           actor: "pm",       actorType: "agent",  av: { initials: "PM",  bg: "#EEEDFE", color: "#534AB7" }, name: "AI Product Manager", desc: "Pushed Week 4 sprint plan to Execution Engine after founder approval",             status: "approved",          statusLabel: "Approved",          statusBg: "#EAF3DE", statusColor: "#27500A",  link: "Workroom" },
-  { id: "l16", time: "3 days ago", range: [],           actor: "founder",  actorType: "human",  av: { initials: "AO",  bg: "#E6F1FB", color: "#0C447C" }, name: "You (Adaeze)",       desc: "Approved Week 4 sprint plan and pushed it to execution",                           status: "human",             statusLabel: "Human action",      statusBg: "#EAF3DE", statusColor: "#27500A",  link: "Workroom" },
+const STATUS_META = {
+  pending_approval: { label: "Awaiting you", bg: "#FCEBEB", color: "#791F1F", filterKey: "awaiting" },
+  autonomous_completed: { label: "Autonomous", bg: "#f3f4f6", color: "#6b7280", filterKey: "auto" },
+  approved: { label: "Approved", bg: "#EAF3DE", color: "#27500A", filterKey: "approved" },
+  declined: { label: "Declined", bg: "#FCEBEB", color: "#791F1F", filterKey: "declined" },
+  human_completed: { label: "Completed", bg: "#EAF3DE", color: "#27500A", filterKey: "human" },
+};
+
+const STATUS_FILTERS = [
+  ["all", "All"],
+  ["awaiting", "Awaiting"],
+  ["auto", "Autonomous"],
+  ["approved", "Approved"],
+  ["declined", "Declined"],
+  ["human", "Completed"],
 ];
 
-const ACTOR_OPTIONS = [
-  { id: "all",      label: "All actors" },
-  { id: "pm",       label: "🤖 AI Product Manager" },
-  { id: "mk",       label: "🤖 AI Marketing" },
-  { id: "sa",       label: "🤖 AI Sales" },
-  { id: "dev",      label: "🤖 AI Developer" },
-  { id: "ga",       label: "🤖 AI Growth Analyst" },
-  { id: "fin",      label: "🤖 AI Finance" },
-  { id: "lgl",      label: "🤖 AI Legal" },
-  { id: "james",    label: "👤 James S." },
-  { id: "chidinma", label: "👤 Chidinma A." },
-  { id: "founder",  label: "👤 You (Adaeze)" },
-];
+function toLogEntry(event, currentUserId) {
+  const actionType = event.actionTypeId || {};
+  const agent = actionType.agentId || {};
+  const isAgent = event.actorType === "agent";
+  const isYou = String(event.actorId) === String(currentUserId);
+  const agentName = agent.name || "Unknown agent";
+  const name = isAgent ? agentName : isYou ? "You" : "A teammate";
+  const actorKey = isAgent ? `agent:${agent.id || agentName}` : `human:${event.actorId || "unknown"}`;
+  const palette = paletteForAgent(isAgent ? (agent.id || agentName) : actorKey);
+  const meta = STATUS_META[event.status] || { label: event.status, bg: "#f3f4f6", color: "#6b7280", filterKey: "other" };
+  const createdAt = new Date(event.createdAt);
+  const now = new Date();
 
-/* ── Helpers ─────────────────────────────────────────────────────────────── */
+  return {
+    id: event.id,
+    createdAt: event.createdAt,
+    time: formatEventTime(event.createdAt),
+    isToday: createdAt.toDateString() === now.toDateString(),
+    isThisWeek: now - createdAt < 7 * 24 * 60 * 60 * 1000,
+    actorKey,
+    actorType: event.actorType,
+    av: { initials: isAgent ? initialsForAgent(agentName) : "👤", bg: palette.bg, color: palette.color },
+    name,
+    desc: actionType.label
+      ? `${actionType.label}${event.targetType ? ` · ${event.targetType}${event.targetId ? ` (${event.targetId})` : ""}` : ""}`
+      : (event.targetType || "Agent action"),
+    status: event.status,
+    statusLabel: meta.label,
+    statusBg: meta.bg,
+    statusColor: meta.color,
+    filterKey: meta.filterKey,
+    showLink: event.status === "pending_approval",
+  };
+}
+
+/* ── Toast ─────────────────────────────────────────────────────────────────── */
 function Toast({ msg }) {
   if (!msg) return null;
   return (
@@ -51,36 +79,96 @@ function Toast({ msg }) {
 }
 
 /* ── Main ────────────────────────────────────────────────────────────────── */
-export default function V2AuditTrail({ onBack }) {
-  const [range, setRange]   = useState("all");
-  const [actor, setActor]   = useState("all");
+export default function V2AuditTrail({ user, onBack, onNavigate }) {
+  const founderId = useOfficeStore((s) => s.founderId);
+  const loadWorkspace = useOfficeStore((s) => s.loadWorkspace);
+  const resolvedFounderId = founderId || String(user?._id ?? user?.id ?? "");
+  const currentUserId = String(user?._id ?? user?.id ?? resolvedFounderId ?? "");
+
+  const [events, setEvents] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [range, setRange] = useState("all");
+  const [actor, setActor] = useState("all");
   const [status, setStatus] = useState("all");
   const [search, setSearch] = useState("");
   const [actorOpen, setActorOpen] = useState(false);
-  const [toast, setToast]   = useState("");
+  const [toast, setToast] = useState("");
 
   const showToast = (msg) => { setToast(msg); setTimeout(() => setToast(""), 2400); };
 
+  useEffect(() => { if (user) loadWorkspace(user); }, [user, loadWorkspace]);
+
+  const upsertEvent = useCallback((incoming) => {
+    if (!incoming?.id) return;
+    setEvents((prev) => {
+      const idx = prev.findIndex((e) => e.id === incoming.id);
+      const next = idx === -1 ? [incoming, ...prev] : prev.map((e) => (e.id === incoming.id ? { ...e, ...incoming } : e));
+      return next.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+    });
+  }, []);
+
+  useEffect(() => {
+    if (!resolvedFounderId) return;
+    let cancelled = false;
+    setLoading(true);
+    getAgentEvents(resolvedFounderId)
+      .then((rows) => { if (!cancelled) { setEvents(rows || []); setError(""); } })
+      .catch((err) => { if (!cancelled) setError(err?.message || "Could not load the audit trail."); })
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
+  }, [resolvedFounderId]);
+
+  useEffect(() => {
+    if (!resolvedFounderId) return undefined;
+    return subscribeToAgentEvents(resolvedFounderId, upsertEvent);
+  }, [resolvedFounderId, upsertEvent]);
+
+  const entries = useMemo(() => events.map((e) => toLogEntry(e, currentUserId)), [events, currentUserId]);
+
+  const actorOptions = useMemo(() => {
+    const map = new Map();
+    entries.forEach((e) => {
+      if (!map.has(e.actorKey)) map.set(e.actorKey, { id: e.actorKey, label: `${e.actorType === "agent" ? "🤖" : "👤"} ${e.name}` });
+    });
+    return [{ id: "all", label: "All actors" }, ...Array.from(map.values())];
+  }, [entries]);
+
   const filtered = useMemo(() => {
-    let list = LOG_ENTRIES;
-    if (range === "today")  list = list.filter((e) => e.range.includes("today"));
-    if (range === "week")   list = list.filter((e) => e.range.includes("week"));
-    if (actor !== "all")    list = list.filter((e) => e.actor === actor);
-    if (status === "auto")     list = list.filter((e) => e.status === "autonomous");
-    if (status === "approved") list = list.filter((e) => e.status === "approved");
-    if (status === "declined") list = list.filter((e) => e.status === "declined");
-    if (status === "human")    list = list.filter((e) => e.status === "human");
+    let list = entries;
+    if (range === "today") list = list.filter((e) => e.isToday);
+    if (range === "week") list = list.filter((e) => e.isThisWeek);
+    if (actor !== "all") list = list.filter((e) => e.actorKey === actor);
+    if (status !== "all") list = list.filter((e) => e.filterKey === status);
     if (search) {
       const q = search.toLowerCase();
       list = list.filter((e) => (e.name + " " + e.desc).toLowerCase().includes(q));
     }
     return list;
-  }, [range, actor, status, search]);
+  }, [entries, range, actor, status, search]);
 
-  const todayEntries    = filtered.filter((e) => e.range.includes("today"));
-  const prevEntries     = filtered.filter((e) => !e.range.includes("today"));
+  const todayEntries = filtered.filter((e) => e.isToday);
+  const prevEntries = filtered.filter((e) => !e.isToday);
+  const actorLabel = actorOptions.find((o) => o.id === actor)?.label ?? "All";
 
-  const actorLabel = ACTOR_OPTIONS.find((o) => o.id === actor)?.label ?? "All";
+  const weekEntries = useMemo(() => entries.filter((e) => e.isThisWeek), [entries]);
+  const weekStats = useMemo(() => ({
+    total: weekEntries.length,
+    autonomous: weekEntries.filter((e) => e.filterKey === "auto").length,
+    escalated: weekEntries.filter((e) => ["awaiting", "approved", "declined"].includes(e.filterKey)).length,
+    routedToTeammates: weekEntries.filter((e) => e.actorType === "human" && e.name === "A teammate").length,
+    declined: weekEntries.filter((e) => e.filterKey === "declined").length,
+  }), [weekEntries]);
+
+  const agentBreakdown = useMemo(() => {
+    const byAgent = new Map();
+    weekEntries.filter((e) => e.actorType === "agent").forEach((e) => {
+      const entry = byAgent.get(e.name) || { ...e.av, name: e.name, count: 0 };
+      entry.count += 1;
+      byAgent.set(e.name, entry);
+    });
+    return Array.from(byAgent.values()).sort((a, b) => b.count - a.count).slice(0, 5);
+  }, [weekEntries]);
 
   return (
     <div className="flex min-h-0 flex-1 overflow-hidden bg-v2-page">
@@ -105,13 +193,17 @@ export default function V2AuditTrail({ onBack }) {
             <button type="button" onClick={onBack} className="flex items-center gap-1.5 rounded-full border border-v2-border bg-white px-3 py-1.5 font-body text-[12px] font-medium text-v2-heading hover:bg-gray-50 transition-colors">
               Agent Workroom
             </button>
-            <button type="button" onClick={() => showToast("Exporting CSV…")} className="flex items-center gap-1.5 rounded-full bg-v2-purple px-3 py-1.5 font-body text-[12px] font-medium text-white hover:opacity-90 transition-opacity">
+            <button type="button" onClick={() => showToast("CSV export isn't wired up yet — it's next on the list once there's real volume to export.")} className="flex items-center gap-1.5 rounded-full bg-v2-purple px-3 py-1.5 font-body text-[12px] font-medium text-white hover:opacity-90 transition-opacity">
               Export CSV →
             </button>
           </div>
         </div>
 
         <div className="space-y-3 p-5">
+
+          {error && (
+            <div className="rounded-2xl border border-[#791F1F]/20 bg-[#FCEBEB] p-3 font-body text-[11px] text-[#791F1F]">{error}</div>
+          )}
 
           {/* Filter bar */}
           <div className="flex flex-wrap items-center justify-between gap-3">
@@ -140,7 +232,7 @@ export default function V2AuditTrail({ onBack }) {
                 </button>
                 {actorOpen && (
                   <div className="absolute left-0 top-9 z-20 max-h-64 w-52 overflow-y-auto rounded-xl border border-v2-border bg-white py-1.5 shadow-lg">
-                    {ACTOR_OPTIONS.map((opt) => (
+                    {actorOptions.map((opt) => (
                       <button key={opt.id} type="button"
                         onClick={() => { setActor(opt.id); setActorOpen(false); }}
                         className={cn("flex w-full items-center gap-2 px-3 py-1.5 font-body text-[11px] text-left hover:bg-gray-50 transition-colors",
@@ -154,7 +246,7 @@ export default function V2AuditTrail({ onBack }) {
 
               {/* Status filters */}
               <div className="flex gap-1.5">
-                {[["all","All"],["auto","Autonomous"],["approved","Approved"],["declined","Declined"],["human","Human action"]].map(([id, label]) => (
+                {STATUS_FILTERS.map(([id, label]) => (
                   <button key={id} type="button" onClick={() => setStatus(id)}
                     className={cn("rounded-full border px-3 py-1.5 font-body text-[11px] font-medium transition-colors",
                       status === id ? "border-gray-900 bg-gray-900 text-white" : "border-v2-border bg-white text-v2-muted hover:text-v2-heading"
@@ -175,23 +267,27 @@ export default function V2AuditTrail({ onBack }) {
             </div>
           </div>
 
+          {loading && (
+            <div className="rounded-2xl border border-v2-border bg-white p-12 text-center font-body text-[12px] text-v2-muted">Loading audit trail…</div>
+          )}
+
           {/* Today */}
-          {todayEntries.length > 0 && (
+          {!loading && todayEntries.length > 0 && (
             <>
               <div className="flex items-center gap-3">
-                <span className="shrink-0 font-body text-[10px] font-semibold uppercase tracking-wider text-v2-muted">Today · Week 5</span>
+                <span className="shrink-0 font-body text-[10px] font-semibold uppercase tracking-wider text-v2-muted">Today</span>
                 <div className="h-px flex-1 bg-v2-border" />
               </div>
               <div className="overflow-hidden rounded-2xl border border-v2-border bg-white">
                 {todayEntries.map((entry, i) => (
-                  <LogRow key={entry.id} entry={entry} last={i === todayEntries.length - 1} />
+                  <LogRow key={entry.id} entry={entry} last={i === todayEntries.length - 1} onNavigate={onNavigate} />
                 ))}
               </div>
             </>
           )}
 
           {/* Earlier */}
-          {prevEntries.length > 0 && (
+          {!loading && prevEntries.length > 0 && (
             <>
               <div className="flex items-center gap-3">
                 <span className="shrink-0 font-body text-[10px] font-semibold uppercase tracking-wider text-v2-muted">Earlier</span>
@@ -199,16 +295,22 @@ export default function V2AuditTrail({ onBack }) {
               </div>
               <div className="overflow-hidden rounded-2xl border border-v2-border bg-white">
                 {prevEntries.map((entry, i) => (
-                  <LogRow key={entry.id} entry={entry} last={i === prevEntries.length - 1} />
+                  <LogRow key={entry.id} entry={entry} last={i === prevEntries.length - 1} onNavigate={onNavigate} />
                 ))}
               </div>
             </>
           )}
 
-          {filtered.length === 0 && (
+          {!loading && filtered.length === 0 && (
             <div className="rounded-2xl border border-v2-border bg-white p-12 text-center">
-              <div className="font-heading text-[14px] font-medium text-v2-heading">No entries match your filters</div>
-              <div className="mt-1 font-body text-[12px] text-v2-muted">Try changing the date range or removing filters.</div>
+              <div className="font-heading text-[14px] font-medium text-v2-heading">
+                {entries.length === 0 ? "No activity logged yet" : "No entries match your filters"}
+              </div>
+              <div className="mt-1 font-body text-[12px] text-v2-muted">
+                {entries.length === 0
+                  ? "Every agent and human action will show up here — real agents haven't started acting yet."
+                  : "Try changing the date range or removing filters."}
+              </div>
             </div>
           )}
         </div>
@@ -221,11 +323,11 @@ export default function V2AuditTrail({ onBack }) {
         <div className="rounded-2xl bg-v2-page p-3">
           <div className="mb-2 font-heading text-[11px] font-semibold text-v2-heading">This week</div>
           {[
-            { k: "Total actions",      v: "18 entries" },
-            { k: "Autonomous",         v: "10 actions" },
-            { k: "Escalated to you",   v: "5 decisions" },
-            { k: "Routed to teammates",v: "2 items" },
-            { k: "Declined",           v: "1 item" },
+            { k: "Total actions",       v: `${weekStats.total} entries` },
+            { k: "Autonomous",          v: `${weekStats.autonomous} actions` },
+            { k: "Escalated to you",    v: `${weekStats.escalated} decisions` },
+            { k: "Routed to teammates", v: `${weekStats.routedToTeammates} items` },
+            { k: "Declined",            v: `${weekStats.declined} items` },
           ].map((r) => (
             <div key={r.k} className="flex items-center justify-between border-b border-gray-100 py-1 last:border-b-0">
               <span className="font-body text-[10px] text-v2-muted">{r.k}</span>
@@ -237,14 +339,11 @@ export default function V2AuditTrail({ onBack }) {
         {/* By agent */}
         <div className="rounded-2xl bg-v2-page p-3">
           <div className="mb-2 font-heading text-[11px] font-semibold text-v2-heading">Actions by agent</div>
-          {[
-            { initials: "MK",  bg: "#EAF3DE", color: "#27500A", name: "AI Marketing",        count: 4 },
-            { initials: "DEV", bg: "#f3f4f6", color: "#6b7280", name: "AI Developer",        count: 3 },
-            { initials: "PM",  bg: "#EEEDFE", color: "#534AB7", name: "AI Product Manager",  count: 3 },
-            { initials: "GA",  bg: "#E6F1FB", color: "#0C447C", name: "AI Growth Analyst",   count: 3 },
-            { initials: "SA",  bg: "#E6F1FB", color: "#0C447C", name: "AI Sales",            count: 2 },
-          ].map((a) => (
-            <div key={a.initials} className="flex items-center gap-2 border-b border-gray-100 py-1.5 last:border-b-0">
+          {agentBreakdown.length === 0 && (
+            <div className="py-1.5 font-body text-[10px] text-v2-muted">No agent activity this week.</div>
+          )}
+          {agentBreakdown.map((a) => (
+            <div key={a.name} className="flex items-center gap-2 border-b border-gray-100 py-1.5 last:border-b-0">
               <div className="flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-[7px] font-body text-[8px] font-semibold" style={{ background: a.bg, color: a.color }}>{a.initials}</div>
               <span className="flex-1 font-body text-[10px] text-gray-600">{a.name}</span>
               <span className="font-body text-[10px] font-medium text-v2-heading">{a.count}</span>
@@ -256,7 +355,7 @@ export default function V2AuditTrail({ onBack }) {
         <div className="rounded-2xl bg-v2-page p-3">
           <div className="mb-1.5 font-heading text-[11px] font-semibold text-v2-heading">Why this log matters</div>
           <p className="font-body text-[10px] leading-relaxed text-v2-muted">
-            Every entry captures the agent or human who acted, the data they used, and what they decided. Nothing runs silently — you have a complete record you can search, filter, and export.
+            Every entry captures the agent or human who acted, the data they used, and what they decided. Nothing runs silently — you have a complete record you can search, filter, and (soon) export.
           </p>
         </div>
       </div>
@@ -267,9 +366,9 @@ export default function V2AuditTrail({ onBack }) {
 }
 
 /* ── Log row sub-component ─────────────────────────────────────────────────── */
-function LogRow({ entry, last }) {
+function LogRow({ entry, last, onNavigate }) {
   return (
-    <div className={cn("flex cursor-pointer items-center gap-3 px-4 py-3 hover:bg-gray-50 transition-colors", !last && "border-b border-gray-100")}>
+    <div className={cn("flex items-center gap-3 px-4 py-3 transition-colors", !last && "border-b border-gray-100", entry.showLink && "hover:bg-gray-50")}>
       <span className="w-[52px] shrink-0 font-body text-[10px] text-v2-muted">{entry.time}</span>
       <div className="relative shrink-0">
         <div className="flex h-7 w-7 items-center justify-center rounded-[8px] font-body text-[9px] font-semibold" style={{ background: entry.av.bg, color: entry.av.color }}>{entry.av.initials}</div>
@@ -282,7 +381,11 @@ function LogRow({ entry, last }) {
         <div className="font-body text-[11px] text-v2-muted">{entry.desc}</div>
       </div>
       <span className="shrink-0 rounded-lg px-2 py-0.5 font-body text-[9px] font-medium whitespace-nowrap" style={{ background: entry.statusBg, color: entry.statusColor }}>{entry.statusLabel}</span>
-      <span className="shrink-0 font-body text-[10px] text-v2-blue hover:underline">{entry.link} →</span>
+      {entry.showLink && (
+        <button type="button" onClick={() => onNavigate?.("approval-queue")} className="shrink-0 font-body text-[10px] text-v2-blue hover:underline">
+          Approval Queue →
+        </button>
+      )}
     </div>
   );
 }
