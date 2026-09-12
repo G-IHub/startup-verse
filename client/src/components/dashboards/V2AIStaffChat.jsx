@@ -330,10 +330,6 @@ export default function V2AIStaffChat({ onBack, onNavigate }) {
                 <span className="text-gray-300">·</span>
               </>
             )}
-            <span className="font-body text-[12px] text-v2-muted">AI Staff</span>
-            <span className="text-gray-300">›</span>
-            <span className="font-body text-[13px] font-medium text-v2-heading">{activeStaffObj?.label}</span>
-            <span className="text-gray-300">·</span>
             <span className="inline-flex items-center gap-1.5 rounded-full bg-[#EEEDFE] px-2.5 py-1 font-body text-[11px] font-medium text-[#3C3489]">
               <span className="h-[5px] w-[5px] rounded-full bg-[#534AB7]" />Chat session · Week 5
             </span>
