@@ -42,9 +42,18 @@ import * as founderApi from "../../utils/api/founderApi";
 import * as inboxApi from "../../utils/api/inboxApi";
 import * as payrollApi from "../../utils/api/payrollApi";
 
-import { Search, X, UserPlus, Wallet, ClipboardCheck } from "lucide-react";
+import { Search, X, UserPlus, Wallet, ClipboardCheck, ArrowLeft, Plus, Trash2 } from "lucide-react";
 
 const MONTH_NAMES = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+
+const DEFAULT_ONBOARDING_TASKS = [
+  "Sign employment agreement",
+  "Complete identity verification",
+  "Set up your StartupVerse team member account",
+  "Attend onboarding call with founder",
+  "Review startup roadmap and quarterly goals",
+  "Set your first week's targets",
+];
 
 function rateColor(rate) {
   if (rate >= 0.9) return "text-v2-green";
@@ -66,6 +75,36 @@ function timeAgo(dateStr) {
   if (days <= 0) return "Posted today";
   if (days === 1) return "Posted yesterday";
   return `Posted ${days} days ago`;
+}
+
+function computeVestingInfo(equity, joinDateStr) {
+  if (!equity || !equity.totalEquity) return null;
+  const vestingPeriod = Number(equity.vestingPeriod) || 0;
+  const cliffMonths = equity.cliffEnabled ? Number(equity.cliffPeriod) || 0 : 0;
+  const joinDate = joinDateStr ? new Date(joinDateStr) : null;
+  const now = new Date();
+  const monthsElapsed = joinDate
+    ? Math.max(0, (now.getFullYear() - joinDate.getFullYear()) * 12 + (now.getMonth() - joinDate.getMonth()))
+    : 0;
+  const pastCliff = monthsElapsed >= cliffMonths;
+  const vestedPct = !pastCliff || vestingPeriod <= 0
+    ? 0
+    : Math.min(100, Math.round((monthsElapsed / vestingPeriod) * 100));
+  const milestones = [0.25, 0.5, 0.75, 1].map((frac) => {
+    const atMonth = Math.round(vestingPeriod * frac);
+    return { atMonth, pct: Math.round(frac * 100), reached: pastCliff && monthsElapsed >= atMonth };
+  });
+  return { vestedPct, monthsElapsed, cliffMonths, pastCliff, milestones, vestingPeriod };
+}
+
+function memberPerformanceThreshold(member) {
+  const c = member.compensation;
+  if (!c) return null;
+  const configs = [c.fixed, c.equity, c.hourly];
+  for (const cfg of configs) {
+    if (cfg?.performanceGated && cfg.threshold != null) return Number(cfg.threshold);
+  }
+  return null;
 }
 
 function compensationSummary(comp) {
@@ -109,19 +148,44 @@ function StatsRow({ totalMembers, avgCompletion, monthlyPayroll, openRoles, onPa
 // ─────────────────────────────────────────────────────────────────────────
 
 function RosterTable({ members, performanceByMember, checklistByMember, onOpenMember }) {
+  const [sortKey, setSortKey] = useState(null);
+  const [sortDir, setSortDir] = useState("asc");
+
+  const sortedMembers = useMemo(() => {
+    if (!sortKey) return members;
+    const withRate = members.map((m) => ({
+      m,
+      rate: performanceByMember[String(m._id ?? m.id)]?.completionRate ?? -1,
+    }));
+    withRate.sort((a, b) => {
+      const cmp = sortKey === "name" ? a.m.name.localeCompare(b.m.name) : a.rate - b.rate;
+      return sortDir === "asc" ? cmp : -cmp;
+    });
+    return withRate.map((r) => r.m);
+  }, [members, performanceByMember, sortKey, sortDir]);
+
+  const toggleSort = (key) => {
+    if (sortKey === key) setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    else { setSortKey(key); setSortDir("asc"); }
+  };
+
   if (members.length === 0) {
     return <p className="py-10 text-center font-body text-[13px] text-v2-muted">No team members match this filter.</p>;
   }
   return (
     <V2Card className="overflow-hidden p-0">
       <div className="grid grid-cols-[2fr_1fr_1fr_1fr_0.8fr] gap-2 border-b border-v2-border bg-v2-page px-4 py-2 font-body text-[10px] font-medium uppercase tracking-wide text-v2-subtle">
-        <span>Member</span>
-        <span>Completion rate</span>
+        <button type="button" onClick={() => toggleSort("name")} className="text-left hover:text-v2-muted">
+          Member {sortKey === "name" ? (sortDir === "asc" ? "↑" : "↓") : "↕"}
+        </button>
+        <button type="button" onClick={() => toggleSort("completion")} className="text-left hover:text-v2-muted">
+          Completion rate {sortKey === "completion" ? (sortDir === "asc" ? "↑" : "↓") : "↕"}
+        </button>
         <span>Compensation</span>
         <span>Onboarding</span>
         <span></span>
       </div>
-      {members.map((m) => {
+      {sortedMembers.map((m) => {
         const id = String(m._id ?? m.id ?? "");
         const perf = performanceByMember[id] || { completionRate: 0, totalTasks: 0 };
         const checklist = checklistByMember[id];
@@ -172,10 +236,14 @@ function RosterTable({ members, performanceByMember, checklistByMember, onOpenMe
 // MEMBER DETAIL SLIDE-OUT
 // ─────────────────────────────────────────────────────────────────────────
 
-function MemberDetailPanel({ member, performance, checklist, onClose, onToggleTask, onEditCompensation, onCreateChecklist }) {
+function MemberDetailPanel({ member, performance, checklist, payrollHistory, onClose, onToggleTask, onEditCompensation, onCreateChecklist }) {
   const [tab, setTab] = useState("profile");
   if (!member) return null;
   const perf = performance || { completionRate: 0, totalTasks: 0, completedTasks: 0 };
+  const equityConfig = member.compensation?.type === "equity" || member.compensation?.type === "equity-fixed"
+    ? member.compensation.equity
+    : null;
+  const vesting = equityConfig ? computeVestingInfo(equityConfig, member.createdAt) : null;
 
   return (
     <>
@@ -196,7 +264,7 @@ function MemberDetailPanel({ member, performance, checklist, onClose, onToggleTa
 
         <div className="min-h-0 flex-1 overflow-y-auto p-5">
           <div className="mb-4 flex gap-0.5 rounded-lg bg-gray-100 p-[3px]">
-            {["profile", "performance", "compensation", "onboarding"].map((t) => (
+            {["profile", "performance", "compensation", "equity", "onboarding"].map((t) => (
               <button
                 key={t}
                 type="button"
@@ -219,6 +287,10 @@ function MemberDetailPanel({ member, performance, checklist, onClose, onToggleTa
                   ["Joined", member.createdAt ? new Date(member.createdAt).toLocaleDateString() : "—"],
                   ["Status", member.isOnline ? "Online" : "Offline"],
                   ["Role", member.title || member.role || "Team member"],
+                  ...(equityConfig ? [
+                    ["Equity", `${equityConfig.totalEquity}%`],
+                    ["Vested", vesting ? `${vesting.vestedPct}%` : "—"],
+                  ] : []),
                 ].map(([l, v]) => (
                   <div key={l} className="rounded-[8px] bg-v2-page p-2.5">
                     <p className="font-body text-[10px] text-v2-subtle">{l}</p>
@@ -287,6 +359,64 @@ function MemberDetailPanel({ member, performance, checklist, onClose, onToggleTa
               <p className="font-body text-[10px] text-v2-subtle">
                 Opens the real compensation wizard (equity / fixed salary / hourly, with performance gating) — same one used during onboarding.
               </p>
+
+              <div>
+                <p className="mb-1.5 font-body text-[11px] font-medium uppercase tracking-wide text-v2-subtle">Payment history</p>
+                {payrollHistory && payrollHistory.length > 0 ? (
+                  <div className="flex flex-col gap-1">
+                    {payrollHistory.map((r) => (
+                      <div key={r._id} className="flex items-center justify-between rounded-[8px] bg-v2-page px-3 py-2">
+                        <span className="font-body text-[11px] text-v2-muted">{MONTH_NAMES[r.periodMonth - 1]} {r.periodYear}</span>
+                        <span className="font-body text-[11px] font-medium text-v2-heading">{r.currency} {r.amount.toLocaleString()}</span>
+                        {r.status === "paid" ? <V2Chip variant="green">Paid</V2Chip> : <V2Chip variant="amber">Pending</V2Chip>}
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="font-body text-[11px] text-v2-subtle">No payroll history yet.</p>
+                )}
+              </div>
+            </div>
+          )}
+
+          {tab === "equity" && (
+            <div className="flex flex-col gap-3">
+              {!equityConfig ? (
+                <p className="py-6 text-center font-body text-[12px] text-v2-muted">
+                  No equity compensation set up for this member.
+                </p>
+              ) : (
+                <>
+                  <div className="rounded-[10px] bg-v2-page p-4 text-center">
+                    <div className="font-heading text-[32px] font-medium text-v2-blue">{vesting?.vestedPct ?? 0}%</div>
+                    <p className="font-body text-[11px] text-v2-subtle">of {equityConfig.totalEquity}% equity vested to date</p>
+                  </div>
+                  {!vesting?.pastCliff ? (
+                    <div className="rounded-[10px] bg-v2-amber-tint p-3 font-body text-[11px] text-v2-amber-dark">
+                      Still within the {equityConfig.cliffPeriod}-month cliff — no equity vests until then.
+                    </div>
+                  ) : null}
+                  <div>
+                    <p className="mb-1.5 font-body text-[11px] font-medium uppercase tracking-wide text-v2-subtle">Vesting schedule</p>
+                    <div className="flex flex-col gap-1.5">
+                      {vesting?.milestones.map((ms) => (
+                        <div key={ms.pct} className="flex items-center gap-2.5 rounded-[8px] bg-v2-page px-3 py-2">
+                          <span className="w-16 shrink-0 font-body text-[11px] text-v2-muted">Month {ms.atMonth}</span>
+                          <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-v2-border">
+                            <div className={cn("h-full rounded-full", ms.reached ? "bg-v2-blue" : "bg-v2-border")} style={{ width: ms.reached ? "100%" : "0%" }} />
+                          </div>
+                          <span className={cn("w-10 shrink-0 text-right font-body text-[11px] font-medium", ms.reached ? "text-v2-green" : "text-v2-subtle")}>
+                            {ms.pct}%{ms.reached ? " ✓" : ""}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                  <p className="font-body text-[10px] text-v2-subtle">
+                    Computed from real fields (join date, vesting period, cliff) — standard linear vesting after cliff, not fabricated.
+                  </p>
+                </>
+              )}
             </div>
           )}
 
@@ -365,6 +495,159 @@ function InviteModal({ open, onClose, onSend, sending }) {
           <V2Btn variant="primary" size="sm" disabled={sending || !email.trim()} onClick={() => onSend({ email: email.trim(), role: role.trim(), message })}>
             {sending ? "Sending…" : "Send invite"}
           </V2Btn>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// ADD MEMBER MODAL — 3-step: basic info → compensation → onboarding tasks.
+// Step 2 reuses V2CompensationSetupWizard as-is (same validated config
+// builder as "Edit compensation"); onComplete just captures the config
+// locally instead of PATCHing, since the member doesn't exist yet.
+// ─────────────────────────────────────────────────────────────────────────
+
+function AddMemberModal({ open, onClose, onSend, sending }) {
+  const [step, setStep] = useState(1);
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
+  const [email, setEmail] = useState("");
+  const [role, setRole] = useState("");
+  const [compConfig, setCompConfig] = useState(null);
+  const [tasks, setTasks] = useState([...DEFAULT_ONBOARDING_TASKS]);
+  const [customTask, setCustomTask] = useState("");
+  const [message, setMessage] = useState("");
+
+  useEffect(() => {
+    if (!open) {
+      setStep(1); setFirstName(""); setLastName(""); setEmail(""); setRole("");
+      setCompConfig(null); setTasks([...DEFAULT_ONBOARDING_TASKS]); setCustomTask(""); setMessage("");
+    }
+  }, [open]);
+
+  if (!open) return null;
+  const fullName = `${firstName} ${lastName}`.trim();
+
+  if (step === 2) {
+    return (
+      <CompensationSetupWizard
+        isOpen
+        onClose={() => setStep(1)}
+        teamMemberName={fullName || "this team member"}
+        onComplete={(config) => { setCompConfig(config); setStep(3); }}
+      />
+    );
+  }
+
+  return (
+    <div className="fixed inset-0 z-[95] flex items-center justify-center bg-black/35" onClick={onClose}>
+      <div className="flex max-h-[85vh] w-[440px] flex-col overflow-hidden rounded-2xl bg-white" onClick={(e) => e.stopPropagation()}>
+        <div className="flex shrink-0 items-center justify-between border-b border-v2-border px-5 py-4">
+          <div>
+            <p className="font-body text-[15px] font-medium text-v2-heading">Add a team member</p>
+            <p className="font-body text-[11px] text-v2-subtle">Step {step} of 3</p>
+          </div>
+          <button type="button" onClick={onClose} className="flex h-7 w-7 items-center justify-center rounded-md text-v2-muted hover:bg-v2-page"><X className="h-4 w-4" /></button>
+        </div>
+
+        <div className="min-h-0 flex-1 overflow-y-auto p-5">
+          {step === 1 && (
+            <div className="flex flex-col gap-3">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="mb-1 block font-body text-[12px] font-medium text-v2-muted">First name</label>
+                  <input value={firstName} onChange={(e) => setFirstName(e.target.value)} placeholder="Oluwaseun" className="h-9 w-full rounded-lg border border-v2-border px-3 font-body text-[12px] text-v2-heading outline-none focus:border-v2-blue" />
+                </div>
+                <div>
+                  <label className="mb-1 block font-body text-[12px] font-medium text-v2-muted">Last name</label>
+                  <input value={lastName} onChange={(e) => setLastName(e.target.value)} placeholder="Adeyemi" className="h-9 w-full rounded-lg border border-v2-border px-3 font-body text-[12px] text-v2-heading outline-none focus:border-v2-blue" />
+                </div>
+              </div>
+              <div>
+                <label className="mb-1 block font-body text-[12px] font-medium text-v2-muted">Email address</label>
+                <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="seun@email.com" className="h-9 w-full rounded-lg border border-v2-border px-3 font-body text-[12px] text-v2-heading outline-none focus:border-v2-blue" />
+              </div>
+              <div>
+                <label className="mb-1 block font-body text-[12px] font-medium text-v2-muted">Role / job title</label>
+                <input value={role} onChange={(e) => setRole(e.target.value)} placeholder="e.g. Senior developer" className="h-9 w-full rounded-lg border border-v2-border px-3 font-body text-[12px] text-v2-heading outline-none focus:border-v2-blue" />
+              </div>
+              <p className="font-body text-[10px] text-v2-subtle">
+                Department, location, and a scheduled start date aren't tracked in the system yet — only real fields are collected here.
+              </p>
+            </div>
+          )}
+
+          {step === 3 && (
+            <div className="flex flex-col gap-4">
+              <div>
+                <p className="mb-2 font-body text-[11px] font-medium uppercase tracking-wide text-v2-subtle">Onboarding tasks</p>
+                <p className="mb-3 font-body text-[11px] leading-relaxed text-v2-muted">
+                  These are assigned automatically as a real checklist the moment {fullName || "they"} accept the invitation.
+                </p>
+                <div className="flex flex-col gap-1.5">
+                  {tasks.map((t, i) => (
+                    <div key={i} className="flex items-center gap-2 rounded-[8px] border border-v2-border px-3 py-2">
+                      <span className="flex-1 font-body text-[12px] text-v2-heading">{t}</span>
+                      <button type="button" onClick={() => setTasks((prev) => prev.filter((_, idx) => idx !== i))} className="text-v2-subtle hover:text-red-500">
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+                <div className="mt-2 flex gap-2">
+                  <input
+                    value={customTask}
+                    onChange={(e) => setCustomTask(e.target.value)}
+                    placeholder="e.g. Review product roadmap"
+                    className="h-9 flex-1 rounded-lg border border-v2-border px-3 font-body text-[12px] text-v2-heading outline-none focus:border-v2-blue"
+                  />
+                  <V2Btn
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => { if (customTask.trim()) { setTasks((prev) => [...prev, customTask.trim()]); setCustomTask(""); } }}
+                  >
+                    <Plus className="h-3.5 w-3.5" /> Add
+                  </V2Btn>
+                </div>
+              </div>
+              <div>
+                <label className="mb-1 block font-body text-[12px] font-medium text-v2-muted">Personal message (optional)</label>
+                <textarea value={message} onChange={(e) => setMessage(e.target.value)} placeholder="Welcome to the team! We're excited to have you..." className="h-20 w-full resize-none rounded-lg border border-v2-border p-3 font-body text-[12px] text-v2-heading outline-none focus:border-v2-blue" />
+              </div>
+              {compConfig ? (
+                <div className="rounded-[10px] bg-v2-blue-tint p-3 font-body text-[11px] text-v2-blue-dark">
+                  Compensation set: {compensationSummary(compConfig)}
+                </div>
+              ) : (
+                <div className="rounded-[10px] bg-v2-page p-3 font-body text-[11px] text-v2-subtle">
+                  No compensation set yet — you can set it up any time from the Team page after they accept.
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        <div className="flex shrink-0 items-center justify-between gap-2 border-t border-v2-border px-5 py-3.5">
+          {step > 1 ? (
+            <V2Btn variant="secondary" size="sm" onClick={() => setStep(step - 1)}><ArrowLeft className="h-3.5 w-3.5" /> Back</V2Btn>
+          ) : <span />}
+          {step === 1 && (
+            <div className="flex items-center gap-2">
+              <button type="button" onClick={() => setStep(3)} className="font-body text-[11px] text-v2-muted hover:underline">Skip compensation</button>
+              <V2Btn variant="primary" size="sm" disabled={!email.trim()} onClick={() => setStep(2)}>Continue</V2Btn>
+            </div>
+          )}
+          {step === 3 && (
+            <V2Btn
+              variant="primary"
+              size="sm"
+              disabled={sending || !email.trim()}
+              onClick={() => onSend({ firstName, lastName, email: email.trim(), role: role.trim(), compConfig, tasks, message })}
+            >
+              {sending ? "Sending…" : "Send invitation"}
+            </V2Btn>
+          )}
         </div>
       </div>
     </div>
@@ -628,8 +911,11 @@ export default function V2Team({ user, onPageChange }) {
 
   const [showInvite, setShowInvite] = useState(false);
   const [sendingInvite, setSendingInvite] = useState(false);
+  const [showAddMember, setShowAddMember] = useState(false);
+  const [sendingAddMember, setSendingAddMember] = useState(false);
   const [showPayroll, setShowPayroll] = useState(false);
   const [payrollRecords, setPayrollRecords] = useState([]);
+  const [allPayrollRecords, setAllPayrollRecords] = useState([]);
   const [generatingPayroll, setGeneratingPayroll] = useState(false);
   const [paystackRecord, setPaystackRecord] = useState(null);
   const [payingPaystack, setPayingPaystack] = useState(false);
@@ -647,11 +933,12 @@ export default function V2Team({ user, onPageChange }) {
       setLoading(true);
       try {
         const now = new Date();
-        const [rosterResult, perfResult, postsResult, payrollResult] = await Promise.allSettled([
+        const [rosterResult, perfResult, postsResult, payrollResult, allPayrollResult] = await Promise.allSettled([
           teamMemberApi.getStartupTeamMembers(startupId || resolvedFounderId),
           teamMemberApi.getFounderTeamPerformance(resolvedFounderId),
           founderApi.getFounderPosts(resolvedFounderId),
           payrollApi.getPayroll(resolvedFounderId, { periodMonth: now.getMonth() + 1, periodYear: now.getFullYear() }),
+          payrollApi.getPayroll(resolvedFounderId, {}),
         ]);
         if (cancelled) return;
 
@@ -670,6 +957,7 @@ export default function V2Team({ user, onPageChange }) {
         setMyPosts(postsList);
 
         if (payrollResult.status === "fulfilled") setPayrollRecords(payrollResult.value || []);
+        if (allPayrollResult.status === "fulfilled") setAllPayrollRecords(allPayrollResult.value || []);
 
         const checklists = await Promise.allSettled(
           roster.map((m) => teamMemberApi.getOnboardingChecklist(String(m._id ?? m.id))),
@@ -708,7 +996,9 @@ export default function V2Team({ user, onPageChange }) {
   const lowPerformers = useMemo(
     () => members.filter((m) => {
       const p = performanceByMember[String(m._id ?? m.id)];
-      return p && p.totalTasks >= 3 && p.completionRate < 0.5;
+      const threshold = memberPerformanceThreshold(m);
+      if (!p || p.totalTasks < 3 || threshold == null) return false;
+      return p.completionRate * 100 < threshold;
     }),
     [members, performanceByMember],
   );
@@ -745,6 +1035,13 @@ export default function V2Team({ user, onPageChange }) {
     () => members.find((m) => String(m._id ?? m.id) === String(activeMemberId)) || null,
     [members, activeMemberId],
   );
+
+  const activeMemberPayrollHistory = useMemo(() => {
+    if (!activeMemberId) return [];
+    return allPayrollRecords
+      .filter((r) => String(r.teamMemberId?._id ?? r.teamMemberId) === String(activeMemberId))
+      .sort((a, b) => (b.periodYear - a.periodYear) || (b.periodMonth - a.periodMonth));
+  }, [allPayrollRecords, activeMemberId]);
 
   const refreshChecklist = async (teamMemberId) => {
     const checklist = await teamMemberApi.getOnboardingChecklist(teamMemberId);
@@ -799,14 +1096,43 @@ export default function V2Team({ user, onPageChange }) {
     }
   };
 
+  const handleAddMember = async ({ firstName, lastName, email, role, compConfig, tasks, message }) => {
+    setSendingAddMember(true);
+    try {
+      const fullName = `${firstName} ${lastName}`.trim();
+      await inboxApi.sendInvitation({
+        id: `inv_${Date.now()}_${resolvedFounderId}`,
+        startupId: startupId || resolvedFounderId,
+        startupTitle: startupName,
+        founderId: resolvedFounderId,
+        founderName: user?.name,
+        email,
+        talentName: fullName,
+        role: role || "Team Member",
+        message: message || `${user?.name || "A founder"} would like you to join ${startupName} on StartupVerse.`,
+        sentAt: new Date().toISOString(),
+        status: "pending",
+        pendingCompensationConfig: compConfig || undefined,
+        pendingOnboardingTasks: tasks && tasks.length ? tasks : undefined,
+      });
+      toast.success(`Invitation sent to ${email}${compConfig ? " — compensation & onboarding pre-configured" : ""}.`);
+      setShowAddMember(false);
+    } catch (error) {
+      toast.error(error?.message || "Could not send invitation.");
+    } finally {
+      setSendingAddMember(false);
+    }
+  };
+
   const loadPayroll = async () => {
     try {
       const now = new Date();
-      const records = await payrollApi.getPayroll(resolvedFounderId, {
-        periodMonth: now.getMonth() + 1,
-        periodYear: now.getFullYear(),
-      });
+      const [records, allRecords] = await Promise.all([
+        payrollApi.getPayroll(resolvedFounderId, { periodMonth: now.getMonth() + 1, periodYear: now.getFullYear() }),
+        payrollApi.getPayroll(resolvedFounderId, {}),
+      ]);
       setPayrollRecords(records || []);
+      setAllPayrollRecords(allRecords || []);
     } catch (error) {
       toast.error(error?.message || "Could not load payroll.");
     }
@@ -902,8 +1228,11 @@ export default function V2Team({ user, onPageChange }) {
           <V2Btn variant="secondary" size="sm" onClick={handleOpenPayroll}>
             <Wallet className="h-3.5 w-3.5" /> Payroll
           </V2Btn>
-          <V2Btn variant="primary" size="sm" onClick={() => setShowInvite(true)}>
+          <V2Btn variant="secondary" size="sm" onClick={() => setShowInvite(true)}>
             <UserPlus className="h-3.5 w-3.5" /> Invite member
+          </V2Btn>
+          <V2Btn variant="primary" size="sm" onClick={() => setShowAddMember(true)}>
+            <UserPlus className="h-3.5 w-3.5" /> Add member
           </V2Btn>
         </>
       }
@@ -946,7 +1275,7 @@ export default function V2Team({ user, onPageChange }) {
             <div className="flex items-center gap-2.5">
               <ClipboardCheck className="h-4 w-4 shrink-0 text-v2-amber-dark" />
               <p className="font-body text-[12px] text-v2-heading">
-                {lowPerformers[0].name}'s completion rate is below 50%
+                {lowPerformers[0].name}'s completion rate is below their {memberPerformanceThreshold(lowPerformers[0])}% compensation threshold
                 {lowPerformers.length > 1 ? ` (+${lowPerformers.length - 1} more)` : ""}
               </p>
             </div>
@@ -969,6 +1298,7 @@ export default function V2Team({ user, onPageChange }) {
           member={activeMember}
           performance={performanceByMember[activeMemberIdStr]}
           checklist={checklistByMember[activeMemberIdStr]}
+          payrollHistory={activeMemberPayrollHistory}
           onClose={() => setActiveMemberId(null)}
           onToggleTask={handleToggleTask}
           onEditCompensation={() => setShowCompWizard(true)}
@@ -977,6 +1307,8 @@ export default function V2Team({ user, onPageChange }) {
       ) : null}
 
       <InviteModal open={showInvite} onClose={() => setShowInvite(false)} onSend={handleSendInvite} sending={sendingInvite} />
+
+      <AddMemberModal open={showAddMember} onClose={() => setShowAddMember(false)} onSend={handleAddMember} sending={sendingAddMember} />
 
       <PayrollModal
         open={showPayroll}

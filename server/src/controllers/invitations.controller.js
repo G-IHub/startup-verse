@@ -12,6 +12,7 @@ import OrganizationAdmin from "../models/OrganizationAdmin.js";
 import User from "../models/User.js";
 import TalentProfile from "../models/TalentProfile.js";
 import TeamMemberProfile from "../models/TeamMemberProfile.js";
+import OnboardingChecklist from "../models/OnboardingChecklist.js";
 import Presence from "../models/Presence.js";
 import Activity from "../models/Activity.js";
 import Notification from "../models/Notification.js";
@@ -691,6 +692,49 @@ export const acceptInvitationByToken = async (req, res) => {
   };
   await invitation.save();
 
+  const pendingCompensationConfig = invitation.metadata?.pendingCompensationConfig || null;
+  const pendingOnboardingTasks = Array.isArray(invitation.metadata?.pendingOnboardingTasks)
+    ? invitation.metadata.pendingOnboardingTasks
+    : null;
+
+  if (pendingCompensationConfig || invitation.founderId) {
+    try {
+      await TeamMemberProfile.findOneAndUpdate(
+        { userId: user._id },
+        {
+          $setOnInsert: {
+            userId: user._id,
+            founderId: invitation.founderId || null,
+            startupId: invitation.startupId || null,
+          },
+          ...(pendingCompensationConfig ? { $set: { compensation: pendingCompensationConfig } } : {}),
+        },
+        { upsert: true, new: true },
+      );
+    } catch (err) {
+      logger.error("[acceptInvitationByToken] Failed to apply pending compensation:", err.message);
+    }
+  }
+
+  if (pendingOnboardingTasks && pendingOnboardingTasks.length > 0) {
+    try {
+      await OnboardingChecklist.findOneAndUpdate(
+        { teamMemberId: user._id },
+        {
+          $setOnInsert: {
+            teamMemberId: user._id,
+            founderId: invitation.founderId || user._id,
+            startupId: invitation.startupId || null,
+            tasks: pendingOnboardingTasks.map((title) => ({ title, done: false })),
+          },
+        },
+        { upsert: true, new: true },
+      );
+    } catch (err) {
+      logger.error("[acceptInvitationByToken] Failed to apply pending onboarding tasks:", err.message);
+    }
+  }
+
   return sendTokenResponse(user, 201, res, "Invitation accepted.");
 };
 
@@ -872,6 +916,20 @@ export const sendFounderTalentInvitation = async (req, res) => {
     founderStartupPost.startupId ||
     null;
 
+  let pendingCompensationConfig = null;
+  if (body.pendingCompensationConfig) {
+    if (!isValidCompensationConfig(body.pendingCompensationConfig)) {
+      return apiError(res, "The compensation configuration is invalid.", 422);
+    }
+    pendingCompensationConfig = body.pendingCompensationConfig;
+  }
+  const pendingOnboardingTasks = Array.isArray(body.pendingOnboardingTasks)
+    ? body.pendingOnboardingTasks
+        .map((t) => String(t || "").trim())
+        .filter(Boolean)
+        .slice(0, 30)
+    : null;
+
   const invitation = await FounderTalentInvitation.create({
     founderId,
     talentId: resolvedTalentId,
@@ -886,6 +944,8 @@ export const sendFounderTalentInvitation = async (req, res) => {
       talentName: body.talentName || "",
       startupTitle: resolvedStartupTitle,
       role: body.role || "",
+      ...(pendingCompensationConfig ? { pendingCompensationConfig } : {}),
+      ...(pendingOnboardingTasks && pendingOnboardingTasks.length ? { pendingOnboardingTasks } : {}),
     },
   });
 
