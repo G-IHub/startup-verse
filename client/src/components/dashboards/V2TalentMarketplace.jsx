@@ -35,6 +35,7 @@ import { toast } from "sonner";
 
 import V2AppLayout from "../layout/V2AppLayout";
 import { V2Card, V2Chip, V2Avatar, V2Btn } from "../shared/v2-primitives";
+import V2SendOfferModal from "./V2SendOfferModal";
 
 import { useOfficeStore } from "../../state/useOfficeStore";
 import * as founderApi from "../../utils/api/founderApi";
@@ -55,15 +56,6 @@ import {
 } from "lucide-react";
 
 const CATEGORIES = ["All talent", "Matched", "Engineering", "Design", "Product", "Operations", "Co-founder", "Available now"];
-const KPI_TIERS = [
-  { name: "Star", range: "90–100", bonusPercent: 20 },
-  { name: "Strong", range: "75–89", bonusPercent: 10 },
-  { name: "Meets", range: "60–74", bonusPercent: 0 },
-];
-const OFFER_ROLE_TYPES = ["Full-time", "Part-time", "Contract", "Co-founder"];
-
-const FIELD_INPUT_CLASS =
-  "h-9 w-full rounded-lg border border-v2-border px-3 font-body text-[12px] text-v2-heading outline-none focus:border-v2-blue";
 
 function initialsOf(name) {
   return (name || "?").split(" ").slice(0, 2).map((w) => w[0]?.toUpperCase() ?? "").join("");
@@ -395,234 +387,6 @@ function TalentDetailPanel({ talent, shortlisted, onClose, onToggleShortlist, on
         </div>
       </div>
     </>
-  );
-}
-
-// ─────────────────────────────────────────────────────────────────────────
-// SEND OFFER MODAL (3 real steps)
-// ─────────────────────────────────────────────────────────────────────────
-
-function SendOfferModal({ open, onClose, onSubmit, submitting, talentOptions, roleOptions, presetTalentId }) {
-  const [step, setStep] = useState(1);
-  const [form, setForm] = useState({
-    talentId: "",
-    role: "",
-    roleType: OFFER_ROLE_TYPES[0],
-    startDate: "",
-    salaryAmount: "",
-    currency: "NGN",
-    kpiBonusTier: "Star",
-    equityPercent: "",
-    vestingMonths: "24",
-    cliffMonths: "6",
-    message: "",
-    expiryDays: "14",
-  });
-
-  useEffect(() => {
-    if (open) {
-      setStep(1);
-      setForm((f) => ({ ...f, talentId: presetTalentId || "", role: roleOptions[0] || "" }));
-    }
-  }, [open, presetTalentId, roleOptions]);
-
-  if (!open) return null;
-
-  const tier = KPI_TIERS.find((t) => t.name === form.kpiBonusTier) || KPI_TIERS[0];
-  const salaryNum = parseInt(String(form.salaryAmount).replace(/[^0-9]/g, ""), 10) || 0;
-  const bonusAmount = Math.round((salaryNum * tier.bonusPercent) / 100);
-
-  const canContinueStep1 = form.talentId && form.role.trim();
-  const canSubmit = canContinueStep1;
-
-  return (
-    <div className="fixed inset-0 z-[95] flex items-center justify-center bg-black/35" onClick={onClose}>
-      <div className="flex max-h-[88vh] w-[520px] flex-col overflow-hidden rounded-2xl bg-white" onClick={(e) => e.stopPropagation()}>
-        <div className="flex shrink-0 items-center justify-between border-b border-v2-border px-5 py-4">
-          <p className="font-body text-[15px] font-medium text-v2-heading">Send a compensation offer</p>
-          <button type="button" onClick={onClose} className="flex h-7 w-7 items-center justify-center rounded-md text-v2-muted hover:bg-v2-page"><X className="h-4 w-4" /></button>
-        </div>
-        <div className="min-h-0 flex-1 overflow-y-auto p-5">
-          <div className="mb-4 flex gap-1">
-            {[1, 2, 3].map((i) => (
-              <div key={i} className={cn("h-[3px] flex-1 rounded-full", i <= step ? "bg-v2-blue" : "bg-v2-border")} />
-            ))}
-          </div>
-
-          {step === 1 && (
-            <div className="flex flex-col gap-3">
-              <div className="rounded-[10px] bg-v2-blue-tint p-3 font-body text-[12px] leading-relaxed text-v2-blue-dark">
-                You're sending a formal offer. The candidate receives a real notification with the full offer.
-              </div>
-              <Field label="Candidate *">
-                <select value={form.talentId} onChange={(e) => setForm((f) => ({ ...f, talentId: e.target.value }))} className={FIELD_INPUT_CLASS}>
-                  <option value="">Select candidate</option>
-                  {talentOptions.map((t) => (
-                    <option key={t.id} value={t.id}>{t.name}{t.shortlisted ? " (shortlisted)" : ""}</option>
-                  ))}
-                </select>
-              </Field>
-              <Field label="Role *">
-                <select value={form.role} onChange={(e) => setForm((f) => ({ ...f, role: e.target.value }))} className={FIELD_INPUT_CLASS}>
-                  <option value="">Select role</option>
-                  {roleOptions.map((r) => <option key={r} value={r}>{r}</option>)}
-                </select>
-              </Field>
-              <div className="grid grid-cols-2 gap-3">
-                <Field label="Start date">
-                  <input type="date" value={form.startDate} onChange={(e) => setForm((f) => ({ ...f, startDate: e.target.value }))} className={FIELD_INPUT_CLASS} />
-                </Field>
-                <Field label="Role type">
-                  <select value={form.roleType} onChange={(e) => setForm((f) => ({ ...f, roleType: e.target.value }))} className={FIELD_INPUT_CLASS}>
-                    {OFFER_ROLE_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
-                  </select>
-                </Field>
-              </div>
-            </div>
-          )}
-
-          {step === 2 && (
-            <div className="flex flex-col gap-3">
-              <div className="grid grid-cols-2 gap-3">
-                <Field label="Monthly salary">
-                  <input value={form.salaryAmount} onChange={(e) => setForm((f) => ({ ...f, salaryAmount: e.target.value }))} placeholder="280000" className={FIELD_INPUT_CLASS} />
-                </Field>
-                <Field label="Currency">
-                  <select value={form.currency} onChange={(e) => setForm((f) => ({ ...f, currency: e.target.value }))} className={FIELD_INPUT_CLASS}>
-                    <option value="NGN">NGN (₦)</option>
-                    <option value="USD">USD ($)</option>
-                    <option value="GHS">GHS (₵)</option>
-                  </select>
-                </Field>
-              </div>
-              <div>
-                <p className="mb-1.5 font-body text-[12px] font-medium text-v2-muted">KPI bonus tier</p>
-                <div className="grid grid-cols-3 gap-1.5">
-                  {KPI_TIERS.map((t) => (
-                    <button
-                      key={t.name}
-                      type="button"
-                      onClick={() => setForm((f) => ({ ...f, kpiBonusTier: t.name }))}
-                      className={cn(
-                        "rounded-lg border-[1.5px] p-2 text-center",
-                        form.kpiBonusTier === t.name ? "border-v2-blue" : "border-transparent bg-v2-page",
-                      )}
-                    >
-                      <div className="font-body text-[11px] font-medium text-v2-heading">{t.name}</div>
-                      <div className="font-body text-[10px] text-v2-subtle">{t.range}</div>
-                      <div className="font-body text-[11px] font-medium text-v2-blue">{t.bonusPercent > 0 ? `+${t.bonusPercent}%` : "Base only"}</div>
-                    </button>
-                  ))}
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <Field label="Equity (%)">
-                  <input type="number" step="0.1" value={form.equityPercent} onChange={(e) => setForm((f) => ({ ...f, equityPercent: e.target.value }))} placeholder="1.5" className={FIELD_INPUT_CLASS} />
-                </Field>
-                <Field label="Vesting period (months)">
-                  <select value={form.vestingMonths} onChange={(e) => setForm((f) => ({ ...f, vestingMonths: e.target.value }))} className={FIELD_INPUT_CLASS}>
-                    <option value="24">24 months</option>
-                    <option value="36">36 months</option>
-                    <option value="48">48 months</option>
-                  </select>
-                </Field>
-              </div>
-              <Field label="Cliff period (months)">
-                <select value={form.cliffMonths} onChange={(e) => setForm((f) => ({ ...f, cliffMonths: e.target.value }))} className={FIELD_INPUT_CLASS}>
-                  <option value="3">3 months</option>
-                  <option value="6">6 months</option>
-                  <option value="0">No cliff</option>
-                </select>
-              </Field>
-              <div className="rounded-[10px] bg-v2-page p-3">
-                <p className="mb-2 font-body text-[11px] font-medium text-v2-heading">Offer summary preview</p>
-                <div className="flex justify-between border-b border-v2-border py-1 font-body text-[12px]">
-                  <span className="text-v2-muted">Base salary</span>
-                  <span className="text-v2-heading">{salaryNum ? `${form.currency} ${salaryNum.toLocaleString()}` : "—"}</span>
-                </div>
-                <div className="flex justify-between border-b border-v2-border py-1 font-body text-[12px]">
-                  <span className="text-v2-muted">KPI bonus ({form.kpiBonusTier.toLowerCase()} tier)</span>
-                  <span className="text-v2-green">{salaryNum ? `+${form.currency} ${bonusAmount.toLocaleString()}` : "—"}</span>
-                </div>
-                <div className="flex justify-between border-b border-v2-border py-1 font-body text-[12px]">
-                  <span className="text-v2-muted">Equity</span>
-                  <span className="text-v2-heading">{form.equityPercent ? `${form.equityPercent}%` : "—"}</span>
-                </div>
-                <div className="flex justify-between pt-1 font-body text-[12px] font-medium">
-                  <span className="text-v2-heading">Total monthly (star)</span>
-                  <span className="text-v2-blue">{salaryNum ? `${form.currency} ${(salaryNum + bonusAmount).toLocaleString()}` : "—"}</span>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {step === 3 && (
-            <div className="flex flex-col gap-3">
-              <Field label="Personal message">
-                <textarea
-                  value={form.message}
-                  onChange={(e) => setForm((f) => ({ ...f, message: e.target.value }))}
-                  placeholder="We'd love to have you join us. Here's why we think you're perfect for this role..."
-                  className={cn(FIELD_INPUT_CLASS, "h-24 resize-none py-2")}
-                />
-              </Field>
-              <Field label="Offer expires in">
-                <select value={form.expiryDays} onChange={(e) => setForm((f) => ({ ...f, expiryDays: e.target.value }))} className={FIELD_INPUT_CLASS}>
-                  <option value="7">7 days</option>
-                  <option value="14">14 days</option>
-                  <option value="30">30 days</option>
-                  <option value="">No expiry</option>
-                </select>
-              </Field>
-              <div className="rounded-[10px] bg-v2-green-tint p-3 font-body text-[12px] leading-relaxed text-v2-green-dark">
-                ✓ This creates a real offer record the candidate can see and respond to.
-              </div>
-            </div>
-          )}
-        </div>
-        <div className="flex shrink-0 justify-end gap-2 border-t border-v2-border px-5 py-3.5">
-          {step > 1 && <V2Btn variant="secondary" size="sm" onClick={() => setStep((s) => s - 1)}>Back</V2Btn>}
-          <V2Btn variant="secondary" size="sm" onClick={onClose}>Cancel</V2Btn>
-          {step < 3 ? (
-            <V2Btn variant="primary" size="sm" disabled={step === 1 && !canContinueStep1} onClick={() => setStep((s) => s + 1)}>Continue →</V2Btn>
-          ) : (
-            <V2Btn
-              variant="primary"
-              size="sm"
-              disabled={submitting || !canSubmit}
-              onClick={() =>
-                onSubmit({
-                  talentId: form.talentId,
-                  role: form.role,
-                  roleType: form.roleType,
-                  startDate: form.startDate || null,
-                  salaryAmount: form.salaryAmount,
-                  currency: form.currency,
-                  kpiBonusTier: form.kpiBonusTier,
-                  kpiBonusPercent: tier.bonusPercent,
-                  equityPercent: form.equityPercent,
-                  vestingMonths: Number(form.vestingMonths) || 0,
-                  cliffMonths: Number(form.cliffMonths) || 0,
-                  message: form.message,
-                  expiresAt: form.expiryDays ? new Date(Date.now() + Number(form.expiryDays) * 86400000).toISOString() : null,
-                })
-              }
-            >
-              {submitting ? "Sending…" : "Send offer"}
-            </V2Btn>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function Field({ label, children }) {
-  return (
-    <div>
-      <label className="mb-1 block font-body text-[12px] font-medium text-v2-muted">{label}</label>
-      {children}
-    </div>
   );
 }
 
@@ -1093,7 +857,7 @@ export default function V2TalentMarketplace({ user, onPageChange }) {
         />
       ) : null}
 
-      <SendOfferModal
+      <V2SendOfferModal
         open={showOffer}
         onClose={() => setShowOffer(false)}
         onSubmit={handleSendOffer}
