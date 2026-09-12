@@ -34,4 +34,6 @@ export const SOCKET_EVENTS = Object.freeze({
   ANNOUNCEMENT_UPDATED: "announcement:updated",
   ANNOUNCEMENT_DELETED: "announcement:deleted",
   ANNOUNCEMENT_READ: "announcement:read",
+  // AI Staff orchestration — docs/ai-agent-roadmap.md Phase 0
+  AGENT_EVENT_UPDATED: "agent-event:updated",
 });
