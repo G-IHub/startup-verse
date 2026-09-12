@@ -30,6 +30,20 @@ const HIRED = [
     task: "Monitoring traction metrics and weekly execution patterns. Will generate growth report after Week 4 outcome is logged.",
     output: "Interview validation rate is 100% — unusually strong. Recommend adding 5 more interviews before building to deepen signal.",
   },
+  {
+    id: "fin", initials: "FIN", name: "AI Finance", role: "Invoicing · Cash position · Bookkeeping",
+    bg: "#FAEEDA", color: "#633806", price: "$15/mo", priceBg: "#FAEEDA", priceColor: "#633806",
+    status: "waiting", statusLabel: "Idle — 1 invoice needs your approval", statusColor: "#633806", statusDot: "#BA7517",
+    task: "Drafted invoice INV-1042 for Reddington Clinic from the signed pilot agreement. Sending always waits for you — it's fixed, not adjustable in autonomy settings.",
+    output: "₦180,000 invoice ready to send, plus this week's revenue chart and connected Stripe/GTBank cash position, updated automatically.",
+  },
+  {
+    id: "legal", initials: "LGL", name: "AI Legal", role: "Contracts · NDAs · Compliance",
+    bg: "#FCEBEB", color: "#791F1F", price: "$20/mo", priceBg: "#FCEBEB", priceColor: "#791F1F",
+    status: "waiting", statusLabel: "Idle — 1 document needs your approval", statusColor: "#791F1F", statusDot: "#BA7517",
+    task: "Drafted a standard NDA for next week's backend engineer interview from the approved template. No legal document sends without your sign-off.",
+    output: "NDA ready to send to the candidate. 7 active contracts on file, 0 open compliance flags as of this morning's check.",
+  },
 ];
 
 const AVAILABLE_PHASES = [
@@ -40,7 +54,6 @@ const AVAILABLE_PHASES = [
     staff: [
       { initials: "DEV", name: "AI Developer Agent",   role: "Code review · Tech decisions · Docs",    bg: "#EEEDFE", color: "#3C3489", price: "$25/mo", task: "Reviews code architecture, suggests tech stack decisions, writes technical documentation, flags complexity risks." },
       { initials: "SA",  name: "AI Sales Agent",       role: "Pipeline · Outreach · Conversion",        bg: "#EAF3DE", color: "#27500A", price: "$20/mo", task: "Builds outreach sequences, drafts sales scripts, tracks pipeline conversations, and suggests when to follow up." },
-      { initials: "CFO", name: "AI Finance Officer",   role: "Runway · Budgets · Financial models",     bg: "#FAEEDA", color: "#633806", price: "$15/mo", task: "Tracks burn rate, builds financial projections, models pricing scenarios, and alerts on runway decisions." },
     ],
   },
   {
@@ -49,7 +62,6 @@ const AVAILABLE_PHASES = [
     lockLabel: "Unlocks Month 9",
     staff: [
       { initials: "STR", name: "AI Strategy Advisor", role: "Vision · Pivots · Competitive positioning", bg: "#EEEDFE", color: "#3C3489", price: "$25/mo", task: "Big-picture strategic advice tailored to your stage, market, and execution history. Flags when to pivot." },
-      { initials: "LGL", name: "AI Legal Counsel",    role: "Contracts · Compliance · IP protection",   bg: "#FCEBEB", color: "#791F1F", price: "$20/mo", task: "Reviews contracts, flags legal risks, guides IP registration, and helps draft founder agreements and NDAs." },
       { initials: "DES", name: "AI Designer Agent",   role: "Brand · UX critique · Design briefs",      bg: "#EEEDFE", color: "#3C3489", price: "$15/mo", task: "Writes design briefs, critiques UX flows, suggests brand direction, and reviews Figma links for consistency." },
     ],
   },
@@ -84,6 +96,9 @@ const CONTEXT = [
   { k: "Traction",  v: "8/8 validation rate" },
   { k: "Revenue",   v: "Pre-revenue" },
 ];
+
+/* ── Agents with a real dedicated workspace page (else falls back to chat) ── */
+const AGENT_WORKSPACE_PAGE = { mk: "agent-marketing", sa: "agent-sales", fin: "agent-finance", legal: "agent-legal" };
 
 /* ── Sub-components ───────────────────────────────────────────────────────── */
 function AgentAvatar({ initials, bg, color, size = 40 }) {
@@ -134,9 +149,15 @@ function HiredCard({ agent, onChat, onNavigate }) {
         <button type="button" className="flex-1 rounded-xl border border-v2-border bg-white py-1.5 font-body text-[10px] font-medium text-v2-heading hover:bg-v2-page transition-colors">
           Review output
         </button>
-        <button type="button" onClick={() => onNavigate?.("ai-staff-chat")} className="flex flex-1 items-center justify-center gap-1 rounded-xl bg-v2-purple py-1.5 font-body text-[10px] font-medium text-white hover:opacity-90 transition-opacity">
-          <MessageSquare className="h-3 w-3" /> Chat ↗
-        </button>
+        {AGENT_WORKSPACE_PAGE[agent.id] ? (
+          <button type="button" onClick={() => onNavigate?.(AGENT_WORKSPACE_PAGE[agent.id])} className="flex flex-1 items-center justify-center gap-1 rounded-xl bg-v2-purple py-1.5 font-body text-[10px] font-medium text-white hover:opacity-90 transition-opacity">
+            <FileText className="h-3 w-3" /> Open workspace ↗
+          </button>
+        ) : (
+          <button type="button" onClick={() => onNavigate?.("ai-staff-chat")} className="flex flex-1 items-center justify-center gap-1 rounded-xl bg-v2-purple py-1.5 font-body text-[10px] font-medium text-white hover:opacity-90 transition-opacity">
+            <MessageSquare className="h-3 w-3" /> Chat ↗
+          </button>
+        )}
       </div>
     </div>
   );
@@ -222,7 +243,7 @@ export default function V2AIStaffManage({ onChat, onNavigate }) {
           <div className="mb-3 flex items-end justify-between">
             <div>
               <div className="font-heading text-[13px] font-semibold text-v2-heading">Your hired AI staff</div>
-              <div className="mt-0.5 font-body text-[11px] text-v2-muted">3 roles active · All aware of HealthTrack context</div>
+              <div className="mt-0.5 font-body text-[11px] text-v2-muted">5 roles active · All aware of HealthTrack context</div>
             </div>
             <span className="rounded-full bg-[#EEEDFE] px-2.5 py-1 font-body text-[10px] font-medium text-v2-purple">Phase 1 · Active</span>
           </div>
@@ -236,7 +257,7 @@ export default function V2AIStaffManage({ onChat, onNavigate }) {
           <div className="mb-4 flex items-end justify-between">
             <div>
               <div className="font-heading text-[13px] font-semibold text-v2-heading">Available to hire</div>
-              <div className="mt-0.5 font-body text-[11px] text-v2-muted">10 roles ready · Phase 2 available now</div>
+              <div className="mt-0.5 font-body text-[11px] text-v2-muted">7 roles ready · Phase 2 available now</div>
             </div>
             <span className="rounded-full bg-[#FAEEDA] px-2.5 py-1 font-body text-[10px] font-medium text-[#633806]">Phase 2 · Available now</span>
           </div>
@@ -298,6 +319,8 @@ export default function V2AIStaffManage({ onChat, onNavigate }) {
             { label: "AI Product Manager", val: "$25" },
             { label: "AI Marketing Agent", val: "$20" },
             { label: "AI Growth Analyst",  val: "$10" },
+            { label: "AI Finance",         val: "$15" },
+            { label: "AI Legal",           val: "$20" },
           ].map((r) => (
             <div key={r.label} className="flex items-center justify-between py-1">
               <span className="font-body text-[11px] text-v2-muted">{r.label}</span>
@@ -307,7 +330,7 @@ export default function V2AIStaffManage({ onChat, onNavigate }) {
           <div className="my-1 h-px bg-gray-200" />
           <div className="flex items-center justify-between py-1">
             <span className="font-body text-[11px] font-semibold text-v2-heading">Current total</span>
-            <span className="font-body text-[11px] font-semibold text-v2-purple">$55/mo</span>
+            <span className="font-body text-[11px] font-semibold text-v2-purple">$90/mo</span>
           </div>
           <div className="flex items-center justify-between py-1">
             <span className="font-body text-[11px] text-v2-muted">Full bundle (13 roles)</span>
