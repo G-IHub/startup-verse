@@ -23,6 +23,7 @@ import {
   ChevronDown,
   StickyNote,
   Map,
+  Mail,
 } from "lucide-react";
 
 const PROGRAM_TAB_ICONS = {
@@ -128,6 +129,12 @@ export default function VerticalSidebar({
           icon: MessageCircle,
           label: "Chat",
           page: "talent-chat",
+          roles: ["talent"],
+        }, {
+          id: "talent-offers",
+          icon: Mail,
+          label: "Offers",
+          page: "talent-offers",
           roles: ["talent"],
         }]
       : []),

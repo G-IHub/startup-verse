@@ -52,6 +52,7 @@ const FounderDeliverablesView = lazy(
 );
 const ProgramWorkspace = lazy(() => import("./program/ProgramWorkspace"));
 const TalentChatPage = lazy(() => import("./talent/TalentChatPage"));
+const TalentOffersPage = lazy(() => import("./talent/TalentOffersPage"));
 const FounderChatPage = lazy(() => import("./office/FounderChatPage"));
 const TaskDetailPage = lazy(() => import("./office/TaskDetailPage"));
 const TalentProfilePage = lazy(() => import("./TalentProfilePage"));
@@ -103,6 +104,7 @@ export default function DashboardHybrid({ user, onLogout, onUpdateUser }) {
         "browse-startups",
         "startup-detail",
         "talent-profile",
+        "talent-offers",
         "compensation-demo",
       ]),
     [],
@@ -631,6 +633,18 @@ export default function DashboardHybrid({ user, onLogout, onUpdateUser }) {
               user={user}
               onNavigate={handleNavigate}
               initialSelectedUserId={messageUserId || null}
+            />
+          </Suspense>
+        );
+
+      // Talent Offers — real received Offers, accept/decline (see CLAUDE.md)
+      case "talent-offers":
+        return (
+          <Suspense fallback={<PageLoadingFallback />}>
+            <TalentOffersPage
+              user={user}
+              onUpdateUser={onUpdateUser}
+              onNavigate={handleNavigate}
             />
           </Suspense>
         );
