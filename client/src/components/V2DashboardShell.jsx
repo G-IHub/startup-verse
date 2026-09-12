@@ -39,6 +39,9 @@ const V2TalentMarketplace = lazy(
 const V2Team = lazy(
   () => import("./dashboards/V2Team"),
 );
+const V2AIStaffShell = lazy(
+  () => import("./dashboards/V2AIStaffShell"),
+);
 
 // ── Placeholder for screens not yet built ─────────────────────────────────
 function V2ComingSoon({ label, user, onPageChange }) {
@@ -167,9 +170,7 @@ export default function V2DashboardShell({ user, onLogout, onUpdateUser }) {
       break;
 
     case "ai-staff":
-      screen = (
-        <V2ComingSoon label="AI Staff" {...sharedProps} />
-      );
+      screen = <V2AIStaffShell {...sharedProps} />;
       break;
 
     case "blueprints":
