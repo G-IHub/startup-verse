@@ -100,6 +100,19 @@ const CORE_AGENT_DEFINITIONS = [
         adjustable: false,
         approverRule: "role:engineering",
       },
+      {
+        // Read-only, no side effects — always executes immediately regardless
+        // of mode (see orchestrator.service.js's proposeAction branching),
+        // same as any read_only action. Lets AI PM answer "what did this PR
+        // actually do" or "what is this repo" with real file/diff content
+        // instead of only ever seeing event metadata.
+        actionKey: "read_repo_content",
+        label: "Read repo content",
+        riskCategory: "read_only",
+        defaultMode: "autonomous",
+        adjustable: false,
+        approverRule: "founder",
+      },
     ],
   },
 ];

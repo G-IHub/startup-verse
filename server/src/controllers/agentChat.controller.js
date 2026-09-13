@@ -19,6 +19,7 @@ import Startup from "../models/Startup.js";
 import WeeklyOutcome from "../models/WeeklyOutcome.js";
 import Milestone from "../models/Milestone.js";
 import Task from "../models/Task.js";
+import User from "../models/User.js";
 import mongoose from "mongoose";
 import { error as apiError, success as apiSuccess } from "../utils/apiResponse.js";
 import { chatCompletion, deepseekConfigured } from "../services/deepseekClient.js";
@@ -41,6 +42,7 @@ const MARKERS = [
   { name: "DELETE_TASK", re: /```DELETE_TASK\s*([\s\S]*?)```/ },
   { name: "DELETE_MILESTONE", re: /```DELETE_MILESTONE\s*([\s\S]*?)```/ },
   { name: "UPDATE_GOAL", re: /```UPDATE_GOAL\s*([\s\S]*?)```/ },
+  { name: "READ_REPO", re: /```READ_REPO\s*([\s\S]*?)```/ },
 ];
 
 function founderGuard(req, founderId) {
@@ -89,10 +91,15 @@ function summarizeDevEvent(e) {
     approved: "approved, executing",
     declined: "declined",
   }[e.status] || (e.status === "failed" ? `failed — ${e.result?.error || "error"}` : e.status);
-  return `${label}${pr}${repo ? ` on ${repo}` : ""} — ${statusText}`;
+  // Real bug fixed: taskDescription was already sitting in our own stored
+  // payload (set the moment a task was handed off) and never surfaced here —
+  // AI PM had this real signal about "what was built" the whole time without
+  // needing any GitHub call at all, and just wasn't using it.
+  const desc = e.payload?.taskDescription ? ` — "${String(e.payload.taskDescription).slice(0, 140)}"` : "";
+  return `${label}${pr}${repo ? ` on ${repo}` : ""}${desc} — ${statusText}`;
 }
 
-function buildSystemPrompt({ startupName, stage, goal, milestonesSummary, devActivitySummary, openTasksSummary, defaultRepo }) {
+function buildSystemPrompt({ startupName, stage, goal, milestonesSummary, devActivitySummary, openTasksSummary, defaultRepo, teamSummary }) {
   return `You are AI Product Manager, a StartupVerse agent and ${startupName ? `${startupName}'s` : "the founder's"} primary day-to-day planning partner.
 
 Your job:
@@ -117,9 +124,10 @@ Your job:
 - You can also manage real tasks, milestones, and the weekly goal directly — not just create them. Always use a real id from the "Tasks" or "Milestones" lists below; never invent one, and if you don't see the one the founder means, say so and ask rather than guessing.
   **Critical: saying it happened doesn't make it happen. Only the fenced block below does anything real.** Never write "staged," "proposed," "done," "updated," or anything implying an action was taken unless you emit the exact block in that same reply — if you're not ready to act, say what you're missing instead of describing an action you didn't take.
 \`\`\`UPDATE_TASK
-{"taskId":"...","updates":{"status":"...","title":"...","description":"...","priority":"...","assignedToName":"...","blockerReason":"...","blockerNote":"..."}}
+{"taskId":"...","updates":{"status":"...","title":"...","description":"...","priority":"...","assignedTo":null,"blockerReason":"...","blockerNote":"..."}}
 \`\`\`
   Only include the fields actually changing in "updates" — leave the rest out entirely, don't send empty strings for things you're not touching. Status must be a real one (pending, in-progress, blocked, completed) and a legal transition (e.g. you can't jump pending straight to completed — move it to in-progress first). Marking something "blocked" requires both blockerReason and blockerNote.
+  **Reassigning a task**: "assignedTo" must be a real id copied exactly from the "Team" list below, or the literal string "founder" to assign it to the founder themself — never a name, never invented. If the founder names someone not on that list, say plainly you don't see them on the team and ask them to check, rather than writing their name in anyway — a name with no real id behind it doesn't actually notify anyone or link to a real person, it would just look assigned without being assigned.
 \`\`\`DELETE_TASK
 {"taskId":"..."}
 \`\`\`
@@ -131,6 +139,11 @@ Your job:
 {"goal":"..."}
 \`\`\`
   Replaces the current weekly goal's text. Only for a founder who already has an active weekly goal (see below) — if none is set, tell them to set one from the Execution Engine first.
+- **You can actually read a real repo now — not just see that something happened to it.** If asked what a repo is, what a PR actually did, or what's in a specific file, emit this (never alongside any other block):
+\`\`\`READ_REPO
+{"owner":"...","repo":"...","target":"readme","prNumber":null,"path":null}
+\`\`\`
+  "target" is "readme" (reads the repo's real README), "pr" (reads a specific PR's real changed files/diffs — set "prNumber"), or "file" (reads one specific real file — set "path"). This runs immediately, no approval needed, since reading has no side effects. You'll get the real content back and should answer using it directly, in your own words — don't just say "here's the README," actually read it and tell the founder what it means for their product. If a README doesn't exist, or a file/PR isn't found, say so honestly rather than guessing what might be in it.
 - Besides those real actions, you still can't do anything else for real — you can't send money, sign documents, or message customers on the founder's behalf. If asked, say so honestly instead of pretending you can.
 - Write like a sharp, direct colleague, not a customer-support bot. No filler, no "I'd be happy to help."
 
@@ -140,6 +153,7 @@ Real context:
 - Default GitHub repo: ${defaultRepo || "none set yet"}
 - Milestones (id — title, status): ${milestonesSummary || "none yet"}
 - Tasks (id — title, status): ${openTasksSummary || "none yet"}
+- Team (id — name, for reassignment only): ${teamSummary || "no team members added yet"}
 - Recent AI Developer activity: ${devActivitySummary || "none yet — AI Developer hasn't done anything for this founder yet"}`;
 }
 
@@ -158,6 +172,15 @@ async function loadContext(founderId) {
     .limit(OPEN_TASKS_LIMIT)
     .lean();
   const openTasksSummary = openTasks.map((t) => `[${t._id}] ${t.title} (${t.status})`).join("; ");
+
+  // Real team roster — so a reassignment can link to a real person's real
+  // id instead of a free-text name with nothing behind it. Deliberately a
+  // simpler query than teamMembers.controller.js's full lookup (which also
+  // merges in TeamMemberProfile-only rows for cross-startup edge cases) —
+  // this is just enough for AI PM to reference a real id in chat, not the
+  // full membership resolution logic.
+  const teamMembers = await User.find({ founderId, role: { $in: ["team-member", "team"] } }, { name: 1 }).lean();
+  const teamSummary = teamMembers.map((u) => `[${u._id}] ${u.name}`).join("; ");
 
   const devAgent = await Agent.findOne({ founderId, agentKey: "dev" }).lean();
   let devActivitySummary = "";
@@ -182,6 +205,7 @@ async function loadContext(founderId) {
     weeklyOutcomeId: outcome?._id ? String(outcome._id) : null,
     milestonesSummary,
     openTasksSummary,
+    teamSummary,
     devActivitySummary,
     defaultRepo,
   };
@@ -262,6 +286,7 @@ export const sendMessage = async (req, res) => {
     const label = {
       BUILD_TASK: "task hand-off", SET_DEFAULT_REPO: "repo setting", UPDATE_TASK: "task update",
       DELETE_TASK: "task deletion", DELETE_MILESTONE: "milestone deletion", UPDATE_GOAL: "goal update",
+      READ_REPO: "repo read request",
     }[openName] || "sprint plan";
     replyText = `${raw.slice(0, raw.indexOf("```" + openName)).trim()}\n\n(I started drafting a ${label} but ran out of room to finish it — mind asking me to try again?)`;
   } else if (closed?.name === "SPRINT_PLAN") {
@@ -420,19 +445,46 @@ export const sendMessage = async (req, res) => {
         try {
           const actionType = await ActionType.findOne({ agentId: agent._id, actionKey: "update_task" });
           if (!actionType) throw new Error("update_task action type is not seeded for this agent.");
+          const updates = { ...(body.updates || {}) };
+          let assignmentNote = "";
+          // Real bug fixed: a model-supplied name with no real id behind it
+          // would previously get written as assignedToName alone — looks
+          // assigned, notifies no one, links to no real person. Only trust
+          // "assignedTo" here, resolved against a real User, never free text.
+          if (Object.prototype.hasOwnProperty.call(updates, "assignedTo")) {
+            if (updates.assignedTo === null) {
+              updates.assignedToName = "";
+            } else if (String(updates.assignedTo) === "founder") {
+              updates.assignedTo = founderId;
+              updates.assignedToName = "";
+            } else if (mongoose.isValidObjectId(updates.assignedTo)) {
+              const realMember = await User.findOne({ _id: updates.assignedTo, founderId, role: { $in: ["team-member", "team"] } }, { name: 1 });
+              if (realMember) {
+                updates.assignedToName = realMember.name;
+              } else {
+                delete updates.assignedTo;
+                delete updates.assignedToName;
+                assignmentNote = " (I couldn't find that team member for real, so I left the assignment as it was)";
+              }
+            } else {
+              delete updates.assignedTo;
+              delete updates.assignedToName;
+              assignmentNote = " (that wasn't a real team member id, so I left the assignment as it was)";
+            }
+          }
           const result = await proposeAction({
             founderId, actorType: "agent", actorId: String(agent._id), actionTypeId: actionType._id,
             targetType: "task", targetId: String(existingTask._id),
-            payload: { taskId: String(existingTask._id), updates: body.updates || {} },
+            payload: { taskId: String(existingTask._id), updates },
           });
           proposedEvent = result.event;
           proposedEventKind = "sprint_plan"; // reuses the Approval Queue link, not the AI Developer one
           if (result.event.status === "failed") {
             replyText += `\n\n(I tried to update "${existingTask.title}" but hit an error: ${result.event.result?.error || "unknown error"})`;
           } else if (result.event.status === "pending_approval") {
-            replyText += `\n\n📋 I've proposed an update to "${existingTask.title}" — check your Approval Queue to review and approve it.`;
+            replyText += `\n\n📋 I've proposed an update to "${existingTask.title}"${assignmentNote} — check your Approval Queue to review and approve it.`;
           } else {
-            replyText += `\n\n✅ Updated "${existingTask.title}".`;
+            replyText += `\n\n✅ Updated "${existingTask.title}"${assignmentNote}.`;
           }
         } catch (err) {
           logger.error("[agentChat] failed to propose task update", { message: err.message });
@@ -538,6 +590,72 @@ export const sendMessage = async (req, res) => {
       } catch (err) {
         logger.error("[agentChat] failed to propose goal update", { message: err.message });
         replyText += `\n\n(I tried to update the goal but hit an error: ${err.message})`;
+      }
+    }
+  } else if (closed?.name === "READ_REPO") {
+    // Unlike every other marker, reading has no proposal to show — the
+    // point is to actually answer the founder's question with real content.
+    // So: fetch for real, then make a second real chatCompletion call
+    // feeding that content back in, and use *that* reply — never show the
+    // founder the "let me check" stub or the raw fetched blob directly.
+    let body = null;
+    try {
+      body = JSON.parse(closed.body);
+    } catch {
+      replyText = "(I tried to read that repo but the request came out malformed — mind asking me to try again?)";
+    }
+    if (body) {
+      // ctx.defaultRepo is already the real "owner/repo" combined string
+      // loadContext built from Startup.defaultGithubRepo — split it back
+      // apart as the fallback rather than re-querying Startup here.
+      const [defaultOwner, defaultRepoName] = String(ctx.defaultRepo || "").split("/");
+      const owner = String(body.owner || "").trim() || defaultOwner || "";
+      const repo = String(body.repo || "").trim() || defaultRepoName || "";
+      const target = String(body.target || "").trim();
+      if (!owner || !repo || !["readme", "file", "pr"].includes(target)) {
+        replyText = "(I tried to read a repo but was missing the owner, repo, or a valid target — mind asking me again?)";
+      } else {
+        try {
+          const devAgent = await Agent.findOne({ founderId, agentKey: "dev" });
+          if (!devAgent) throw new Error("AI Developer isn't set up for this founder yet.");
+          const readType = await ActionType.findOne({ agentId: devAgent._id, actionKey: "read_repo_content" });
+          if (!readType) throw new Error("read_repo_content action type is not seeded for this agent.");
+          const result = await proposeAction({
+            founderId, actorType: "agent", actorId: String(devAgent._id), actionTypeId: readType._id,
+            targetType: "repo_content", targetId: `read-${Date.now()}`,
+            payload: { owner, repo, target, prNumber: body.prNumber || null, path: body.path || null },
+          });
+          if (result.event.status === "failed") {
+            replyText = `(I tried to read that, but hit a real error: ${result.event.result?.error || "unknown error"})`;
+          } else {
+            const fetched = result.event.result || {};
+            let toolText;
+            if (!fetched.found) {
+              toolText = target === "pr"
+                ? `PR #${body.prNumber} on ${owner}/${repo} has no files, or wasn't found.`
+                : `No "${target === "readme" ? "README" : fetched.path}" found in ${owner}/${repo}.`;
+            } else if (target === "pr") {
+              const fileBlocks = (fetched.files || []).map((f) => `--- ${f.filename} (${f.status}, +${f.additions}/-${f.deletions}) ---\n${f.patch || "(no diff available)"}`).join("\n\n");
+              toolText = `Real diff for PR #${fetched.prNumber} on ${owner}/${repo}${fetched.moreFiles ? ` (showing ${fetched.files.length} of ${fetched.files.length + fetched.moreFiles} changed files)` : ""}:\n\n${fileBlocks}`;
+            } else {
+              toolText = `Real content of ${fetched.path} in ${owner}/${repo}${fetched.truncated ? " (truncated)" : ""}:\n\n${fetched.content}`;
+            }
+            try {
+              const followUp = await chatCompletion({
+                systemPrompt: buildSystemPrompt(ctx),
+                messages: [...messages, { role: "assistant", content: raw.replace(closed.fullMatch, "").trim() || "Let me check." }, { role: "user", content: `[Automated result, not from the founder] ${toolText}\n\nAnswer my actual question now using this real content, in your own words.` }],
+                maxTokens: 1200,
+              });
+              replyText = followUp.trim() || "(I read it but couldn't put together an answer — mind asking again?)";
+            } catch (err) {
+              logger.error("[agentChat] failed to synthesize read_repo_content result", { message: err.message });
+              replyText = `I read it for real, but couldn't finish summarizing it: ${err.message}`;
+            }
+          }
+        } catch (err) {
+          logger.error("[agentChat] failed to read repo content", { message: err.message });
+          replyText = `(I tried to read that repo but hit an error: ${err.message})`;
+        }
       }
     }
   }

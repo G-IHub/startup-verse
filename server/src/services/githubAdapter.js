@@ -96,3 +96,42 @@ export async function mergeBranches({ founderId, owner, repo, base, head, commit
   });
   return { merged: true, sha: result.sha || null };
 }
+
+/**
+ * Real file content via the Contents API — added so AI PM can actually read
+ * a repo (README, a specific file) instead of only ever seeing metadata
+ * about PRs/deploys. GitHub returns file content base64-encoded for files
+ * under 1MB; returns null (not a thrown error) for a 404 so callers can try
+ * a few candidate paths (e.g. README.md vs Readme.md) without noise.
+ */
+export async function getFileContent({ founderId, owner, repo, path, ref }) {
+  const token = await getFounderToken(founderId);
+  const qs = ref ? `?ref=${encodeURIComponent(ref)}` : "";
+  const response = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${encodeURIComponent(path)}${qs}`, {
+    headers: {
+      Accept: "application/vnd.github+json",
+      Authorization: `Bearer ${token}`,
+      "User-Agent": "StartupVerse-AI-Developer",
+      "X-GitHub-Api-Version": "2022-11-28",
+    },
+  });
+  if (response.status === 404) return null;
+  const data = await response.json();
+  if (!response.ok) throw new Error(data?.message || `GitHub API error (${response.status})`);
+  if (Array.isArray(data)) throw new Error(`"${path}" is a directory, not a file.`);
+  if (data.encoding !== "base64") throw new Error(`Unexpected encoding "${data.encoding}" for "${path}".`);
+  return { path: data.path, content: Buffer.from(data.content, "base64").toString("utf8"), sha: data.sha };
+}
+
+/** Real changed-file list (with diffs) for one PR — what AI PM needs to answer "what did this PR actually do." */
+export async function getPullRequestFiles({ founderId, owner, repo, prNumber }) {
+  const token = await getFounderToken(founderId);
+  const files = await gh(token, `/repos/${owner}/${repo}/pulls/${prNumber}/files?per_page=30`);
+  return (Array.isArray(files) ? files : []).map((f) => ({
+    filename: f.filename,
+    status: f.status,
+    additions: f.additions,
+    deletions: f.deletions,
+    patch: f.patch || "",
+  }));
+}

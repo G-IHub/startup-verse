@@ -8,7 +8,7 @@
  * means orchestrator.service.js never needs to know which integration
  * backs a given action type.
  */
-import { openPullRequest, mergePullRequest, mergeBranches } from "./githubAdapter.js";
+import { openPullRequest, mergePullRequest, mergeBranches, getFileContent, getPullRequestFiles } from "./githubAdapter.js";
 import { draftText, deepseekConfigured } from "./deepseekClient.js";
 import Startup from "../models/Startup.js";
 import Milestone from "../models/Milestone.js";
@@ -88,6 +88,51 @@ async function executeGithubMergeMain({ founderId, payload }) {
     head: baseBranch || DEFAULT_STAGING_BRANCH,
     commitMessage: "AI Developer: promote staging to production (human-approved)",
   });
+}
+
+const README_CANDIDATES = ["README.md", "Readme.md", "readme.md", "README.MD"];
+const CONTENT_CHAR_LIMIT = 4000;
+const PATCH_CHAR_LIMIT = 1200;
+const MAX_PR_FILES = 6;
+
+/**
+ * Real repo content for AI PM — read-only, no side effects, so it always
+ * executes immediately (see coreAgentSeeds.js's riskCategory for this one).
+ * Truncates aggressively: this result gets fed back into a second real
+ * chatCompletion call (see agentChat.controller.js), and an untruncated
+ * README or a PR with many large diffs could blow well past a reasonable
+ * token budget for that follow-up call.
+ */
+async function executeReadRepoContent({ founderId, payload }) {
+  const { owner, repo, target, prNumber, path } = payload || {};
+  if (!owner || !repo || !target) {
+    throw new Error("read_repo_content requires owner, repo, and target.");
+  }
+  if (target === "readme") {
+    for (const candidate of README_CANDIDATES) {
+      const file = await getFileContent({ founderId, owner, repo, path: candidate });
+      if (file) {
+        return { target, found: true, path: file.path, content: file.content.slice(0, CONTENT_CHAR_LIMIT), truncated: file.content.length > CONTENT_CHAR_LIMIT };
+      }
+    }
+    return { target, found: false };
+  }
+  if (target === "file") {
+    if (!path) throw new Error("read_repo_content with target \"file\" requires a path.");
+    const file = await getFileContent({ founderId, owner, repo, path });
+    if (!file) return { target, found: false, path };
+    return { target, found: true, path: file.path, content: file.content.slice(0, CONTENT_CHAR_LIMIT), truncated: file.content.length > CONTENT_CHAR_LIMIT };
+  }
+  if (target === "pr") {
+    if (!prNumber) throw new Error("read_repo_content with target \"pr\" requires prNumber.");
+    const files = await getPullRequestFiles({ founderId, owner, repo, prNumber });
+    return {
+      target, found: files.length > 0, prNumber,
+      files: files.slice(0, MAX_PR_FILES).map((f) => ({ ...f, patch: f.patch.slice(0, PATCH_CHAR_LIMIT) })),
+      moreFiles: Math.max(0, files.length - MAX_PR_FILES),
+    };
+  }
+  throw new Error(`read_repo_content: unknown target "${target}" (expected "readme", "file", or "pr").`);
 }
 
 /**
@@ -251,6 +296,7 @@ const EXECUTORS = {
   delete_task: executeDeleteTask,
   delete_milestone: executeDeleteMilestone,
   update_goal: executeUpdateGoal,
+  read_repo_content: executeReadRepoContent,
 };
 
 export function hasExecutor(actionKey) {
