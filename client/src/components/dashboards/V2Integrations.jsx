@@ -1,10 +1,18 @@
 /**
  * V2Integrations — Integrations management page
  * Built from StartupVerse_Integrations.html mockup
+ *
+ * Real as of docs/ai-agent-roadmap.md Phase 2: only the GitHub card reads/
+ * writes real connect state (same per-founder OAuth connection AI Developer's
+ * workspace uses — client/src/utils/api/githubApi.js), since it's the only
+ * integration with a real backend today. Everything else stays honest
+ * illustrative mock, matching the pattern already established for the agent
+ * workspace pages, pending Phase 3's real integrations.
  */
 
-import React, { useState } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { cn } from "../ui/utils";
+import * as githubApi from "../../utils/api/githubApi";
 
 /* ── Data ─────────────────────────────────────────────────────────────────── */
 const SECTIONS = [
@@ -111,15 +119,23 @@ function Modal({ data, onClose, onToast, onNavigate }) {
           <button type="button" onClick={onClose} className="rounded-full border border-v2-border px-4 py-1.5 font-body text-[12px] font-medium text-v2-heading hover:bg-gray-50">Close</button>
           <button
             type="button"
-            onClick={() => { onClose(); onToast(data.connectToast); }}
+            disabled={data.busy || (data.real && !data.onAction)}
+            onClick={async () => {
+              if (data.onAction) {
+                await data.onAction();
+                return;
+              }
+              onClose();
+              onToast(data.connectToast);
+            }}
             className={cn(
-              "rounded-full px-4 py-1.5 font-body text-[12px] font-medium transition-opacity hover:opacity-90",
+              "rounded-full px-4 py-1.5 font-body text-[12px] font-medium transition-opacity hover:opacity-90 disabled:opacity-60",
               data.connectDanger
                 ? "border border-[#f3c9c9] bg-white text-[#791F1F]"
                 : "bg-v2-purple text-white"
             )}
           >
-            {data.connectLabel}
+            {data.busy ? "Working…" : data.connectLabel}
           </button>
         </div>
       </div>
@@ -188,10 +204,81 @@ function IntCard({ item, onOpen }) {
 export default function V2Integrations({ onBack, onNavigate }) {
   const [modal, setModal] = useState(null);
   const [toast, setToast] = useState("");
+  const [gh, setGh] = useState({ connected: false, configured: true, githubLogin: "" });
+  const [ghBusy, setGhBusy] = useState(false);
 
   const showToast = (msg) => { setToast(msg); setTimeout(() => setToast(""), 2400); };
-  const openModal = (key) => setModal(MODALS[key] ?? null);
+
+  const refreshGithub = useCallback(async () => {
+    try {
+      const status = await githubApi.getGithubConnection();
+      setGh(status);
+    } catch (err) {
+      showToast(err?.message || "Could not check GitHub status.");
+    }
+  }, []);
+
+  useEffect(() => { refreshGithub(); }, [refreshGithub]);
+
+  const connectGithub = () => {
+    setGhBusy(true);
+    githubApi.getGithubAuthorizeUrl()
+      .then((data) => {
+        if (!data.authUrl) throw new Error("GitHub authorize URL missing.");
+        const popup = window.open(data.authUrl, "GitHub OAuth", "width=600,height=700");
+        if (!popup) throw new Error("Allow popups to connect GitHub.");
+        const timer = setInterval(() => {
+          if (popup.closed) {
+            clearInterval(timer);
+            refreshGithub().finally(() => { setGhBusy(false); setModal(null); showToast("GitHub connected"); });
+          }
+        }, 500);
+      })
+      .catch((err) => { showToast(err?.message || "Could not start GitHub connect."); setGhBusy(false); });
+  };
+
+  const disconnectGithub = async () => {
+    setGhBusy(true);
+    try {
+      await githubApi.disconnectGithub();
+      await refreshGithub();
+      showToast("Disconnected GitHub — AI Developer can't open PRs until you reconnect.");
+    } catch (err) {
+      showToast(err?.message || "Could not disconnect GitHub.");
+    } finally {
+      setGhBusy(false);
+      setModal(null);
+    }
+  };
+
+  const openModal = (key) => {
+    if (key === "github") {
+      setModal(gh.connected
+        ? {
+            title: "GitHub", sub: `Connected as ${gh.githubLogin}`,
+            scopes: ["Open pull requests, push branches", "Merge to staging autonomously", "Deploy to production — always locked, always waits for you"],
+            note: "Deploying to production is permanently locked in Autonomy Settings, regardless of what this token permits.",
+            connectLabel: "Disconnect", connectDanger: true, real: true, busy: ghBusy, onAction: disconnectGithub,
+          }
+        : {
+            title: "Connect GitHub", sub: "Real per-founder OAuth connection — the same one AI Developer's workspace uses",
+            scopes: ["Read your repos", "Open pull requests, push branches", "Read issues & commit history"],
+            note: gh.configured ? "You'll be redirected to GitHub to authorize access." : "GitHub OAuth isn't configured on this server yet — ask an admin to set GITHUB_CLIENT_ID/SECRET.",
+            connectLabel: gh.configured ? "Connect →" : "Not available", real: true, busy: ghBusy, onAction: gh.configured ? connectGithub : undefined,
+          });
+      return;
+    }
+    setModal(MODALS[key] ?? null);
+  };
   const closeModal = () => setModal(null);
+
+  const sections = SECTIONS.map((section) => ({
+    ...section,
+    items: section.items.map((item) => item.id === "github"
+      ? { ...item, connected: gh.connected, meta: gh.connected ? `Connected as ${gh.githubLogin}` : "Not connected yet" }
+      : item),
+  }));
+  const connectedCount = sections.flatMap((s) => s.items).filter((i) => i.connected).length;
 
   return (
     <div className="flex min-h-0 flex-1 overflow-hidden bg-v2-page">
@@ -205,7 +292,7 @@ export default function V2Integrations({ onBack, onNavigate }) {
             <span className="font-body text-[13px] font-semibold text-v2-heading">Integrations</span>
             <span className="text-gray-300">·</span>
             <span className="inline-flex items-center gap-1.5 rounded-full bg-[#EAF3DE] px-2.5 py-1 font-body text-[11px] font-medium text-[#27500A]">
-              <span className="h-[5px] w-[5px] rounded-full bg-[#1D9E75]" />6 connected · 3 available
+              <span className="h-[5px] w-[5px] rounded-full bg-[#1D9E75]" />{connectedCount} connected · {sections.flatMap((s) => s.items).length - connectedCount} available
             </span>
           </div>
           <button type="button" onClick={() => onNavigate?.("workroom")} className="rounded-full border border-v2-border bg-white px-3 py-1.5 font-body text-[12px] font-medium text-v2-heading hover:bg-gray-50 transition-colors">
@@ -214,7 +301,7 @@ export default function V2Integrations({ onBack, onNavigate }) {
         </div>
 
         {/* Sections */}
-        {SECTIONS.map((section) => (
+        {sections.map((section) => (
           <div key={section.title} className="space-y-2.5">
             <div>
               <div className="font-body text-[13px] font-medium text-v2-heading">{section.title}</div>
