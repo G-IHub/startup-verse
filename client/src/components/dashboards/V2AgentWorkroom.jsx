@@ -12,8 +12,8 @@ import {
   TrendingUp, Shield, Activity,
 } from "lucide-react";
 import { useOfficeStore } from "../../state/useOfficeStore";
-import { getAgentEvents, resolveAgentEvent } from "../../utils/api/agentOrchestrationApi";
-import { formatEventTime } from "../../utils/agentDisplay";
+import { getAgents, getAgentEvents, resolveAgentEvent } from "../../utils/api/agentOrchestrationApi";
+import { formatEventTime, paletteForAgent, initialsForAgent } from "../../utils/agentDisplay";
 
 /* ─────────────────────────────────────────────
    Static mock data  (wire to API when ready)
@@ -43,13 +43,6 @@ const FEED_ITEMS = [
   { time: "8:15am", from: { initials: "PM",  bg: "#EEEDFE", color: "#534AB7", isAgent: true },  to: null, text: "AI Product Manager rebuilt the Week 5 priority stack around the cleared blocker and the Growth Analyst's signal, and queued the plan for your review.", tags: [{ label: "Escalated · needs approval", bg: "#FCEBEB", color: "#791F1F" }] },
 ];
 
-const DEP_MAP = [
-  { initials: "PM",  bg: "#EEEDFE", color: "#534AB7", name: "AI Product Manager",   task: "Rebuilding Week 5 sprint plan",      state: "active",   stateLabel: "Working",         stateBg: "#EAF3DE", stateColor: "#27500A" },
-  { initials: "AO",  bg: "#EFB0AF", color: "#791F1F", name: "You (Adaeze) · Founder", task: "4 approvals waiting",              state: "waiting",  stateLabel: "Needs decision",  stateBg: "#FCEBEB", stateColor: "#791F1F" },
-  { initials: "SA",  bg: "#E6F1FB", color: "#0C447C", name: "AI Sales",               task: "Outreach queued, can't send",      state: "blocked",  stateLabel: "Blocked on you",  stateBg: "#FCEBEB", stateColor: "#791F1F" },
-  { initials: "CA",  bg: "#FAEEDA", color: "#633806", name: "Chidinma A. · Marketing", task: "Reviewing nurture email tone",     state: "waiting",  stateLabel: "Human review",    stateBg: "#FCF7EC", stateColor: "#633806" },
-  { initials: "GA",  bg: "#E6F1FB", color: "#0C447C", name: "AI Growth Analyst",      task: "Waiting on Week 5 interview log",  state: "active",   stateLabel: "Idle · no data",  stateBg: "#FCF7EC", stateColor: "#633806" },
-];
 
 const INITIAL_APPROVALS = [
   { id: "appr-1", agent: { initials: "SA", bg: "#E6F1FB", color: "#0C447C" }, title: "Send 10 clinic outreach messages", risk: "Low risk", riskBg: "#f3f4f6", riskColor: "#6b7280", desc: "AI Sales personalised and queued all 10 — Lagos Island + VI, Vezeeta supply-first script.", waitingOn: "you", primaryLabel: "Send all →", primaryAction: "Sent 10 messages" },
@@ -162,6 +155,63 @@ function summarizeAgentStatus(agentKey, events) {
   return { status: "working", statusLabel: "Active — real work on file" };
 }
 
+/**
+ * Built generically off whatever real Agent docs actually exist for this
+ * founder (via getAgents) rather than hardcoded to "pm"/"dev" — today that's
+ * all there is, but coreAgentSeeds.js's own doc comment says new real agents
+ * get added to the same registry over time, and this way the Hero and
+ * dependency map pick them up automatically, with zero further changes here.
+ */
+const KNOWN_INITIALS = { pm: "PM", dev: "DEV" };
+function styleForAgent(agent) {
+  const palette = paletteForAgent(agent.id || agent.agentKey);
+  return { initials: KNOWN_INITIALS[agent.agentKey] || initialsForAgent(agent.name), bg: palette.bg, color: palette.color };
+}
+
+function summarizeAgentActivity(agent, events) {
+  const agentEvents = events.filter((e) => e.actionTypeId?.agentId?.agentKey === agent.agentKey);
+  if (agentEvents.length === 0) {
+    return { state: "idle", stateLabel: "Not started yet", task: "No real task given yet." };
+  }
+  const latest = agentEvents[0]; // events already sorted newest-first
+  if (latest.status === "pending_approval") {
+    return { state: "waiting", stateLabel: "Needs your approval", task: latest.actionTypeId?.label || "Pending action" };
+  }
+  if (latest.status === "failed") {
+    return { state: "blocked", stateLabel: "Last action failed", task: latest.actionTypeId?.label || "Action failed" };
+  }
+  return { state: "active", stateLabel: "Active", task: latest.actionTypeId?.label || "Real work in progress" };
+}
+
+function buildRealDepMap(agents, events, approvalsCount) {
+  const nodes = agents.map((agent) => {
+    const style = styleForAgent(agent);
+    const activity = summarizeAgentActivity(agent, events);
+    const stateMeta = {
+      active:  { stateLabel: activity.stateLabel, stateBg: "#EAF3DE", stateColor: "#27500A", cardState: "active" },
+      waiting: { stateLabel: activity.stateLabel, stateBg: "#FCF7EC", stateColor: "#633806", cardState: "waiting" },
+      blocked: { stateLabel: activity.stateLabel, stateBg: "#FCEBEB", stateColor: "#791F1F", cardState: "blocked" },
+      idle:    { stateLabel: activity.stateLabel, stateBg: "#f3f4f6", stateColor: "#6b7280", cardState: "waiting" },
+    }[activity.state];
+    return { ...style, name: agent.name, task: activity.task, state: stateMeta.cardState, stateLabel: stateMeta.stateLabel, stateBg: stateMeta.stateBg, stateColor: stateMeta.stateColor };
+  });
+  nodes.push({
+    initials: "You", bg: "#EFB0AF", color: "#791F1F", name: "You · Founder",
+    task: approvalsCount > 0 ? `${approvalsCount} real approval${approvalsCount === 1 ? "" : "s"} waiting` : "All caught up",
+    state: approvalsCount > 0 ? "waiting" : "active",
+    stateLabel: approvalsCount > 0 ? "Needs decision" : "All clear",
+    stateBg: approvalsCount > 0 ? "#FCF7EC" : "#EAF3DE",
+    stateColor: approvalsCount > 0 ? "#633806" : "#27500A",
+  });
+  return nodes;
+}
+
+function buildHeroStats(agents, events, approvalsCount) {
+  const total = events.length;
+  const autonomous = events.filter((e) => ["autonomous_completed", "human_completed"].includes(e.status)).length;
+  return { total, agentCount: agents.length, autonomous, waiting: approvalsCount };
+}
+
 /* ─────────────────────────────────────────────
    Tiny helpers
 ───────────────────────────────────────────── */
@@ -252,28 +302,36 @@ function Toast({ msg }) {
 /* ─────────────────────────────────────────────
    Overnight Summary Hero
 ───────────────────────────────────────────── */
-function OvernightHero({ agentsPaused }) {
+function OvernightHero({ agentsPaused, stats }) {
+  const { total, agentCount, autonomous, waiting } = stats;
   return (
     <div className="relative overflow-hidden rounded-2xl p-5" style={{ background: "linear-gradient(135deg,#3C3489,#1B4FD8)" }}>
-      <div className="mb-1.5 font-body text-[11px]" style={{ color: "#c9c5f0" }}>While you were away · 11:42pm – 8:15am</div>
-      <p className="font-body text-[15px] font-medium leading-relaxed text-white" style={{ maxWidth: 600 }}>
-        Your team ran <strong>11 coordinated actions</strong> across 4 agents and 2 human teammates overnight.{" "}
-        <strong>6 completed autonomously.</strong>{" "}
-        <strong>5 are waiting on a person</strong> — some on you, some on James and Chidinma.
-      </p>
-      <div className="mt-4 flex flex-wrap gap-6">
-        {[
-          { val: "78 → 91", lbl: "projected score if approved" },
-          { val: "6",       lbl: "agents + humans coordinated" },
-          { val: "1",       lbl: "blocker cleared without you" },
-          { val: "4",       lbl: "waiting in your queue" },
-        ].map((s) => (
-          <div key={s.lbl}>
-            <div className="font-heading text-[22px] font-semibold text-white">{s.val}</div>
-            <div className="font-body text-[10px]" style={{ color: "#c9c5f0" }}>{s.lbl}</div>
-          </div>
-        ))}
-      </div>
+      <div className="mb-1.5 font-body text-[11px]" style={{ color: "#c9c5f0" }}>Real activity · AI Product Manager and AI Developer</div>
+      {total === 0 ? (
+        <p className="font-body text-[15px] font-medium leading-relaxed text-white" style={{ maxWidth: 600 }}>
+          No real activity yet — give AI Developer a task, or chat with AI Product Manager, to get your team started.
+        </p>
+      ) : (
+        <p className="font-body text-[15px] font-medium leading-relaxed text-white" style={{ maxWidth: 600 }}>
+          Your team has run <strong>{total} real action{total === 1 ? "" : "s"}</strong> across <strong>{agentCount} real agent{agentCount === 1 ? "" : "s"}</strong>.{" "}
+          <strong>{autonomous} completed on {autonomous === 1 ? "its" : "their"} own.</strong>{" "}
+          {waiting > 0 ? <strong>{waiting} {waiting === 1 ? "is" : "are"} waiting on you.</strong> : "Nothing is waiting on you right now."}
+        </p>
+      )}
+      {total > 0 && (
+        <div className="mt-4 flex flex-wrap gap-6">
+          {[
+            { val: String(total),      lbl: "real actions" },
+            { val: String(agentCount), lbl: "real agents active" },
+            { val: String(waiting),    lbl: "waiting in your queue" },
+          ].map((s) => (
+            <div key={s.lbl}>
+              <div className="font-heading text-[22px] font-semibold text-white">{s.val}</div>
+              <div className="font-body text-[10px]" style={{ color: "#c9c5f0" }}>{s.lbl}</div>
+            </div>
+          ))}
+        </div>
+      )}
       {agentsPaused && (
         <div className="absolute right-4 top-4 rounded-full bg-white/20 px-3 py-1 font-body text-[11px] font-medium text-white">
           ⏸ Agents paused
@@ -344,15 +402,15 @@ function CoordinationFeed({ items, onViewLog }) {
 /* ─────────────────────────────────────────────
    Right Now (dependency map)
 ───────────────────────────────────────────── */
-function RightNowMap() {
+function RightNowMap({ nodes }) {
   return (
     <div className="rounded-2xl border border-v2-border bg-white p-4">
       <div className="mb-3">
         <div className="font-heading text-[13px] font-semibold text-v2-heading">Right now</div>
-        <div className="mt-0.5 font-body text-[11px] text-v2-muted">Agents and teammates — who's working, who's blocked, who's waiting on whom</div>
+        <div className="mt-0.5 font-body text-[11px] text-v2-muted">Real agents and you — who's working, who's blocked, who's waiting on whom</div>
       </div>
       <div className="flex items-stretch gap-0 overflow-x-auto pb-2">
-        {DEP_MAP.map((node, i) => (
+        {nodes.map((node, i) => (
           <React.Fragment key={node.name}>
             <div
               className={cn(
@@ -369,7 +427,7 @@ function RightNowMap() {
                 {node.stateLabel}
               </div>
             </div>
-            {i < DEP_MAP.length - 1 && (
+            {i < nodes.length - 1 && (
               <div className="flex w-6 shrink-0 items-center justify-center">
                 <ChevronRight className="h-3.5 w-3.5 text-gray-300" />
               </div>
@@ -539,6 +597,9 @@ export default function V2AgentWorkroom({ user, onNavigate }) {
   const [approvals, setApprovals] = useState([]);
   const [feedItems, setFeedItems] = useState([]);
   const [realStatus, setRealStatus] = useState({});
+  const [realAgents, setRealAgents] = useState([]);
+  const [heroStats, setHeroStats] = useState({ total: 0, agentCount: 0, autonomous: 0, waiting: 0 });
+  const [depMapNodes, setDepMapNodes] = useState([]);
   const [agentsPaused, setAgentsPaused] = useState(false);
   const [toast, setToast] = useState("");
   const [modal, setModal] = useState(null); // { type, data }
@@ -550,14 +611,20 @@ export default function V2AgentWorkroom({ user, onNavigate }) {
 
   const refreshRealData = useCallback(() => {
     if (!resolvedFounderId) return;
-    getAgentEvents(resolvedFounderId)
-      .then((events) => {
-        setFeedItems(buildRealFeed(events || []));
-        setApprovals(buildRealApprovals(events || []));
+    Promise.all([getAgents(resolvedFounderId), getAgentEvents(resolvedFounderId)])
+      .then(([agents, events]) => {
+        const realAgentList = agents || [];
+        const realEvents = events || [];
+        const realApprovals = buildRealApprovals(realEvents);
+        setRealAgents(realAgentList);
+        setFeedItems(buildRealFeed(realEvents));
+        setApprovals(realApprovals);
         setRealStatus({
-          pm: summarizeAgentStatus("pm", events || []),
-          dev: summarizeAgentStatus("dev", events || []),
+          pm: summarizeAgentStatus("pm", realEvents),
+          dev: summarizeAgentStatus("dev", realEvents),
         });
+        setHeroStats(buildHeroStats(realAgentList, realEvents, realApprovals.length));
+        setDepMapNodes(buildRealDepMap(realAgentList, realEvents, realApprovals.length));
       })
       .catch(() => {
         // Real data is a nice-to-have here — the widgets just show their
@@ -598,11 +665,13 @@ export default function V2AgentWorkroom({ user, onNavigate }) {
           <span className="text-gray-300">·</span>
           <span className={cn("inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 font-body text-[11px] font-medium", agentsPaused ? "bg-gray-100 text-gray-500" : "bg-[#EAF3DE] text-[#27500A]")}>
             <span className="h-[5px] w-[5px] rounded-full" style={{ background: agentsPaused ? "#9ca3af" : "#1D9E75" }} />
-            {agentsPaused ? "Agents paused" : "5 active — 4 agents, 1 human"}
+            {agentsPaused ? "Agents paused" : `${realAgents.length} real agent${realAgents.length === 1 ? "" : "s"}`}
           </span>
-          <span className="inline-flex items-center gap-1 rounded-full bg-[#FAEEDA] px-2.5 py-1 font-body text-[11px] font-medium text-[#633806]">
-            4 waiting on someone
-          </span>
+          {queueCount > 0 && (
+            <span className="inline-flex items-center gap-1 rounded-full bg-[#FAEEDA] px-2.5 py-1 font-body text-[11px] font-medium text-[#633806]">
+              {queueCount} waiting on you
+            </span>
+          )}
         </div>
         <div className="flex shrink-0 items-center gap-2">
           <button
@@ -636,9 +705,9 @@ export default function V2AgentWorkroom({ user, onNavigate }) {
 
         {/* Main content — block container so children keep natural heights; overflow-y-auto scrolls */}
         <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-5">
-          <OvernightHero agentsPaused={agentsPaused} />
+          <OvernightHero agentsPaused={agentsPaused} stats={heroStats} />
           <CoordinationFeed items={feedItems} onViewLog={() => onNavigate?.("audit-trail")} />
-          <RightNowMap />
+          <RightNowMap nodes={depMapNodes} />
         </div>
 
         {/* Right panel — 320px matches V2AppLayout standard right-panel width */}
