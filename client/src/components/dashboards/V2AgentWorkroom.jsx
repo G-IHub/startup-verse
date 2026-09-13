@@ -4,13 +4,16 @@
  * and individual agent pages are accessed via buttons/links inside this view.
  */
 
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useEffect } from "react";
 import { cn } from "../ui/utils";
 import {
   Zap, Users, Clock, CheckCircle2, AlertCircle, ChevronRight,
   Pause, Settings, ArrowRight, X, ExternalLink, FileText,
   TrendingUp, Shield, Activity,
 } from "lucide-react";
+import { useOfficeStore } from "../../state/useOfficeStore";
+import { getAgentEvents, resolveAgentEvent } from "../../utils/api/agentOrchestrationApi";
+import { formatEventTime } from "../../utils/agentDisplay";
 
 /* ─────────────────────────────────────────────
    Static mock data  (wire to API when ready)
@@ -54,6 +57,110 @@ const INITIAL_APPROVALS = [
   { id: "appr-3", agent: { initials: "PM", bg: "#EEEDFE", color: "#534AB7" }, title: "Week 5 sprint plan", risk: "Low risk", riskBg: "#f3f4f6", riskColor: "#6b7280", desc: "4 milestones, 11 tasks, rebuilt around the cleared blocker and this week's interview signal.", waitingOn: "you", primaryLabel: "Push to engine", primaryAction: "Pushed sprint plan to Execution Engine" },
   { id: "appr-4", agent: { initials: "CA", bg: "#FAEEDA", color: "#633806" }, title: "Nurture email tone review", risk: "FYI only", riskBg: "#f3f4f6", riskColor: "#6b7280", desc: "Routed to Chidinma, not you — brand-voice calls go to the marketing role holder.", waitingOn: "Chidinma A.", isFyi: true },
 ];
+
+/* ─────────────────────────────────────────────
+   Real data (PM + AI Developer only — the only two real agents;
+   MK/SA/GA/human-teammate content above stays honest illustrative mock)
+───────────────────────────────────────────── */
+const PM_ACTOR = { initials: "PM", bg: "#EEEDFE", color: "#534AB7", isAgent: true };
+const DEV_ACTOR = { initials: "DEV", bg: "#f3f4f6", color: "#6b7280", isAgent: true };
+const YOU_ACTOR = { initials: "You", bg: "#EFB0AF", color: "#791F1F", isAgent: false };
+
+function describeDevEvent(e) {
+  const targetId = e.targetId || "";
+  const actionKey = e.actionTypeId?.actionKey;
+  const repoLabel = e.payload?.owner && e.payload?.repo ? `${e.payload.owner}/${e.payload.repo}` : "";
+
+  if (actionKey === "github_open_pr") {
+    // targetId's own prefix tells us who actually initiated this, since the
+    // three real callers (agentChat.controller.js's BUILD_TASK hand-off, the
+    // auto-build queue, and the AI Developer workspace's manual form) each
+    // use a distinct prefix — a real structural signal, not a guess.
+    const fromActor = targetId.startsWith("handoff-") || targetId.startsWith("sprint-task-") ? "pm" : "you";
+    const text = fromActor === "pm"
+      ? `Handed AI Developer a task: ${e.payload?.taskDescription || "a build task"}`
+      : `You asked AI Developer to build: ${e.payload?.taskDescription || "a task"}`;
+    const tag = e.status === "failed"
+      ? { label: `Failed — ${e.result?.error || "error"}`, bg: "#FCEBEB", color: "#791F1F" }
+      : { label: `PR opened${repoLabel ? " · " + repoLabel : ""}`, bg: "#f3f4f6", color: "#6b7280" };
+    return { from: fromActor === "pm" ? PM_ACTOR : YOU_ACTOR, to: DEV_ACTOR, text, tag, link: e.result?.prUrl };
+  }
+  if (actionKey === "github_merge_staging") {
+    return {
+      from: DEV_ACTOR, to: null,
+      text: `Merged to staging${repoLabel ? " on " + repoLabel : ""}.`,
+      tag: e.status === "failed" ? { label: "Failed", bg: "#FCEBEB", color: "#791F1F" } : { label: "Autonomous", bg: "#f3f4f6", color: "#6b7280" },
+    };
+  }
+  if (actionKey === "github_merge_main") {
+    if (e.status === "pending_approval") {
+      return { from: DEV_ACTOR, to: YOU_ACTOR, text: `Requested a production deploy${repoLabel ? " on " + repoLabel : ""} — needs your approval.`, tag: { label: "Escalated · needs approval", bg: "#FCEBEB", color: "#791F1F" } };
+    }
+    if (e.status === "human_completed" || e.status === "autonomous_completed") {
+      return { from: DEV_ACTOR, to: null, text: `Deployed to production${repoLabel ? " on " + repoLabel : ""}.`, tag: { label: "Live in production", bg: "#EAF3DE", color: "#27500A" } };
+    }
+    if (e.status === "declined") {
+      return { from: DEV_ACTOR, to: null, text: `Production deploy declined${repoLabel ? " on " + repoLabel : ""}.`, tag: { label: "Declined", bg: "#FCEBEB", color: "#791F1F" } };
+    }
+  }
+  return null;
+}
+
+function describePmEvent(e) {
+  if (e.actionTypeId?.actionKey !== "propose_sprint_plan") return null;
+  const milestones = e.payload?.milestones || [];
+  const taskCount = milestones.reduce((n, m) => n + (m.tasks?.length || 0), 0);
+  const text = `Proposed a sprint plan — ${milestones.length} milestone${milestones.length === 1 ? "" : "s"}, ${taskCount} task${taskCount === 1 ? "" : "s"}.`;
+  const tag = e.status === "pending_approval" ? { label: "Escalated · needs approval", bg: "#FCEBEB", color: "#791F1F" }
+    : e.status === "declined" ? { label: "Declined", bg: "#FCEBEB", color: "#791F1F" }
+    : { label: "Approved", bg: "#EAF3DE", color: "#27500A" };
+  return { from: PM_ACTOR, to: YOU_ACTOR, text, tag };
+}
+
+function buildRealFeed(events) {
+  return events
+    .map((e) => {
+      const agentKey = e.actionTypeId?.agentId?.agentKey;
+      const desc = agentKey === "dev" ? describeDevEvent(e) : agentKey === "pm" ? describePmEvent(e) : null;
+      if (!desc) return null;
+      return { id: e.id, time: formatEventTime(e.createdAt), ...desc };
+    })
+    .filter(Boolean)
+    .slice(0, 8); // events already sorted newest-first by getAgentEvents
+}
+
+function buildRealApprovals(events) {
+  return events
+    .filter((e) => e.status === "pending_approval" && ["pm", "dev"].includes(e.actionTypeId?.agentId?.agentKey))
+    .map((e) => {
+      const isDev = e.actionTypeId?.agentId?.agentKey === "dev";
+      const repoLabel = e.payload?.owner && e.payload?.repo ? `${e.payload.owner}/${e.payload.repo}` : "";
+      const milestones = e.payload?.milestones;
+      const planDesc = Array.isArray(milestones)
+        ? `${milestones.length} milestone${milestones.length === 1 ? "" : "s"}, ${milestones.reduce((n, m) => n + (m.tasks?.length || 0), 0)} task${milestones.reduce((n, m) => n + (m.tasks?.length || 0), 0) === 1 ? "" : "s"}.`
+        : null;
+      return {
+        id: e.id,
+        agent: isDev ? DEV_ACTOR : PM_ACTOR,
+        title: e.actionTypeId?.label || "Pending action",
+        risk: e.actionTypeId?.riskCategory === "sensitive_locked" ? "Sensitive" : "Low risk",
+        riskBg: e.actionTypeId?.riskCategory === "sensitive_locked" ? "#FCEBEB" : "#f3f4f6",
+        riskColor: e.actionTypeId?.riskCategory === "sensitive_locked" ? "#791F1F" : "#6b7280",
+        desc: e.payload?.taskDescription || planDesc || (repoLabel ? `On ${repoLabel}.` : "Real action awaiting your review."),
+        waitingOn: "you",
+        isFyi: false,
+        primaryLabel: "Approve →",
+      };
+    });
+}
+
+function summarizeAgentStatus(agentKey, events) {
+  const latest = events.find((e) => e.actionTypeId?.agentId?.agentKey === agentKey);
+  if (!latest) return { status: "idle", statusLabel: "Not started yet" };
+  if (latest.status === "pending_approval") return { status: "blocked", statusLabel: "Waiting on your approval" };
+  if (latest.status === "failed") return { status: "blocked", statusLabel: "Last action failed" };
+  return { status: "working", statusLabel: "Active — real work on file" };
+}
 
 /* ─────────────────────────────────────────────
    Tiny helpers
@@ -179,66 +286,57 @@ function OvernightHero({ agentsPaused }) {
 /* ─────────────────────────────────────────────
    Coordination Feed
 ───────────────────────────────────────────── */
-function CoordinationFeed({ onViewLog, onNavigate }) {
+function CoordinationFeed({ items, onViewLog }) {
   return (
     <div className="rounded-2xl border border-v2-border bg-white p-4">
       <div className="mb-3 flex items-end justify-between">
         <div>
           <div className="font-heading text-[13px] font-semibold text-v2-heading">Coordination feed</div>
-          <div className="mt-0.5 font-body text-[11px] text-v2-muted">Agents hand work to each other — and to whichever teammate actually has the role for it</div>
+          <div className="mt-0.5 font-body text-[11px] text-v2-muted">Real activity from AI Product Manager and AI Developer — the only two agents with a real backend so far</div>
         </div>
         <button type="button" onClick={onViewLog} className="shrink-0 font-body text-[11px] text-v2-blue hover:underline">View full log →</button>
       </div>
 
-      <div className="flex flex-col divide-y divide-gray-200">
-        {FEED_ITEMS.map((item, i) => (
-          <div key={i} className="flex gap-3 py-3">
-            {/* Time above avatars */}
-            <div className="flex shrink-0 flex-col items-center gap-1">
-              <span className="font-body text-[9px] text-v2-subtle">{item.time}</span>
-              <div className="flex items-center gap-1">
-                <Avatar initials={item.from.initials} bg={item.from.bg} color={item.from.color} size={26} badge={item.from.isAgent ? "agent" : "human"} />
-                {item.to && (
-                  <>
-                    <ArrowRight className="h-3 w-3 text-gray-300" />
-                    <Avatar initials={item.to.initials} bg={item.to.bg} color={item.to.color} size={26} badge={item.to.isAgent ? "agent" : "human"} />
-                  </>
+      {items.length === 0 ? (
+        <p className="py-6 text-center font-body text-[12px] text-v2-muted">
+          No real activity yet — give AI Developer a task or chat with AI Product Manager to see it here.
+        </p>
+      ) : (
+        <div className="flex flex-col divide-y divide-gray-200">
+          {items.map((item) => (
+            <div key={item.id} className="flex gap-3 py-3">
+              {/* Time above avatars */}
+              <div className="flex shrink-0 flex-col items-center gap-1">
+                <span className="font-body text-[9px] text-v2-subtle">{item.time}</span>
+                <div className="flex items-center gap-1">
+                  <Avatar initials={item.from.initials} bg={item.from.bg} color={item.from.color} size={26} badge={item.from.isAgent ? "agent" : "human"} />
+                  {item.to && (
+                    <>
+                      <ArrowRight className="h-3 w-3 text-gray-300" />
+                      <Avatar initials={item.to.initials} bg={item.to.bg} color={item.to.color} size={26} badge={item.to.isAgent ? "agent" : "human"} />
+                    </>
+                  )}
+                </div>
+              </div>
+
+              {/* Body */}
+              <div className="min-w-0 flex-1">
+                <p className="font-body text-[12px] leading-snug text-v2-heading">{item.text}</p>
+                {item.tag && (
+                  <div className="mt-1.5 flex flex-wrap gap-1">
+                    <Tag {...item.tag} />
+                  </div>
+                )}
+                {item.link && (
+                  <a href={item.link} target="_blank" rel="noreferrer" className="mt-1.5 inline-block font-body text-[10px] font-medium text-v2-purple hover:underline">
+                    View real PR →
+                  </a>
                 )}
               </div>
             </div>
-
-            {/* Body */}
-            <div className="min-w-0 flex-1">
-              <p className="font-body text-[12px] leading-snug text-v2-heading">{item.text}</p>
-              {item.tags?.length > 0 && (
-                <div className="mt-1.5 flex flex-wrap gap-1">
-                  {item.tags.map((t) => <Tag key={t.label} {...t} />)}
-                </div>
-              )}
-              {item.artifact && (
-                <button
-                  type="button"
-                  disabled={!item.artifact.viewPage}
-                  onClick={() => item.artifact.viewPage && onNavigate?.(item.artifact.viewPage)}
-                  className={cn(
-                    "mt-2 flex w-full items-center gap-2.5 rounded-xl border border-transparent bg-gray-50 px-3 py-2 text-left transition-colors",
-                    item.artifact.viewPage ? "cursor-pointer hover:border-gray-200 hover:bg-gray-100" : "cursor-default",
-                  )}
-                >
-                  <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg" style={{ background: item.artifact.iconBg }}>
-                    <FileText className="h-3.5 w-3.5" style={{ color: item.artifact.iconColor }} />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <div className="truncate font-body text-[11px] font-medium text-v2-heading">{item.artifact.name}</div>
-                    <div className="font-body text-[10px] text-v2-muted">{item.artifact.sub}</div>
-                  </div>
-                  {item.artifact.viewPage && <span className="shrink-0 font-body text-[10px] text-v2-purple">View →</span>}
-                </button>
-              )}
-            </div>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -319,7 +417,7 @@ function ApprovalCard({ approvals, onApprove, onViewAll }) {
                 Review
               </button>
               {!a.isFyi ? (
-                <button type="button" onClick={() => onApprove(a.id, a.primaryAction)} className="flex-1 rounded-lg bg-v2-green py-1 font-body text-[9px] font-medium text-white hover:opacity-90 transition-opacity">
+                <button type="button" onClick={() => onApprove(a)} className="flex-1 rounded-lg bg-v2-green py-1 font-body text-[9px] font-medium text-white hover:opacity-90 transition-opacity">
                   {a.primaryLabel}
                 </button>
               ) : (
@@ -338,12 +436,13 @@ function ApprovalCard({ approvals, onApprove, onViewAll }) {
 /* ─────────────────────────────────────────────
    Right Panel — Agents / Humans
 ───────────────────────────────────────────── */
-function AgentsList({ agentsPaused, onOpenAgent }) {
+function AgentsList({ agentsPaused, onOpenAgent, realStatus }) {
+  const agents = AGENTS.map((a) => (realStatus[a.id] ? { ...a, ...realStatus[a.id] } : a));
   return (
     <div className="rounded-2xl bg-[#f9fafb] p-2.5">
       <div className="mb-1.5 font-heading text-[11px] font-semibold text-v2-heading">Agents</div>
       <div className="flex flex-col">
-        {AGENTS.map((a) => (
+        {agents.map((a) => (
           <button key={a.id} type="button" onClick={() => onOpenAgent(a)} className="flex items-center gap-1.5 border-b border-gray-100 py-1.5 text-left last:border-b-0 hover:opacity-80 transition-opacity">
             <Avatar initials={a.initials} bg={a.bg} color={a.color} size={20} badge="agent" />
             <div className="min-w-0 flex-1">
@@ -433,8 +532,13 @@ function AuditCard({ onViewLog }) {
 /* ─────────────────────────────────────────────
    Main component
 ───────────────────────────────────────────── */
-export default function V2AgentWorkroom({ onNavigate }) {
-  const [approvals, setApprovals] = useState(INITIAL_APPROVALS);
+export default function V2AgentWorkroom({ user, onNavigate }) {
+  const founderId = useOfficeStore((s) => s.founderId);
+  const resolvedFounderId = founderId || String(user?._id ?? user?.id ?? "");
+
+  const [approvals, setApprovals] = useState([]);
+  const [feedItems, setFeedItems] = useState([]);
+  const [realStatus, setRealStatus] = useState({});
   const [agentsPaused, setAgentsPaused] = useState(false);
   const [toast, setToast] = useState("");
   const [modal, setModal] = useState(null); // { type, data }
@@ -444,10 +548,35 @@ export default function V2AgentWorkroom({ onNavigate }) {
     setTimeout(() => setToast(""), 2400);
   }, []);
 
-  const handleApprove = useCallback((id, msg) => {
-    setApprovals((prev) => prev.filter((a) => a.id !== id));
-    showToast("✓ " + msg);
-  }, [showToast]);
+  const refreshRealData = useCallback(() => {
+    if (!resolvedFounderId) return;
+    getAgentEvents(resolvedFounderId)
+      .then((events) => {
+        setFeedItems(buildRealFeed(events || []));
+        setApprovals(buildRealApprovals(events || []));
+        setRealStatus({
+          pm: summarizeAgentStatus("pm", events || []),
+          dev: summarizeAgentStatus("dev", events || []),
+        });
+      })
+      .catch(() => {
+        // Real data is a nice-to-have here — the widgets just show their
+        // honest empty state if this fails, same as a brand-new founder.
+      });
+  }, [resolvedFounderId]);
+
+  useEffect(() => { refreshRealData(); }, [refreshRealData]);
+
+  const handleApprove = useCallback(async (item) => {
+    try {
+      await resolveAgentEvent(item.id, "approved");
+      setApprovals((prev) => prev.filter((a) => a.id !== item.id));
+      showToast(`✓ Approved — ${item.title}`);
+      refreshRealData();
+    } catch (err) {
+      showToast(err?.message || "Could not approve — try the full queue.");
+    }
+  }, [showToast, refreshRealData]);
 
   const handlePauseAll = useCallback(() => {
     setAgentsPaused(true);
@@ -508,7 +637,7 @@ export default function V2AgentWorkroom({ onNavigate }) {
         {/* Main content — block container so children keep natural heights; overflow-y-auto scrolls */}
         <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-5">
           <OvernightHero agentsPaused={agentsPaused} />
-          <CoordinationFeed onViewLog={() => onNavigate?.("audit-trail")} onNavigate={onNavigate} />
+          <CoordinationFeed items={feedItems} onViewLog={() => onNavigate?.("audit-trail")} />
           <RightNowMap />
         </div>
 
@@ -521,9 +650,16 @@ export default function V2AgentWorkroom({ onNavigate }) {
           />
           <AgentsList
             agentsPaused={agentsPaused}
+            realStatus={realStatus}
             onOpenAgent={(agent) => {
               // Agents with their own workspace page → navigate there
-              const AGENT_PAGES = { mk: "agent-marketing", sa: "agent-sales" };
+              // Real bug found while wiring real PM/DEV data into this widget:
+              // pm/dev weren't in this map, so clicking them fell through to
+              // the generic modal, whose "Open workspace" button navigates to
+              // `ai-${id}` — not a real page name anywhere in V2AIStaffShell,
+              // so it silently did nothing. Both now go straight to their
+              // real page instead.
+              const AGENT_PAGES = { mk: "agent-marketing", sa: "agent-sales", dev: "agent-developer", pm: "ai-staff-chat" };
               const page = AGENT_PAGES[agent.id];
               if (page) { onNavigate?.(page); } else { setModal({ type: "agent", data: agent }); }
             }}

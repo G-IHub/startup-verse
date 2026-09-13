@@ -9,6 +9,8 @@ import { cn } from "../ui/utils";
 import { useOfficeStore } from "../../state/useOfficeStore";
 import { getPmMessages, sendPmMessage } from "../../utils/api/agentChatApi";
 import { getAgentEvents } from "../../utils/api/agentOrchestrationApi";
+import { getFounderStartupSafe } from "../../utils/api/founderApi";
+import { getCurrentWeeklyOutcome } from "../../utils/api/coreEngineApi";
 
 /* ── Staff config ─────────────────────────────────────────────────────────── */
 const STAFF = [
@@ -20,11 +22,14 @@ const STAFF = [
 
 const STATUS_COLORS = { green: "#1D9E75", amber: "#BA7517" };
 
-/* ── Context data for right panel ─────────────────────────────────────────── */
-const PM_CONTEXT = [
-  { k: "Startup",    v: "HealthTrack" },
-  { k: "Stage",      v: "Stage 1 · Validation" },
-  { k: "Week",       v: "Week 5 · Active" },
+/* ── Context data for right panel ─────────────────────────────────────────── *
+ * Startup/Stage/Week/Goal are real (see buildRealContextRows below) — this
+ * is what's left once those are pulled out. No real source exists yet for a
+ * gamified Score/Streak, or for Blueprint/Interviews/Clinics/Revenue (those
+ * are startup-specific business metrics, not something an AI Staff agent
+ * computes), so they stay honest mock rather than being half-faked.
+ */
+const PM_CONTEXT_MOCK = [
   { k: "Score",      v: "91 · +13 this week", vColor: "#1B4FD8" },
   { k: "Streak",     v: "🔥 5 weeks" },
   { k: "Blueprint",  v: "Vezeeta · Stage 1" },
@@ -32,6 +37,15 @@ const PM_CONTEXT = [
   { k: "Clinics",    v: "3 paying", vColor: "#1D9E75" },
   { k: "Revenue",    v: "₦285K MRR", vColor: "#1D9E75" },
 ];
+
+function buildRealContextRows(startup, outcome) {
+  return [
+    { k: "Startup", v: startup?.name || "Not set yet" },
+    { k: "Stage",   v: startup?.stage || "Not set yet" },
+    { k: "Week",    v: outcome ? `Week ${outcome.weekNumber ?? "?"} · ${outcome.status === "active" ? "Active" : outcome.status}` : "No active week" },
+    { k: "Goal",    v: outcome?.goal || "None set yet" },
+  ];
+}
 
 // The sprint-plan card is the only one of these three with a real backend —
 // AI Marketing/Growth aren't real agents yet — so only it gets replaced with
@@ -272,6 +286,7 @@ export default function V2AIStaffChat({ user, onNavigate }) {
   const [pmSending, setPmSending] = useState(false);
   const [pmError, setPmError] = useState("");
   const [latestPlanOutput, setLatestPlanOutput] = useState(null);
+  const [realContextRows, setRealContextRows] = useState(null);
 
   const showToast = (msg) => { setToast(msg); setTimeout(() => setToast(""), 2400); };
 
@@ -299,6 +314,18 @@ export default function V2AIStaffChat({ user, onNavigate }) {
   }, [resolvedFounderId]);
 
   useEffect(() => { refreshLatestPlan(); }, [refreshLatestPlan]);
+
+  useEffect(() => {
+    if (!resolvedFounderId) return;
+    let cancelled = false;
+    Promise.all([getFounderStartupSafe(resolvedFounderId), getCurrentWeeklyOutcome(resolvedFounderId)])
+      .then(([startup, outcome]) => { if (!cancelled) setRealContextRows(buildRealContextRows(startup, outcome)); })
+      .catch(() => {
+        // Real data is a nice-to-have here — the mock rows below still
+        // render fine if this fails.
+      });
+    return () => { cancelled = true; };
+  }, [resolvedFounderId]);
 
   const sendToPm = useCallback(async (content) => {
     const localMessage = { _id: `local-${Date.now()}`, role: "founder", content, createdAt: new Date().toISOString() };
@@ -451,7 +478,7 @@ export default function V2AIStaffChat({ user, onNavigate }) {
               Context being used
               <button type="button" className="font-body text-[10px] text-[#534AB7] hover:underline">Edit context →</button>
             </div>
-            {PM_CONTEXT.map(({ k, v, vColor }) => (
+            {[...(realContextRows || []), ...PM_CONTEXT_MOCK].map(({ k, v, vColor }) => (
               <div key={k} className="flex items-center justify-between border-b border-gray-100 py-1.5 last:border-b-0">
                 <span className="font-body text-[11px] text-v2-muted">{k}</span>
                 <span className="max-w-[140px] text-right font-body text-[11px] font-medium" style={{ color: vColor || "var(--v2-heading)" }}>{v}</span>
