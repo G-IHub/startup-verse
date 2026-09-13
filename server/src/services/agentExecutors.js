@@ -45,10 +45,18 @@ async function executeGithubOpenPr({ founderId, payload, targetId }) {
   if (!owner || !repo || !filePath || !taskDescription) {
     throw new Error("write_code requires owner, repo, filePath, and taskDescription in payload.");
   }
+  // Real finding from live testing: draftText's own default (1200, sized
+  // long before this executor existed) was too small for an actual file a
+  // founder would want — a real landing page hit the length limit even
+  // after the empty-content retry escalated 1200 -> 2400. Real code/markup
+  // needs more headroom than a short chat reply; 4000 gives real room for
+  // a genuine file, with retry escalation (see deepseekClient.js) still
+  // able to go to 8000 if a single generation is unusually large.
   const fileContent = deepseekConfigured()
     ? await draftText({
         systemPrompt: AI_DEVELOPER_SYSTEM_PROMPT,
         userPrompt: `File path: ${filePath}\n\nTask: ${taskDescription}`,
+        maxTokens: 4000,
       })
     : `# ${taskDescription}\n\n(DeepSeek not configured — placeholder content, not real drafting.)\n`;
 

@@ -61,12 +61,31 @@ export async function openPullRequest({ founderId, owner, repo, branchName, base
     body: JSON.stringify({ ref: `refs/heads/${branchName}`, sha: baseSha }),
   });
 
+  // Real bug found live: a new branch forked from an existing baseBranch
+  // inherits whatever's already there — so re-writing a file that already
+  // exists (e.g. asking AI Developer to redo/revise index.html) always hit
+  // a real "sha wasn't supplied" error, since GitHub's Contents API requires
+  // the current file's sha to update it and only omits it for a genuine
+  // create. This PUT always omitted it, so it only ever worked once per
+  // path. Check for an existing file on the new branch first and include
+  // its real sha when found, so a revision updates instead of failing.
+  const existing = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${encodeURIComponent(filePath)}?ref=${encodeURIComponent(branchName)}`, {
+    headers: {
+      Accept: "application/vnd.github+json",
+      Authorization: `Bearer ${token}`,
+      "User-Agent": "StartupVerse-AI-Developer",
+      "X-GitHub-Api-Version": "2022-11-28",
+    },
+  });
+  const existingSha = existing.status === 200 ? (await existing.json())?.sha : null;
+
   await gh(token, `/repos/${owner}/${repo}/contents/${encodeURIComponent(filePath)}`, {
     method: "PUT",
     body: JSON.stringify({
       message: commitMessage,
       content: Buffer.from(fileContent, "utf8").toString("base64"),
       branch: branchName,
+      ...(existingSha ? { sha: existingSha } : {}),
     }),
   });
 
