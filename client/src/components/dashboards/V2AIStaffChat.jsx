@@ -8,6 +8,7 @@ import React, { useState, useRef, useEffect, useCallback } from "react";
 import { cn } from "../ui/utils";
 import { useOfficeStore } from "../../state/useOfficeStore";
 import { getPmMessages, sendPmMessage } from "../../utils/api/agentChatApi";
+import { getAgentEvents } from "../../utils/api/agentOrchestrationApi";
 
 /* ── Staff config ─────────────────────────────────────────────────────────── */
 const STAFF = [
@@ -32,11 +33,30 @@ const PM_CONTEXT = [
   { k: "Revenue",    v: "₦285K MRR", vColor: "#1D9E75" },
 ];
 
-const SESSION_OUTPUTS = [
-  { label: "Sprint plan",       title: "Week 5 Sprint — 4 milestones, 11 tasks",    sub: "Generated 9:16am · not yet pushed" },
+// The sprint-plan card is the only one of these three with a real backend —
+// AI Marketing/Growth aren't real agents yet — so only it gets replaced with
+// live data (see summarizeLatestPlan below); the other two stay honest mock.
+const SESSION_OUTPUTS_MOCK = [
   { label: "Outreach template", title: "Clinic cold outreach — Vezeeta method",     sub: "Generated 9:19am · not yet copied" },
   { label: "Priority analysis", title: "Week 5 priority stack — 3 items",           sub: "Generated 9:15am · based on live data" },
 ];
+
+function summarizeLatestPlan(events) {
+  const latest = events.find((e) => e.actionTypeId?.actionKey === "propose_sprint_plan");
+  if (!latest) {
+    return { label: "Sprint plan", title: "No sprint plan proposed yet", sub: "Ask AI PM to draft one" };
+  }
+  const milestones = latest.payload?.milestones || [];
+  const taskCount = milestones.reduce((n, m) => n + (m.tasks?.length || 0), 0);
+  const statusText = { pending_approval: "awaiting your approval", declined: "declined" }[latest.status]
+    || "approved · in the Execution Engine";
+  return {
+    label: "Sprint plan",
+    title: `${milestones.length} milestone${milestones.length === 1 ? "" : "s"}, ${taskCount} task${taskCount === 1 ? "" : "s"}`,
+    sub: `Proposed ${new Date(latest.createdAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })} · ${statusText}`,
+    pending: latest.status === "pending_approval",
+  };
+}
 
 const OTHER_STAFF = [
   { initials: "MK",  bg: "#EAF3DE", color: "#27500A", name: "AI Marketing Agent",  sub: "Output ready · landing page copy",  status: "green" },
@@ -251,6 +271,7 @@ export default function V2AIStaffChat({ user, onNavigate }) {
   const [pmLoading, setPmLoading] = useState(true);
   const [pmSending, setPmSending] = useState(false);
   const [pmError, setPmError] = useState("");
+  const [latestPlanOutput, setLatestPlanOutput] = useState(null);
 
   const showToast = (msg) => { setToast(msg); setTimeout(() => setToast(""), 2400); };
 
@@ -267,6 +288,18 @@ export default function V2AIStaffChat({ user, onNavigate }) {
     return () => { cancelled = true; };
   }, [resolvedFounderId]);
 
+  const refreshLatestPlan = useCallback(() => {
+    if (!resolvedFounderId) return;
+    getAgentEvents(resolvedFounderId)
+      .then((events) => setLatestPlanOutput(summarizeLatestPlan(events || [])))
+      .catch(() => {
+        // Real data is a nice-to-have here — the static outreach/priority
+        // cards next to it still render fine if this one fails to load.
+      });
+  }, [resolvedFounderId]);
+
+  useEffect(() => { refreshLatestPlan(); }, [refreshLatestPlan]);
+
   const sendToPm = useCallback(async (content) => {
     const localMessage = { _id: `local-${Date.now()}`, role: "founder", content, createdAt: new Date().toISOString() };
     setPmMessages((prev) => [...prev, localMessage]);
@@ -274,12 +307,13 @@ export default function V2AIStaffChat({ user, onNavigate }) {
     try {
       const { message } = await sendPmMessage(resolvedFounderId, content);
       if (message) setPmMessages((prev) => [...prev, message]);
+      if (message?.proposedEventKind === "sprint_plan") refreshLatestPlan();
     } catch (err) {
       showToast(err?.message || "AI Product Manager could not respond.");
     } finally {
       setPmSending(false);
     }
-  }, [resolvedFounderId]);
+  }, [resolvedFounderId, refreshLatestPlan]);
 
   const activeStaffObj = STAFF.find((s) => s.id === activeStaff);
 
@@ -431,7 +465,17 @@ export default function V2AIStaffChat({ user, onNavigate }) {
               This session's outputs
               <button type="button" onClick={() => showToast("Downloading all outputs…")} className="font-body text-[10px] text-[#534AB7] hover:underline">Download all</button>
             </div>
-            {SESSION_OUTPUTS.map((item) => (
+            {latestPlanOutput && (
+              <div
+                className="cursor-pointer border-b border-gray-100 py-2 last:border-b-0 hover:opacity-80"
+                onClick={() => latestPlanOutput.pending && onNavigate?.("approval-queue")}
+              >
+                <div className="font-body text-[9px] font-medium uppercase tracking-wide text-v2-muted">{latestPlanOutput.label}</div>
+                <div className="mt-0.5 font-body text-[11px] font-medium text-v2-heading">{latestPlanOutput.title}</div>
+                <div className="mt-0.5 font-body text-[10px] text-v2-muted">{latestPlanOutput.sub}</div>
+              </div>
+            )}
+            {SESSION_OUTPUTS_MOCK.map((item) => (
               <div key={item.label} className="cursor-pointer border-b border-gray-100 py-2 last:border-b-0 hover:opacity-80">
                 <div className="font-body text-[9px] font-medium uppercase tracking-wide text-v2-muted">{item.label}</div>
                 <div className="mt-0.5 font-body text-[11px] font-medium text-v2-heading">{item.title}</div>

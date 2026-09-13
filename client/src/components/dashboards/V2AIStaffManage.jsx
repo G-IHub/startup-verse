@@ -3,9 +3,12 @@
  * Shows hired agents, available-to-hire roster (phased), monthly spend, and upgrade CTA.
  */
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { cn } from "../ui/utils";
 import { MessageSquare, FileText, Lock, Zap } from "lucide-react";
+import { useOfficeStore } from "../../state/useOfficeStore";
+import { getAgentEvents } from "../../utils/api/agentOrchestrationApi";
+import { getPmMessages } from "../../utils/api/agentChatApi";
 
 /* ── Static data ──────────────────────────────────────────────────────────── */
 const HIRED = [
@@ -59,6 +62,86 @@ const HIRED = [
     output: "Connect a GitHub repo from the workspace to see real PRs, staging merges, and the production-deploy approval gate in action.",
   },
 ];
+
+/**
+ * PM and AI Developer are the only two agents with a real backend
+ * (docs/ai-agent-roadmap.md Phase 1/3) — their HIRED cards above are static
+ * placeholder text otherwise identical in shape to the still-mock agents
+ * (MK/GA/FIN/LGL/SA), which risks a real founder mistaking illustrative
+ * numbers for real ones. These two summarizers turn real AgentEvent/
+ * AgentMessage data into the same {statusLabel, statusColor, statusDot,
+ * task, output} shape HiredCard already expects, so only these two cards'
+ * content changes — everything else on the page stays exactly as-is.
+ */
+function summarizeDevAgent(events) {
+  const devEvents = events.filter((e) => e.actionTypeId?.agentId?.agentKey === "dev");
+  if (devEvents.length === 0) {
+    return {
+      statusLabel: "Not started yet — give it a task", statusColor: "#633806", statusDot: "#BA7517",
+      task: "No real task has been sent to AI Developer yet — open its workspace to give it one.",
+      output: "No real GitHub activity yet.",
+    };
+  }
+  const latest = devEvents[0]; // getAgentEvents already sorts newest-first
+  const prCount = new Set(
+    devEvents.filter((e) => e.actionTypeId?.actionKey === "github_open_pr").map((e) => e.targetId),
+  ).size;
+
+  let statusLabel, statusColor, statusDot;
+  if (latest.status === "pending_approval") {
+    statusLabel = "Waiting on your approval"; statusColor = "#633806"; statusDot = "#BA7517";
+  } else if (latest.status === "failed") {
+    statusLabel = "Last action failed — check Audit Trail"; statusColor = "#791F1F"; statusDot = "#791F1F";
+  } else {
+    statusLabel = `Active — ${prCount} real PR${prCount === 1 ? "" : "s"} on file`; statusColor = "#27500A"; statusDot = "#1D9E75";
+  }
+
+  // The latest event might be a staging/production deploy step, which has no
+  // taskDescription of its own (only github_open_pr's payload carries one) —
+  // pull it from the most recent real PR instead of the most recent event.
+  const latestOpenPr = devEvents.find((e) => e.actionTypeId?.actionKey === "github_open_pr");
+  const task = latestOpenPr?.payload?.taskDescription || "No task description recorded yet.";
+  let output;
+  if (latest.result?.prUrl) {
+    output = `Opened a real PR: ${latest.result.prUrl}`;
+  } else if (latest.actionTypeId?.actionKey === "github_merge_main" && (latest.status === "human_completed" || latest.status === "autonomous_completed")) {
+    output = "Latest task is live in production.";
+  } else if (latest.status === "failed") {
+    output = `Last attempt failed: ${latest.result?.error || "unknown error"}`;
+  } else {
+    output = `${latest.actionTypeId?.label || "Action"} — ${String(latest.status).replace(/_/g, " ")}`;
+  }
+  return { statusLabel, statusColor, statusDot, task, output };
+}
+
+function summarizePmAgent(events, messages) {
+  const pmEvents = events.filter((e) => e.actionTypeId?.agentId?.agentKey === "pm");
+  const latestPlan = pmEvents[0];
+  const lastAgentMessage = [...messages].reverse().find((m) => m.role === "agent");
+  const task = lastAgentMessage
+    ? lastAgentMessage.content.slice(0, 140) + (lastAgentMessage.content.length > 140 ? "…" : "")
+    : "No conversation yet — start one in Chat.";
+
+  if (!latestPlan) {
+    return {
+      statusLabel: "Ready — no plan proposed yet", statusColor: "#633806", statusDot: "#BA7517",
+      task, output: "No sprint plan proposed yet — chat with AI PM to create one.",
+    };
+  }
+
+  const milestones = latestPlan.payload?.milestones || [];
+  const taskCount = milestones.reduce((n, m) => n + (m.tasks?.length || 0), 0);
+  let statusLabel, statusColor, statusDot;
+  if (latestPlan.status === "pending_approval") {
+    statusLabel = "Waiting on your approval — sprint plan"; statusColor = "#633806"; statusDot = "#BA7517";
+  } else if (latestPlan.status === "declined") {
+    statusLabel = "Last plan declined"; statusColor = "#791F1F"; statusDot = "#791F1F";
+  } else {
+    statusLabel = "Active — plan approved"; statusColor = "#27500A"; statusDot = "#1D9E75";
+  }
+  const output = `${milestones.length} milestone${milestones.length === 1 ? "" : "s"}, ${taskCount} task${taskCount === 1 ? "" : "s"} — ${String(latestPlan.status).replace(/_/g, " ")}`;
+  return { statusLabel, statusColor, statusDot, task, output };
+}
 
 const AVAILABLE_PHASES = [
   {
@@ -196,7 +279,35 @@ function AvailableCard({ agent, locked, lockLabel }) {
 }
 
 /* ── Main ─────────────────────────────────────────────────────────────────── */
-export default function V2AIStaffManage({ onChat, onNavigate }) {
+export default function V2AIStaffManage({ user, onChat, onNavigate }) {
+  const founderId = useOfficeStore((s) => s.founderId);
+  const resolvedFounderId = founderId || String(user?._id ?? user?.id ?? "");
+
+  const [realPm, setRealPm] = useState(null);
+  const [realDev, setRealDev] = useState(null);
+
+  useEffect(() => {
+    if (!resolvedFounderId) return undefined;
+    let cancelled = false;
+    Promise.all([getAgentEvents(resolvedFounderId), getPmMessages(resolvedFounderId)])
+      .then(([events, { messages }]) => {
+        if (cancelled) return;
+        setRealDev(summarizeDevAgent(events || []));
+        setRealPm(summarizePmAgent(events || [], messages || []));
+      })
+      .catch(() => {
+        // Real data is a nice-to-have here — the static illustrative text is
+        // still shown if this fails, same as before this fix existed.
+      });
+    return () => { cancelled = true; };
+  }, [resolvedFounderId]);
+
+  const hired = HIRED.map((a) => {
+    if (a.id === "pm" && realPm) return { ...a, ...realPm };
+    if (a.id === "dev" && realDev) return { ...a, ...realDev };
+    return a;
+  });
+
   return (
     <div className="flex h-full min-h-0 overflow-hidden bg-v2-page">
 
@@ -253,7 +364,7 @@ export default function V2AIStaffManage({ onChat, onNavigate }) {
             <span className="rounded-full bg-[#EEEDFE] px-2.5 py-1 font-body text-[10px] font-medium text-v2-purple">Phase 1 · Active</span>
           </div>
           <div className="grid grid-cols-3 gap-3">
-            {HIRED.map((a) => <HiredCard key={a.id} agent={a} onChat={onChat} onNavigate={onNavigate} />)}
+            {hired.map((a) => <HiredCard key={a.id} agent={a} onChat={onChat} onNavigate={onNavigate} />)}
           </div>
         </div>
 
