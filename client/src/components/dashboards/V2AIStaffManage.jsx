@@ -9,6 +9,7 @@ import { MessageSquare, FileText, Lock, Zap } from "lucide-react";
 import { useOfficeStore } from "../../state/useOfficeStore";
 import { getAgentEvents } from "../../utils/api/agentOrchestrationApi";
 import { getPmMessages } from "../../utils/api/agentChatApi";
+import { buildRealFeed } from "../../utils/agentFeed";
 
 /* ── Static data ──────────────────────────────────────────────────────────── */
 const HIRED = [
@@ -165,13 +166,13 @@ const AVAILABLE_PHASES = [
   },
 ];
 
-const ACTIVITY = [
-  { initials: "PM", bg: "#EEEDFE", color: "#3C3489", name: "AI Product Manager",  text: "Week 5 sprint plan drafted — 4 milestones, 12 tasks. Prioritised landing page to unblock James.", time: "12 min ago" },
-  { initials: "MK", bg: "#EAF3DE", color: "#27500A", name: "AI Marketing Agent",  text: '3 landing page headlines + 5 launch posts generated. "Own your health story" ranked highest.',    time: "1 hr ago" },
-  { initials: "PM", bg: "#EEEDFE", color: "#3C3489", name: "AI Product Manager",  text: "Blocker alert — flagged James S. landing page risk to execution score. Suggested Figma handoff.",   time: "3 hrs ago" },
-  { initials: "GA", bg: "#E6F1FB", color: "#0C447C", name: "AI Growth Analyst",   text: "100% validation rate from 8 interviews is above average. Recommend 5 more before build phase.",    time: "Yesterday" },
-  { initials: "MK", bg: "#EAF3DE", color: "#27500A", name: "AI Marketing Agent",  text: "HealthTrack differentiator is data ownership, not convenience. Recommend leading with that in copy.", time: "Yesterday" },
-];
+// Real per-agent color/name lookup for the activity feed below — matches
+// buildRealFeed's own PM_ACTOR/DEV_ACTOR/YOU_ACTOR initials from agentFeed.js.
+const ACTOR_META = {
+  PM:  { bg: "#EEEDFE", color: "#3C3489", name: "AI Product Manager" },
+  DEV: { bg: "#f3f4f6", color: "#6b7280", name: "AI Developer" },
+  You: { bg: "#EFB0AF", color: "#791F1F", name: "You" },
+};
 
 const CONTEXT = [
   { k: "Startup",   v: "HealthTrack" },
@@ -285,6 +286,7 @@ export default function V2AIStaffManage({ user, onChat, onNavigate }) {
 
   const [realPm, setRealPm] = useState(null);
   const [realDev, setRealDev] = useState(null);
+  const [realActivity, setRealActivity] = useState([]);
 
   useEffect(() => {
     if (!resolvedFounderId) return undefined;
@@ -294,6 +296,20 @@ export default function V2AIStaffManage({ user, onChat, onNavigate }) {
         if (cancelled) return;
         setRealDev(summarizeDevAgent(events || []));
         setRealPm(summarizePmAgent(events || [], messages || []));
+        // Same real-feed logic Workroom's Coordination feed uses — replaces
+        // the old ACTIVITY mock array, which mixed real PM text in among
+        // fictional MK/GA entries (the exact "can't tell what's real" risk
+        // this whole cleanup pass exists to remove).
+        setRealActivity(
+          buildRealFeed(events || [], 5).map((item) => ({
+            initials: item.from.initials,
+            bg: ACTOR_META[item.from.initials]?.bg || item.from.bg,
+            color: ACTOR_META[item.from.initials]?.color || item.from.color,
+            name: ACTOR_META[item.from.initials]?.name || item.from.initials,
+            text: item.text,
+            time: item.time,
+          })),
+        );
       })
       .catch(() => {
         // Real data is a nice-to-have here — the static illustrative text is
@@ -401,7 +417,10 @@ export default function V2AIStaffManage({ user, onChat, onNavigate }) {
         <div className="rounded-2xl bg-v2-page p-3">
           <div className="mb-2 font-heading text-[12px] font-semibold text-v2-heading">AI staff activity feed</div>
           <div className="flex flex-col">
-            {ACTIVITY.map((a, i) => (
+            {realActivity.length === 0 && (
+              <p className="py-3 font-body text-[11px] text-v2-muted">No real activity yet — give AI Developer a task or chat with AI Product Manager.</p>
+            )}
+            {realActivity.map((a, i) => (
               <div key={i} className="flex items-start gap-2 border-b border-gray-100 py-2 last:border-b-0">
                 <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg font-body text-[9px] font-semibold" style={{ background: a.bg, color: a.color }}>
                   {a.initials}

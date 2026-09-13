@@ -12,8 +12,14 @@ import {
   TrendingUp, Shield, Activity,
 } from "lucide-react";
 import { useOfficeStore } from "../../state/useOfficeStore";
-import { getAgents, getAgentEvents, resolveAgentEvent } from "../../utils/api/agentOrchestrationApi";
-import { formatEventTime, paletteForAgent, initialsForAgent } from "../../utils/agentDisplay";
+import { getAgents, getActionTypes, getAgentEvents, resolveAgentEvent } from "../../utils/api/agentOrchestrationApi";
+import { getFounderStartupSafe } from "../../utils/api/founderApi";
+import { getStartupTeamMembers } from "../../utils/api/teamMemberApi";
+import { formatEventTime } from "../../utils/agentDisplay";
+import {
+  buildRealFeed, buildRealApprovals, summarizeAgentStatus,
+  buildRealDepMap, buildHeroStats, buildAutonomySummary, buildHumansInLoop,
+} from "../../utils/agentFeed";
 
 /* ─────────────────────────────────────────────
    Static mock data  (wire to API when ready)
@@ -25,192 +31,6 @@ const AGENTS = [
   { id: "dev",      initials: "DEV", name: "AI Developer",        bg: "#f3f4f6", color: "#6b7280", status: "blocked",  statusLabel: "Blocked · needs approval" },
   { id: "ga",       initials: "GA",  name: "AI Growth Analyst",   bg: "#E6F1FB", color: "#0C447C", status: "idle",     statusLabel: "Idle · waiting on data" },
 ];
-
-const HUMANS = [
-  { id: "james",    initials: "JS", name: "James S.",     role: "Engineering", bg: "#E6F1FB", color: "#0C447C", status: "clear",   statusLabel: "Cleared M1 · nothing pending" },
-  { id: "chidinma", initials: "CA", name: "Chidinma A.",  role: "Marketing",   bg: "#FAEEDA", color: "#633806", status: "pending", statusLabel: "1 pending · email tone review" },
-];
-
-const FEED_ITEMS = [
-  { time: "6:02am", from: { initials: "DEV", bg: "#f3f4f6", color: "#6b7280", isAgent: true },  to: { initials: "DS",  bg: "#FAEEDA", color: "#633806", isAgent: true },  text: "AI Developer opened PR #14 (landing page hero section) and tagged AI Designer for an asset review before merging.", tags: [{ label: "Autonomous", bg: "#f3f4f6", color: "#6b7280" }, { label: "Milestone M1 · Landing page", bg: "#E6F1FB", color: "#0C447C" }] },
-  { time: "6:14am", from: { initials: "DS",  bg: "#FAEEDA", color: "#633806", isAgent: true },  to: { initials: "DEV", bg: "#f3f4f6", color: "#6b7280", isAgent: true },  text: "AI Designer approved the hero assets and handed PR #14 back to AI Developer — brand colours and image compression fixed.", tags: [{ label: "Autonomous", bg: "#f3f4f6", color: "#6b7280" }], artifact: { name: "hero-final-v3.png + 2 more", sub: "Design review notes attached", iconBg: "#EEEDFE", iconColor: "#534AB7" } },
-  { time: "6:22am", from: { initials: "DEV", bg: "#f3f4f6", color: "#6b7280", isAgent: true },  to: { initials: "JS",  bg: "#E6F1FB", color: "#0C447C", isAgent: false }, text: "AI Developer merged PR #14 and deployed to staging, then handed off to James S. — go-live and DNS need a human with deploy access.", tags: [{ label: "Blocker cleared", bg: "#EAF3DE", color: "#27500A" }, { label: "Waiting on James · Engineering", bg: "#FCF7EC", color: "#633806" }], artifact: { name: "staging.healthtrack.app", sub: "Deployed · awaiting James's publish", iconBg: "#EAF3DE", iconColor: "#1D9E75", viewPage: "product-viewer" } },
-  { time: "7:03am", from: { initials: "JS",  bg: "#E6F1FB", color: "#0C447C", isAgent: false }, to: { initials: "PM",  bg: "#EEEDFE", color: "#534AB7", isAgent: true },  text: "James S. pointed the domain live from his phone and told AI Product Manager to mark the milestone complete — a human closing the loop an agent couldn't finish alone.", tags: [{ label: "Human action · Milestone M1 done", bg: "#EAF3DE", color: "#27500A" }] },
-  { time: "7:40am", from: { initials: "MK",  bg: "#EAF3DE", color: "#27500A", isAgent: true },  to: { initials: "SA",  bg: "#E6F1FB", color: "#0C447C", isAgent: true },  text: "AI Marketing drafted 10 clinic outreach messages using the Vezeeta Blueprint's supply-first approach, then handed them to AI Sales to personalise and queue.", tags: [{ label: "Autonomous", bg: "#f3f4f6", color: "#6b7280" }, { label: "Blueprint milestone · 0 of 10 clinics", bg: "#FAEEDA", color: "#633806" }] },
-  { time: "7:52am", from: { initials: "SA",  bg: "#E6F1FB", color: "#0C447C", isAgent: true },  to: { initials: "AO",  bg: "#EFB0AF", color: "#791F1F", isAgent: false }, text: "AI Sales personalised all 10 messages and queued them — then escalated to you because sending is external-facing and outside its autonomy setting.", tags: [{ label: "Escalated · needs approval", bg: "#FCEBEB", color: "#791F1F" }] },
-  { time: "7:58am", from: { initials: "MK",  bg: "#EAF3DE", color: "#27500A", isAgent: true },  to: { initials: "CA",  bg: "#FAEEDA", color: "#633806", isAgent: false }, text: "AI Marketing drafted the Week 5 nurture email sequence and routed it to Chidinma A. — brand voice calls go to the human on the marketing role, not to you.", tags: [{ label: "Waiting on Chidinma · Marketing", bg: "#FCF7EC", color: "#633806" }] },
-  { time: "8:10am", from: { initials: "GA",  bg: "#E6F1FB", color: "#0C447C", isAgent: true },  to: { initials: "PM",  bg: "#EEEDFE", color: "#534AB7", isAgent: true },  text: "AI Growth Analyst flagged that 8/8 interviews validated the core pain point — unusually strong — and passed the pattern to AI Product Manager.", tags: [{ label: "Autonomous", bg: "#f3f4f6", color: "#6b7280" }] },
-  { time: "8:15am", from: { initials: "PM",  bg: "#EEEDFE", color: "#534AB7", isAgent: true },  to: null, text: "AI Product Manager rebuilt the Week 5 priority stack around the cleared blocker and the Growth Analyst's signal, and queued the plan for your review.", tags: [{ label: "Escalated · needs approval", bg: "#FCEBEB", color: "#791F1F" }] },
-];
-
-
-const INITIAL_APPROVALS = [
-  { id: "appr-1", agent: { initials: "SA", bg: "#E6F1FB", color: "#0C447C" }, title: "Send 10 clinic outreach messages", risk: "Low risk", riskBg: "#f3f4f6", riskColor: "#6b7280", desc: "AI Sales personalised and queued all 10 — Lagos Island + VI, Vezeeta supply-first script.", waitingOn: "you", primaryLabel: "Send all →", primaryAction: "Sent 10 messages" },
-  { id: "appr-2", agent: { initials: "DEV", bg: "#f3f4f6", color: "#6b7280" }, title: "Merge PR #15 — pricing page", risk: "Touches billing", riskBg: "#FCEBEB", riskColor: "#791F1F", desc: "Updates the Stripe price IDs. AI Developer flagged this itself and won't merge without a human.", waitingOn: "you", primaryLabel: "Approve merge", primaryAction: "Merged PR #15" },
-  { id: "appr-3", agent: { initials: "PM", bg: "#EEEDFE", color: "#534AB7" }, title: "Week 5 sprint plan", risk: "Low risk", riskBg: "#f3f4f6", riskColor: "#6b7280", desc: "4 milestones, 11 tasks, rebuilt around the cleared blocker and this week's interview signal.", waitingOn: "you", primaryLabel: "Push to engine", primaryAction: "Pushed sprint plan to Execution Engine" },
-  { id: "appr-4", agent: { initials: "CA", bg: "#FAEEDA", color: "#633806" }, title: "Nurture email tone review", risk: "FYI only", riskBg: "#f3f4f6", riskColor: "#6b7280", desc: "Routed to Chidinma, not you — brand-voice calls go to the marketing role holder.", waitingOn: "Chidinma A.", isFyi: true },
-];
-
-/* ─────────────────────────────────────────────
-   Real data (PM + AI Developer only — the only two real agents;
-   MK/SA/GA/human-teammate content above stays honest illustrative mock)
-───────────────────────────────────────────── */
-const PM_ACTOR = { initials: "PM", bg: "#EEEDFE", color: "#534AB7", isAgent: true };
-const DEV_ACTOR = { initials: "DEV", bg: "#f3f4f6", color: "#6b7280", isAgent: true };
-const YOU_ACTOR = { initials: "You", bg: "#EFB0AF", color: "#791F1F", isAgent: false };
-
-function describeDevEvent(e) {
-  const targetId = e.targetId || "";
-  const actionKey = e.actionTypeId?.actionKey;
-  const repoLabel = e.payload?.owner && e.payload?.repo ? `${e.payload.owner}/${e.payload.repo}` : "";
-
-  if (actionKey === "github_open_pr") {
-    // targetId's own prefix tells us who actually initiated this, since the
-    // three real callers (agentChat.controller.js's BUILD_TASK hand-off, the
-    // auto-build queue, and the AI Developer workspace's manual form) each
-    // use a distinct prefix — a real structural signal, not a guess.
-    const fromActor = targetId.startsWith("handoff-") || targetId.startsWith("sprint-task-") ? "pm" : "you";
-    const text = fromActor === "pm"
-      ? `Handed AI Developer a task: ${e.payload?.taskDescription || "a build task"}`
-      : `You asked AI Developer to build: ${e.payload?.taskDescription || "a task"}`;
-    const tag = e.status === "failed"
-      ? { label: `Failed — ${e.result?.error || "error"}`, bg: "#FCEBEB", color: "#791F1F" }
-      : { label: `PR opened${repoLabel ? " · " + repoLabel : ""}`, bg: "#f3f4f6", color: "#6b7280" };
-    return { from: fromActor === "pm" ? PM_ACTOR : YOU_ACTOR, to: DEV_ACTOR, text, tag, link: e.result?.prUrl };
-  }
-  if (actionKey === "github_merge_staging") {
-    return {
-      from: DEV_ACTOR, to: null,
-      text: `Merged to staging${repoLabel ? " on " + repoLabel : ""}.`,
-      tag: e.status === "failed" ? { label: "Failed", bg: "#FCEBEB", color: "#791F1F" } : { label: "Autonomous", bg: "#f3f4f6", color: "#6b7280" },
-    };
-  }
-  if (actionKey === "github_merge_main") {
-    if (e.status === "pending_approval") {
-      return { from: DEV_ACTOR, to: YOU_ACTOR, text: `Requested a production deploy${repoLabel ? " on " + repoLabel : ""} — needs your approval.`, tag: { label: "Escalated · needs approval", bg: "#FCEBEB", color: "#791F1F" } };
-    }
-    if (e.status === "human_completed" || e.status === "autonomous_completed") {
-      return { from: DEV_ACTOR, to: null, text: `Deployed to production${repoLabel ? " on " + repoLabel : ""}.`, tag: { label: "Live in production", bg: "#EAF3DE", color: "#27500A" } };
-    }
-    if (e.status === "declined") {
-      return { from: DEV_ACTOR, to: null, text: `Production deploy declined${repoLabel ? " on " + repoLabel : ""}.`, tag: { label: "Declined", bg: "#FCEBEB", color: "#791F1F" } };
-    }
-  }
-  return null;
-}
-
-function describePmEvent(e) {
-  if (e.actionTypeId?.actionKey !== "propose_sprint_plan") return null;
-  const milestones = e.payload?.milestones || [];
-  const taskCount = milestones.reduce((n, m) => n + (m.tasks?.length || 0), 0);
-  const text = `Proposed a sprint plan — ${milestones.length} milestone${milestones.length === 1 ? "" : "s"}, ${taskCount} task${taskCount === 1 ? "" : "s"}.`;
-  const tag = e.status === "pending_approval" ? { label: "Escalated · needs approval", bg: "#FCEBEB", color: "#791F1F" }
-    : e.status === "declined" ? { label: "Declined", bg: "#FCEBEB", color: "#791F1F" }
-    : { label: "Approved", bg: "#EAF3DE", color: "#27500A" };
-  return { from: PM_ACTOR, to: YOU_ACTOR, text, tag };
-}
-
-function buildRealFeed(events) {
-  return events
-    .map((e) => {
-      const agentKey = e.actionTypeId?.agentId?.agentKey;
-      const desc = agentKey === "dev" ? describeDevEvent(e) : agentKey === "pm" ? describePmEvent(e) : null;
-      if (!desc) return null;
-      return { id: e.id, time: formatEventTime(e.createdAt), ...desc };
-    })
-    .filter(Boolean)
-    .slice(0, 8); // events already sorted newest-first by getAgentEvents
-}
-
-function buildRealApprovals(events) {
-  return events
-    .filter((e) => e.status === "pending_approval" && ["pm", "dev"].includes(e.actionTypeId?.agentId?.agentKey))
-    .map((e) => {
-      const isDev = e.actionTypeId?.agentId?.agentKey === "dev";
-      const repoLabel = e.payload?.owner && e.payload?.repo ? `${e.payload.owner}/${e.payload.repo}` : "";
-      const milestones = e.payload?.milestones;
-      const planDesc = Array.isArray(milestones)
-        ? `${milestones.length} milestone${milestones.length === 1 ? "" : "s"}, ${milestones.reduce((n, m) => n + (m.tasks?.length || 0), 0)} task${milestones.reduce((n, m) => n + (m.tasks?.length || 0), 0) === 1 ? "" : "s"}.`
-        : null;
-      return {
-        id: e.id,
-        agent: isDev ? DEV_ACTOR : PM_ACTOR,
-        title: e.actionTypeId?.label || "Pending action",
-        risk: e.actionTypeId?.riskCategory === "sensitive_locked" ? "Sensitive" : "Low risk",
-        riskBg: e.actionTypeId?.riskCategory === "sensitive_locked" ? "#FCEBEB" : "#f3f4f6",
-        riskColor: e.actionTypeId?.riskCategory === "sensitive_locked" ? "#791F1F" : "#6b7280",
-        desc: e.payload?.taskDescription || planDesc || (repoLabel ? `On ${repoLabel}.` : "Real action awaiting your review."),
-        waitingOn: "you",
-        isFyi: false,
-        primaryLabel: "Approve →",
-      };
-    });
-}
-
-function summarizeAgentStatus(agentKey, events) {
-  const latest = events.find((e) => e.actionTypeId?.agentId?.agentKey === agentKey);
-  if (!latest) return { status: "idle", statusLabel: "Not started yet" };
-  if (latest.status === "pending_approval") return { status: "blocked", statusLabel: "Waiting on your approval" };
-  if (latest.status === "failed") return { status: "blocked", statusLabel: "Last action failed" };
-  return { status: "working", statusLabel: "Active — real work on file" };
-}
-
-/**
- * Built generically off whatever real Agent docs actually exist for this
- * founder (via getAgents) rather than hardcoded to "pm"/"dev" — today that's
- * all there is, but coreAgentSeeds.js's own doc comment says new real agents
- * get added to the same registry over time, and this way the Hero and
- * dependency map pick them up automatically, with zero further changes here.
- */
-const KNOWN_INITIALS = { pm: "PM", dev: "DEV" };
-function styleForAgent(agent) {
-  const palette = paletteForAgent(agent.id || agent.agentKey);
-  return { initials: KNOWN_INITIALS[agent.agentKey] || initialsForAgent(agent.name), bg: palette.bg, color: palette.color };
-}
-
-function summarizeAgentActivity(agent, events) {
-  const agentEvents = events.filter((e) => e.actionTypeId?.agentId?.agentKey === agent.agentKey);
-  if (agentEvents.length === 0) {
-    return { state: "idle", stateLabel: "Not started yet", task: "No real task given yet." };
-  }
-  const latest = agentEvents[0]; // events already sorted newest-first
-  if (latest.status === "pending_approval") {
-    return { state: "waiting", stateLabel: "Needs your approval", task: latest.actionTypeId?.label || "Pending action" };
-  }
-  if (latest.status === "failed") {
-    return { state: "blocked", stateLabel: "Last action failed", task: latest.actionTypeId?.label || "Action failed" };
-  }
-  return { state: "active", stateLabel: "Active", task: latest.actionTypeId?.label || "Real work in progress" };
-}
-
-function buildRealDepMap(agents, events, approvalsCount) {
-  const nodes = agents.map((agent) => {
-    const style = styleForAgent(agent);
-    const activity = summarizeAgentActivity(agent, events);
-    const stateMeta = {
-      active:  { stateLabel: activity.stateLabel, stateBg: "#EAF3DE", stateColor: "#27500A", cardState: "active" },
-      waiting: { stateLabel: activity.stateLabel, stateBg: "#FCF7EC", stateColor: "#633806", cardState: "waiting" },
-      blocked: { stateLabel: activity.stateLabel, stateBg: "#FCEBEB", stateColor: "#791F1F", cardState: "blocked" },
-      idle:    { stateLabel: activity.stateLabel, stateBg: "#f3f4f6", stateColor: "#6b7280", cardState: "waiting" },
-    }[activity.state];
-    return { ...style, name: agent.name, task: activity.task, state: stateMeta.cardState, stateLabel: stateMeta.stateLabel, stateBg: stateMeta.stateBg, stateColor: stateMeta.stateColor };
-  });
-  nodes.push({
-    initials: "You", bg: "#EFB0AF", color: "#791F1F", name: "You · Founder",
-    task: approvalsCount > 0 ? `${approvalsCount} real approval${approvalsCount === 1 ? "" : "s"} waiting` : "All caught up",
-    state: approvalsCount > 0 ? "waiting" : "active",
-    stateLabel: approvalsCount > 0 ? "Needs decision" : "All clear",
-    stateBg: approvalsCount > 0 ? "#FCF7EC" : "#EAF3DE",
-    stateColor: approvalsCount > 0 ? "#633806" : "#27500A",
-  });
-  return nodes;
-}
-
-function buildHeroStats(agents, events, approvalsCount) {
-  const total = events.length;
-  const autonomous = events.filter((e) => ["autonomous_completed", "human_completed"].includes(e.status)).length;
-  return { total, agentCount: agents.length, autonomous, waiting: approvalsCount };
-}
 
 /* ─────────────────────────────────────────────
    Tiny helpers
@@ -515,16 +335,16 @@ function AgentsList({ agentsPaused, onOpenAgent, realStatus }) {
   );
 }
 
-function HumansList() {
+function HumansList({ humans }) {
   return (
     <div className="rounded-2xl bg-[#f9fafb] p-2.5">
       <div className="mb-1.5 font-heading text-[11px] font-semibold text-v2-heading">Humans in the loop</div>
       <div className="flex flex-col">
-        {HUMANS.map((h) => (
+        {humans.map((h) => (
           <div key={h.id} className="flex items-center gap-1.5 border-b border-gray-100 py-1.5 last:border-b-0">
-            <Avatar initials={h.initials} bg={h.bg} color={h.color} size={20} badge="human" />
+            <Avatar initials={h.initials} bg="#EFB0AF" color="#791F1F" size={20} badge="human" />
             <div className="min-w-0 flex-1">
-              <div className="font-body text-[10px] font-medium text-v2-heading">{h.name} · {h.role}</div>
+              <div className="font-body text-[10px] font-medium text-v2-heading">{h.name}</div>
               <div className="font-body text-[8px] text-v2-muted">{h.statusLabel}</div>
             </div>
             <StatusDot status={h.status} />
@@ -532,24 +352,26 @@ function HumansList() {
         ))}
       </div>
       <p className="mt-1.5 font-body text-[9px] leading-relaxed text-v2-muted">
-        Agents route work to whichever human holds the relevant role — not everything comes to the founder.
+        {humans.length > 1
+          ? "Every real approval still comes to you — routing a decision to a specific team member isn't built yet."
+          : "You're the only real human in the loop right now. Add team members on the Team page as your startup grows."}
       </p>
     </div>
   );
 }
 
-function AutonomyQuickView({ onOpenSettings }) {
+function AutonomyQuickView({ onOpenSettings, summary }) {
   return (
     <div className="rounded-2xl bg-[#f9fafb] p-2.5">
       <div className="mb-1.5 font-heading text-[11px] font-semibold text-v2-heading">Autonomy — quick view</div>
       {[
-        { k: "Runs fully autonomous", v: "Drafts, code, research" },
-        { k: "Always escalates",      v: "Sending, payments, contracts" },
-        { k: "This week",             v: "6 auto · 5 escalated" },
+        { k: "Runs fully autonomous", v: summary.autonomousLabel },
+        { k: "Always escalates",      v: summary.escalatesLabel },
+        { k: "So far",                v: summary.soFarLabel },
       ].map((r) => (
-        <div key={r.k} className="flex items-center justify-between border-b border-gray-100 py-1 last:border-b-0">
-          <span className="font-body text-[9px] text-v2-muted">{r.k}</span>
-          <span className="font-body text-[9px] font-medium text-v2-heading">{r.v}</span>
+        <div key={r.k} className="flex items-center justify-between gap-2 border-b border-gray-100 py-1 last:border-b-0">
+          <span className="shrink-0 font-body text-[9px] text-v2-muted">{r.k}</span>
+          <span className="truncate text-right font-body text-[9px] font-medium text-v2-heading" title={r.v}>{r.v}</span>
         </div>
       ))}
       <button type="button" onClick={onOpenSettings} className="mt-2 w-full rounded-xl border border-v2-border bg-white py-1.5 font-body text-[10px] font-medium text-v2-heading hover:bg-v2-page transition-colors">
@@ -600,6 +422,8 @@ export default function V2AgentWorkroom({ user, onNavigate }) {
   const [realAgents, setRealAgents] = useState([]);
   const [heroStats, setHeroStats] = useState({ total: 0, agentCount: 0, autonomous: 0, waiting: 0 });
   const [depMapNodes, setDepMapNodes] = useState([]);
+  const [autonomySummary, setAutonomySummary] = useState({ autonomousLabel: "None yet", escalatesLabel: "None yet", soFarLabel: "0 auto · 0 waiting" });
+  const [teamMembers, setTeamMembers] = useState([]);
   const [agentsPaused, setAgentsPaused] = useState(false);
   const [toast, setToast] = useState("");
   const [modal, setModal] = useState(null); // { type, data }
@@ -611,11 +435,12 @@ export default function V2AgentWorkroom({ user, onNavigate }) {
 
   const refreshRealData = useCallback(() => {
     if (!resolvedFounderId) return;
-    Promise.all([getAgents(resolvedFounderId), getAgentEvents(resolvedFounderId)])
-      .then(([agents, events]) => {
+    Promise.all([getAgents(resolvedFounderId), getAgentEvents(resolvedFounderId), getActionTypes(resolvedFounderId)])
+      .then(([agents, events, actionTypes]) => {
         const realAgentList = agents || [];
         const realEvents = events || [];
         const realApprovals = buildRealApprovals(realEvents);
+        const stats = buildHeroStats(realAgentList, realEvents, realApprovals.length);
         setRealAgents(realAgentList);
         setFeedItems(buildRealFeed(realEvents));
         setApprovals(realApprovals);
@@ -623,13 +448,27 @@ export default function V2AgentWorkroom({ user, onNavigate }) {
           pm: summarizeAgentStatus("pm", realEvents),
           dev: summarizeAgentStatus("dev", realEvents),
         });
-        setHeroStats(buildHeroStats(realAgentList, realEvents, realApprovals.length));
+        setHeroStats(stats);
         setDepMapNodes(buildRealDepMap(realAgentList, realEvents, realApprovals.length));
+        setAutonomySummary(buildAutonomySummary(actionTypes || [], stats));
       })
       .catch(() => {
         // Real data is a nice-to-have here — the widgets just show their
         // honest empty state if this fails, same as a brand-new founder.
       });
+  }, [resolvedFounderId]);
+
+  // Team members change rarely — fetched once, separately from the frequent
+  // agent-event refresh above. Combined with the real approvals count into
+  // the Humans-in-the-loop list at render time, below.
+  useEffect(() => {
+    if (!resolvedFounderId) return;
+    let cancelled = false;
+    getFounderStartupSafe(resolvedFounderId)
+      .then((startup) => (startup?._id ? getStartupTeamMembers(resolvedFounderId) : []))
+      .then((members) => { if (!cancelled) setTeamMembers(members || []); })
+      .catch(() => {});
+    return () => { cancelled = true; };
   }, [resolvedFounderId]);
 
   useEffect(() => { refreshRealData(); }, [refreshRealData]);
@@ -652,6 +491,7 @@ export default function V2AgentWorkroom({ user, onNavigate }) {
   }, [showToast]);
 
   const queueCount = approvals.length;
+  const humans = buildHumansInLoop(user?.name, teamMembers, queueCount);
 
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden bg-v2-page">
@@ -733,8 +573,8 @@ export default function V2AgentWorkroom({ user, onNavigate }) {
               if (page) { onNavigate?.(page); } else { setModal({ type: "agent", data: agent }); }
             }}
           />
-          <HumansList />
-          <AutonomyQuickView onOpenSettings={() => onNavigate?.("autonomy-settings")} />
+          <HumansList humans={humans} />
+          <AutonomyQuickView onOpenSettings={() => onNavigate?.("autonomy-settings")} summary={autonomySummary} />
           <ProductCard onView={() => onNavigate?.("product-viewer")} />
           <AuditCard onViewLog={() => onNavigate?.("audit-trail")} />
         </div>
