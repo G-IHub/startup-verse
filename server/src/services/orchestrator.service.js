@@ -255,6 +255,60 @@ async function advanceBuildQueueIfIdle(founderId) {
 }
 
 /**
+ * Auto-advances AI Developer's own PR -> staging -> production pipeline the
+ * moment one stage finishes successfully, instead of requiring a manual
+ * "Merge to staging" / "Request production deploy" click every time (real
+ * gap the founder hit and flagged directly: a direct AI PM hand-off made
+ * them do both by hand, when the whole point of a hand-off is that the
+ * founder only comes back in for a real approval). Reuses proposeAction
+ * itself for the next stage, so this never bypasses a real gate — it only
+ * decides WHEN to ask. github_merge_staging is autonomous by default, so it
+ * just runs; github_merge_main is sensitive_locked, so this always lands it
+ * in the Approval Queue exactly as a manual "Request production deploy"
+ * click already does, just without the founder having to click it first.
+ * Applies uniformly to every github_open_pr, taskId-linked or not, so a
+ * one-off direct hand-off now behaves the same as a sprint-plan build task.
+ */
+async function autoAdvancePipeline({ founderId, startupId, actionKey, status, targetId, payload, result, taskId }) {
+  if (!["autonomous_completed", "human_completed"].includes(status)) return;
+  const nextActionKey =
+    actionKey === "github_open_pr" ? "github_merge_staging" :
+    actionKey === "github_merge_staging" ? "github_merge_main" :
+    null;
+  if (!nextActionKey) return;
+
+  try {
+    const owner = payload?.owner;
+    const repo = payload?.repo;
+    if (!owner || !repo) return;
+
+    const nextPayload = nextActionKey === "github_merge_staging"
+      ? { owner, repo, prNumber: result?.prNumber }
+      : { owner, repo };
+    if (nextActionKey === "github_merge_staging" && !nextPayload.prNumber) return;
+
+    const devAgent = await Agent.findOne({ founderId, agentKey: "dev" });
+    if (!devAgent) return;
+    const nextType = await ActionType.findOne({ agentId: devAgent._id, actionKey: nextActionKey });
+    if (!nextType) return;
+
+    await proposeAction({
+      founderId,
+      startupId,
+      actorType: "agent",
+      actorId: String(devAgent._id),
+      actionTypeId: nextType._id,
+      targetType: nextActionKey === "github_merge_staging" ? "pr" : "repo",
+      targetId,
+      payload: nextPayload,
+      taskId,
+    });
+  } catch (err) {
+    logger.error(`[orchestrator] failed to auto-advance pipeline from ${actionKey}`, { founderId: String(founderId), targetId, message: err.message });
+  }
+}
+
+/**
  * Step 1 of the decision loop: an agent (or the seed script, in Phase 0)
  * proposes an action. Branches on the ActionType's real risk category and
  * current autonomy mode. Never executes a sensitive_locked action here —
@@ -340,6 +394,9 @@ export async function proposeAction({ founderId, startupId, actorType, actorId, 
   }
   if (actionType.actionKey === "propose_sprint_plan" && status === "autonomous_completed") {
     await advanceBuildQueueIfIdle(founderId);
+  }
+  if (["github_open_pr", "github_merge_staging"].includes(actionType.actionKey) && status !== "failed") {
+    await autoAdvancePipeline({ founderId, startupId, actionKey: actionType.actionKey, status, targetId, payload, result, taskId });
   }
 
   return { event: dto, executed: status !== "failed" };
@@ -443,6 +500,18 @@ export async function resolveApproval({ eventId, decision, approverId }) {
   }
   if (actionType?.actionKey === "propose_sprint_plan" && execStatus === "human_completed") {
     await advanceBuildQueueIfIdle(pending.founderId);
+  }
+  if (["github_open_pr", "github_merge_staging"].includes(actionType?.actionKey) && execStatus !== "failed") {
+    await autoAdvancePipeline({
+      founderId: pending.founderId,
+      startupId: pending.startupId,
+      actionKey: actionType.actionKey,
+      status: execStatus,
+      targetId: pending.targetId,
+      payload: pending.payload,
+      result: execResult,
+      taskId: pending.taskId,
+    });
   }
 
   return { resolved: resolvedDto, execution: executionDto };
