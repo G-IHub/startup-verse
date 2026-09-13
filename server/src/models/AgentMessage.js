@@ -16,9 +16,12 @@ const agentMessageSchema = new mongoose.Schema(
     agentId: { type: mongoose.Schema.Types.ObjectId, ref: "Agent", required: true, index: true },
     role: { type: String, enum: ["founder", "agent"], required: true },
     content: { type: String, required: true, maxlength: 8000 },
-    // Set only on an "agent" message that resulted in a real proposed action
-    // (e.g. a sprint plan), so the UI can show "proposed — check Approval Queue".
+    // Set only on an "agent" message that resulted in a real proposed action,
+    // so the UI can show "proposed — check X". `proposedEventKind` tells the
+    // UI which real action this was (a sprint plan vs. a hand-off to AI
+    // Developer), since each links somewhere different.
     proposedEventId: { type: mongoose.Schema.Types.ObjectId, ref: "AgentEvent", default: null },
+    proposedEventKind: { type: String, enum: ["sprint_plan", "build_task", null], default: null },
   },
   { timestamps: true },
 );

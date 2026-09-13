@@ -119,7 +119,12 @@ function PMMessages({ messages, loading, sending, error, onNavigate }) {
             >
               {m.content}
             </div>
-            {m.proposedEventId && (
+            {m.proposedEventId && m.proposedEventKind === "build_task" && (
+              <button type="button" onClick={() => onNavigate?.("agent-developer")} className="font-body text-[10px] font-medium text-v2-purple hover:underline">
+                🛠️ View in AI Developer workspace →
+              </button>
+            )}
+            {m.proposedEventId && m.proposedEventKind !== "build_task" && (
               <button type="button" onClick={() => onNavigate?.("approval-queue")} className="font-body text-[10px] font-medium text-v2-purple hover:underline">
                 📋 View in Approval Queue →
               </button>
