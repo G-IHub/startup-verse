@@ -43,6 +43,7 @@ const MARKERS = [
   { name: "DELETE_MILESTONE", re: /```DELETE_MILESTONE\s*([\s\S]*?)```/ },
   { name: "UPDATE_GOAL", re: /```UPDATE_GOAL\s*([\s\S]*?)```/ },
   { name: "READ_REPO", re: /```READ_REPO\s*([\s\S]*?)```/ },
+  { name: "ASK_DEV", re: /```ASK_DEV\s*([\s\S]*?)```/ },
 ];
 
 function founderGuard(req, founderId) {
@@ -80,6 +81,28 @@ function findOpenMarkerName(raw) {
   return null;
 }
 
+/**
+ * Shared by every "go fetch/read something real, then answer using it"
+ * marker (READ_REPO, ASK_DEV) — reading has no proposal to show the founder,
+ * the point is answering their actual question. Makes a second real
+ * chatCompletion call with the fetched content injected as an automated
+ * turn, and returns that reply — never the "let me check" stub or a raw
+ * content dump. Extracted once a second marker needed the identical pattern.
+ */
+async function synthesizeFromToolResult({ ctx, messages, raw, closedFullMatch, toolText, instruction }) {
+  const stub = raw.replace(closedFullMatch, "").trim() || "Let me check.";
+  const followUp = await chatCompletion({
+    systemPrompt: buildSystemPrompt(ctx),
+    messages: [
+      ...messages,
+      { role: "assistant", content: stub },
+      { role: "user", content: `[Automated result, not from the founder] ${toolText}\n\n${instruction}` },
+    ],
+    maxTokens: 1200,
+  });
+  return followUp.trim() || "(I got the real data back but couldn't put together an answer — mind asking again?)";
+}
+
 function summarizeDevEvent(e) {
   const label = e.actionTypeId?.label || e.targetType || "action";
   const repo = e.payload?.owner && e.payload?.repo ? `${e.payload.owner}/${e.payload.repo}` : "";
@@ -96,7 +119,10 @@ function summarizeDevEvent(e) {
   // AI PM had this real signal about "what was built" the whole time without
   // needing any GitHub call at all, and just wasn't using it.
   const desc = e.payload?.taskDescription ? ` — "${String(e.payload.taskDescription).slice(0, 140)}"` : "";
-  return `${label}${pr}${repo ? ` on ${repo}` : ""}${desc} — ${statusText}`;
+  // [id] prefix so AI PM can reference *this specific* event for ASK_DEV
+  // (e.g. "what did it actually write for this one") — not just describe
+  // the activity in prose with nothing real to point back at.
+  return `[${e._id}] ${label}${pr}${repo ? ` on ${repo}` : ""}${desc} — ${statusText}`;
 }
 
 function buildSystemPrompt({ startupName, stage, goal, milestonesSummary, devActivitySummary, openTasksSummary, defaultRepo, teamSummary }) {
@@ -144,6 +170,11 @@ Your job:
 {"owner":"...","repo":"...","target":"readme","prNumber":null,"path":null}
 \`\`\`
   "target" is "readme" (reads the repo's real README), "pr" (reads a specific PR's real changed files/diffs — set "prNumber"), or "file" (reads one specific real file — set "path"). This runs immediately, no approval needed, since reading has no side effects. You'll get the real content back and should answer using it directly, in your own words — don't just say "here's the README," actually read it and tell the founder what it means for their product. If a README doesn't exist, or a file/PR isn't found, say so honestly rather than guessing what might be in it.
+- **You can also explain or answer a question about a specific past AI Developer action** — real id from the "Recent AI Developer activity" list below, no invented ones:
+\`\`\`ASK_DEV
+{"eventId":"...","question":null}
+\`\`\`
+  Leave "question" null to just explain what that event actually was and why in your own words; set it to a specific question ("what does this file do," "why this approach") to answer that instead. This pulls from AI Developer's own real stored record of that action — including the actual file content it wrote, when there is one — not a live GitHub fetch, so it works even for old events. If nothing useful is stored for that event (e.g. it was a deploy step, not a code-writing one), say so honestly.
 - Besides those real actions, you still can't do anything else for real — you can't send money, sign documents, or message customers on the founder's behalf. If asked, say so honestly instead of pretending you can.
 - Write like a sharp, direct colleague, not a customer-support bot. No filler, no "I'd be happy to help."
 
@@ -286,7 +317,7 @@ export const sendMessage = async (req, res) => {
     const label = {
       BUILD_TASK: "task hand-off", SET_DEFAULT_REPO: "repo setting", UPDATE_TASK: "task update",
       DELETE_TASK: "task deletion", DELETE_MILESTONE: "milestone deletion", UPDATE_GOAL: "goal update",
-      READ_REPO: "repo read request",
+      READ_REPO: "repo read request", ASK_DEV: "question for AI Developer",
     }[openName] || "sprint plan";
     replyText = `${raw.slice(0, raw.indexOf("```" + openName)).trim()}\n\n(I started drafting a ${label} but ran out of room to finish it — mind asking me to try again?)`;
   } else if (closed?.name === "SPRINT_PLAN") {
@@ -641,12 +672,10 @@ export const sendMessage = async (req, res) => {
               toolText = `Real content of ${fetched.path} in ${owner}/${repo}${fetched.truncated ? " (truncated)" : ""}:\n\n${fetched.content}`;
             }
             try {
-              const followUp = await chatCompletion({
-                systemPrompt: buildSystemPrompt(ctx),
-                messages: [...messages, { role: "assistant", content: raw.replace(closed.fullMatch, "").trim() || "Let me check." }, { role: "user", content: `[Automated result, not from the founder] ${toolText}\n\nAnswer my actual question now using this real content, in your own words.` }],
-                maxTokens: 1200,
+              replyText = await synthesizeFromToolResult({
+                ctx, messages, raw, closedFullMatch: closed.fullMatch, toolText,
+                instruction: "Answer my actual question now using this real content, in your own words.",
               });
-              replyText = followUp.trim() || "(I read it but couldn't put together an answer — mind asking again?)";
             } catch (err) {
               logger.error("[agentChat] failed to synthesize read_repo_content result", { message: err.message });
               replyText = `I read it for real, but couldn't finish summarizing it: ${err.message}`;
@@ -656,6 +685,65 @@ export const sendMessage = async (req, res) => {
           logger.error("[agentChat] failed to read repo content", { message: err.message });
           replyText = `(I tried to read that repo but hit an error: ${err.message})`;
         }
+      }
+    }
+  } else if (closed?.name === "ASK_DEV") {
+    // Same "no proposal, just answer for real" shape as READ_REPO — but zero
+    // GitHub calls: the real data (what AI Developer actually wrote, and
+    // why) is already sitting in our own stored AgentEvent, from the moment
+    // the task was handed off. This is capability A ("what did it write")
+    // and C ("ask it something") merged into one: no "question" means "just
+    // explain it," a real question gets answered from the same real data.
+    let body = null;
+    try {
+      body = JSON.parse(closed.body);
+    } catch {
+      replyText = "(I tried to look that up but the request came out malformed — mind asking me to try again?)";
+    }
+    const eventId = body?.eventId && mongoose.isValidObjectId(body.eventId) ? body.eventId : null;
+    if (body && !eventId) {
+      replyText = "(I need a real event id from the activity list to look that up — mind pointing me at one from the list?)";
+    } else if (eventId) {
+      try {
+        const devAgent = await Agent.findOne({ founderId, agentKey: "dev" });
+        if (!devAgent) throw new Error("AI Developer isn't set up for this founder yet.");
+        const explainType = await ActionType.findOne({ agentId: devAgent._id, actionKey: "explain_dev_work" });
+        if (!explainType) throw new Error("explain_dev_work action type is not seeded for this agent.");
+        const result = await proposeAction({
+          founderId, actorType: "agent", actorId: String(devAgent._id), actionTypeId: explainType._id,
+          targetType: "dev_event", targetId: `explain-${Date.now()}`,
+          payload: { eventId },
+        });
+        if (result.event.status === "failed") {
+          replyText = `(I tried to look that up, but hit a real error: ${result.event.result?.error || "unknown error"})`;
+        } else {
+          const found = result.event.result || {};
+          if (!found.found) {
+            replyText = "(I don't see a real AI Developer event with that id — mind pointing me at one from the activity list?)";
+          } else {
+            const question = String(body.question || "").trim();
+            const toolText = [
+              `Real record of ${found.actionLabel}${found.filePath ? ` (${found.filePath})` : ""}, status: ${found.status}${found.error ? `, error: ${found.error}` : ""}.`,
+              found.taskDescription ? `The real task it was given: "${found.taskDescription}"` : null,
+              found.fileContent ? `The real file content it actually wrote:\n\n${found.fileContent}` : "No file content is stored for this event (it wasn't a code-writing action, or it failed before writing anything).",
+              found.prUrl ? `Real PR: ${found.prUrl}` : null,
+            ].filter(Boolean).join("\n\n");
+            try {
+              replyText = await synthesizeFromToolResult({
+                ctx, messages, raw, closedFullMatch: closed.fullMatch, toolText,
+                instruction: question
+                  ? `Answer this specific question using this real data: "${question}"`
+                  : "Explain in your own words what AI Developer actually did here and why, using this real data — don't just repeat the raw content verbatim, interpret it for the founder.",
+              });
+            } catch (err) {
+              logger.error("[agentChat] failed to synthesize explain_dev_work result", { message: err.message });
+              replyText = `I found the real record, but couldn't finish summarizing it: ${err.message}`;
+            }
+          }
+        }
+      } catch (err) {
+        logger.error("[agentChat] failed to explain dev work", { message: err.message });
+        replyText = `(I tried to look that up but hit an error: ${err.message})`;
       }
     }
   }

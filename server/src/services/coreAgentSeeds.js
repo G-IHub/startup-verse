@@ -113,6 +113,19 @@ const CORE_AGENT_DEFINITIONS = [
         adjustable: false,
         approverRule: "founder",
       },
+      {
+        // Also read-only — unlike read_repo_content, this needs zero GitHub
+        // calls at all: the real file content AI Developer wrote is already
+        // sitting in the originating github_open_pr event's own `result`
+        // field. This just surfaces AI Developer's own real record of past
+        // work (what it wrote, why it was asked) instead of a fresh fetch.
+        actionKey: "explain_dev_work",
+        label: "Explain past dev work",
+        riskCategory: "read_only",
+        defaultMode: "autonomous",
+        adjustable: false,
+        approverRule: "founder",
+      },
     ],
   },
 ];

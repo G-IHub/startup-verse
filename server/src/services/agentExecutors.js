@@ -14,6 +14,7 @@ import Startup from "../models/Startup.js";
 import Milestone from "../models/Milestone.js";
 import Task from "../models/Task.js";
 import WeeklyOutcome from "../models/WeeklyOutcome.js";
+import AgentEvent from "../models/AgentEvent.js";
 import { validateTaskStatusTransition, validateBlockedTaskPayload } from "../domain/weeklyLoopRules.js";
 import { syncMilestoneCounters } from "../utils/syncMilestoneCounters.js";
 import { emitRealtime } from "./realtime.service.js";
@@ -133,6 +134,33 @@ async function executeReadRepoContent({ founderId, payload }) {
     };
   }
   throw new Error(`read_repo_content: unknown target "${target}" (expected "readme", "file", or "pr").`);
+}
+
+/**
+ * Surfaces AI Developer's own real record of a specific past action — zero
+ * GitHub calls needed, unlike read_repo_content above: the real file
+ * content it wrote is already sitting in that github_open_pr event's own
+ * `result.fileContent` (has been since Phase 1), just never exposed to AI
+ * PM's context before. Read-only, no side effects.
+ */
+async function executeExplainDevWork({ founderId, payload }) {
+  const { eventId } = payload || {};
+  if (!eventId) throw new Error("explain_dev_work requires eventId.");
+  const event = await AgentEvent.findById(eventId).populate({ path: "actionTypeId", select: "actionKey label agentId", populate: { path: "agentId", select: "agentKey" } }).lean();
+  if (!event || String(event.founderId) !== String(founderId) || event.actionTypeId?.agentId?.agentKey !== "dev") {
+    return { found: false };
+  }
+  return {
+    found: true,
+    actionLabel: event.actionTypeId?.label || event.targetType,
+    taskDescription: event.payload?.taskDescription || null,
+    filePath: event.payload?.filePath || null,
+    fileContent: event.result?.fileContent || null,
+    prUrl: event.result?.prUrl || null,
+    prNumber: event.result?.prNumber || null,
+    status: event.status,
+    error: event.status === "failed" ? (event.result?.error || null) : null,
+  };
 }
 
 /**
@@ -297,6 +325,7 @@ const EXECUTORS = {
   delete_milestone: executeDeleteMilestone,
   update_goal: executeUpdateGoal,
   read_repo_content: executeReadRepoContent,
+  explain_dev_work: executeExplainDevWork,
 };
 
 export function hasExecutor(actionKey) {
