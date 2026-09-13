@@ -748,8 +748,32 @@ export const sendMessage = async (req, res) => {
     }
   }
 
+  // Real bug found live: the multi-marker guard above only catches two or
+  // more *fully closed* markers. It missed the case of one legitimate closed
+  // marker (e.g. UPDATE_GOAL) followed, later in the same reply, by a
+  // *second*, merely-started marker (e.g. a SPRINT_PLAN the model attempted
+  // against instructions) that got cut off by the token budget before its
+  // closing fence arrived. That leftover raw, truncated JSON was never
+  // stripped — only the one matched closed.fullMatch is ever removed — so it
+  // sat untouched in replyText and got shown to the founder verbatim, with
+  // the real confirmation line appended after it. Same "never show raw
+  // half-written JSON" principle as the openName branch above, just applied
+  // as a final safety net regardless of which branch built replyText.
+  const strayOpenName = findOpenMarkerName(replyText);
+  if (strayOpenName) {
+    replyText = replyText.slice(0, replyText.indexOf("```" + strayOpenName)).trim();
+    replyText += "\n\n(I also started a second action in that reply but ran out of room to finish it — ask me again once this one's done.)";
+  }
+
   if (!replyText.trim()) {
-    replyText = "(I didn't get a response back — try sending that again.)";
+    // If we get here, chatCompletion's own escalated-budget retry (see
+    // deepseekClient.js) already failed twice for this exact request — so
+    // "try sending that again" would just hit the same wall a third time.
+    // Real cause, confirmed live: a single message asking for several
+    // substantial things at once (e.g. a goal update plus a detailed
+    // multi-task plan) can exhaust the model's token budget before it
+    // emits any visible content. Point the founder at what actually helps.
+    replyText = "(That was a lot to ask in one message and I ran out of room before I could answer — try splitting it into smaller messages, one thing at a time.)";
   }
 
   const savedReply = await AgentMessage.create({
