@@ -12,6 +12,7 @@ import {
   TrendingUp, Shield, Activity,
 } from "lucide-react";
 import { useOfficeStore } from "../../state/useOfficeStore";
+import { subscribeToAgentEvents, subscribeToAgentActionStarted } from "../../utils/socketIoRealtime";
 import { getAgents, getActionTypes, getAgentEvents, resolveAgentEvent } from "../../utils/api/agentOrchestrationApi";
 import { getFounderStartupSafe } from "../../utils/api/founderApi";
 import { getStartupTeamMembers } from "../../utils/api/teamMemberApi";
@@ -164,7 +165,7 @@ function OvernightHero({ agentsPaused, stats }) {
 /* ─────────────────────────────────────────────
    Coordination Feed
 ───────────────────────────────────────────── */
-function CoordinationFeed({ items, onViewLog }) {
+function CoordinationFeed({ items, liveActions = [], onViewLog }) {
   return (
     <div className="rounded-2xl border border-v2-border bg-white p-4">
       <div className="mb-3 flex items-end justify-between">
@@ -174,6 +175,26 @@ function CoordinationFeed({ items, onViewLog }) {
         </div>
         <button type="button" onClick={onViewLog} className="shrink-0 font-body text-[11px] text-v2-blue hover:underline">View full log →</button>
       </div>
+
+      {/* Real, live "working right now" signal — transient, not part of the
+          permanent feed below (every AgentEvent there is only ever written
+          after a real action finishes). Disappears the moment the matching
+          real completion event arrives. */}
+      {liveActions.length > 0 && (
+        <div className="mb-3 flex flex-col gap-1.5 rounded-xl bg-v2-blue-tint/30 p-2.5">
+          {liveActions.map((a) => (
+            <div key={`${a.targetId}-${a.startedAt}`} className="flex items-center gap-2 font-body text-[11px] text-v2-heading">
+              <span className="relative flex h-2 w-2 shrink-0">
+                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-v2-blue opacity-75" />
+                <span className="relative inline-flex h-2 w-2 rounded-full bg-v2-blue" />
+              </span>
+              <span className="font-medium">{a.agentId?.name || "An agent"}</span>
+              <span className="text-v2-muted">is working now —</span>
+              <span className="truncate text-v2-muted">{a.taskDescription || a.actionLabel}</span>
+            </div>
+          ))}
+        </div>
+      )}
 
       {items.length === 0 ? (
         <p className="py-6 text-center font-body text-[12px] text-v2-muted">
@@ -427,6 +448,7 @@ export default function V2AgentWorkroom({ user, onNavigate }) {
   const [agentsPaused, setAgentsPaused] = useState(false);
   const [toast, setToast] = useState("");
   const [modal, setModal] = useState(null); // { type, data }
+  const [liveActions, setLiveActions] = useState([]); // real, transient "working right now" signals
 
   const showToast = useCallback((msg) => {
     setToast(msg);
@@ -472,6 +494,30 @@ export default function V2AgentWorkroom({ user, onNavigate }) {
   }, [resolvedFounderId]);
 
   useEffect(() => { refreshRealData(); }, [refreshRealData]);
+
+  // Real live activity — this page previously only ever fetched once on
+  // mount, so the Coordination feed/stats sat stale until a manual reload.
+  // Also the first real "AI Developer/AI PM is working right now" signal:
+  // every AgentEvent before this was only ever written after a real action
+  // already finished, so there was no live moment to show at all. Cleared
+  // for a given targetId the moment its real completion event arrives, or
+  // after 90s as a safety net if that socket message is ever missed.
+  useEffect(() => {
+    if (!resolvedFounderId) return undefined;
+    const unsubEvents = subscribeToAgentEvents(resolvedFounderId, (event) => {
+      refreshRealData();
+      if (event?.targetId) {
+        setLiveActions((prev) => prev.filter((a) => a.targetId !== event.targetId));
+      }
+    });
+    const unsubStarted = subscribeToAgentActionStarted(resolvedFounderId, (payload) => {
+      setLiveActions((prev) => [...prev.filter((a) => a.targetId !== payload.targetId), payload]);
+      setTimeout(() => {
+        setLiveActions((prev) => prev.filter((a) => a.targetId !== payload.targetId || a.startedAt !== payload.startedAt));
+      }, 90000);
+    });
+    return () => { unsubEvents?.(); unsubStarted?.(); };
+  }, [resolvedFounderId, refreshRealData]);
 
   const handleApprove = useCallback(async (item) => {
     try {
@@ -546,7 +592,7 @@ export default function V2AgentWorkroom({ user, onNavigate }) {
         {/* Main content — block container so children keep natural heights; overflow-y-auto scrolls */}
         <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-5">
           <OvernightHero agentsPaused={agentsPaused} stats={heroStats} />
-          <CoordinationFeed items={feedItems} onViewLog={() => onNavigate?.("audit-trail")} />
+          <CoordinationFeed items={feedItems} liveActions={liveActions} onViewLog={() => onNavigate?.("audit-trail")} />
           <RightNowMap nodes={depMapNodes} />
         </div>
 

@@ -86,6 +86,37 @@ async function publishEvent(event) {
   return dto;
 }
 
+/**
+ * Real-time-only "in progress" signal — never persisted to AgentEvent,
+ * since every AgentEvent is only ever written *after* a real action
+ * finishes (success or fail); there was no live "AI Developer is working
+ * right now" moment captured anywhere before this. Emitted right before a
+ * real executor actually runs (never for a reused-duplicate result, which
+ * completes instantly with no real work happening), so the Workroom can
+ * show real, live activity instead of only ever seeing things after the
+ * fact. Best-effort: a failure here must never block the real action.
+ */
+async function emitActionStarted({ founderId, startupId, actionType, targetId, payload }) {
+  try {
+    await actionType.populate({ path: "agentId", select: "name agentKey" });
+    const agent = actionType.agentId;
+    const rooms = [userRoom(founderId)];
+    if (startupId) rooms.push(startupRoom(startupId));
+    emitRealtime(SOCKET_EVENTS.AGENT_ACTION_STARTED, {
+      founderId: String(founderId),
+      startupId: startupId ? String(startupId) : null,
+      actionKey: actionType.actionKey,
+      actionLabel: actionType.label,
+      agentId: agent ? { id: String(agent._id), name: agent.name, agentKey: agent.agentKey } : null,
+      targetId: targetId || "",
+      taskDescription: payload?.taskDescription || payload?.filePath || null,
+      startedAt: new Date().toISOString(),
+    }, rooms);
+  } catch (err) {
+    logger.error("[orchestrator] failed to emit action-started signal", { message: err.message });
+  }
+}
+
 const COMPLETED_STATUSES = ["autonomous_completed", "human_completed"];
 
 /**
@@ -370,6 +401,7 @@ export async function proposeAction({ founderId, startupId, actorType, actorId, 
       result = { ...duplicate.result, reusedFromEventId: String(duplicate._id) };
       logger.warn(`[orchestrator] duplicate propose for ${actionType.actionKey}/${targetId} — reusing prior result instead of re-executing.`);
     } else {
+      await emitActionStarted({ founderId, startupId, actionType, targetId, payload });
       try {
         result = await runExecutor(actionType.actionKey, { founderId, payload: payload || {}, targetType, targetId: targetId || "" });
       } catch (err) {
@@ -462,6 +494,7 @@ export async function resolveApproval({ eventId, decision, approverId }) {
       execResult = { ...duplicate.result, reusedFromEventId: String(duplicate._id) };
       logger.warn(`[orchestrator] duplicate resolve for ${actionType.actionKey}/${pending.targetId} — reusing prior result instead of re-executing.`);
     } else {
+      await emitActionStarted({ founderId: pending.founderId, startupId: pending.startupId, actionType, targetId: pending.targetId, payload: pending.payload });
       try {
         execResult = await runExecutor(actionType.actionKey, {
           founderId: pending.founderId,
