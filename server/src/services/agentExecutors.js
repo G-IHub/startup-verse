@@ -13,6 +13,12 @@ import { draftText, deepseekConfigured } from "./deepseekClient.js";
 import Startup from "../models/Startup.js";
 import Milestone from "../models/Milestone.js";
 import Task from "../models/Task.js";
+import WeeklyOutcome from "../models/WeeklyOutcome.js";
+import { validateTaskStatusTransition, validateBlockedTaskPayload } from "../domain/weeklyLoopRules.js";
+import { syncMilestoneCounters } from "../utils/syncMilestoneCounters.js";
+import { emitRealtime } from "./realtime.service.js";
+import { SOCKET_EVENTS } from "../realtime/events.js";
+import { startupRoom } from "../realtime/rooms.js";
 
 const DEFAULT_STAGING_BRANCH = "staging";
 const DEFAULT_PROD_BRANCH = "main";
@@ -145,11 +151,106 @@ async function executeProposeSprintPlan({ founderId, payload }) {
   return { milestones: created };
 }
 
+/**
+ * Real task/milestone/goal management for AI PM — docs/ai-agent-roadmap.md
+ * Phase 3. Before this, AI PM could only ever *create* things (a sprint
+ * plan), never edit or remove anything that already existed — it said so
+ * honestly when asked. These four executors reuse the exact same validation
+ * `founders.controller.js`'s own human-facing endpoints already enforce
+ * (`validateTaskStatusTransition`, `validateBlockedTaskPayload`,
+ * `syncMilestoneCounters`, the model's own `ensureOutcomeMutable` guard),
+ * not a parallel, looser implementation — a bad transition or an edit to a
+ * finalized week fails the same real way here as it does from the UI.
+ */
+async function executeUpdateTask({ founderId, payload }) {
+  const { taskId, updates } = payload || {};
+  if (!taskId || !updates || typeof updates !== "object") {
+    throw new Error("update_task requires taskId and an updates object.");
+  }
+  const existingTask = await Task.findOne({ _id: taskId, founderId });
+  if (!existingTask) throw new Error("Task not found.");
+
+  const blockedValidation = validateBlockedTaskPayload(updates);
+  if (!blockedValidation.ok) throw new Error(blockedValidation.message);
+  if (updates.status) {
+    const transition = validateTaskStatusTransition(existingTask.status, updates.status);
+    if (!transition.ok) throw new Error(transition.message);
+  }
+
+  // Same whitelist founders.controller.js's own updateTask enforces — never
+  // a wider surface just because the caller here is an agent, not a human.
+  const allowed = {};
+  if (updates.title) allowed.title = String(updates.title).trim().slice(0, 200);
+  if (Object.prototype.hasOwnProperty.call(updates, "description")) allowed.description = String(updates.description ?? "").slice(0, 5000);
+  if (updates.status) allowed.status = updates.status;
+  if (Object.prototype.hasOwnProperty.call(updates, "assignedTo")) allowed.assignedTo = updates.assignedTo || null;
+  if (Object.prototype.hasOwnProperty.call(updates, "assignedToName")) allowed.assignedToName = String(updates.assignedToName ?? "").slice(0, 200);
+  if (updates.priority) allowed.priority = String(updates.priority).toLowerCase();
+  if (Object.prototype.hasOwnProperty.call(updates, "blockerReason")) allowed.blockerReason = String(updates.blockerReason ?? "").slice(0, 1000);
+  if (Object.prototype.hasOwnProperty.call(updates, "blockerNote")) allowed.blockerNote = String(updates.blockerNote ?? "").slice(0, 1000);
+
+  const updatedTask = await Task.findOneAndUpdate({ _id: taskId, founderId }, allowed, { new: true, runValidators: true });
+  await syncMilestoneCounters(existingTask.milestoneId);
+  if (updatedTask.startupId) {
+    emitRealtime(SOCKET_EVENTS.TASK_UPDATED, updatedTask, [startupRoom(updatedTask.startupId)]);
+  }
+  return { taskId: String(updatedTask._id), title: updatedTask.title, status: updatedTask.status };
+}
+
+async function executeDeleteTask({ founderId, payload }) {
+  const { taskId } = payload || {};
+  if (!taskId) throw new Error("delete_task requires taskId.");
+  const deleted = await Task.findOneAndDelete({ _id: taskId, founderId });
+  if (!deleted) throw new Error("Task not found.");
+  await syncMilestoneCounters(deleted.milestoneId);
+  if (deleted.startupId) {
+    emitRealtime(SOCKET_EVENTS.TASK_DELETED, { taskId: String(deleted._id), milestoneId: deleted.milestoneId ? String(deleted.milestoneId) : null, deleted: true }, [startupRoom(deleted.startupId)]);
+  }
+  return { taskId: String(deleted._id), title: deleted.title, deleted: true };
+}
+
+async function executeDeleteMilestone({ founderId, payload }) {
+  const { milestoneId } = payload || {};
+  if (!milestoneId) throw new Error("delete_milestone requires milestoneId.");
+  const existing = await Milestone.findOne({ _id: milestoneId, founderId });
+  if (!existing) throw new Error("Milestone not found.");
+  if (existing.weeklyOutcomeId) {
+    const outcome = await WeeklyOutcome.findOne({ _id: existing.weeklyOutcomeId, founderId });
+    // Mirrors founders.controller.js's own deleteMilestone check exactly —
+    // a milestone under a finalized week can't be removed retroactively.
+    if (outcome && ["completed", "partial", "missed"].includes(outcome.status)) {
+      throw new Error("This milestone's week is already finalized and can't be modified.");
+    }
+  }
+  await Task.deleteMany({ milestoneId: existing._id, founderId });
+  await Milestone.deleteOne({ _id: existing._id, founderId });
+  return { milestoneId: String(existing._id), title: existing.title, deleted: true };
+}
+
+async function executeUpdateGoal({ founderId, payload }) {
+  const { goal } = payload || {};
+  const trimmedGoal = String(goal || "").trim();
+  if (!trimmedGoal) throw new Error("update_goal requires a non-empty goal.");
+  const active = await WeeklyOutcome.findOne({ founderId, status: "active" }).sort({ weekOf: -1 });
+  if (!active) {
+    throw new Error("No active weekly goal to edit yet — set one first from the Execution Engine.");
+  }
+  // WeeklyOutcome's own findOneAndUpdate pre-hook already rejects this if the
+  // outcome was finalized between AI PM reading it and writing it — the same
+  // real guard the model enforces for every caller, not re-implemented here.
+  const updated = await WeeklyOutcome.findOneAndUpdate({ _id: active._id, founderId }, { goal: trimmedGoal.slice(0, 5000) }, { new: true, runValidators: true });
+  return { weeklyOutcomeId: String(updated._id), goal: updated.goal };
+}
+
 const EXECUTORS = {
   github_open_pr: executeGithubOpenPr,
   github_merge_staging: executeGithubMergeStaging,
   github_merge_main: executeGithubMergeMain,
   propose_sprint_plan: executeProposeSprintPlan,
+  update_task: executeUpdateTask,
+  delete_task: executeDeleteTask,
+  delete_milestone: executeDeleteMilestone,
+  update_goal: executeUpdateGoal,
 };
 
 export function hasExecutor(actionKey) {

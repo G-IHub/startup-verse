@@ -37,18 +37,38 @@ const MARKERS = [
   { name: "SPRINT_PLAN", re: /```SPRINT_PLAN\s*([\s\S]*?)```/ },
   { name: "BUILD_TASK", re: /```BUILD_TASK\s*([\s\S]*?)```/ },
   { name: "SET_DEFAULT_REPO", re: /```SET_DEFAULT_REPO\s*([\s\S]*?)```/ },
+  { name: "UPDATE_TASK", re: /```UPDATE_TASK\s*([\s\S]*?)```/ },
+  { name: "DELETE_TASK", re: /```DELETE_TASK\s*([\s\S]*?)```/ },
+  { name: "DELETE_MILESTONE", re: /```DELETE_MILESTONE\s*([\s\S]*?)```/ },
+  { name: "UPDATE_GOAL", re: /```UPDATE_GOAL\s*([\s\S]*?)```/ },
 ];
 
 function founderGuard(req, founderId) {
   return req.user.isAdmin === true || req.user.id === String(founderId);
 }
 
-function findClosedMarker(raw) {
+/**
+ * Real bug found live: despite the system prompt saying "never both blocks
+ * in the same reply," DeepSeek did exactly that — emitted two different
+ * markers in one response. The old version of this function just returned
+ * whichever marker type happened to be earliest in the MARKERS array,
+ * silently dropping the other with zero explanation — a founder could end
+ * up with the wrong one of two intended actions proposed, or a duplicate,
+ * and no idea why. Now: if more than one marker is genuinely present,
+ * that's treated as its own real case (see sendMessage) instead of a
+ * silent pick.
+ */
+function findAllClosedMarkers(raw) {
+  const found = [];
   for (const marker of MARKERS) {
     const match = raw.match(marker.re);
-    if (match) return { name: marker.name, fullMatch: match[0], body: match[1] };
+    if (match) found.push({ name: marker.name, fullMatch: match[0], body: match[1] });
   }
-  return null;
+  return found;
+}
+
+function findClosedMarker(raw) {
+  return findAllClosedMarkers(raw)[0] || null;
 }
 
 function findOpenMarkerName(raw) {
@@ -93,16 +113,33 @@ Your job:
 {"owner":"...","repo":"...","filePath":"...","taskDescription":"...","taskId":null}
 \`\`\`
   "owner" is just the GitHub username/org (e.g. "oluseyi5280"). "repo" is just the repository name on its own (e.g. "ai-developer-test") — never "owner/repo" combined, never a slash in it. Only do this for one concrete, single-file task, and only once the founder has actually named a real repo — never guess a repo name. If you don't know it yet, ask instead of emitting this block. Unlike the sprint plan, this usually runs immediately and autonomously (opens a real PR right away) — don't tell the founder it needs their approval first unless the actual result you're given afterward says it does.
-  "taskId" closes the loop back to the Execution Engine: if this hand-off is building out one of the real "Open tasks" listed below, copy that task's exact id string into "taskId" so it gets marked done automatically once the build reaches production. If this is a fresh one-off ask that isn't one of those listed tasks, set "taskId" to null — never invent an id.
-- Besides those real actions, you can't yet do anything else for real — you can't send money, sign documents, or message customers on the founder's behalf. If asked, say so honestly instead of pretending you can.
+  "taskId" closes the loop back to the Execution Engine: if this hand-off is building out one of the real tasks listed below, copy that task's exact id string into "taskId" so it gets marked done automatically once the build reaches production. If this is a fresh one-off ask that isn't one of those listed tasks, set "taskId" to null — never invent an id.
+- You can also manage real tasks, milestones, and the weekly goal directly — not just create them. Always use a real id from the "Tasks" or "Milestones" lists below; never invent one, and if you don't see the one the founder means, say so and ask rather than guessing.
+  **Critical: saying it happened doesn't make it happen. Only the fenced block below does anything real.** Never write "staged," "proposed," "done," "updated," or anything implying an action was taken unless you emit the exact block in that same reply — if you're not ready to act, say what you're missing instead of describing an action you didn't take.
+\`\`\`UPDATE_TASK
+{"taskId":"...","updates":{"status":"...","title":"...","description":"...","priority":"...","assignedToName":"...","blockerReason":"...","blockerNote":"..."}}
+\`\`\`
+  Only include the fields actually changing in "updates" — leave the rest out entirely, don't send empty strings for things you're not touching. Status must be a real one (pending, in-progress, blocked, completed) and a legal transition (e.g. you can't jump pending straight to completed — move it to in-progress first). Marking something "blocked" requires both blockerReason and blockerNote.
+\`\`\`DELETE_TASK
+{"taskId":"..."}
+\`\`\`
+\`\`\`DELETE_MILESTONE
+{"milestoneId":"..."}
+\`\`\`
+  Deleting a milestone deletes every task under it too — say that plainly to the founder before you emit this, don't do it quietly. Both deletes always need the founder's approval — never tell them it already happened until you're told it succeeded.
+\`\`\`UPDATE_GOAL
+{"goal":"..."}
+\`\`\`
+  Replaces the current weekly goal's text. Only for a founder who already has an active weekly goal (see below) — if none is set, tell them to set one from the Execution Engine first.
+- Besides those real actions, you still can't do anything else for real — you can't send money, sign documents, or message customers on the founder's behalf. If asked, say so honestly instead of pretending you can.
 - Write like a sharp, direct colleague, not a customer-support bot. No filler, no "I'd be happy to help."
 
 Real context:
 - Stage: ${stage || "not set"}
 - Current weekly goal: ${goal || "none set yet — this might be exactly what you're helping the founder figure out"}
 - Default GitHub repo: ${defaultRepo || "none set yet"}
-- Recent milestones: ${milestonesSummary || "none yet"}
-- Open tasks (id — title, status): ${openTasksSummary || "none yet"}
+- Milestones (id — title, status): ${milestonesSummary || "none yet"}
+- Tasks (id — title, status): ${openTasksSummary || "none yet"}
 - Recent AI Developer activity: ${devActivitySummary || "none yet — AI Developer hasn't done anything for this founder yet"}`;
 }
 
@@ -111,11 +148,13 @@ async function loadContext(founderId) {
   const outcome = await WeeklyOutcome.findOne({ founderId, status: "active" }).sort({ weekOf: -1 }).lean();
   const milestones = await Milestone.find({ founderId }).sort({ createdAt: -1 }).limit(5).lean();
   const milestonesSummary = milestones
-    .map((m) => `${m.title} (${m.status}, ${m.tasksCompleted || 0}/${m.totalTasks || 0} tasks)`)
+    .map((m) => `[${m._id}] ${m.title} (${m.status}, ${m.tasksCompleted || 0}/${m.totalTasks || 0} tasks)`)
     .join("; ");
 
-  const openTasks = await Task.find({ founderId, status: { $in: ["pending", "in-progress"] } })
-    .sort({ createdAt: -1 })
+  // All statuses, not just open ones — AI PM now needs to reference a real
+  // task by id to update/delete it too, not just to list what's outstanding.
+  const openTasks = await Task.find({ founderId })
+    .sort({ updatedAt: -1 })
     .limit(OPEN_TASKS_LIMIT)
     .lean();
   const openTasksSummary = openTasks.map((t) => `[${t._id}] ${t.title} (${t.status})`).join("; ");
@@ -203,14 +242,27 @@ export const sendMessage = async (req, res) => {
   let proposedEvent = null;
   let proposedEventKind = null;
 
-  const closed = findClosedMarker(raw);
+  const allClosed = findAllClosedMarkers(raw);
+  const closed = allClosed.length === 1 ? allClosed[0] : null;
   const openName = closed ? null : findOpenMarkerName(raw);
 
-  if (openName) {
+  if (allClosed.length > 1) {
+    // Real bug caught live: the model emitted two different markers in one
+    // reply despite being told not to. Silently picking one (the old
+    // behavior) meant a founder could get the wrong one of two intended
+    // actions, or a confusing duplicate, with no explanation. Take neither —
+    // strip every fenced block from what's shown and say plainly that only
+    // one action per message is supported, rather than guess which mattered.
+    replyText = allClosed.reduce((text, m) => text.replace(m.fullMatch, ""), raw).trim();
+    replyText += `\n\n(I tried to do more than one thing in that reply (${allClosed.map((m) => m.name).join(" and ")}) — I can only act on one at a time. Nothing was proposed from this message; ask me for one of them again.)`;
+  } else if (openName) {
     // Opened a fence but never closed it — almost certainly truncated even
     // with the generous budget above. Never show a founder a half-written
     // JSON blob; drop everything from the open fence onward.
-    const label = openName === "BUILD_TASK" ? "task hand-off" : openName === "SET_DEFAULT_REPO" ? "repo setting" : "sprint plan";
+    const label = {
+      BUILD_TASK: "task hand-off", SET_DEFAULT_REPO: "repo setting", UPDATE_TASK: "task update",
+      DELETE_TASK: "task deletion", DELETE_MILESTONE: "milestone deletion", UPDATE_GOAL: "goal update",
+    }[openName] || "sprint plan";
     replyText = `${raw.slice(0, raw.indexOf("```" + openName)).trim()}\n\n(I started drafting a ${label} but ran out of room to finish it — mind asking me to try again?)`;
   } else if (closed?.name === "SPRINT_PLAN") {
     // DeepSeek can (and did, in testing) return *only* the marker block with
@@ -350,6 +402,143 @@ export const sendMessage = async (req, res) => {
       replyText += "\n\n(I tried to save that repo but it came out malformed — mind telling me again?)";
     } else {
       replyText += "\n\n(I need both the owner and repo name to remember this — mind telling me again?)";
+    }
+  } else if (closed?.name === "UPDATE_TASK") {
+    replyText = raw.replace(closed.fullMatch, "").trim();
+    let body = null;
+    try {
+      body = JSON.parse(closed.body);
+    } catch {
+      replyText += "\n\n(I tried to update that task but the request came out malformed — mind asking me to try again?)";
+    }
+    if (body) {
+      const taskId = body.taskId && mongoose.isValidObjectId(body.taskId) ? body.taskId : null;
+      const existingTask = taskId ? await Task.findOne({ _id: taskId, founderId }) : null;
+      if (!existingTask) {
+        replyText += "\n\n(I don't see a real task with that id — mind pointing me at one from the list, or telling me again which one you mean?)";
+      } else {
+        try {
+          const actionType = await ActionType.findOne({ agentId: agent._id, actionKey: "update_task" });
+          if (!actionType) throw new Error("update_task action type is not seeded for this agent.");
+          const result = await proposeAction({
+            founderId, actorType: "agent", actorId: String(agent._id), actionTypeId: actionType._id,
+            targetType: "task", targetId: String(existingTask._id),
+            payload: { taskId: String(existingTask._id), updates: body.updates || {} },
+          });
+          proposedEvent = result.event;
+          proposedEventKind = "sprint_plan"; // reuses the Approval Queue link, not the AI Developer one
+          if (result.event.status === "failed") {
+            replyText += `\n\n(I tried to update "${existingTask.title}" but hit an error: ${result.event.result?.error || "unknown error"})`;
+          } else if (result.event.status === "pending_approval") {
+            replyText += `\n\n📋 I've proposed an update to "${existingTask.title}" — check your Approval Queue to review and approve it.`;
+          } else {
+            replyText += `\n\n✅ Updated "${existingTask.title}".`;
+          }
+        } catch (err) {
+          logger.error("[agentChat] failed to propose task update", { message: err.message });
+          replyText += `\n\n(I tried to update that task but hit an error: ${err.message})`;
+        }
+      }
+    }
+  } else if (closed?.name === "DELETE_TASK") {
+    replyText = raw.replace(closed.fullMatch, "").trim();
+    let body = null;
+    try {
+      body = JSON.parse(closed.body);
+    } catch {
+      replyText += "\n\n(I tried to delete that task but the request came out malformed — mind asking me to try again?)";
+    }
+    if (body) {
+      const taskId = body.taskId && mongoose.isValidObjectId(body.taskId) ? body.taskId : null;
+      const existingTask = taskId ? await Task.findOne({ _id: taskId, founderId }) : null;
+      if (!existingTask) {
+        replyText += "\n\n(I don't see a real task with that id — mind pointing me at one from the list?)";
+      } else {
+        try {
+          const actionType = await ActionType.findOne({ agentId: agent._id, actionKey: "delete_task" });
+          if (!actionType) throw new Error("delete_task action type is not seeded for this agent.");
+          const result = await proposeAction({
+            founderId, actorType: "agent", actorId: String(agent._id), actionTypeId: actionType._id,
+            targetType: "task", targetId: String(existingTask._id),
+            payload: { taskId: String(existingTask._id) },
+          });
+          proposedEvent = result.event;
+          proposedEventKind = "sprint_plan";
+          replyText += result.event.status === "pending_approval"
+            ? `\n\n📋 I've proposed deleting "${existingTask.title}" — this always needs your approval, check your Approval Queue.`
+            : `\n\n(Something unexpected happened proposing that deletion — status: ${result.event.status})`;
+        } catch (err) {
+          logger.error("[agentChat] failed to propose task deletion", { message: err.message });
+          replyText += `\n\n(I tried to propose deleting that task but hit an error: ${err.message})`;
+        }
+      }
+    }
+  } else if (closed?.name === "DELETE_MILESTONE") {
+    replyText = raw.replace(closed.fullMatch, "").trim();
+    let body = null;
+    try {
+      body = JSON.parse(closed.body);
+    } catch {
+      replyText += "\n\n(I tried to delete that milestone but the request came out malformed — mind asking me to try again?)";
+    }
+    if (body) {
+      const milestoneId = body.milestoneId && mongoose.isValidObjectId(body.milestoneId) ? body.milestoneId : null;
+      const existingMilestone = milestoneId ? await Milestone.findOne({ _id: milestoneId, founderId }) : null;
+      if (!existingMilestone) {
+        replyText += "\n\n(I don't see a real milestone with that id — mind pointing me at one from the list?)";
+      } else {
+        try {
+          const actionType = await ActionType.findOne({ agentId: agent._id, actionKey: "delete_milestone" });
+          if (!actionType) throw new Error("delete_milestone action type is not seeded for this agent.");
+          const result = await proposeAction({
+            founderId, actorType: "agent", actorId: String(agent._id), actionTypeId: actionType._id,
+            targetType: "milestone", targetId: String(existingMilestone._id),
+            payload: { milestoneId: String(existingMilestone._id) },
+          });
+          proposedEvent = result.event;
+          proposedEventKind = "sprint_plan";
+          replyText += result.event.status === "pending_approval"
+            ? `\n\n📋 I've proposed deleting "${existingMilestone.title}" and every task under it — this always needs your approval, check your Approval Queue.`
+            : `\n\n(Something unexpected happened proposing that deletion — status: ${result.event.status})`;
+        } catch (err) {
+          logger.error("[agentChat] failed to propose milestone deletion", { message: err.message });
+          replyText += `\n\n(I tried to propose deleting that milestone but hit an error: ${err.message})`;
+        }
+      }
+    }
+  } else if (closed?.name === "UPDATE_GOAL") {
+    replyText = raw.replace(closed.fullMatch, "").trim();
+    let body = null;
+    try {
+      body = JSON.parse(closed.body);
+    } catch {
+      replyText += "\n\n(I tried to update the goal but the request came out malformed — mind asking me to try again?)";
+    }
+    const newGoal = String(body?.goal || "").trim();
+    if (body && !newGoal) {
+      replyText += "\n\n(I need real goal text to update it to — mind telling me again?)";
+    } else if (newGoal) {
+      try {
+        const actionType = await ActionType.findOne({ agentId: agent._id, actionKey: "update_goal" });
+        if (!actionType) throw new Error("update_goal action type is not seeded for this agent.");
+        const result = await proposeAction({
+          founderId, actorType: "agent", actorId: String(agent._id), actionTypeId: actionType._id,
+          targetType: "weekly_outcome", targetId: ctx.weeklyOutcomeId || `goal-${Date.now()}`,
+          payload: { goal: newGoal },
+        });
+        proposedEvent = result.event;
+        proposedEventKind = "sprint_plan";
+        if (result.event.status === "failed") {
+          replyText += `\n\n(I tried to update the goal but hit an error: ${result.event.result?.error || "unknown error"})`;
+        } else if (result.event.status === "pending_approval") {
+          replyText += "\n\n📋 I've proposed updating the weekly goal — check your Approval Queue to review and approve it.";
+        } else {
+          replyText += "\n\n✅ Updated the weekly goal.";
+        }
+      } catch (err) {
+        logger.error("[agentChat] failed to propose goal update", { message: err.message });
+        replyText += `\n\n(I tried to update the goal but hit an error: ${err.message})`;
+      }
     }
   }
 

@@ -31,6 +31,42 @@ const CORE_AGENT_DEFINITIONS = [
         adjustable: true,
         approverRule: "founder",
       },
+      {
+        actionKey: "update_task",
+        label: "Update a task",
+        riskCategory: "reversible",
+        defaultMode: "ask_first",
+        adjustable: true,
+        approverRule: "founder",
+      },
+      {
+        // Deletion loses real data with no undo in this schema — kept
+        // non-adjustable (unlike update_task) so it can never be flipped to
+        // autonomous later just because it's run safely a few times, the
+        // same reasoning github_merge_main (deploy_prod) is locked for.
+        actionKey: "delete_task",
+        label: "Delete a task",
+        riskCategory: "sensitive_locked",
+        defaultMode: "ask_first",
+        adjustable: false,
+        approverRule: "founder",
+      },
+      {
+        actionKey: "delete_milestone",
+        label: "Delete a milestone",
+        riskCategory: "sensitive_locked",
+        defaultMode: "ask_first",
+        adjustable: false,
+        approverRule: "founder",
+      },
+      {
+        actionKey: "update_goal",
+        label: "Update the weekly goal",
+        riskCategory: "reversible",
+        defaultMode: "ask_first",
+        adjustable: true,
+        approverRule: "founder",
+      },
     ],
   },
   {
