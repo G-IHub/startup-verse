@@ -51,17 +51,16 @@ const HIRED = [
     task: "Personalised and queued 10 clinic outreach messages for Lagos Island + VI using the Vezeeta supply-first script. Sending is external-facing, so it always waits for you.",
     output: "10 clinic messages ready to send, plus the live pipeline: 3 replied, 1 demo booked this week.",
   },
+  {
+    id: "dev", initials: "DEV", name: "AI Developer", role: "Code · Pull requests · Deploys",
+    bg: "#EEEDFE", color: "#3C3489", price: "$25/mo", priceBg: "#EEEDFE", priceColor: "#3C3489",
+    status: "active", statusLabel: "Active — real GitHub integration", statusColor: "#27500A", statusDot: "#1D9E75",
+    task: "Writes code and opens real pull requests on your connected GitHub repo, merges to staging on its own, and always waits for your approval before touching production.",
+    output: "Connect a GitHub repo from the workspace to see real PRs, staging merges, and the production-deploy approval gate in action.",
+  },
 ];
 
 const AVAILABLE_PHASES = [
-  {
-    label: "Phase 2 — available now",
-    locked: false,
-    lockLabel: null,
-    staff: [
-      { initials: "DEV", name: "AI Developer Agent",   role: "Code review · Tech decisions · Docs",    bg: "#EEEDFE", color: "#3C3489", price: "$25/mo", task: "Reviews code architecture, suggests tech stack decisions, writes technical documentation, flags complexity risks." },
-    ],
-  },
   {
     label: "Phase 3 — unlocks Month 9",
     locked: true,
@@ -104,7 +103,7 @@ const CONTEXT = [
 ];
 
 /* ── Agents with a real dedicated workspace page (else falls back to chat) ── */
-const AGENT_WORKSPACE_PAGE = { mk: "agent-marketing", sa: "agent-sales", fin: "agent-finance", legal: "agent-legal" };
+const AGENT_WORKSPACE_PAGE = { mk: "agent-marketing", sa: "agent-sales", fin: "agent-finance", legal: "agent-legal", dev: "agent-developer" };
 
 /* ── Sub-components ───────────────────────────────────────────────────────── */
 function AgentAvatar({ initials, bg, color, size = 40 }) {
@@ -249,7 +248,7 @@ export default function V2AIStaffManage({ onChat, onNavigate }) {
           <div className="mb-3 flex items-end justify-between">
             <div>
               <div className="font-heading text-[13px] font-semibold text-v2-heading">Your hired AI staff</div>
-              <div className="mt-0.5 font-body text-[11px] text-v2-muted">6 roles active · All aware of HealthTrack context</div>
+              <div className="mt-0.5 font-body text-[11px] text-v2-muted">7 roles active · All aware of HealthTrack context</div>
             </div>
             <span className="rounded-full bg-[#EEEDFE] px-2.5 py-1 font-body text-[10px] font-medium text-v2-purple">Phase 1 · Active</span>
           </div>
@@ -263,9 +262,9 @@ export default function V2AIStaffManage({ onChat, onNavigate }) {
           <div className="mb-4 flex items-end justify-between">
             <div>
               <div className="font-heading text-[13px] font-semibold text-v2-heading">Available to hire</div>
-              <div className="mt-0.5 font-body text-[11px] text-v2-muted">6 roles ready · Phase 2 available now</div>
+              <div className="mt-0.5 font-body text-[11px] text-v2-muted">5 roles ready · Unlocks as you progress</div>
             </div>
-            <span className="rounded-full bg-[#FAEEDA] px-2.5 py-1 font-body text-[10px] font-medium text-[#633806]">Phase 2 · Available now</span>
+            <span className="rounded-full bg-gray-100 px-2.5 py-1 font-body text-[10px] font-medium text-gray-600">Phased rollout</span>
           </div>
 
           {AVAILABLE_PHASES.map((phase) => (
@@ -328,6 +327,7 @@ export default function V2AIStaffManage({ onChat, onNavigate }) {
             { label: "AI Finance",         val: "$15" },
             { label: "AI Legal",           val: "$20" },
             { label: "AI Sales",           val: "$20" },
+            { label: "AI Developer",       val: "$25" },
           ].map((r) => (
             <div key={r.label} className="flex items-center justify-between py-1">
               <span className="font-body text-[11px] text-v2-muted">{r.label}</span>
@@ -337,7 +337,7 @@ export default function V2AIStaffManage({ onChat, onNavigate }) {
           <div className="my-1 h-px bg-gray-200" />
           <div className="flex items-center justify-between py-1">
             <span className="font-body text-[11px] font-semibold text-v2-heading">Current total</span>
-            <span className="font-body text-[11px] font-semibold text-v2-purple">$110/mo</span>
+            <span className="font-body text-[11px] font-semibold text-v2-purple">$135/mo</span>
           </div>
           <div className="flex items-center justify-between py-1">
             <span className="font-body text-[11px] text-v2-muted">Full bundle (13 roles)</span>
@@ -349,7 +349,7 @@ export default function V2AIStaffManage({ onChat, onNavigate }) {
         {/* Upgrade CTA */}
         <div className="rounded-2xl bg-[#EEEDFE] p-3">
           <div className="mb-1 font-heading text-[12px] font-semibold text-[#3C3489]">Upgrade to full team bundle</div>
-          <p className="mb-3 font-body text-[11px] leading-relaxed text-v2-purple">Get all 13 AI staff roles for $99/month. Your Developer Agent alone would unblock James today and save your execution score.</p>
+          <p className="mb-3 font-body text-[11px] leading-relaxed text-v2-purple">Get all 13 AI staff roles for $99/month — including AI Strategy Advisor, AI Designer, and 3 more roles unlocking as you progress.</p>
           <button type="button" className="w-full rounded-xl bg-v2-purple py-2.5 font-body text-[11px] font-semibold text-white hover:opacity-90 transition-opacity">
             Upgrade · $99/mo ↗
           </button>

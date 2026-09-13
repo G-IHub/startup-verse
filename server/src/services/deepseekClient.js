@@ -4,13 +4,17 @@
  * powers agent work (drafting, coding, personalizing); model choice stays a
  * config value here, never hardcoded into an agent's own logic.
  */
+// Model name matches server/src/services/resumeParseService.js's DEFAULT_MODEL
+// — that integration is already live/proven in this codebase, so this stays
+// consistent rather than guessing at a different DeepSeek model string.
 const DEEPSEEK_BASE_URL = "https://api.deepseek.com";
+const DEFAULT_MODEL = "deepseek-v4-flash";
 
 export function deepseekConfigured() {
   return Boolean(process.env.DEEPSEEK_API_KEY);
 }
 
-export async function draftText({ systemPrompt, userPrompt, model = "deepseek-chat", maxTokens = 1200 }) {
+export async function draftText({ systemPrompt, userPrompt, model = DEFAULT_MODEL, maxTokens = 1200 }) {
   const apiKey = process.env.DEEPSEEK_API_KEY;
   if (!apiKey) {
     const err = new Error("DEEPSEEK_API_KEY is not set.");

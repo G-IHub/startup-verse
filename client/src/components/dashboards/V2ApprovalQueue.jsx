@@ -24,6 +24,7 @@ const AGENT_WORKSPACE_PAGE = {
   "AI Marketing": "agent-marketing",
   "AI Finance": "agent-finance",
   "AI Legal": "agent-legal",
+  "AI Developer": "agent-developer",
 };
 
 /* ── Mapping real AgentEvent rows → display items ──────────────────────────── */

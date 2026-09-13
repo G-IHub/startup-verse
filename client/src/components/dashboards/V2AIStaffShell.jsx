@@ -25,6 +25,7 @@ import V2AIMarketingWorkspace from "./V2AIMarketingWorkspace";
 import V2AISalesWorkspace from "./V2AISalesWorkspace";
 import V2AIFinanceWorkspace from "./V2AIFinanceWorkspace";
 import V2AILegalWorkspace from "./V2AILegalWorkspace";
+import V2AIDeveloperWorkspace from "./V2AIDeveloperWorkspace";
 import V2AIStaffChat from "./V2AIStaffChat";
 import V2Integrations from "./V2Integrations";
 import V2ProductViewer from "./V2ProductViewer";
@@ -72,6 +73,7 @@ const SUB_PAGE_LABELS = {
   "agent-sales":      "AI Sales Workspace",
   "agent-finance":    "AI Finance Workspace",
   "agent-legal":      "AI Legal Workspace",
+  "agent-developer":  "AI Developer Workspace",
   "ai-staff-chat":    "AI Staff Chat",
   "product-viewer":   "Product Viewer",
 };
@@ -100,7 +102,7 @@ export default function V2AIStaffShell({ user, onPageChange, ...rest }) {
     if (page === "chat" || page === "ai-staff-chat") { setSubPage(null); setTab("chat"); return; }
     // Known sub-pages stay inside the shell
     const internalPages = ["approval-queue","autonomy-settings","audit-trail",
-      "agent-marketing","agent-sales","agent-finance","agent-legal",
+      "agent-marketing","agent-sales","agent-finance","agent-legal","agent-developer",
       "product-viewer"];
     if (internalPages.includes(page)) { setSubPage(page); return; }
     // Everything else → top-level routing
@@ -126,6 +128,8 @@ export default function V2AIStaffShell({ user, onPageChange, ...rest }) {
         return <V2AIFinanceWorkspace onBack={handleBack} onNavigate={handleNavigate} />;
       case "agent-legal":
         return <V2AILegalWorkspace onBack={handleBack} onNavigate={handleNavigate} />;
+      case "agent-developer":
+        return <V2AIDeveloperWorkspace user={user} onBack={handleBack} onNavigate={handleNavigate} />;
       case "product-viewer":
         return <V2ProductViewer onBack={handleBack} />;
       default:

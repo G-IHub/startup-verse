@@ -1,6 +1,6 @@
 # StartupVerse — AI Agent System Roadmap
 
-**Status as of 2026-09-13:** Phase 0 done and verified live (event log, orchestrator, and 3 of the 4 real-data pages — see the phase section below for what's still mock and why). Phase 1's first agent is now **AI Developer via GitHub**, not Zikorail — see "Zikorail integration" below for why that pivot happened. Phase 1 not started. This file is the plan to close that gap in deliberate, checkpointed phases, not all at once.
+**Status as of 2026-09-13:** Phase 0 and Phase 1 both done and verified live. Phase 1's first agent is **AI Developer via GitHub** (not Zikorail — see "Zikorail integration" below for why that pivot happened): a founder's real, connected GitHub repo now has a real merged PR in production, reached through the full approval flow with no shortcuts taken. Phase 2 (server-side enforcement hardening) is next. This file is the plan to close the remaining gaps in deliberate, checkpointed phases, not all at once.
 
 **Source documents** (read these before touching this system — this file is the working summary, they're the reasoning):
 - [ai-agent-vision-writeup.md](ai-agent-vision-writeup.md) — the actual product bet: the trust/control layer is the moat, not agent capability.
@@ -95,14 +95,20 @@ The architecture doc is written assuming Postgres. Real, already-learned constra
 
 **Changed 2026-09-13**: this phase was originally scoped as AI Sales/Marketing via Zikorail — reversed after investigation, see "Zikorail integration" above. AI Developer/GitHub was the architecture doc's own original suggestion for the first agent, precisely because it doesn't depend on a third-party consumer platform's stability, ban risk, or API availability.
 
-- [ ] Choose/create a real (test) GitHub repo + a GitHub App or PAT scoped to it — this is StartupVerse's own integration, not borrowed infrastructure
-- [ ] Define real `ActionType` rows: `write_code`/`open_pr` (reversible/autonomous), `deploy_staging` (reversible/autonomous), `deploy_prod` (**sensitive_locked**, `adjustable: false`, `approverRule: role:engineering`)
-- [ ] Build the GitHub adapter (`services/githubAdapter.js` or similar) — real API calls (open PR, merge, trigger a staging deploy), not mocked responses
-- [ ] Wire AI Developer's agent logic to call DeepSeek for the actual code-writing/drafting, model passed as config per the model strategy above
-- [ ] Sprint/task-plan approval sits one level above per-commit autonomy — a human approves the plan (via AI PM, see Phase 3) once per cycle, not every PR
-- [ ] Idempotency key on `deploy_staging`/`deploy_prod` so a retried orchestrator call can't double-deploy
-- [ ] `V2AIStaffManage.jsx`'s AI Developer card and any dedicated workspace page read real PR/deploy data instead of static mock arrays
-- [ ] End-to-end verification on a real (test) repo before calling this phase done
+**✅ Done and verified live, 2026-09-13.** Built on the existing per-founder GitHub OAuth connection (`GitHubConnection` model, `server/src/controllers/github.controller.js` — already real, already used by the "Import from GitHub" task feature) rather than a separate GitHub App/PAT-per-platform, since it already gives exactly the right shape: each founder authorizes their own repo access, scoped to what they granted. Verified against a real throwaway repo (`oluseyi5280/ai-developer-test`) with a fine-grained PAT (Contents + Pull requests: read/write) connected the same way a founder would connect their own account.
+
+- [x] Choose/create a real (test) GitHub repo + a GitHub App or PAT scoped to it — used the existing per-founder OAuth `GitHubConnection` mechanism instead of a separate App; a fine-grained PAT validated against GitHub's real API stands in for a founder's own OAuth connection in this verification
+- [x] Define real `ActionType` rows: `github_open_pr` (reversible/autonomous), `github_merge_staging` (reversible/autonomous), `github_merge_main` (**sensitive_locked**, `adjustable: false`) — `approverRule: role:engineering` deferred to founder-only resolution until role-based routing exists (same Phase 0 limitation, unchanged)
+- [x] Build the GitHub adapter (`server/src/services/githubAdapter.js`) — real API calls (create branch, commit file, open PR, merge PR, merge branches), no mocked responses
+- [x] Wire AI Developer's agent logic to call DeepSeek for the actual code-writing/drafting (`server/src/services/deepseekClient.js`, `agentExecutors.js`'s `executeGithubOpenPr`) — model name matches the already-live `resumeParseService.js` integration (`deepseek-v4-flash`), same real `DEEPSEEK_API_KEY`
+- [ ] Sprint/task-plan approval sits one level above per-commit autonomy — still deferred to Phase 3 (AI PM's sprint-plan flow doesn't exist yet); Phase 1 verified the two-gate mechanism (autonomous coding/staging, locked prod) without the upstream sprint gate in front of it yet
+- [x] Idempotency key on `deploy_staging`/`deploy_prod` so a retried orchestrator call can't double-deploy — keyed on (founderId, actionTypeId, targetType, targetId); a duplicate propose/resolve reuses the prior result (`reusedFromEventId`) instead of re-executing. Found this was NOT yet built when reaching this checklist item and built it before verifying end-to-end, per the checklist's own point.
+- [x] `V2AIStaffManage.jsx`'s AI Developer card and any dedicated workspace page read real PR/deploy data instead of static mock arrays — AI Developer moved from "Available to hire" into the real hired roster; new `V2AIDeveloperWorkspace.jsx` reads real `AgentEvent` rows (not mock arrays), reuses the existing GitHub connect/disconnect flow, and lets a founder submit a real task from the UI
+- [x] End-to-end verification on a real (test) repo before calling this phase done — verified twice: once via direct REST calls to the running server, once entirely through the real UI (workspace form → real PR → merge to staging → escalate to Approval Queue → approve → real merge to `main`, confirmed via GitHub's own API at every step)
+
+**Real bug found and fixed during UI verification**: grouping a founder's `AgentEvent` rows into one task-per-PR view picked whichever `github_merge_main` event happened to iterate last when two existed for the same task (the original approval-decision row, mutated to `"approved"`, and the separate execution row from `resolveApproval`, `"human_completed"`) — so a fully-deployed task could still show "Merged to staging" instead of "Live in production" depending on array order. Fixed by picking the highest-priority status across duplicates instead of last-write-wins.
+
+**Real friction hit and resolved during setup, not a code bug**: the first fine-grained PAT was scoped with Contents: Read/write but no Pull requests permission at all — every open-PR call 403'd with "Resource not accessible by personal access token" until diagnosed (isolated via direct `curl` calls to each GitHub API step individually — ref creation and file commits worked, only PR creation failed) and the token's permissions were corrected. Worth remembering: GitHub's fine-grained PAT permission editor has Pull requests as a separate, easy-to-miss row from Contents.
 
 ## Phase 2 — Enforcement hardening
 **Goal:** "locked" is a server-side guarantee, not a UI convention.

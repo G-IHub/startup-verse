@@ -81,6 +81,29 @@ async function publishEvent(event) {
   return dto;
 }
 
+const COMPLETED_STATUSES = ["autonomous_completed", "human_completed"];
+
+/**
+ * Idempotency guard for executable actions (docs/ai-agent-roadmap.md Phase 1
+ * checklist item). Keyed on (founderId, actionTypeId, targetType, targetId) —
+ * the same tuple a retried orchestrator call would resend. If a prior call
+ * already executed this exact action to completion, return that instead of
+ * running the real adapter again, so a network-retried propose/resolve can't
+ * double-open a PR or double-deploy. Only applies to action types with a real
+ * executor — actions with no side effect (Phase 0's log-only path) don't need
+ * it, and duplicates there are harmless.
+ */
+async function findCompletedDuplicate({ founderId, actionTypeId, targetType, targetId }) {
+  if (!targetId) return null;
+  return AgentEvent.findOne({
+    founderId,
+    actionTypeId,
+    targetType,
+    targetId,
+    status: { $in: COMPLETED_STATUSES },
+  }).sort({ createdAt: -1 });
+}
+
 /**
  * Step 1 of the decision loop: an agent (or the seed script, in Phase 0)
  * proposes an action. Branches on the ActionType's real risk category and
@@ -132,12 +155,18 @@ export async function proposeAction({ founderId, startupId, actorType, actorId, 
   let status = "autonomous_completed";
   let result = null;
   if (hasExecutor(actionType.actionKey)) {
-    try {
-      result = await runExecutor(actionType.actionKey, { founderId, payload: payload || {}, targetType, targetId: targetId || "" });
-    } catch (err) {
-      status = "failed";
-      result = { error: err.message || "Execution failed." };
-      logger.error(`[orchestrator] executor "${actionType.actionKey}" failed`, { message: err.message });
+    const duplicate = await findCompletedDuplicate({ founderId, actionTypeId: actionType._id, targetType, targetId });
+    if (duplicate) {
+      result = { ...duplicate.result, reusedFromEventId: String(duplicate._id) };
+      logger.warn(`[orchestrator] duplicate propose for ${actionType.actionKey}/${targetId} — reusing prior result instead of re-executing.`);
+    } else {
+      try {
+        result = await runExecutor(actionType.actionKey, { founderId, payload: payload || {}, targetType, targetId: targetId || "" });
+      } catch (err) {
+        status = "failed";
+        result = { error: err.message || "Execution failed." };
+        logger.error(`[orchestrator] executor "${actionType.actionKey}" failed`, { message: err.message });
+      }
     }
   }
   const event = await AgentEvent.create({ ...baseDoc, status, result });
@@ -189,17 +218,28 @@ export async function resolveApproval({ eventId, decision, approverId }) {
   let execStatus = "human_completed";
   let execResult = null;
   if (actionType && hasExecutor(actionType.actionKey)) {
-    try {
-      execResult = await runExecutor(actionType.actionKey, {
-        founderId: pending.founderId,
-        payload: pending.payload || {},
-        targetType: pending.targetType,
-        targetId: pending.targetId || "",
-      });
-    } catch (err) {
-      execStatus = "failed";
-      execResult = { error: err.message || "Execution failed." };
-      logger.error(`[orchestrator] executor "${actionType.actionKey}" failed on approval`, { message: err.message });
+    const duplicate = await findCompletedDuplicate({
+      founderId: pending.founderId,
+      actionTypeId: actionType._id,
+      targetType: pending.targetType,
+      targetId: pending.targetId,
+    });
+    if (duplicate) {
+      execResult = { ...duplicate.result, reusedFromEventId: String(duplicate._id) };
+      logger.warn(`[orchestrator] duplicate resolve for ${actionType.actionKey}/${pending.targetId} — reusing prior result instead of re-executing.`);
+    } else {
+      try {
+        execResult = await runExecutor(actionType.actionKey, {
+          founderId: pending.founderId,
+          payload: pending.payload || {},
+          targetType: pending.targetType,
+          targetId: pending.targetId || "",
+        });
+      } catch (err) {
+        execStatus = "failed";
+        execResult = { error: err.message || "Execution failed." };
+        logger.error(`[orchestrator] executor "${actionType.actionKey}" failed on approval`, { message: err.message });
+      }
     }
   }
 
