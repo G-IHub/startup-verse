@@ -92,6 +92,23 @@ function Toast({ msg }) {
   );
 }
 
+/**
+ * Real bug found live: AI PM's replies use real Markdown (`**bold**`) for
+ * section headers, but the chat bubble below just printed the raw string —
+ * so the founder saw literal asterisks, not bold text. `**bold**` is
+ * correct Markdown syntax (single `*text*` means italic, not bold); the fix
+ * is rendering it, not changing how many asterisks the model uses. Handles
+ * just bold, since that's what AI PM actually produces — not a full
+ * Markdown parser for syntax nothing here generates.
+ */
+function renderInlineMarkdown(text) {
+  const parts = String(text ?? "").split(/(\*\*[^*]+?\*\*)/g);
+  return parts.map((part, i) => {
+    const match = part.match(/^\*\*([^*]+?)\*\*$/);
+    return match ? <strong key={i} className="font-semibold">{match[1]}</strong> : <React.Fragment key={i}>{part}</React.Fragment>;
+  });
+}
+
 /* ── Typing dots ─────────────────────────────────────────────────────────── */
 function TypingDots() {
   return (
@@ -155,7 +172,7 @@ function PMMessages({ messages, loading, sending, error, onNavigate }) {
                   : "rounded-[4px_14px_14px_14px] border border-gray-100 bg-white px-3.5 py-3 text-v2-heading",
               )}
             >
-              {m.content}
+              {renderInlineMarkdown(m.content)}
             </div>
             {m.proposedEventId && m.proposedEventKind === "build_task" && (
               <button type="button" onClick={() => onNavigate?.("agent-developer")} className="font-body text-[10px] font-medium text-v2-purple hover:underline">
