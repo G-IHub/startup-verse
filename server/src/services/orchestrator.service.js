@@ -17,6 +17,8 @@ import ActionType from "../models/ActionType.js";
 import AutonomySetting from "../models/AutonomySetting.js";
 import AgentEvent from "../models/AgentEvent.js";
 import Task from "../models/Task.js";
+import Agent from "../models/Agent.js";
+import Startup from "../models/Startup.js";
 import { emitRealtime } from "./realtime.service.js";
 import { SOCKET_EVENTS } from "../realtime/events.js";
 import { startupRoom, userRoom } from "../realtime/rooms.js";
@@ -136,6 +138,34 @@ async function advanceTaskToInProgress(taskId) {
 }
 
 /**
+ * A taskId-linked github_open_pr that genuinely fails (no GitHub connection,
+ * bad repo, etc.) must not leave its Task silently stuck at "pending"
+ * forever — that would jam advanceBuildQueueIfIdle below, which only ever
+ * looks for the oldest still-"pending" queued task and would keep re-picking
+ * the same broken one on every future trigger. Marking it "blocked" instead
+ * makes the failure visible in the Execution Engine and lets the queue move
+ * on to the next real task.
+ */
+async function markLinkedTaskBlocked(taskId, reason) {
+  if (!taskId) return;
+  try {
+    const task = await Task.findById(taskId);
+    if (!task) return;
+    if (!validateTaskStatusTransition(task.status, "blocked").ok) return;
+    task.status = "blocked";
+    task.blockerReason = "AI Developer hand-off failed";
+    task.blockerNote = String(reason || "Unknown error").slice(0, 1000);
+    await task.save();
+    await syncMilestoneCounters(task.milestoneId);
+    if (task.startupId) {
+      emitRealtime(SOCKET_EVENTS.TASK_UPDATED, task, [startupRoom(task.startupId)]);
+    }
+  } catch (err) {
+    logger.error("[orchestrator] failed to mark linked task blocked", { taskId: String(taskId), message: err.message });
+  }
+}
+
+/**
  * Finds the github_open_pr event that started this pipeline (same founderId +
  * targetId — the grouping key every step of a hand-off's PR/staging/prod
  * chain already shares, per V2AIDeveloperWorkspace.jsx's own grouping) and,
@@ -145,9 +175,13 @@ async function advanceTaskToInProgress(taskId) {
 async function completeLinkedTask(founderId, targetId) {
   if (!targetId) return;
   try {
-    const openPrType = await ActionType.findOne({ actionKey: "github_open_pr" }, { _id: 1 });
-    if (!openPrType) return;
-    const origin = await AgentEvent.findOne({ founderId, targetId, actionTypeId: openPrType._id, taskId: { $ne: null } }).sort({ createdAt: 1 });
+    // taskId is only ever set on the github_open_pr event that started this
+    // pipeline (see advanceTaskToInProgress's call site below), so this alone
+    // identifies it — no need to also filter by actionTypeId. That matters:
+    // ActionType rows are per-founder (agentId -> Agent -> one founder), not
+    // global, so looking one up by actionKey alone without an agent/founder
+    // scope would risk matching a *different* founder's row entirely.
+    const origin = await AgentEvent.findOne({ founderId, targetId, taskId: { $ne: null } }).sort({ createdAt: 1 });
     if (!origin?.taskId) return;
     const task = await Task.findById(origin.taskId);
     if (!task) return;
@@ -158,8 +192,65 @@ async function completeLinkedTask(founderId, targetId) {
     if (task.startupId) {
       emitRealtime(SOCKET_EVENTS.TASK_UPDATED, task, [startupRoom(task.startupId)]);
     }
+    // One task finishing is exactly what should start the next queued one —
+    // see advanceBuildQueueIfIdle below.
+    await advanceBuildQueueIfIdle(founderId);
   } catch (err) {
     logger.error("[orchestrator] failed to complete linked task", { founderId: String(founderId), targetId, message: err.message });
+  }
+}
+
+/**
+ * Sequential build-queue trigger (docs/ai-agent-roadmap.md Phase 3): once a
+ * founder approves a sprint plan, tasks AI PM flagged as `buildTask: true`
+ * should start reaching AI Developer on their own — one at a time, not all
+ * at once, since every github_open_pr branches off the same `staging`
+ * branch and running several simultaneously risks real merge conflicts with
+ * nothing in the system to resolve them. So: if a buildTask is already
+ * "in-progress", do nothing (it'll trigger the next one itself when
+ * completeLinkedTask marks it done); otherwise, start the oldest still-
+ * "pending" one. Called right after a sprint plan's tasks are created (see
+ * resolveApproval/proposeAction below) and again every time a task in the
+ * queue completes.
+ */
+async function advanceBuildQueueIfIdle(founderId) {
+  try {
+    const alreadyRunning = await Task.findOne({ founderId, buildTask: true, status: "in-progress" });
+    if (alreadyRunning) return;
+
+    const next = await Task.findOne({ founderId, buildTask: true, status: "pending" }).sort({ createdAt: 1 });
+    if (!next) return;
+
+    const startup = await Startup.findOne({ founderId }).lean();
+    const owner = startup?.defaultGithubRepo?.owner;
+    const repo = startup?.defaultGithubRepo?.repo;
+    if (!owner || !repo) {
+      logger.warn(`[orchestrator] build task ${next._id} is queued but no default GitHub repo is set for founder ${founderId} — leaving it pending until one is set (Integrations page).`);
+      return;
+    }
+    if (!next.buildFilePath) {
+      await markLinkedTaskBlocked(next._id, "AI PM flagged this task for AI Developer but didn't specify a file path.");
+      return;
+    }
+
+    const devAgent = await Agent.findOne({ founderId, agentKey: "dev" });
+    if (!devAgent) return;
+    const openPrType = await ActionType.findOne({ agentId: devAgent._id, actionKey: "github_open_pr" });
+    if (!openPrType) return;
+
+    await proposeAction({
+      founderId,
+      startupId: next.startupId,
+      actorType: "agent",
+      actorId: String(devAgent._id),
+      actionTypeId: openPrType._id,
+      targetType: "pr",
+      targetId: `sprint-task-${next._id}`,
+      payload: { owner, repo, filePath: next.buildFilePath, taskDescription: next.description || next.title },
+      taskId: next._id,
+    });
+  } catch (err) {
+    logger.error("[orchestrator] failed to advance build queue", { founderId: String(founderId), message: err.message });
   }
 }
 
@@ -197,20 +288,17 @@ export async function proposeAction({ founderId, startupId, actorType, actorId, 
     taskId: taskId || null,
   };
 
-  // Hand-off started: if this open_pr is linked to a real planned Task, move
-  // it pending -> in-progress now, regardless of which branch below the
-  // event itself takes (ask_first vs. autonomous — either way, work has
-  // genuinely begun from the founder's point of view).
-  if (actionType.actionKey === "github_open_pr" && taskId) {
-    await advanceTaskToInProgress(taskId);
-  }
-
   // Branch a) sensitive_locked -> ALWAYS pending_approval, regardless of mode.
   // Branch b) reversible + ask_first -> pending_approval (re-checked live, not cached).
   if (actionType.riskCategory === "sensitive_locked" || (actionType.riskCategory === "reversible" && mode === "ask_first")) {
     const approverId = resolveApprover(actionType.approverRule, founderId);
     const event = await AgentEvent.create({ ...baseDoc, status: "pending_approval", approverId });
     const dto = await publishEvent(event);
+    // Hand-off requested: a linked Task can move to in-progress now — nothing
+    // has failed yet at this point, only real failures below skip this.
+    if (actionType.actionKey === "github_open_pr" && taskId) {
+      await advanceTaskToInProgress(taskId);
+    }
     return { event: dto, executed: false };
   }
 
@@ -240,8 +328,18 @@ export async function proposeAction({ founderId, startupId, actorType, actorId, 
   const event = await AgentEvent.create({ ...baseDoc, status, result });
   const dto = await publishEvent(event);
 
+  if (actionType.actionKey === "github_open_pr" && taskId) {
+    if (status === "failed") {
+      await markLinkedTaskBlocked(taskId, result?.error);
+    } else {
+      await advanceTaskToInProgress(taskId);
+    }
+  }
   if (actionType.actionKey === "github_merge_main" && status === "autonomous_completed") {
     await completeLinkedTask(founderId, targetId);
+  }
+  if (actionType.actionKey === "propose_sprint_plan" && status === "autonomous_completed") {
+    await advanceBuildQueueIfIdle(founderId);
   }
 
   return { event: dto, executed: status !== "failed" };
@@ -281,6 +379,12 @@ export async function resolveApproval({ eventId, decision, approverId }) {
   const resolvedDto = await publishEvent(pending);
 
   if (decision === "declined") {
+    if (pending.taskId) {
+      const declinedActionType = await ActionType.findById(pending.actionTypeId);
+      if (declinedActionType?.actionKey === "github_open_pr") {
+        await markLinkedTaskBlocked(pending.taskId, "The founder declined this hand-off in the Approval Queue.");
+      }
+    }
     return { resolved: resolvedDto, execution: null };
   }
 
@@ -331,8 +435,14 @@ export async function resolveApproval({ eventId, decision, approverId }) {
   });
   const executionDto = await publishEvent(executionEvent);
 
+  if (actionType?.actionKey === "github_open_pr" && pending.taskId && execStatus === "failed") {
+    await markLinkedTaskBlocked(pending.taskId, execResult?.error);
+  }
   if (actionType?.actionKey === "github_merge_main" && execStatus === "human_completed") {
     await completeLinkedTask(pending.founderId, pending.targetId);
+  }
+  if (actionType?.actionKey === "propose_sprint_plan" && execStatus === "human_completed") {
+    await advanceBuildQueueIfIdle(pending.founderId);
   }
 
   return { resolved: resolvedDto, execution: executionDto };

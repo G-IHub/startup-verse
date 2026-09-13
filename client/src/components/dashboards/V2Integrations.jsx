@@ -114,6 +114,27 @@ function Modal({ data, onClose, onToast, onNavigate }) {
           {data.note && (
             <p className="mt-3 font-body text-[11px] text-v2-muted">{data.note}</p>
           )}
+          {data.repoPicker && (
+            <div className="mt-4 border-t border-gray-100 pt-3">
+              <label className="mb-1 block font-body text-[11px] font-medium text-v2-heading">
+                Default repo for AI Developer
+              </label>
+              <select
+                value={data.selectedRepo || ""}
+                disabled={data.repoBusy}
+                onChange={(e) => data.onSelectRepo?.(e.target.value)}
+                className="w-full rounded-lg border border-v2-border bg-white px-2.5 py-1.5 font-body text-[12px] text-v2-heading"
+              >
+                <option value="">Not set — AI PM will ask in chat</option>
+                {(data.repoOptions || []).map((r) => (
+                  <option key={r.fullName} value={r.fullName}>{r.fullName}</option>
+                ))}
+              </select>
+              <p className="mt-1.5 font-body text-[11px] text-v2-muted">
+                AI Product Manager builds into this repo automatically when a sprint plan has real code tasks — no need to name it in chat every time.
+              </p>
+            </div>
+          )}
         </div>
         <div className="flex justify-end gap-2 border-t border-gray-100 px-5 py-3">
           <button type="button" onClick={onClose} className="rounded-full border border-v2-border px-4 py-1.5 font-body text-[12px] font-medium text-v2-heading hover:bg-gray-50">Close</button>
@@ -206,6 +227,9 @@ export default function V2Integrations({ onBack, onNavigate }) {
   const [toast, setToast] = useState("");
   const [gh, setGh] = useState({ connected: false, configured: true, githubLogin: "" });
   const [ghBusy, setGhBusy] = useState(false);
+  const [defaultRepo, setDefaultRepoState] = useState({ owner: "", repo: "" });
+  const [repoOptions, setRepoOptions] = useState([]);
+  const [repoBusy, setRepoBusy] = useState(false);
 
   const showToast = (msg) => { setToast(msg); setTimeout(() => setToast(""), 2400); };
 
@@ -218,7 +242,10 @@ export default function V2Integrations({ onBack, onNavigate }) {
     }
   }, []);
 
-  useEffect(() => { refreshGithub(); }, [refreshGithub]);
+  useEffect(() => {
+    refreshGithub();
+    githubApi.getDefaultGithubRepo().then(setDefaultRepoState).catch(() => {});
+  }, [refreshGithub]);
 
   const connectGithub = () => {
     setGhBusy(true);
@@ -251,21 +278,57 @@ export default function V2Integrations({ onBack, onNavigate }) {
     }
   };
 
-  const openModal = (key) => {
+  const selectDefaultRepo = async (fullName) => {
+    setRepoBusy(true);
+    try {
+      if (!fullName) {
+        // No "unset" endpoint — an empty selection just means "haven't
+        // picked one," which is already the default state server-side.
+        // Nothing to persist; only update the modal so the dropdown reflects it.
+        setDefaultRepoState({ owner: "", repo: "" });
+        setModal((m) => (m ? { ...m, selectedRepo: "" } : m));
+        return;
+      }
+      const [owner, repo] = fullName.split("/");
+      await githubApi.setDefaultGithubRepo(owner, repo);
+      setDefaultRepoState({ owner, repo });
+      setModal((m) => (m ? { ...m, selectedRepo: fullName } : m));
+      showToast(`AI Developer's default repo is now ${fullName}`);
+    } catch (err) {
+      showToast(err?.message || "Could not save the default repo.");
+    } finally {
+      setRepoBusy(false);
+    }
+  };
+
+  const openModal = async (key) => {
     if (key === "github") {
-      setModal(gh.connected
-        ? {
-            title: "GitHub", sub: `Connected as ${gh.githubLogin}`,
-            scopes: ["Open pull requests, push branches", "Merge to staging autonomously", "Deploy to production — always locked, always waits for you"],
-            note: "Deploying to production is permanently locked in Autonomy Settings, regardless of what this token permits.",
-            connectLabel: "Disconnect", connectDanger: true, real: true, busy: ghBusy, onAction: disconnectGithub,
-          }
-        : {
-            title: "Connect GitHub", sub: "Real per-founder OAuth connection — the same one AI Developer's workspace uses",
-            scopes: ["Read your repos", "Open pull requests, push branches", "Read issues & commit history"],
-            note: gh.configured ? "You'll be redirected to GitHub to authorize access." : "GitHub OAuth isn't configured on this server yet — ask an admin to set GITHUB_CLIENT_ID/SECRET.",
-            connectLabel: gh.configured ? "Connect →" : "Not available", real: true, busy: ghBusy, onAction: gh.configured ? connectGithub : undefined,
-          });
+      if (gh.connected) {
+        setModal({
+          title: "GitHub", sub: `Connected as ${gh.githubLogin}`,
+          scopes: ["Open pull requests, push branches", "Merge to staging autonomously", "Deploy to production — always locked, always waits for you"],
+          note: "Deploying to production is permanently locked in Autonomy Settings, regardless of what this token permits.",
+          connectLabel: "Disconnect", connectDanger: true, real: true, busy: ghBusy, onAction: disconnectGithub,
+          repoPicker: true, repoOptions, repoBusy,
+          selectedRepo: defaultRepo.owner && defaultRepo.repo ? `${defaultRepo.owner}/${defaultRepo.repo}` : "",
+          onSelectRepo: selectDefaultRepo,
+        });
+        try {
+          const { repos } = await githubApi.listGithubRepos();
+          setRepoOptions(repos || []);
+          setModal((m) => (m ? { ...m, repoOptions: repos || [] } : m));
+        } catch {
+          // Repo list is a nice-to-have here — the picker just stays empty
+          // if it fails; the connection itself already succeeded.
+        }
+        return;
+      }
+      setModal({
+        title: "Connect GitHub", sub: "Real per-founder OAuth connection — the same one AI Developer's workspace uses",
+        scopes: ["Read your repos", "Open pull requests, push branches", "Read issues & commit history"],
+        note: gh.configured ? "You'll be redirected to GitHub to authorize access." : "GitHub OAuth isn't configured on this server yet — ask an admin to set GITHUB_CLIENT_ID/SECRET.",
+        connectLabel: gh.configured ? "Connect →" : "Not available", real: true, busy: ghBusy, onAction: gh.configured ? connectGithub : undefined,
+      });
       return;
     }
     setModal(MODALS[key] ?? null);

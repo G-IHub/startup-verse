@@ -268,6 +268,40 @@ export async function createRepo(req, res) {
   }, 201);
 }
 
+/**
+ * The default repo AI PM's automatic build-task hand-offs (orchestrator.
+ * service.js's advanceBuildQueueIfIdle) use — separate from "connected,"
+ * since a connected founder can have many repos and connecting doesn't say
+ * which one is the actual product. Set here from the Integrations page's
+ * GitHub card, or by AI PM itself once a founder names a repo in chat.
+ */
+export async function getDefaultRepo(req, res) {
+  if (!requireFounder(req, res)) return;
+  const startup = await Startup.findOne({ founderId: req.user.id }).lean();
+  return apiSuccess(res, {
+    owner: startup?.defaultGithubRepo?.owner || "",
+    repo: startup?.defaultGithubRepo?.repo || "",
+  });
+}
+
+export async function setDefaultRepo(req, res) {
+  if (!requireFounder(req, res)) return;
+  const owner = String(req.body?.owner || "").trim();
+  const repo = String(req.body?.repo || "").trim();
+  if (!owner || !repo) {
+    return apiError(res, "owner and repo are required.", 422);
+  }
+  const startup = await Startup.findOneAndUpdate(
+    { founderId: req.user.id },
+    { defaultGithubRepo: { owner, repo } },
+    { new: true },
+  );
+  if (!startup) {
+    return apiError(res, "Create a startup before setting a default repo.", 422);
+  }
+  return apiSuccess(res, { owner, repo });
+}
+
 export async function listIssues(req, res) {
   if (!requireFounder(req, res)) return;
   const auth = await tokenFor(req, res);

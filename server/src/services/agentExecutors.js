@@ -131,6 +131,8 @@ async function executeProposeSprintPlan({ founderId, payload }) {
         description: String(t?.description || "").slice(0, 5000),
         status: "pending",
         milestoneId: milestone._id,
+        buildTask: Boolean(t?.buildTask),
+        buildFilePath: String(t?.filePath || "").trim().slice(0, 500),
       });
       tasks.push({ id: String(task._id), title: task.title });
     }

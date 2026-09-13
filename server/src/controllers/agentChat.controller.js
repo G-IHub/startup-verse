@@ -36,6 +36,7 @@ const OPEN_TASKS_LIMIT = 10;
 const MARKERS = [
   { name: "SPRINT_PLAN", re: /```SPRINT_PLAN\s*([\s\S]*?)```/ },
   { name: "BUILD_TASK", re: /```BUILD_TASK\s*([\s\S]*?)```/ },
+  { name: "SET_DEFAULT_REPO", re: /```SET_DEFAULT_REPO\s*([\s\S]*?)```/ },
 ];
 
 function founderGuard(req, founderId) {
@@ -71,7 +72,7 @@ function summarizeDevEvent(e) {
   return `${label}${pr}${repo ? ` on ${repo}` : ""} — ${statusText}`;
 }
 
-function buildSystemPrompt({ startupName, stage, goal, milestonesSummary, devActivitySummary, openTasksSummary }) {
+function buildSystemPrompt({ startupName, stage, goal, milestonesSummary, devActivitySummary, openTasksSummary, defaultRepo }) {
   return `You are AI Product Manager, a StartupVerse agent and ${startupName ? `${startupName}'s` : "the founder's"} primary day-to-day planning partner.
 
 Your job:
@@ -79,21 +80,27 @@ Your job:
 - Use only the real context given below. Never invent startup data, and never invent or guess at AI Developer's activity beyond what's listed below — if it's not listed, say you don't have visibility into it.
 - When you and the founder reach real clarity on a concrete plan for the week, propose it with a fenced block, exactly like this, with nothing else inside it:
 \`\`\`SPRINT_PLAN
-{"milestones":[{"title":"...","description":"...","tasks":[{"title":"...","description":"..."}]}]}
+{"milestones":[{"title":"...","description":"...","tasks":[{"title":"...","description":"...","buildTask":false,"filePath":""}]}]}
 \`\`\`
   Only emit this when you have a genuinely concrete, ready plan — never as a placeholder or hypothetical. It goes to the founder for real review and approval, not executed automatically. Keep it realistic for about one week: 2-4 milestones, a handful of tasks each.
-- If a specific task is ready to hand straight to AI Developer to build, and the founder has told you which real GitHub repo to use, use this fenced block instead (never both blocks in the same reply):
+  For EACH task, decide right then whether it's real, single-file code work AI Developer should build: set \`"buildTask": true\` and a real \`"filePath"\` for that file if so, or \`"buildTask": false\` and \`"filePath": ""\` for anything that isn't (planning, design, talking to users, anything not a single concrete file). This matters: once the founder approves the plan, every \`buildTask: true\` task starts getting built and shipped automatically, one at a time, with no further chat from the founder — they're only pulled back in to approve each production deploy. So only flag a task this way when you're genuinely confident it's ready to become a real PR unattended, not as a guess.
+  **Before proposing any plan with a \`buildTask: true\` task, you need a real repo to build into.** Default repo for this startup: ${defaultRepo || "none set yet"}. If none is set, ask the founder which real GitHub repo to use — do not propose a plan with build tasks until you have one, and do not guess a repo name. Once the founder tells you, emit this block to remember it for next time (never both this and SPRINT_PLAN/BUILD_TASK in the same reply):
+\`\`\`SET_DEFAULT_REPO
+{"owner":"...","repo":"..."}
+\`\`\`
+- If a specific task is ready to hand straight to AI Developer to build right now, mid-conversation (rather than as part of a full plan), and the founder has told you which real GitHub repo to use, use this fenced block instead (never both blocks in the same reply):
 \`\`\`BUILD_TASK
 {"owner":"...","repo":"...","filePath":"...","taskDescription":"...","taskId":null}
 \`\`\`
   "owner" is just the GitHub username/org (e.g. "oluseyi5280"). "repo" is just the repository name on its own (e.g. "ai-developer-test") — never "owner/repo" combined, never a slash in it. Only do this for one concrete, single-file task, and only once the founder has actually named a real repo — never guess a repo name. If you don't know it yet, ask instead of emitting this block. Unlike the sprint plan, this usually runs immediately and autonomously (opens a real PR right away) — don't tell the founder it needs their approval first unless the actual result you're given afterward says it does.
   "taskId" closes the loop back to the Execution Engine: if this hand-off is building out one of the real "Open tasks" listed below, copy that task's exact id string into "taskId" so it gets marked done automatically once the build reaches production. If this is a fresh one-off ask that isn't one of those listed tasks, set "taskId" to null — never invent an id.
-- Besides those two real actions, you can't yet do anything else for real — you can't send money, sign documents, or message customers on the founder's behalf. If asked, say so honestly instead of pretending you can.
+- Besides those real actions, you can't yet do anything else for real — you can't send money, sign documents, or message customers on the founder's behalf. If asked, say so honestly instead of pretending you can.
 - Write like a sharp, direct colleague, not a customer-support bot. No filler, no "I'd be happy to help."
 
 Real context:
 - Stage: ${stage || "not set"}
 - Current weekly goal: ${goal || "none set yet — this might be exactly what you're helping the founder figure out"}
+- Default GitHub repo: ${defaultRepo || "none set yet"}
 - Recent milestones: ${milestonesSummary || "none yet"}
 - Open tasks (id — title, status): ${openTasksSummary || "none yet"}
 - Recent AI Developer activity: ${devActivitySummary || "none yet — AI Developer hasn't done anything for this founder yet"}`;
@@ -125,6 +132,10 @@ async function loadContext(founderId) {
     devActivitySummary = devEvents.map(summarizeDevEvent).join("; ");
   }
 
+  const defaultRepo = startup?.defaultGithubRepo?.owner && startup?.defaultGithubRepo?.repo
+    ? `${startup.defaultGithubRepo.owner}/${startup.defaultGithubRepo.repo}`
+    : "";
+
   return {
     startupName: startup?.name || "",
     stage: startup?.stage || "",
@@ -133,6 +144,7 @@ async function loadContext(founderId) {
     milestonesSummary,
     openTasksSummary,
     devActivitySummary,
+    defaultRepo,
   };
 }
 
@@ -198,7 +210,7 @@ export const sendMessage = async (req, res) => {
     // Opened a fence but never closed it — almost certainly truncated even
     // with the generous budget above. Never show a founder a half-written
     // JSON blob; drop everything from the open fence onward.
-    const label = openName === "BUILD_TASK" ? "task hand-off" : "sprint plan";
+    const label = openName === "BUILD_TASK" ? "task hand-off" : openName === "SET_DEFAULT_REPO" ? "repo setting" : "sprint plan";
     replyText = `${raw.slice(0, raw.indexOf("```" + openName)).trim()}\n\n(I started drafting a ${label} but ran out of room to finish it — mind asking me to try again?)`;
   } else if (closed?.name === "SPRINT_PLAN") {
     // DeepSeek can (and did, in testing) return *only* the marker block with
@@ -307,6 +319,37 @@ export const sendMessage = async (req, res) => {
       replyText += "\n\n(I tried to hand a task to AI Developer but it came out malformed — mind asking me to try again?)";
     } else {
       replyText += "\n\n(I started to hand a task to AI Developer but was missing some details — mind asking me to try again?)";
+    }
+  } else if (closed?.name === "SET_DEFAULT_REPO") {
+    replyText = raw.replace(closed.fullMatch, "").trim();
+    let repoInfo = null;
+    let parseFailed = false;
+    try {
+      repoInfo = JSON.parse(closed.body);
+    } catch {
+      parseFailed = true;
+    }
+    let owner = String(repoInfo?.owner || "").trim();
+    let repo = String(repoInfo?.repo || "").trim();
+    // Same normalization guard as BUILD_TASK's owner/repo handling above —
+    // don't trust the model to never combine them.
+    if (repo.includes("/")) {
+      const parts = repo.split("/").filter(Boolean);
+      repo = parts[parts.length - 1];
+      if (parts.length > 1) owner = parts[0];
+    }
+    if (owner && repo) {
+      try {
+        await Startup.findOneAndUpdate({ founderId }, { defaultGithubRepo: { owner, repo } });
+        replyText += `\n\n✅ Got it — I'll build into ${owner}/${repo} by default from now on.`;
+      } catch (err) {
+        logger.error("[agentChat] failed to save default repo", { message: err.message });
+        replyText += `\n\n(I tried to remember that repo but hit an error: ${err.message})`;
+      }
+    } else if (parseFailed) {
+      replyText += "\n\n(I tried to save that repo but it came out malformed — mind telling me again?)";
+    } else {
+      replyText += "\n\n(I need both the owner and repo name to remember this — mind telling me again?)";
     }
   }
 

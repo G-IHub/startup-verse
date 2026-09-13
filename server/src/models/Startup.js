@@ -41,6 +41,15 @@ const startupSchema = new mongoose.Schema(
       maxlength: [1000, "Logo URL cannot exceed 1000 characters"]
     },
     data: { type: mongoose.Schema.Types.Mixed, default: {} },
+    // The real repo AI Developer builds into for this startup, so AI PM's
+    // automatic build-task hand-offs (orchestrator.service.js's
+    // advanceBuildQueueIfIdle) know where to open a PR without asking the
+    // founder every time. Set from the Integrations page's GitHub card, or
+    // by AI PM itself the first time a founder names a repo in chat.
+    defaultGithubRepo: {
+      owner: { type: String, default: "", trim: true, maxlength: 200 },
+      repo: { type: String, default: "", trim: true, maxlength: 200 },
+    },
   },
   { timestamps: true },
 );
