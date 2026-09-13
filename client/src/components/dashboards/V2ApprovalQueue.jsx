@@ -110,6 +110,81 @@ function Toast({ msg }) {
   );
 }
 
+/* ── Review modal — a readable breakdown of the real payload, not raw JSON ── */
+function ReviewModal({ item, onClose }) {
+  if (!item) return null;
+  const { owner, repo, prNumber, filePath, taskDescription, ...rest } = item.payload || {};
+  const repoUrl = owner && repo ? `https://github.com/${owner}/${repo}` : null;
+  const prUrl = repoUrl && prNumber ? `${repoUrl}/pull/${prNumber}` : null;
+  const hasKnownFields = Boolean(repoUrl || filePath || taskDescription);
+  const otherEntries = Object.entries(rest).filter(([, v]) => v !== undefined && v !== null && v !== "");
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-5" onClick={onClose}>
+      <div className="w-full max-w-[440px] overflow-hidden rounded-2xl bg-white shadow-2xl" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-start justify-between gap-3 border-b border-gray-100 px-5 py-4">
+          <div className="min-w-0">
+            <div className="font-body text-[14px] font-medium text-v2-heading">{item.title}</div>
+            <div className="mt-0.5 font-body text-[11px] text-v2-muted">Proposed by {item.agentName} · {item.time}</div>
+          </div>
+          <button type="button" onClick={onClose} className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-gray-100 text-gray-500 hover:bg-gray-200">
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M1 1l10 10M11 1L1 11" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/></svg>
+          </button>
+        </div>
+
+        <div className="space-y-3 px-5 py-4">
+          <span className="inline-flex rounded-[6px] px-2 py-0.5 font-body text-[9px] font-medium" style={{ background: item.riskBg, color: item.riskColor }}>{item.riskLabel}</span>
+
+          {repoUrl && (
+            <div className="flex items-center justify-between font-body text-[12px]">
+              <span className="text-v2-muted">Repository</span>
+              <a href={repoUrl} target="_blank" rel="noreferrer" className="font-medium text-v2-blue hover:underline">{owner}/{repo} ↗</a>
+            </div>
+          )}
+          {prUrl && (
+            <div className="flex items-center justify-between font-body text-[12px]">
+              <span className="text-v2-muted">Pull request</span>
+              <a href={prUrl} target="_blank" rel="noreferrer" className="font-medium text-v2-blue hover:underline">#{prNumber} ↗</a>
+            </div>
+          )}
+          {filePath && (
+            <div className="flex items-center justify-between font-body text-[12px]">
+              <span className="text-v2-muted">File</span>
+              <span className="font-medium text-v2-heading">{filePath}</span>
+            </div>
+          )}
+          {taskDescription && (
+            <div className="font-body text-[12px]">
+              <div className="text-v2-muted">Task description</div>
+              <p className="mt-1 leading-relaxed text-v2-heading">{taskDescription}</p>
+            </div>
+          )}
+          {otherEntries.length > 0 && (
+            <div className="font-body text-[11px]">
+              <div className="text-v2-muted">Other details</div>
+              <div className="mt-1 space-y-1 rounded-lg bg-gray-50 p-2">
+                {otherEntries.map(([k, v]) => (
+                  <div key={k} className="flex items-center justify-between">
+                    <span className="text-gray-500">{k}</span>
+                    <span className="text-v2-heading">{typeof v === "object" ? JSON.stringify(v) : String(v)}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+          {!hasKnownFields && otherEntries.length === 0 && (
+            <p className="font-body text-[12px] text-v2-muted">No additional detail attached to this action yet.</p>
+          )}
+        </div>
+
+        <div className="flex justify-end border-t border-gray-100 px-5 py-3">
+          <button type="button" onClick={onClose} className="rounded-full border border-v2-border px-4 py-1.5 font-body text-[12px] font-medium text-v2-heading hover:bg-gray-50">Close</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /* ── Main component ──────────────────────────────────────────────────────── */
 export default function V2ApprovalQueue({ user, onBack, onNavigate }) {
   const founderId = useOfficeStore((s) => s.founderId);
@@ -126,6 +201,7 @@ export default function V2ApprovalQueue({ user, onBack, onNavigate }) {
   const [selected, setSelected] = useState(new Set());
   const [busyIds, setBusyIds] = useState(new Set());
   const [toast, setToast] = useState("");
+  const [reviewingItem, setReviewingItem] = useState(null);
 
   const showToast = (msg) => { setToast(msg); setTimeout(() => setToast(""), 2500); };
 
@@ -224,11 +300,6 @@ export default function V2ApprovalQueue({ user, onBack, onNavigate }) {
       s.has(id) ? s.delete(id) : s.add(id);
       return s;
     });
-  };
-
-  const reviewItem = (item) => {
-    const hasPayload = item.payload && typeof item.payload === "object" && Object.keys(item.payload).length > 0;
-    showToast(hasPayload ? `Payload: ${JSON.stringify(item.payload).slice(0, 140)}` : "No additional detail attached to this action yet.");
   };
 
   const visible = useMemo(() => {
@@ -392,7 +463,7 @@ export default function V2ApprovalQueue({ user, onBack, onNavigate }) {
                   </div>
 
                   <div className="flex shrink-0 items-center gap-2">
-                    <button type="button" onClick={() => reviewItem(item)} className="rounded-[9px] border border-gray-200 bg-white px-3 py-1.5 font-body text-[11px] font-medium text-v2-heading hover:bg-gray-50 transition-colors">
+                    <button type="button" onClick={() => setReviewingItem(item)} className="rounded-[9px] border border-gray-200 bg-white px-3 py-1.5 font-body text-[11px] font-medium text-v2-heading hover:bg-gray-50 transition-colors">
                       Review
                     </button>
                     {busyIds.has(item.id) ? (
@@ -498,6 +569,7 @@ export default function V2ApprovalQueue({ user, onBack, onNavigate }) {
         </div>
       </div>
 
+      <ReviewModal item={reviewingItem} onClose={() => setReviewingItem(null)} />
       <Toast msg={toast} />
     </div>
   );

@@ -104,6 +104,11 @@ export default function V2AIDeveloperWorkspace({ user, onBack, onNavigate }) {
   const [filePath, setFilePath] = useState("");
   const [taskDescription, setTaskDescription] = useState("");
 
+  const [creatingRepo, setCreatingRepo] = useState(false);
+  const [newRepoName, setNewRepoName] = useState("");
+  const [newRepoPrivate, setNewRepoPrivate] = useState(true);
+  const [repoCreateBusy, setRepoCreateBusy] = useState(false);
+
   const showToast = (msg) => { setToast(msg); setTimeout(() => setToast(""), 3000); };
 
   useEffect(() => { if (user) loadWorkspace(user); }, [user, loadWorkspace]);
@@ -152,6 +157,25 @@ export default function V2AIDeveloperWorkspace({ user, onBack, onNavigate }) {
       showToast(err?.message || "Could not disconnect GitHub.");
     } finally {
       setGhBusy(false);
+    }
+  };
+
+  const createRepo = async (e) => {
+    e.preventDefault();
+    const name = newRepoName.trim();
+    if (!name) { showToast("Give the repo a name."); return; }
+    setRepoCreateBusy(true);
+    try {
+      const repo = await githubApi.createGithubRepo(name, newRepoPrivate);
+      setRepos((prev) => [{ id: repo.id, fullName: repo.fullName, owner: repo.owner, name: repo.name, private: repo.private }, ...prev]);
+      setSelectedRepo(repo.fullName);
+      setCreatingRepo(false);
+      setNewRepoName("");
+      showToast(repo.stagingCreated ? "Repo created, ready to use." : "Repo created — couldn't auto-create a staging branch, add one manually before merging.");
+    } catch (err) {
+      showToast(err?.message || "Could not create the repo.");
+    } finally {
+      setRepoCreateBusy(false);
     }
   };
 
@@ -310,12 +334,43 @@ export default function V2AIDeveloperWorkspace({ user, onBack, onNavigate }) {
             <form onSubmit={submitTask} className="rounded-2xl border border-v2-border bg-white p-4 space-y-3">
               <div className="font-body text-[12px] font-semibold text-v2-heading">Give AI Developer a real task</div>
               <div className="grid grid-cols-2 gap-3">
-                <select value={selectedRepo} onChange={(e) => setSelectedRepo(e.target.value)} className="rounded-xl border border-v2-border px-3 py-2 font-body text-[12px] outline-none focus:border-v2-purple">
+                <select
+                  value={selectedRepo}
+                  onChange={(e) => {
+                    if (e.target.value === "__create__") { setCreatingRepo(true); return; }
+                    setSelectedRepo(e.target.value);
+                  }}
+                  className="rounded-xl border border-v2-border px-3 py-2 font-body text-[12px] outline-none focus:border-v2-purple"
+                >
                   <option value="">Choose a repo…</option>
                   {repos.map((r) => <option key={r.id} value={r.fullName}>{r.fullName}</option>)}
+                  <option value="__create__">+ Create new repo…</option>
                 </select>
                 <input value={filePath} onChange={(e) => setFilePath(e.target.value)} placeholder="File path, e.g. FEATURE.md" className="rounded-xl border border-v2-border px-3 py-2 font-body text-[12px] outline-none focus:border-v2-purple" />
               </div>
+
+              {creatingRepo && (
+                <div className="flex flex-wrap items-center gap-2 rounded-xl bg-v2-page p-3">
+                  <input
+                    value={newRepoName}
+                    onChange={(e) => setNewRepoName(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); createRepo(e); } }}
+                    placeholder="Repo name, e.g. my-startup-app"
+                    className="min-w-[200px] flex-1 rounded-lg border border-v2-border px-3 py-1.5 font-body text-[12px] outline-none focus:border-v2-purple"
+                  />
+                  <label className="flex items-center gap-1.5 font-body text-[11px] text-v2-muted">
+                    <input type="checkbox" checked={newRepoPrivate} onChange={(e) => setNewRepoPrivate(e.target.checked)} />
+                    Private
+                  </label>
+                  <button type="button" onClick={createRepo} disabled={repoCreateBusy} className="rounded-full bg-v2-purple px-3 py-1.5 font-body text-[11px] font-medium text-white hover:opacity-90 transition-opacity disabled:opacity-60">
+                    {repoCreateBusy ? "Creating…" : "Create →"}
+                  </button>
+                  <button type="button" onClick={() => setCreatingRepo(false)} className="font-body text-[11px] text-v2-muted hover:text-v2-heading">
+                    Cancel
+                  </button>
+                </div>
+              )}
+
               <textarea value={taskDescription} onChange={(e) => setTaskDescription(e.target.value)} placeholder="Describe what to write into that file…" rows={2} className="w-full rounded-xl border border-v2-border px-3 py-2 font-body text-[12px] outline-none focus:border-v2-purple" />
               <button type="submit" disabled={submitting} className="rounded-full bg-v2-green px-4 py-2 font-body text-[12px] font-medium text-white hover:opacity-90 transition-opacity disabled:opacity-60">
                 {submitting ? "Working…" : "Open a real PR →"}

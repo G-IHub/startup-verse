@@ -28,14 +28,17 @@ function popupHtml(ok, message) {
   return `<!doctype html><html><body><p>${ok ? "Connected." : safe}</p><script>window.close();</script></body></html>`;
 }
 
-async function githubJson(url, token) {
+async function githubJson(url, token, options = {}) {
   const response = await fetch(url, {
+    method: options.method || "GET",
     headers: {
       Accept: "application/vnd.github+json",
       Authorization: `Bearer ${token}`,
       "User-Agent": "StartupVerse",
       "X-GitHub-Api-Version": "2022-11-28",
+      ...(options.body ? { "Content-Type": "application/json" } : {}),
     },
+    ...(options.body ? { body: JSON.stringify(options.body) } : {}),
   });
   const text = await response.text();
   let data = {};
@@ -196,6 +199,73 @@ export async function listRepos(req, res) {
       }))
     : [];
   return apiSuccess(res, { repos, page });
+}
+
+const REPO_NAME_RE = /^[A-Za-z0-9._-]{1,100}$/;
+
+/**
+ * Creates a real GitHub repo under the founder's own account (their token,
+ * their `repo` scope — no extra permission needed), auto-initialized with a
+ * README so there's a real first commit, then creates a real `staging`
+ * branch off it. That second step matters: AI Developer's adapter
+ * (githubAdapter.js) always opens PRs against `staging`, and a brand-new
+ * GitHub repo only ever has its default branch — without this, every
+ * founder would hit the same "create a staging branch" manual step this
+ * feature exists to remove.
+ */
+export async function createRepo(req, res) {
+  if (!requireFounder(req, res)) return;
+  const auth = await tokenFor(req, res);
+  if (!auth) return;
+
+  const name = String(req.body?.name || "").trim();
+  if (!REPO_NAME_RE.test(name)) {
+    return apiError(res, "Repo name must be 1-100 characters: letters, numbers, dots, hyphens, underscores only.", 422);
+  }
+  const isPrivate = Boolean(req.body?.private);
+
+  const created = await githubJson("https://api.github.com/user/repos", auth.token, {
+    method: "POST",
+    body: { name, private: isPrivate, auto_init: true },
+  });
+  if (created.status === 401) {
+    await markRevoked(auth.row);
+    return apiError(res, "Reconnect GitHub.", 401);
+  }
+  if (created.status !== 201) {
+    return apiError(res, created.data?.errors?.[0]?.message || created.data?.message || "Could not create the repo.", created.status >= 400 && created.status < 500 ? 422 : 502);
+  }
+
+  const owner = created.data.owner?.login;
+  const defaultBranch = created.data.default_branch || "main";
+
+  // Best-effort staging branch — the repo itself is already real and
+  // returned to the client either way; a failure here just means the
+  // founder (or AI Developer's own baseBranch fallback) needs to create
+  // `staging` manually, same as before this feature existed.
+  let stagingCreated = false;
+  try {
+    const baseRef = await githubJson(`https://api.github.com/repos/${owner}/${name}/git/ref/heads/${defaultBranch}`, auth.token);
+    if (baseRef.status === 200) {
+      const branchResult = await githubJson(`https://api.github.com/repos/${owner}/${name}/git/refs`, auth.token, {
+        method: "POST",
+        body: { ref: "refs/heads/staging", sha: baseRef.data.object.sha },
+      });
+      stagingCreated = branchResult.status === 201;
+    }
+  } catch {
+    // Non-fatal — see comment above.
+  }
+
+  return apiSuccess(res, {
+    id: created.data.id,
+    fullName: created.data.full_name,
+    owner,
+    name: created.data.name,
+    private: Boolean(created.data.private),
+    defaultBranch,
+    stagingCreated,
+  }, 201);
 }
 
 export async function listIssues(req, res) {
