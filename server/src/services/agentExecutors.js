@@ -52,6 +52,18 @@ async function executeGithubOpenPr({ founderId, payload, targetId }) {
       })
     : `# ${taskDescription}\n\n(DeepSeek not configured — placeholder content, not real drafting.)\n`;
 
+  // Real bug found live: draftText can come back empty (see deepseekClient.js's
+  // retry-with-escalated-budget fix) even after that retry — and this code
+  // used to open a real PR anyway, silently shipping an empty file all the
+  // way to production with no error, no warning, nothing for the founder to
+  // notice except an actually-blank live page. Never write real code from an
+  // empty draft — fail loudly here instead, so the founder sees a real
+  // "failed" status and a clear reason, and can just ask AI Developer to
+  // retry, instead of an invisible empty file quietly going live.
+  if (!fileContent.trim()) {
+    throw new Error(`AI Developer's drafting call for "${filePath}" came back empty — nothing was written, so no PR was opened. Try asking again.`);
+  }
+
   const branchName = `ai-developer/${targetId || Date.now()}`;
   const result = await openPullRequest({
     founderId,
