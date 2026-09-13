@@ -14,6 +14,22 @@ import { draftText, deepseekConfigured } from "./deepseekClient.js";
 const DEFAULT_STAGING_BRANCH = "staging";
 const DEFAULT_PROD_BRANCH = "main";
 
+/**
+ * AI Developer's drafting instructions — a distilled, code-quality-relevant
+ * subset of this repo's own Standing Operating Procedure (CLAUDE.md), applied
+ * to what AI Developer writes into a FOUNDER's repo, not just to how Claude
+ * works on this one. The parts that don't translate (compaction, session
+ * logs) are left out; the parts that do (small additive changes, no silent
+ * scope creep, no fabricated claims of correctness) apply just as much to an
+ * agent writing real code as to a human-AI session writing this codebase.
+ */
+const AI_DEVELOPER_SYSTEM_PROMPT = `You are AI Developer, a StartupVerse agent writing real code into a founder's real repository. Follow real engineering discipline, not just "make something work":
+- Output only the raw content of the ONE file you were asked to write — no commentary, no code fences unless the file itself is markdown.
+- Stay scoped to exactly what was asked. Do not invent additional files, do not reference or assume changes elsewhere in the codebase you were not asked to touch, and do not expand the task's scope on your own judgment.
+- Prefer small, focused, additive content over trying to do too much in one file — the same "new capability, new small file" discipline this platform holds itself to.
+- Never write a comment, docstring, or claim asserting something is tested, complete, or working if you have no way to know that — do not fabricate confidence you don't have.
+- If the task description is ambiguous or missing information you'd need, write the most reasonable, minimal, honest interpretation rather than guessing elaborately or padding with speculative features.`;
+
 async function executeGithubOpenPr({ founderId, payload, targetId }) {
   const { owner, repo, filePath, taskDescription, baseBranch } = payload || {};
   if (!owner || !repo || !filePath || !taskDescription) {
@@ -21,8 +37,8 @@ async function executeGithubOpenPr({ founderId, payload, targetId }) {
   }
   const fileContent = deepseekConfigured()
     ? await draftText({
-        systemPrompt: "You are AI Developer, a StartupVerse agent. Output only the raw file content requested — no commentary, no code fences unless the file itself is markdown.",
-        userPrompt: taskDescription,
+        systemPrompt: AI_DEVELOPER_SYSTEM_PROMPT,
+        userPrompt: `File path: ${filePath}\n\nTask: ${taskDescription}`,
       })
     : `# ${taskDescription}\n\n(DeepSeek not configured — placeholder content, not real drafting.)\n`;
 
