@@ -1,6 +1,6 @@
 # StartupVerse — AI Agent System Roadmap
 
-**Status as of 2026-09-12:** Phase 0 done and verified live (event log, orchestrator, and 3 of the 4 real-data pages — see the phase section below for what's still mock and why). Phase 1 (the first real agent, via Zikorail) not started. This file is the plan to close that gap in deliberate, checkpointed phases, not all at once.
+**Status as of 2026-09-13:** Phase 0 done and verified live (event log, orchestrator, and 3 of the 4 real-data pages — see the phase section below for what's still mock and why). Phase 1's first agent is now **AI Developer via GitHub**, not Zikorail — see "Zikorail integration" below for why that pivot happened. Phase 1 not started. This file is the plan to close that gap in deliberate, checkpointed phases, not all at once.
 
 **Source documents** (read these before touching this system — this file is the working summary, they're the reasoning):
 - [ai-agent-vision-writeup.md](ai-agent-vision-writeup.md) — the actual product bet: the trust/control layer is the moat, not agent capability.
@@ -29,13 +29,28 @@ The defensible part is **not** "AI agents that do work" (commodity — Devin, Co
 
 ---
 
-## Zikorail integration (decided 2026-09-12)
+## Zikorail integration — investigated 2026-09-13, reversed: NOT the first agent
+
+The 2026-09-12 plan below (kept for the record, not deleted) assumed Zikorail was a stable, callable, wholly-owned asset that AI Sales/Marketing could integrate with directly. A full read of the actual Zikorail codebase (`C:\Users\Owner\Documents\WhatsApp Agent`, ground-truthed against the freshest production pulls, not its stale local files) found four independent blockers, each sufficient on its own to defer this:
+
+1. **No callable API exists.** The "Zikorail-Core" extraction that would make the engine a service another product can call is explicitly `PARKED — do not build yet` in Zikorail's own `zikorail-core/PLAN.md`, gated on a trigger ("20–30 paying workspaces") that hasn't been hit. Every endpoint today is session-cookie auth for Zikorail's own web app — no API keys, no partner contract, no versioning.
+2. **WhatsApp onboarding isn't reliably solved even for Zikorail's own team.** Only 4 of 19 active Zikorail workspaces have completed migration to the compliant Meta Cloud API; the other 15 (including Zikorail's own alert-sender) currently have **no working WhatsApp channel at all**. The unofficial transport used historically (Baileys, not whatsapp-web.js as originally assumed) got two real workspaces **permanently banned by Meta** — one of them Zikorail's highest-volume account (~26k contacts) — for exactly the bulk/cold-outreach pattern `send_message_batch` was designed around. The compliant path has its own fresh friction: a test Facebook account was permanently banned by Meta during onboarding testing this same month.
+3. **The platform is mid-firefight, not steady-state.** Recent real incidents: a cost-overrun bug, an internal cost-tracking table silently broken for three months, a recurring "missing await" bug class, an autonomous review engine that silently stopped and was never diagnosed, a `git checkout` accident that wiped a route file, and zero automated tests anywhere (every fix verified live in production). Not a reason to judge the work — it's a fast-moving real business — but not a foundation to launch a second product's first real agent on.
+4. **Ownership/IP is unresolved on paper.** Every Zikorail doc names the owner as Genomac Holdings Limited and never mentions StartupVerse. Its IP inventory explicitly recommends NDAs before any additional product touches the codebase — unchecked as of this writing. Independent of findings 1–3, but worth resolving before revisiting this.
+
+**Decision:** AI Sales/Marketing via Zikorail is deferred, not cancelled — see the "Deferred" section below. **AI Developer via GitHub is now the Phase 1 agent** (see below), since it has a real, stable, versioned public API, no ban risk, no cross-company IP question, and is fully inside StartupVerse's own control. If a WhatsApp sales agent is still wanted later, the plan is a small, StartupVerse-owned, compliant Meta Cloud API integration built from scratch (Zikorail's own `whatsapp-cloud.js` is a ~200-line reference for the pattern) — reusing the *trust-pattern insight* Zikorail validated, not its code or its infrastructure.
+
+<details>
+<summary>Original 2026-09-12 plan (superseded, kept for the record)</summary>
 
 - We own Zikorail. It already runs DeepSeek in production for real customer conversations and already implements the exact trust pattern this product is built around (payment-confirmation escalation before anything charges, "Intelligent Handoff" to a human for sensitive conversations).
 - **AI Sales/Marketing is the first agent to go real**, specifically because of this — not because it's the easiest integration (the architecture doc's own suggestion was AI Developer/GitHub for that reason), but because Zikorail gives it a working reference implementation and real distribution, per the vision doc's already-settled plan.
 - Since we own it, `send_message_batch` becomes a **direct internal call into Zikorail**, not a generic third-party adapter — a real simplification versus the architecture doc's generic "integration adapter" framing.
 - **Open item, not yet verified — check before Phase 1 ships**: confirm Zikorail's cold-outreach path (unsolicited messages to clinics that never messaged first) is actually running through Meta's official WhatsApp Business API with approved templates, not a QR-linked number. This is a Meta policy enforcement issue (bans numbers for unsolicited outbound at volume), not a business decision — ownership doesn't exempt us from it.
 - **Open item — access**: this session has no read access to Zikorail's codebase or API surface. Before writing the adapter, get either repo access or a written contract (endpoints, auth, message-status webhooks).
+
+*(Both open items above are now resolved by the 2026-09-13 investigation: access was obtained and read; the compliance question's answer was worse than "unverified" — see findings above.)*
+</details>
 
 ---
 
@@ -74,18 +89,20 @@ The architecture doc is written assuming Postgres. Real, already-learned constra
 **Scope note, not yet raised with the user before this pass — flagging here per SOP**: only the event-driven pages (Approval Queue, Autonomy Settings, Audit Trail) were rewired to real data this pass. The 4 agent-specific illustrative workspace pages (`V2AIFinanceWorkspace.jsx`, `V2AILegalWorkspace.jsx`, `V2AIMarketingWorkspace.jsx`, `V2AISalesWorkspace.jsx`) and `V2AIStaffManage.jsx`'s hired-roster mock content were deliberately left untouched — they need Phase 1's real integrations to have any real content, and rewiring them now to point at an empty event log would just make them look broken rather than more real. `V2AgentWorkroom.jsx`'s coordination feed was left mock for the same reason plus time — its "while you were away" narrative needs real coordinated activity to summarize, which doesn't exist until Phase 1.
 **Real, expected behavior change**: with real agents/events now driving Approval Queue, Autonomy Settings, and Audit Trail, and zero real agents existing yet, all three pages now show genuinely empty states ("Queue clear ✓", "No agents yet", "No activity logged yet") instead of the rich mock content they showed before this pass. This is the correct Phase 0 outcome, not a regression — it fills in the moment Phase 1 ships a real agent.
 
-## Phase 1 — One agent, fully real: AI Sales/Marketing → Zikorail
+## Phase 1 — One agent, fully real: AI Developer → GitHub
 **Goal:** one real founder decision causes one real external effect, safely.
-**Done when:** a founder clicks Approve on a real pending outreach batch in Approval Queue, and a real WhatsApp message actually sends via Zikorail — logged as two real `Event` rows (escalation, then execution).
+**Done when:** a founder approves a real sprint/task plan, AI Developer autonomously opens a real PR and deploys it to a real staging environment on a real (test) repo, and a production deploy attempt is forced into `pending_approval` regardless of autonomy setting — logged as real `AgentEvent` rows, visible live in Approval Queue/Audit Trail with no page refresh.
 
-- [ ] Get Zikorail codebase access or a written integration contract (endpoints, auth, message-status webhooks)
-- [ ] Verify Zikorail's cold-outreach path uses the official WhatsApp Business API with approved templates (compliance go/no-go)
-- [ ] Define real `ActionType` rows: `personalize_outreach` (reversible/autonomous), `send_message_batch` (**sensitive_locked**, `adjustable: false`)
-- [ ] Build the Zikorail adapter as a direct internal call (not a generic third-party wrapper)
-- [ ] Wire AI Marketing/Sales's agent logic to call DeepSeek for drafting/personalization, model passed as config
-- [ ] Idempotency key on `send_message_batch` so a retried orchestrator call can't double-send
-- [ ] `V2AIMarketingWorkspace.jsx`/`V2AISalesWorkspace.jsx` read real pipeline/outreach data instead of static mock arrays
-- [ ] End-to-end verification with a real (test) WhatsApp number before calling this phase done
+**Changed 2026-09-13**: this phase was originally scoped as AI Sales/Marketing via Zikorail — reversed after investigation, see "Zikorail integration" above. AI Developer/GitHub was the architecture doc's own original suggestion for the first agent, precisely because it doesn't depend on a third-party consumer platform's stability, ban risk, or API availability.
+
+- [ ] Choose/create a real (test) GitHub repo + a GitHub App or PAT scoped to it — this is StartupVerse's own integration, not borrowed infrastructure
+- [ ] Define real `ActionType` rows: `write_code`/`open_pr` (reversible/autonomous), `deploy_staging` (reversible/autonomous), `deploy_prod` (**sensitive_locked**, `adjustable: false`, `approverRule: role:engineering`)
+- [ ] Build the GitHub adapter (`services/githubAdapter.js` or similar) — real API calls (open PR, merge, trigger a staging deploy), not mocked responses
+- [ ] Wire AI Developer's agent logic to call DeepSeek for the actual code-writing/drafting, model passed as config per the model strategy above
+- [ ] Sprint/task-plan approval sits one level above per-commit autonomy — a human approves the plan (via AI PM, see Phase 3) once per cycle, not every PR
+- [ ] Idempotency key on `deploy_staging`/`deploy_prod` so a retried orchestrator call can't double-deploy
+- [ ] `V2AIStaffManage.jsx`'s AI Developer card and any dedicated workspace page read real PR/deploy data instead of static mock arrays
+- [ ] End-to-end verification on a real (test) repo before calling this phase done
 
 ## Phase 2 — Enforcement hardening
 **Goal:** "locked" is a server-side guarantee, not a UI convention.
@@ -100,11 +117,11 @@ The architecture doc is written assuming Postgres. Real, already-learned constra
 **Goal:** each new agent is proven real before the next one starts, per the vision doc's explicit risk call ("prove one agent before expanding" over shipping seven shallow agents at once).
 **Done when:** each listed agent has real `ActionType` rows, a real integration (or honestly none, if out of scope), and at least one real end-to-end approval→execution loop verified live.
 
-- [ ] **AI Developer** — GitHub adapter; `write_code`/`open_pr`/`deploy_staging` autonomous, `deploy_prod` locked (`ask_first`, approverRule: `role:engineering`); sprint-plan approval sits one level above via AI PM; DeepSeek-powered per the model strategy above
+- [ ] **AI Product Manager** — sprint-plan proposal flow feeding the Execution Engine for real, becoming the actual upstream gate for AI Developer's work (AI Developer itself moved to Phase 1, 2026-09-13)
 - [ ] **AI Finance** — real ledger/invoice actions; `send_payment`/`send_invoice` **sensitive_locked**, non-adjustable, always escalates regardless of DeepSeek or any model's confidence
 - [ ] **AI Legal** — real document drafting from templates; any `send_document`/`publish_contract` action **sensitive_locked**
-- [ ] **AI Product Manager** — sprint-plan proposal flow feeding the Execution Engine for real, becoming the actual upstream gate for AI Developer's work
 - [ ] **AI Growth Analyst** — read-only category; safe to run fully autonomous from day one since nothing it does executes an external effect
+- [ ] **AI Sales/Marketing** — moved here from Phase 1, 2026-09-13 (see "Zikorail integration" above). Channel is now a small, StartupVerse-owned Meta WhatsApp Cloud API integration built from scratch, not Zikorail — `send_message_batch` stays **sensitive_locked**/non-adjustable regardless of channel
 
 ## Phase 4 — The hard part (design pass, not a checklist to rush)
 **Goal:** name and design against the failure modes before they show up in production, since none of these are solved by adding more integrations.
@@ -119,6 +136,7 @@ The architecture doc is written assuming Postgres. Real, already-learned constra
 
 ## Deferred / explicitly out of scope for now
 (Not forgotten — listed so nobody assumes silence means "already planned.")
+- **Any direct technical integration with Zikorail** — deferred 2026-09-13 per the investigation above (no callable API, unreliable WhatsApp onboarding even for Zikorail's own team, active operational firefighting, unresolved ownership/IP question). Not ruled out forever — revisit only if Zikorail's own Core extraction ships and the ownership question is resolved; don't restart this by default just because time has passed.
 - Blueprint submission/creator flow
 - Surfacing the Approval Queue directly on the Founder Dashboard
 - The full "13 AI staff roles" bundle beyond the agents listed in Phase 3
