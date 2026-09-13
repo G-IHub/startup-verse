@@ -14,7 +14,7 @@
  * fields — have no real source anywhere in this codebase and are dropped
  * rather than faked.
  */
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { getAgentEvents } from "../../utils/api/agentOrchestrationApi";
 import { getFounderStartupSafe } from "../../utils/api/founderApi";
 import { useOfficeStore } from "../../state/useOfficeStore";
@@ -45,8 +45,14 @@ function buildRealHistory(events) {
       title: b.openPr.payload?.taskDescription || b.openPr.payload?.filePath || "Untitled change",
       filePath: b.openPr.payload?.filePath,
       prUrl: b.openPr.result?.prUrl,
+      // The real HTML AI Developer actually wrote — already stored on the
+      // github_open_pr event itself, so a local preview needs no hosting at
+      // all and works even when GitHub Pages can't be enabled (e.g. a
+      // private repo on a plan that doesn't support it).
+      fileContent: b.openPr.result?.fileContent || null,
       live: Boolean(b.prod),
       pagesUrl: b.prod?.result?.pagesUrl || null,
+      pagesError: b.prod?.result?.pagesError || null,
       time: b.prod?.createdAt || b.openPr.createdAt,
     }))
     .sort((a, b) => new Date(b.time) - new Date(a.time));
@@ -77,6 +83,25 @@ export default function V2ProductViewer({ user, onBack }) {
 
   const latestLive = history.find((h) => h.live && h.pagesUrl) || null;
 
+  // Real fallback for when no public URL exists yet (Pages not enabled, or
+  // a real limitation like a private repo on a plan that doesn't support
+  // it) — the actual HTML AI Developer wrote is already stored, so it can
+  // be rendered directly with zero hosting, and "Open in new tab" works via
+  // a real Blob URL rather than needing an actual server anywhere.
+  const localPreview = !latestLive
+    ? history.find((h) => h.fileContent && /\.html?$/i.test(h.filePath || "")) || null
+    : null;
+
+  const localPreviewBlobUrl = useMemo(() => {
+    if (!localPreview?.fileContent) return null;
+    const blob = new Blob([localPreview.fileContent], { type: "text/html" });
+    return URL.createObjectURL(blob);
+  }, [localPreview?.targetId, localPreview?.fileContent]);
+
+  useEffect(() => {
+    return () => { if (localPreviewBlobUrl) URL.revokeObjectURL(localPreviewBlobUrl); };
+  }, [localPreviewBlobUrl]);
+
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden bg-v2-page">
       {/* Topbar */}
@@ -106,8 +131,12 @@ export default function V2ProductViewer({ user, onBack }) {
             <a href={latestLive.pagesUrl} target="_blank" rel="noreferrer" className="rounded-full bg-v2-purple px-3 py-1.5 font-body text-[12px] font-medium text-white hover:opacity-90 transition-opacity">
               Open live site ↗
             </a>
+          ) : localPreviewBlobUrl ? (
+            <a href={localPreviewBlobUrl} target="_blank" rel="noreferrer" className="rounded-full bg-v2-purple px-3 py-1.5 font-body text-[12px] font-medium text-white hover:opacity-90 transition-opacity">
+              Open in new tab ↗
+            </a>
           ) : (
-            <span className="rounded-full bg-gray-100 px-3 py-1.5 font-body text-[12px] font-medium text-v2-subtle">Nothing live yet</span>
+            <span className="rounded-full bg-gray-100 px-3 py-1.5 font-body text-[12px] font-medium text-v2-subtle">Nothing to preview yet</span>
           )}
         </div>
       </div>
@@ -119,8 +148,17 @@ export default function V2ProductViewer({ user, onBack }) {
           <div className="px-6 pt-6">
             <div className="font-body text-[15px] font-medium text-white">{startup?.name || "Your product"} — what's actually been built</div>
             <p className="mt-0.5 max-w-[420px] font-body text-[11px] leading-relaxed text-[#a8a3d9]">
-              {latestLive ? "Real deploy, embedded live below — this is the actual page AI Developer shipped." : "Nothing has reached production yet. Once a real deploy goes live, it renders here."}
+              {latestLive
+                ? "Real deploy, embedded live below — this is the actual page AI Developer shipped."
+                : localPreview
+                ? "No public URL yet, but here's exactly what was built — rendered directly from the real file, no hosting needed."
+                : "Nothing has reached production yet. Once a real deploy goes live, it renders here."}
             </p>
+            {!latestLive && localPreview?.pagesError && (
+              <p className="mt-2 max-w-[420px] rounded-lg bg-white/[0.06] px-3 py-2 font-body text-[10px] leading-relaxed text-[#c9c5f0]">
+                Why there's no public link: {localPreview.pagesError}
+              </p>
+            )}
           </div>
           <div className="flex min-h-[380px] items-center justify-center p-6">
             {loading ? (
@@ -132,6 +170,14 @@ export default function V2ProductViewer({ user, onBack }) {
                   <div className="ml-2 flex-1 truncate rounded-xl bg-white/[0.08] px-3 py-1 font-body text-[10px] text-[#c9c5f0]">{latestLive.pagesUrl}</div>
                 </div>
                 <iframe title="Live product preview" src={latestLive.pagesUrl} className="h-[420px] w-full border-0" />
+              </div>
+            ) : localPreview ? (
+              <div className="w-full overflow-hidden rounded-2xl bg-white" style={{ boxShadow: "0 30px 70px rgba(0,0,0,.45)" }}>
+                <div className="flex h-[30px] items-center gap-1.5 bg-[#26263a] px-3">
+                  {["#E24B4A", "#BA7517", "#1D9E75"].map((c) => <div key={c} className="h-[7px] w-[7px] rounded-full" style={{ background: c }} />)}
+                  <div className="ml-2 flex-1 truncate rounded-xl bg-white/[0.08] px-3 py-1 font-body text-[10px] text-[#c9c5f0]">{localPreview.filePath} · local preview, not a public link</div>
+                </div>
+                <iframe title="Local product preview" srcDoc={localPreview.fileContent} className="h-[420px] w-full border-0" />
               </div>
             ) : (
               <div className="max-w-[320px] text-center font-body text-[12px] leading-relaxed text-[#a8a3d9]">

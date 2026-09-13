@@ -193,6 +193,11 @@ async function executeExplainDevWork({ founderId, payload }) {
     fileContent: event.result?.fileContent || null,
     prUrl: event.result?.prUrl || null,
     prNumber: event.result?.prNumber || null,
+    // Real gap found live: asked about a specific production-deploy event,
+    // this had no way to say whether a real live URL exists — pagesUrl/
+    // pagesError were sitting in the event's own result the whole time.
+    pagesUrl: event.result?.pagesUrl || null,
+    pagesError: event.result?.pagesError || null,
     status: event.status,
     error: event.status === "failed" ? (event.result?.error || null) : null,
   };
