@@ -7,10 +7,11 @@
 import React, { useState, useRef, useEffect, useCallback } from "react";
 import { cn } from "../ui/utils";
 import { useOfficeStore } from "../../state/useOfficeStore";
-import { getPmMessages, sendPmMessage } from "../../utils/api/agentChatApi";
+import { getPmMessages, sendPmMessage, getPmConversations } from "../../utils/api/agentChatApi";
 import { getAgentEvents } from "../../utils/api/agentOrchestrationApi";
 import { getFounderStartupSafe } from "../../utils/api/founderApi";
 import { getCurrentWeeklyOutcome } from "../../utils/api/coreEngineApi";
+import { formatEventTime } from "../../utils/agentDisplay";
 
 /* ── Staff config ─────────────────────────────────────────────────────────── */
 const STAFF = [
@@ -313,6 +314,16 @@ export default function V2AIStaffChat({ user, onNavigate }) {
   const [latestPlanOutput, setLatestPlanOutput] = useState(null);
   const [realContextRows, setRealContextRows] = useState(null);
 
+  // Real, distinct chats with AI PM (conversationId groups AgentMessage rows
+  // — see agentChat.controller.js). null conversationId means "founder
+  // hasn't picked one yet" — the server resolves that to the most recently
+  // active conversation on load, or starts a brand-new one on next send.
+  const [conversationId, setConversationId] = useState(null);
+  const [conversations, setConversations] = useState([]);
+  const [conversationsLoading, setConversationsLoading] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const historyRef = useRef(null);
+
   const showToast = (msg) => { setToast(msg); setTimeout(() => setToast(""), 2400); };
 
   useEffect(() => { if (user) loadWorkspace(user); }, [user, loadWorkspace]);
@@ -322,11 +333,24 @@ export default function V2AIStaffChat({ user, onNavigate }) {
     let cancelled = false;
     setPmLoading(true);
     getPmMessages(resolvedFounderId)
-      .then(({ messages }) => { if (!cancelled) { setPmMessages(messages || []); setPmError(""); } })
+      .then(({ messages, conversationId: cid }) => {
+        if (!cancelled) { setPmMessages(messages || []); setConversationId(cid || null); setPmError(""); }
+      })
       .catch((err) => { if (!cancelled) setPmError(err?.message || "Could not load AI Product Manager's conversation."); })
       .finally(() => { if (!cancelled) setPmLoading(false); });
     return () => { cancelled = true; };
   }, [resolvedFounderId]);
+
+  // Close the History dropdown on an outside click, same convention as any
+  // other popover on this page.
+  useEffect(() => {
+    if (!historyOpen) return undefined;
+    const onClickOutside = (e) => {
+      if (historyRef.current && !historyRef.current.contains(e.target)) setHistoryOpen(false);
+    };
+    document.addEventListener("mousedown", onClickOutside);
+    return () => document.removeEventListener("mousedown", onClickOutside);
+  }, [historyOpen]);
 
   const refreshLatestPlan = useCallback(() => {
     if (!resolvedFounderId) return;
@@ -394,15 +418,53 @@ export default function V2AIStaffChat({ user, onNavigate }) {
     setPmMessages((prev) => [...prev, localMessage]);
     setPmSending(true);
     try {
-      const { message } = await sendPmMessage(resolvedFounderId, content);
+      const { message, conversationId: cid } = await sendPmMessage(resolvedFounderId, content, conversationId);
       if (message) setPmMessages((prev) => [...prev, message]);
+      if (cid) setConversationId(cid);
       if (message?.proposedEventKind === "sprint_plan") refreshLatestPlan();
     } catch (err) {
       showToast(err?.message || "AI Product Manager could not respond.");
     } finally {
       setPmSending(false);
     }
-  }, [resolvedFounderId, refreshLatestPlan]);
+  }, [resolvedFounderId, conversationId, refreshLatestPlan]);
+
+  // "New chat" clears the visible thread and the remembered conversationId —
+  // the next real message starts a fresh one server-side (see sendMessage in
+  // agentChat.controller.js). The old conversation is untouched and stays
+  // reachable from History.
+  const handleNewChat = useCallback(() => {
+    setPmMessages([]);
+    setConversationId(null);
+    setHistoryOpen(false);
+  }, []);
+
+  const handleToggleHistory = useCallback(() => {
+    setHistoryOpen((wasOpen) => {
+      const opening = !wasOpen;
+      if (opening && resolvedFounderId) {
+        setConversationsLoading(true);
+        getPmConversations(resolvedFounderId)
+          .then((list) => setConversations(list))
+          .catch(() => showToast("Could not load past chats."))
+          .finally(() => setConversationsLoading(false));
+      }
+      return opening;
+    });
+  }, [resolvedFounderId]);
+
+  const handleSelectConversation = useCallback((cid) => {
+    setHistoryOpen(false);
+    if (cid === conversationId) return;
+    setPmLoading(true);
+    getPmMessages(resolvedFounderId, cid)
+      .then(({ messages, conversationId: resolvedCid }) => {
+        setPmMessages(messages || []);
+        setConversationId(resolvedCid || cid);
+      })
+      .catch((err) => showToast(err?.message || "Could not load that chat."))
+      .finally(() => setPmLoading(false));
+  }, [resolvedFounderId, conversationId]);
 
   const activeStaffObj = STAFF.find((s) => s.id === activeStaff);
 
@@ -461,6 +523,46 @@ export default function V2AIStaffChat({ user, onNavigate }) {
             Hire more staff
           </button>
         </div>
+
+        {/* Real chats with AI PM: start a new one, or browse past ones —
+            no other staff has a real persisted conversation yet. */}
+        {activeStaff === "pm" && (
+          <div ref={historyRef} className="relative flex shrink-0 items-center gap-2 border-b border-v2-border bg-white px-5 py-2">
+            <button type="button" onClick={handleNewChat} className="flex items-center gap-1.5 rounded-full border border-v2-border px-2.5 py-1 font-body text-[11px] text-v2-heading hover:bg-gray-50 transition-colors">
+              <svg width="11" height="11" viewBox="0 0 12 12" fill="none"><path d="M6 2v8M2 6h8" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" /></svg>
+              New chat
+            </button>
+            <button type="button" onClick={handleToggleHistory} className={cn("flex items-center gap-1.5 rounded-full border px-2.5 py-1 font-body text-[11px] transition-colors", historyOpen ? "border-v2-purple bg-[#EEEDFE] text-v2-purple" : "border-v2-border text-v2-heading hover:bg-gray-50")}>
+              <svg width="11" height="11" viewBox="0 0 16 16" fill="none"><path d="M8 4.5v3.5l2.5 2M14 8A6 6 0 112 8a6 6 0 0112 0z" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" /></svg>
+              History
+            </button>
+
+            {historyOpen && (
+              <div className="absolute left-5 top-full z-20 mt-1 max-h-80 w-80 overflow-y-auto rounded-xl border border-v2-border bg-white p-1.5 shadow-lg">
+                {conversationsLoading ? (
+                  <div className="p-3 text-center font-body text-[11px] text-v2-muted">Loading…</div>
+                ) : conversations.length === 0 ? (
+                  <div className="p-3 text-center font-body text-[11px] text-v2-muted">No past chats yet.</div>
+                ) : (
+                  conversations.map((c) => (
+                    <button
+                      key={c.conversationId}
+                      type="button"
+                      onClick={() => handleSelectConversation(c.conversationId)}
+                      className={cn(
+                        "flex w-full flex-col items-start gap-0.5 rounded-lg px-2.5 py-2 text-left transition-colors hover:bg-gray-50",
+                        c.conversationId === conversationId && "bg-v2-blue-tint/40",
+                      )}
+                    >
+                      <span className="w-full truncate font-body text-[12px] font-medium text-v2-heading">{c.title}</span>
+                      <span className="font-body text-[10px] text-v2-muted">{formatEventTime(c.updatedAt)} · {c.messageCount} message{c.messageCount === 1 ? "" : "s"}</span>
+                    </button>
+                  ))
+                )}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Chat area */}
         <div ref={chatScrollRef} onScroll={handleChatScroll} className="min-h-0 flex-1 overflow-y-auto p-5">

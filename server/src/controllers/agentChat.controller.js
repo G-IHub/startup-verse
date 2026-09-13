@@ -244,14 +244,72 @@ async function loadContext(founderId) {
   };
 }
 
+/**
+ * Resolves which conversation a request means: the one explicitly named in
+ * the query/body, or — when the founder hasn't picked one (the normal case
+ * of just opening the Chat page) — whichever conversation most recently had
+ * a message, so opening the page still shows your latest chat by default.
+ * Returns null only when this founder+agent has no messages at all yet.
+ */
+async function resolveConversationId(founderId, agentId, requested) {
+  if (requested && mongoose.isValidObjectId(requested)) return requested;
+  const latest = await AgentMessage.findOne({ founderId, agentId }).sort({ createdAt: -1 }).select("conversationId").lean();
+  return latest?.conversationId ? String(latest.conversationId) : null;
+}
+
 export const listMessages = async (req, res) => {
   const founderId = req.params.founderId;
   if (!founderGuard(req, founderId)) return apiError(res, "Forbidden.", 403);
   await ensureCoreAgentsSeeded(founderId);
   const agent = await Agent.findOne({ founderId, agentKey: "pm" }).lean();
-  if (!agent) return apiSuccess(res, { messages: [], agentId: null });
-  const messages = await AgentMessage.find({ founderId, agentId: agent._id }).sort({ createdAt: 1 }).lean();
-  return apiSuccess(res, { messages, agentId: String(agent._id) });
+  if (!agent) return apiSuccess(res, { messages: [], agentId: null, conversationId: null });
+
+  const conversationId = await resolveConversationId(founderId, agent._id, req.query?.conversationId);
+  if (!conversationId) return apiSuccess(res, { messages: [], agentId: String(agent._id), conversationId: null });
+
+  const messages = await AgentMessage.find({ founderId, agentId: agent._id, conversationId }).sort({ createdAt: 1 }).lean();
+  return apiSuccess(res, { messages, agentId: String(agent._id), conversationId: String(conversationId) });
+};
+
+const CONVERSATION_TITLE_LENGTH = 60;
+
+/**
+ * Real, distinct past conversations for the History dropdown — derived
+ * entirely from AgentMessage itself (no separate model just to hold a
+ * title/timestamp that's already implicit in the messages). Title is the
+ * first founder message in that conversation, truncated — the same
+ * "title from the opening message" convention chat products already use,
+ * so a founder never has to name anything.
+ */
+export const listConversations = async (req, res) => {
+  const founderId = req.params.founderId;
+  if (!founderGuard(req, founderId)) return apiError(res, "Forbidden.", 403);
+  const agent = await Agent.findOne({ founderId, agentKey: "pm" }).lean();
+  if (!agent) return apiSuccess(res, { conversations: [] });
+
+  const rows = await AgentMessage.aggregate([
+    { $match: { founderId: new mongoose.Types.ObjectId(founderId), agentId: agent._id } },
+    { $sort: { createdAt: 1 } },
+    {
+      $group: {
+        _id: "$conversationId",
+        updatedAt: { $last: "$createdAt" },
+        firstFounderMessage: {
+          $first: { $cond: [{ $eq: ["$role", "founder"] }, "$content", null] },
+        },
+        messageCount: { $sum: 1 },
+      },
+    },
+    { $sort: { updatedAt: -1 } },
+  ]);
+
+  const conversations = rows.map((r) => ({
+    conversationId: String(r._id),
+    title: (r.firstFounderMessage || "New chat").slice(0, CONVERSATION_TITLE_LENGTH),
+    updatedAt: r.updatedAt,
+    messageCount: r.messageCount,
+  }));
+  return apiSuccess(res, { conversations });
 };
 
 export const sendMessage = async (req, res) => {
@@ -264,20 +322,30 @@ export const sendMessage = async (req, res) => {
   const agent = await Agent.findOne({ founderId, agentKey: "pm" });
   if (!agent) return apiError(res, "AI Product Manager isn't available for this founder.", 404);
 
-  await AgentMessage.create({ founderId, agentId: agent._id, role: "founder", content });
+  // "New chat" (client clears its remembered conversationId) or this
+  // founder's very first ever message both arrive with no conversationId —
+  // start a real new one rather than requiring a separate "create
+  // conversation" round trip first.
+  const requestedConversationId = req.body?.conversationId;
+  const conversationId = requestedConversationId && mongoose.isValidObjectId(requestedConversationId)
+    ? requestedConversationId
+    : new mongoose.Types.ObjectId();
+
+  await AgentMessage.create({ founderId, agentId: agent._id, conversationId, role: "founder", content });
 
   if (!deepseekConfigured()) {
     const reply = await AgentMessage.create({
       founderId,
       agentId: agent._id,
+      conversationId,
       role: "agent",
       content: "DeepSeek isn't configured on this server yet, so I can't respond for real right now.",
     });
-    return apiSuccess(res, { message: reply, proposedEvent: null });
+    return apiSuccess(res, { message: reply, proposedEvent: null, conversationId: String(conversationId) });
   }
 
   const ctx = await loadContext(founderId);
-  const history = await AgentMessage.find({ founderId, agentId: agent._id })
+  const history = await AgentMessage.find({ founderId, agentId: agent._id, conversationId })
     .sort({ createdAt: -1 })
     .limit(HISTORY_LIMIT)
     .lean();
@@ -800,11 +868,12 @@ export const sendMessage = async (req, res) => {
   const savedReply = await AgentMessage.create({
     founderId,
     agentId: agent._id,
+    conversationId,
     role: "agent",
     content: replyText,
     proposedEventId: proposedEvent?.id || null,
     proposedEventKind,
   });
 
-  return apiSuccess(res, { message: savedReply, proposedEvent });
+  return apiSuccess(res, { message: savedReply, proposedEvent, conversationId: String(conversationId) });
 };

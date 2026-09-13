@@ -5,15 +5,22 @@
  */
 import { request } from "../backendClient";
 
-export async function getPmMessages(founderId) {
-  const payload = await request(`/founders/${founderId}/agent-chat/pm/messages`, { method: "GET" });
-  return payload?.data || { messages: [], agentId: null };
+export async function getPmMessages(founderId, conversationId) {
+  const qs = conversationId ? `?conversationId=${encodeURIComponent(conversationId)}` : "";
+  const payload = await request(`/founders/${founderId}/agent-chat/pm/messages${qs}`, { method: "GET" });
+  return payload?.data || { messages: [], agentId: null, conversationId: null };
 }
 
-export async function sendPmMessage(founderId, content) {
+export async function sendPmMessage(founderId, content, conversationId) {
   const payload = await request(`/founders/${founderId}/agent-chat/pm/messages`, {
     method: "POST",
-    body: JSON.stringify({ content }),
+    body: JSON.stringify({ content, ...(conversationId ? { conversationId } : {}) }),
   });
   return payload?.data || {};
+}
+
+/** Real, distinct past conversations for the History dropdown — see listConversations in agentChat.controller.js. */
+export async function getPmConversations(founderId) {
+  const payload = await request(`/founders/${founderId}/agent-chat/pm/conversations`, { method: "GET" });
+  return payload?.data?.conversations || [];
 }
