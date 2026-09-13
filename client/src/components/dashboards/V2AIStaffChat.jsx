@@ -42,7 +42,11 @@ function buildRealContextRows(startup, outcome) {
   return [
     { k: "Startup", v: startup?.name || "Not set yet" },
     { k: "Stage",   v: startup?.stage || "Not set yet" },
-    { k: "Week",    v: outcome ? `Week ${outcome.weekNumber ?? "?"} · ${outcome.status === "active" ? "Active" : outcome.status}` : "No active week" },
+    // WeeklyOutcome.weekNumber has no schema default and isn't always set on
+    // creation (confirmed in the model) — the rest of the app already knows
+    // this and falls back to 1 (V2FounderDashboard.jsx, V2ExecutionEngine.jsx
+    // both do `weekNumber ?? 1`), so match that instead of showing "Week ?".
+    { k: "Week",    v: outcome ? `Week ${outcome.weekNumber ?? 1} · ${outcome.status === "active" ? "Active" : outcome.status}` : "No active week" },
     { k: "Goal",    v: outcome?.goal || "None set yet" },
   ];
 }
