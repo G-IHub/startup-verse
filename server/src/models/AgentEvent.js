@@ -22,11 +22,16 @@ const agentEventSchema = new mongoose.Schema(
     targetType: { type: String, required: true, maxlength: 50 }, // "pr", "invoice", "message_batch", "sprint_plan"
     targetId: { type: String, default: "" },
     payload: { type: mongoose.Schema.Types.Mixed, default: {} },
+    // Output of a real adapter call (e.g. { prUrl, prNumber, merged: true }), as
+    // opposed to `payload` which is the proposal's input. Null until Phase 1's
+    // real executors run; Phase 0 events never populate this. On failure, holds
+    // { error: "..." } instead — see the "failed" status below.
+    result: { type: mongoose.Schema.Types.Mixed, default: null },
 
     status: {
       type: String,
       enum: {
-        values: ["autonomous_completed", "pending_approval", "approved", "declined", "human_completed"],
+        values: ["autonomous_completed", "pending_approval", "approved", "declined", "human_completed", "failed"],
         message: "{VALUE} is not a valid event status",
       },
       required: true,

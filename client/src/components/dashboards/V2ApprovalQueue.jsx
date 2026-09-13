@@ -58,6 +58,7 @@ const HISTORY_STATUS_META = {
   approved: { icon: "✓", iconBg: "#EAF3DE", status: "Approved", statusBg: "#EAF3DE", statusColor: "#27500A" },
   declined: { icon: "✕", iconBg: "#FCEBEB", status: "Declined", statusBg: "#FCEBEB", statusColor: "#791F1F" },
   human_completed: { icon: "✓", iconBg: "#EAF3DE", status: "Completed", statusBg: "#EAF3DE", statusColor: "#27500A" },
+  failed: { icon: "✕", iconBg: "#FCEBEB", status: "Failed", statusBg: "#FCEBEB", statusColor: "#791F1F" },
 };
 
 function toHistoryItem(event) {
@@ -65,12 +66,13 @@ function toHistoryItem(event) {
   const agent = actionType.agentId || {};
   const agentName = agent.name || "Unknown agent";
   const meta = HISTORY_STATUS_META[event.status] || { icon: "•", iconBg: "#f3f4f6", status: event.status, statusBg: "#f3f4f6", statusColor: "#6b7280" };
-  const actorDesc = event.actorType === "human" ? "human action" : meta.status.toLowerCase();
+  const actorDesc = event.status === "failed" ? "failed" : event.actorType === "human" ? "human action" : meta.status.toLowerCase();
+  const errorSuffix = event.status === "failed" && event.result?.error ? ` — ${event.result.error}` : "";
   return {
     id: event.id,
     icon: meta.icon, iconBg: meta.iconBg,
     title: actionType.label || `${event.targetType || "Agent action"}`,
-    sub: `${agentName} · ${actorDesc} · ${formatEventTime(event.resolvedAt || event.createdAt)}`,
+    sub: `${agentName} · ${actorDesc} · ${formatEventTime(event.resolvedAt || event.createdAt)}${errorSuffix}`,
     status: meta.status, statusBg: meta.statusBg, statusColor: meta.statusColor,
   };
 }

@@ -22,6 +22,7 @@ const STATUS_META = {
   approved: { label: "Approved", bg: "#EAF3DE", color: "#27500A", filterKey: "approved" },
   declined: { label: "Declined", bg: "#FCEBEB", color: "#791F1F", filterKey: "declined" },
   human_completed: { label: "Completed", bg: "#EAF3DE", color: "#27500A", filterKey: "human" },
+  failed: { label: "Failed", bg: "#FCEBEB", color: "#791F1F", filterKey: "failed" },
 };
 
 const STATUS_FILTERS = [
@@ -31,6 +32,7 @@ const STATUS_FILTERS = [
   ["approved", "Approved"],
   ["declined", "Declined"],
   ["human", "Completed"],
+  ["failed", "Failed"],
 ];
 
 function toLogEntry(event, currentUserId) {
@@ -56,9 +58,9 @@ function toLogEntry(event, currentUserId) {
     actorType: event.actorType,
     av: { initials: isAgent ? initialsForAgent(agentName) : "👤", bg: palette.bg, color: palette.color },
     name,
-    desc: actionType.label
+    desc: (actionType.label
       ? `${actionType.label}${event.targetType ? ` · ${event.targetType}${event.targetId ? ` (${event.targetId})` : ""}` : ""}`
-      : (event.targetType || "Agent action"),
+      : (event.targetType || "Agent action")) + (event.status === "failed" && event.result?.error ? ` — ${event.result.error}` : ""),
     status: event.status,
     statusLabel: meta.label,
     statusBg: meta.bg,

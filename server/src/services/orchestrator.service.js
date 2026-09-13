@@ -1,15 +1,17 @@
 /**
- * orchestrator.service.js — Phase 0 of docs/ai-agent-roadmap.md.
+ * orchestrator.service.js — docs/ai-agent-roadmap.md.
  *
  * The only code allowed to write to AgentEvent. No agent talks to an
  * external API or another agent directly — everything routes through here,
  * which is what makes the "locked" enforcement real instead of decorative
  * (see docs/ai-agent-orchestration-architecture.md Section 2-3).
  *
- * Phase 0 has no real agent and no real integration adapters yet — this is
- * the decision loop and event-writing plumbing, proven with a seeded test
- * agent. Real adapters (Zikorail, GitHub, etc.) get called from the
- * `executeAction` stub added per-agent in later phases.
+ * Phase 0 had no real integration adapters — every action just logged a
+ * status. Phase 1 (AI Developer/GitHub) adds the first real ones: when an
+ * ActionType's actionKey has a registered executor (agentExecutors.js), the
+ * autonomous branch and the post-approval execution branch below actually
+ * call it, and a real failure is stored as a genuine "failed" status with
+ * the error attached — not silently reported as success.
  */
 import ActionType from "../models/ActionType.js";
 import AutonomySetting from "../models/AutonomySetting.js";
@@ -18,6 +20,7 @@ import { emitRealtime } from "./realtime.service.js";
 import { SOCKET_EVENTS } from "../realtime/events.js";
 import { startupRoom, userRoom } from "../realtime/rooms.js";
 import { logger } from "../config/logger.js";
+import { hasExecutor, runExecutor } from "./agentExecutors.js";
 
 /**
  * Resolves an approverRule string to a real human user id.
@@ -65,6 +68,7 @@ async function publishEvent(event) {
     targetType: event.targetType,
     targetId: event.targetId,
     payload: event.payload,
+    result: event.result ?? null,
     status: event.status,
     approverId: event.approverId ? String(event.approverId) : null,
     parentEventId: event.parentEventId ? String(event.parentEventId) : null,
@@ -121,11 +125,24 @@ export async function proposeAction({ founderId, startupId, actorType, actorId, 
 
   // Branch c) reversible + autonomous -> execute immediately.
   // Branch d) read_only -> always executes, always autonomous.
-  // Phase 0 has no real integration adapters yet, so "execute" just means
-  // "log it as done" — real adapters plug in here per-agent in later phases.
-  const event = await AgentEvent.create({ ...baseDoc, status: "autonomous_completed" });
+  // If a real executor is registered for this action type, actually run it —
+  // otherwise (no adapter built yet for this action) fall back to Phase 0's
+  // "log it as done" behavior, which stays correct for agents/actions that
+  // are genuinely just informational (e.g. AI Growth Analyst's read_only work).
+  let status = "autonomous_completed";
+  let result = null;
+  if (hasExecutor(actionType.actionKey)) {
+    try {
+      result = await runExecutor(actionType.actionKey, { founderId, payload: payload || {}, targetType, targetId: targetId || "" });
+    } catch (err) {
+      status = "failed";
+      result = { error: err.message || "Execution failed." };
+      logger.error(`[orchestrator] executor "${actionType.actionKey}" failed`, { message: err.message });
+    }
+  }
+  const event = await AgentEvent.create({ ...baseDoc, status, result });
   const dto = await publishEvent(event);
-  return { event: dto, executed: true };
+  return { event: dto, executed: status !== "failed" };
 }
 
 /**
@@ -165,7 +182,27 @@ export async function resolveApproval({ eventId, decision, approverId }) {
     return { resolved: resolvedDto, execution: null };
   }
 
-  // Real execution point — no adapter exists yet in Phase 0.
+  // Real execution point. If the approved action type has a registered
+  // executor, actually run it now — this is the moment a locked action (e.g.
+  // deploy_prod) really takes effect, only after a human said yes.
+  const actionType = await ActionType.findById(pending.actionTypeId);
+  let execStatus = "human_completed";
+  let execResult = null;
+  if (actionType && hasExecutor(actionType.actionKey)) {
+    try {
+      execResult = await runExecutor(actionType.actionKey, {
+        founderId: pending.founderId,
+        payload: pending.payload || {},
+        targetType: pending.targetType,
+        targetId: pending.targetId || "",
+      });
+    } catch (err) {
+      execStatus = "failed";
+      execResult = { error: err.message || "Execution failed." };
+      logger.error(`[orchestrator] executor "${actionType.actionKey}" failed on approval`, { message: err.message });
+    }
+  }
+
   const executionEvent = await AgentEvent.create({
     founderId: pending.founderId,
     startupId: pending.startupId,
@@ -175,7 +212,8 @@ export async function resolveApproval({ eventId, decision, approverId }) {
     targetType: pending.targetType,
     targetId: pending.targetId,
     payload: pending.payload,
-    status: "human_completed",
+    status: execStatus,
+    result: execResult,
     parentEventId: pending._id,
   });
   const executionDto = await publishEvent(executionEvent);
