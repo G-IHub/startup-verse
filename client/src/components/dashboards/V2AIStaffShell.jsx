@@ -220,7 +220,7 @@ export default function V2AIStaffShell({ user, onPageChange, ...rest }) {
               onNavigate={handleNavigate}
             />
           ) : tab === "chat" ? (
-            <V2AIStaffChat onNavigate={handleNavigate} />
+            <V2AIStaffChat user={user} onNavigate={handleNavigate} />
           ) : (
             <V2AIStaffManage
               user={user}

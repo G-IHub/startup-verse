@@ -43,3 +43,37 @@ export async function draftText({ systemPrompt, userPrompt, model = DEFAULT_MODE
   }
   return data?.choices?.[0]?.message?.content || "";
 }
+
+/**
+ * Multi-turn variant for real conversations (AI Product Manager's chat) —
+ * draftText() above is single-shot only (one system + one user message),
+ * which can't carry conversation history. `messages` is the prior turns as
+ * `{ role: "user" | "assistant", content }`, oldest first; the caller is
+ * responsible for trimming history to a reasonable length.
+ */
+export async function chatCompletion({ systemPrompt, messages, model = DEFAULT_MODEL, maxTokens = 1200 }) {
+  const apiKey = process.env.DEEPSEEK_API_KEY;
+  if (!apiKey) {
+    const err = new Error("DEEPSEEK_API_KEY is not set.");
+    err.statusCode = 503;
+    throw err;
+  }
+  const response = await fetch(`${DEEPSEEK_BASE_URL}/chat/completions`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${apiKey}`,
+    },
+    body: JSON.stringify({
+      model,
+      messages: [{ role: "system", content: systemPrompt }, ...(messages || [])],
+      max_tokens: maxTokens,
+      temperature: 0.4,
+    }),
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(data?.error?.message || `DeepSeek API error (${response.status})`);
+  }
+  return data?.choices?.[0]?.message?.content || "";
+}

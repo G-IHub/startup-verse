@@ -4,8 +4,10 @@
  * Multi-agent chat: PM (default), DEV, MK, GA tabs
  */
 
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, useCallback } from "react";
 import { cn } from "../ui/utils";
+import { useOfficeStore } from "../../state/useOfficeStore";
+import { getPmMessages, sendPmMessage } from "../../utils/api/agentChatApi";
 
 /* ── Staff config ─────────────────────────────────────────────────────────── */
 const STAFF = [
@@ -66,134 +68,70 @@ function TypingDots() {
   );
 }
 
-/* ── PM Messages ─────────────────────────────────────────────────────────── */
-function PMMessages({ onToast }) {
+/* ── PM Messages — real, per docs/ai-agent-roadmap.md Phase 3 ──────────────
+ * Unlike DEV/MK/GA below (still illustrative mock, pending their own real
+ * actions), AI Product Manager's chat is genuinely real: persisted history,
+ * real DeepSeek replies grounded in the founder's actual startup context,
+ * and a real proposed sprint plan (a real, approvable AgentEvent) when the
+ * conversation reaches enough clarity. See agentChat.controller.js. */
+function PMMessages({ messages, loading, sending, error, onNavigate }) {
   return (
     <div className="flex flex-col gap-4">
-      {/* System */}
       <div className="text-center">
-        <span className="inline-block rounded-full bg-gray-100 px-3 py-1 font-body text-[10px] text-v2-muted">Today · Week 5 · Session started 9:14am</span>
+        <span className="inline-block rounded-full bg-gray-100 px-3 py-1 font-body text-[10px] text-v2-muted">Real conversation · AI Product Manager</span>
       </div>
 
-      {/* AI welcome */}
-      <div className="flex items-start gap-2.5">
-        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full font-body text-[10px] font-semibold" style={{ background: "#EEEDFE", color: "#534AB7" }}>PM</div>
-        <div className="flex max-w-[72%] flex-col gap-1">
-          <div className="font-body text-[10px] text-v2-muted">AI Product Manager · HealthTrack</div>
-          <div className="rounded-[4px_14px_14px_14px] border border-gray-100 bg-white px-3.5 py-3 font-body text-[13px] leading-relaxed text-v2-heading">
-            Good morning, Adaeze. I've loaded HealthTrack's Week 5 context.
-            <div className="my-2 rounded-[0_8px_8px_0] border-l-[3px] border-[#534AB7] bg-[#EEEDFE] px-3 py-2 font-body text-[11px] leading-relaxed text-[#3C3489]">
-              <strong className="font-medium">Context loaded:</strong> Stage 1 · Week 5 · Execution score 91 · 5-week streak · 3 paying clinics · ₦285K MRR · Vezeeta Blueprint installed
-            </div>
-            Your execution score is strong at 91, and you've hit Stage 1's clinic milestone. What would you like to work on today?
-          </div>
-          <div className="font-body text-[10px] text-v2-muted">9:14am</div>
-        </div>
-      </div>
+      {loading && (
+        <div className="text-center font-body text-[12px] text-v2-muted">Loading conversation…</div>
+      )}
+      {error && (
+        <div className="text-center font-body text-[12px] text-[#791F1F]">{error}</div>
+      )}
 
-      {/* User */}
-      <div className="flex flex-row-reverse items-start gap-2.5">
-        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#1B4FD8] font-body text-[10px] font-semibold text-white">AO</div>
-        <div className="flex max-w-[72%] flex-col items-end gap-1">
-          <div className="font-body text-[10px] text-v2-muted">Adaeze · HealthTrack</div>
-          <div className="rounded-[14px_4px_14px_14px] bg-[#534AB7] px-3.5 py-3 font-body text-[13px] leading-relaxed text-white">What's the most important thing I should focus on this week?</div>
-          <div className="font-body text-[10px] text-v2-muted">9:15am</div>
-        </div>
-      </div>
-
-      {/* AI priority list */}
-      <div className="flex items-start gap-2.5">
-        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full font-body text-[10px] font-semibold" style={{ background: "#EEEDFE", color: "#534AB7" }}>PM</div>
-        <div className="flex max-w-[80%] flex-col gap-1">
-          <div className="font-body text-[10px] text-v2-muted">AI Product Manager</div>
-          <div className="rounded-[4px_14px_14px_14px] border border-gray-100 bg-white px-3.5 py-3 font-body text-[13px] leading-relaxed text-v2-heading">
-            Based on your Week 5 data and the Vezeeta Blueprint stage gates, here's your priority stack:
-            <div className="mt-2 flex flex-col gap-1.5">
-              {[
-                { n: "1", bg: "#E24B4A", title: "Scale to 10 paying clinics", sub: "3 paying, 13 in pipeline. Vezeeta Blueprint requires 10 for Stage 2. Surulere General demo is Thursday.", tag: "Stage gate · 3 of 10 clinics", tagBg: "#FCEBEB", tagColor: "#791F1F" },
-                { n: "2", bg: "#BA7517", title: "Approve the 10-message outreach batch", sub: "AI Sales has personalised 10 clinic messages and queued them. They're waiting on your approval — nothing sends without you.", tag: "Approval needed · AI Sales blocked", tagBg: "#FAEEDA", tagColor: "#633806" },
-                { n: "3", bg: "#1D9E75", title: "Review INV-1042 in AI Finance", sub: "₦180,000 invoice for Reddington Clinic's setup fee. Sending it unlocks ₦180K cash and protects the renewal relationship.", tag: "Optional · high impact", tagBg: "#EAF3DE", tagColor: "#27500A" },
-              ].map((item) => (
-                <div key={item.n} className="flex items-start gap-2.5 rounded-lg bg-v2-page p-2">
-                  <div className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full font-body text-[9px] font-semibold text-white" style={{ background: item.bg }}>{item.n}</div>
-                  <div className="min-w-0 flex-1">
-                    <div className="font-body text-[12px] font-medium text-v2-heading">{item.title}</div>
-                    <div className="mt-0.5 font-body text-[11px] leading-snug text-v2-muted">{item.sub}</div>
-                    <span className="mt-1 inline-block rounded-[5px] px-1.5 py-0.5 font-body text-[9px] font-medium" style={{ background: item.tagBg, color: item.tagColor }}>{item.tag}</span>
-                  </div>
-                </div>
-              ))}
-            </div>
-            I've already drafted a Week 6 sprint plan around these. Want me to show it?
-          </div>
-          <div className="font-body text-[10px] text-v2-muted">9:15am</div>
-        </div>
-      </div>
-
-      {/* User */}
-      <div className="flex flex-row-reverse items-start gap-2.5">
-        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#1B4FD8] font-body text-[10px] font-semibold text-white">AO</div>
-        <div className="flex max-w-[72%] flex-col items-end gap-1">
-          <div className="rounded-[14px_4px_14px_14px] bg-[#534AB7] px-3.5 py-3 font-body text-[13px] leading-relaxed text-white">Yes, show me the sprint plan</div>
-          <div className="font-body text-[10px] text-v2-muted">9:16am</div>
-        </div>
-      </div>
-
-      {/* AI sprint plan card */}
-      <div className="flex items-start gap-2.5">
-        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full font-body text-[10px] font-semibold" style={{ background: "#EEEDFE", color: "#534AB7" }}>PM</div>
-        <div className="flex max-w-[80%] flex-col gap-1">
-          <div className="font-body text-[10px] text-v2-muted">AI Product Manager</div>
-          <div className="rounded-[4px_14px_14px_14px] border border-gray-100 bg-white px-3.5 py-3 font-body text-[13px] leading-relaxed text-v2-heading">
-            Here's your Week 6 sprint — 4 milestones, built around clinic scale and approvals.
-            {/* Sprint card */}
-            <div className="mt-2 overflow-hidden rounded-[10px] border border-gray-100">
-              <div className="flex items-center justify-between bg-[#EEEDFE] px-3 py-2">
-                <span className="font-body text-[11px] font-medium text-[#3C3489]">Week 6 Sprint Plan · HealthTrack</span>
-                <span className="rounded-[6px] bg-white px-1.5 py-0.5 font-body text-[9px] text-[#534AB7]">AI-generated · based on HealthTrack context</span>
-              </div>
-              <div className="flex flex-col gap-1.5 bg-v2-page p-2.5">
-                {[
-                  { n: "M1", bg: "#E24B4A", task: "Approve & send 10-clinic outreach batch", meta: "Owner: Adaeze · Due: Mon · Unblocks AI Sales" },
-                  { n: "M2", bg: "#BA7517", task: "Approve INV-1042 for Reddington Clinic setup fee", meta: "Owner: Adaeze · Due: Tue · +₦180K cash" },
-                  { n: "M3", bg: "#1D9E75", task: "Surulere General demo call — close as 4th client", meta: "Owner: Adaeze · Thursday 2pm" },
-                  { n: "M4", bg: "#534AB7", task: "Week 6 outcome logged by Sunday 11:59pm — protect streak", meta: "Owner: Adaeze · Streak at risk if missed" },
-                ].map((item) => (
-                  <div key={item.n} className="flex items-start gap-2 rounded-[7px] border border-gray-100 bg-white p-2">
-                    <div className="mt-0.5 flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-[5px] font-body text-[9px] font-semibold text-white" style={{ background: item.bg }}>{item.n}</div>
-                    <div className="flex-1">
-                      <div className="font-body text-[11px] text-v2-heading">{item.task}</div>
-                      <div className="mt-0.5 font-body text-[9px] text-v2-muted">{item.meta}</div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-              <div className="flex items-center justify-between border-t border-gray-100 bg-v2-page px-3 py-2">
-                <span className="font-body text-[10px] text-v2-muted">Projected score impact if all 4 milestones hit:</span>
-                <span className="font-body text-[12px] font-medium text-[#1D9E75]">91 → 97 (+6 pts) 🔥</span>
-              </div>
-            </div>
-            <div className="mt-2.5 flex gap-1.5">
-              <button type="button" onClick={() => onToast("Sprint plan accepted and pushed")} className="rounded-lg bg-[#534AB7] px-3 py-1.5 font-body text-[11px] font-medium text-white hover:opacity-90">Accept sprint plan</button>
-              <button type="button" onClick={() => onToast("Opening milestone editor…")} className="rounded-lg border border-v2-border bg-white px-3 py-1.5 font-body text-[11px] font-medium text-v2-heading hover:bg-gray-50">Edit milestones</button>
-              <button type="button" onClick={() => onToast("Pushed to Execution Engine")} className="rounded-lg border border-v2-border bg-white px-3 py-1.5 font-body text-[11px] font-medium text-v2-heading hover:bg-gray-50">Push to engine</button>
+      {!loading && messages.length === 0 && (
+        <div className="flex items-start gap-2.5">
+          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full font-body text-[10px] font-semibold" style={{ background: "#EEEDFE", color: "#534AB7" }}>PM</div>
+          <div className="flex max-w-[72%] flex-col gap-1">
+            <div className="font-body text-[10px] text-v2-muted">AI Product Manager</div>
+            <div className="rounded-[4px_14px_14px_14px] border border-gray-100 bg-white px-3.5 py-3 font-body text-[13px] leading-relaxed text-v2-heading">
+              Hey — I'm your AI Product Manager. Tell me what's on your mind: an idea, a blocker, or honestly just "I don't know what to focus on" — and we'll work out this week's plan together.
             </div>
           </div>
-          <div className="font-body text-[10px] text-v2-muted">9:16am</div>
         </div>
-      </div>
+      )}
 
-      {/* User */}
-      <div className="flex flex-row-reverse items-start gap-2.5">
-        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#1B4FD8] font-body text-[10px] font-semibold text-white">AO</div>
-        <div className="flex max-w-[72%] flex-col items-end gap-1">
-          <div className="rounded-[14px_4px_14px_14px] bg-[#534AB7] px-3.5 py-3 font-body text-[13px] leading-relaxed text-white">Should I be worried about my execution score dropping this week?</div>
-          <div className="font-body text-[10px] text-v2-muted">9:21am</div>
+      {messages.map((m) => (
+        <div key={m._id} className={cn("flex items-start gap-2.5", m.role === "founder" && "flex-row-reverse")}>
+          <div
+            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full font-body text-[10px] font-semibold"
+            style={m.role === "founder" ? { background: "#1B4FD8", color: "#fff" } : { background: "#EEEDFE", color: "#534AB7" }}
+          >
+            {m.role === "founder" ? "You" : "PM"}
+          </div>
+          <div className={cn("flex max-w-[72%] flex-col gap-1", m.role === "founder" && "items-end")}>
+            <div
+              className={cn(
+                "whitespace-pre-wrap font-body text-[13px] leading-relaxed",
+                m.role === "founder"
+                  ? "rounded-[14px_4px_14px_14px] bg-[#534AB7] px-3.5 py-3 text-white"
+                  : "rounded-[4px_14px_14px_14px] border border-gray-100 bg-white px-3.5 py-3 text-v2-heading",
+              )}
+            >
+              {m.content}
+            </div>
+            {m.proposedEventId && (
+              <button type="button" onClick={() => onNavigate?.("approval-queue")} className="font-body text-[10px] font-medium text-v2-purple hover:underline">
+                📋 View in Approval Queue →
+              </button>
+            )}
+            <div className="font-body text-[10px] text-v2-muted">
+              {m.createdAt ? new Date(m.createdAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }) : ""}
+            </div>
+          </div>
         </div>
-      </div>
+      ))}
 
-      {/* Typing */}
-      <TypingDots />
+      {sending && <TypingDots />}
     </div>
   );
 }
@@ -293,27 +231,74 @@ function PlaceholderChat({ staff }) {
 }
 
 /* ── Main ─────────────────────────────────────────────────────────────────── */
-export default function V2AIStaffChat({ onNavigate }) {
+export default function V2AIStaffChat({ user, onNavigate }) {
+  const founderId = useOfficeStore((s) => s.founderId);
+  const loadWorkspace = useOfficeStore((s) => s.loadWorkspace);
+  const resolvedFounderId = founderId || String(user?._id ?? user?.id ?? "");
+
   const [activeStaff, setActiveStaff] = useState("pm");
   const [toast, setToast] = useState("");
   const [contextOn, setContextOn] = useState(true);
   const [inputText, setInputText] = useState("");
   const chatEndRef = useRef(null);
 
+  const [pmMessages, setPmMessages] = useState([]);
+  const [pmLoading, setPmLoading] = useState(true);
+  const [pmSending, setPmSending] = useState(false);
+  const [pmError, setPmError] = useState("");
+
   const showToast = (msg) => { setToast(msg); setTimeout(() => setToast(""), 2400); };
+
+  useEffect(() => { if (user) loadWorkspace(user); }, [user, loadWorkspace]);
+
+  useEffect(() => {
+    if (!resolvedFounderId) return;
+    let cancelled = false;
+    setPmLoading(true);
+    getPmMessages(resolvedFounderId)
+      .then(({ messages }) => { if (!cancelled) { setPmMessages(messages || []); setPmError(""); } })
+      .catch((err) => { if (!cancelled) setPmError(err?.message || "Could not load AI Product Manager's conversation."); })
+      .finally(() => { if (!cancelled) setPmLoading(false); });
+    return () => { cancelled = true; };
+  }, [resolvedFounderId]);
+
+  const sendToPm = useCallback(async (content) => {
+    const localMessage = { _id: `local-${Date.now()}`, role: "founder", content, createdAt: new Date().toISOString() };
+    setPmMessages((prev) => [...prev, localMessage]);
+    setPmSending(true);
+    try {
+      const { message } = await sendPmMessage(resolvedFounderId, content);
+      if (message) setPmMessages((prev) => [...prev, message]);
+    } catch (err) {
+      showToast(err?.message || "AI Product Manager could not respond.");
+    } finally {
+      setPmSending(false);
+    }
+  }, [resolvedFounderId]);
 
   const activeStaffObj = STAFF.find((s) => s.id === activeStaff);
 
-  const placeholderText = activeStaff === "pm" ? "Ask your AI PM anything about HealthTrack…"
+  const placeholderText = activeStaff === "pm" ? "Tell your AI PM what's on your mind…"
     : activeStaff === "dev" ? "Ask AI Developer about your codebase or build…"
     : activeStaff === "mk"  ? "Ask AI Marketing about content or campaigns…"
     : "Ask AI Growth Analyst about your data…";
 
   const HINTS = activeStaff === "pm"
-    ? ["What's my Stage 2 readiness?", "Draft my investor update", "What should James do today?"]
+    ? ["I don't know what to focus on this week", "Help me plan around this blocker", "Draft a sprint plan for this idea"]
     : activeStaff === "dev"
     ? ["Show me recent PRs", "What's blocking the next deploy?", "Review my Stripe integration"]
     : ["Write a LinkedIn post", "Analyse clinic reply rates", "What data do I have?"];
+
+  const handleSend = () => {
+    const content = inputText.trim();
+    if (!content) return;
+    setInputText("");
+    if (activeStaff === "pm") {
+      sendToPm(content);
+    } else {
+      showToast("Message sent");
+    }
+  };
 
   return (
     <div className="flex min-h-0 flex-1 overflow-hidden bg-v2-page">
@@ -351,7 +336,9 @@ export default function V2AIStaffChat({ onNavigate }) {
 
         {/* Chat area */}
         <div className="min-h-0 flex-1 overflow-y-auto p-5">
-          {activeStaff === "pm"  && <PMMessages onToast={showToast} />}
+          {activeStaff === "pm" && (
+            <PMMessages messages={pmMessages} loading={pmLoading} sending={pmSending} error={pmError} onNavigate={onNavigate} />
+          )}
           {activeStaff === "dev" && <DEVMessages onToast={showToast} onNavigate={onNavigate} />}
           {activeStaff !== "pm" && activeStaff !== "dev" && (
             <PlaceholderChat staff={activeStaffObj} />
@@ -383,7 +370,7 @@ export default function V2AIStaffChat({ onNavigate }) {
                 placeholder={placeholderText}
                 className="flex-1 resize-none border-none bg-transparent font-body text-[13px] text-v2-heading outline-none placeholder:text-v2-muted"
                 style={{ lineHeight: "1.5" }}
-                onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); if (inputText.trim()) { showToast("Message sent"); setInputText(""); } } }}
+                onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
               />
               <button type="button" className="flex h-7 w-7 items-center justify-center rounded-[7px] text-v2-muted hover:bg-gray-100">
                 <svg width="15" height="15" viewBox="0 0 15 15" fill="none"><path d="M12.5 7.5l-5 5a3.5 3.5 0 01-5-5l5-5a2.5 2.5 0 013.5 3.5l-5 5a1.5 1.5 0 01-2-2l4-4" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/></svg>
@@ -391,8 +378,9 @@ export default function V2AIStaffChat({ onNavigate }) {
             </div>
             <button
               type="button"
-              onClick={() => { if (inputText.trim()) { showToast("Message sent"); setInputText(""); } }}
-              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[10px] bg-[#534AB7] hover:bg-[#3C3489] transition-colors"
+              onClick={handleSend}
+              disabled={activeStaff === "pm" && pmSending}
+              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[10px] bg-[#534AB7] hover:bg-[#3C3489] transition-colors disabled:opacity-60"
             >
               <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M14 2L7 9M14 2l-4 12-3-5-5-3 12-4z" stroke="#fff" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/></svg>
             </button>

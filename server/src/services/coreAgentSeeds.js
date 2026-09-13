@@ -17,6 +17,23 @@ import ActionType from "../models/ActionType.js";
 
 const CORE_AGENT_DEFINITIONS = [
   {
+    agentKey: "pm",
+    name: "AI Product Manager",
+    role: "Strategy, roadmap, sprint planning",
+    capabilities: ["chat", "propose_sprint_plan"],
+    model: "deepseek",
+    actionTypes: [
+      {
+        actionKey: "propose_sprint_plan",
+        label: "Propose a sprint plan",
+        riskCategory: "reversible",
+        defaultMode: "ask_first",
+        adjustable: true,
+        approverRule: "founder",
+      },
+    ],
+  },
+  {
     agentKey: "dev",
     name: "AI Developer",
     role: "Code, deploys, GitHub",

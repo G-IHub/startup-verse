@@ -10,6 +10,9 @@
  */
 import { openPullRequest, mergePullRequest, mergeBranches } from "./githubAdapter.js";
 import { draftText, deepseekConfigured } from "./deepseekClient.js";
+import Startup from "../models/Startup.js";
+import Milestone from "../models/Milestone.js";
+import Task from "../models/Task.js";
 
 const DEFAULT_STAGING_BRANCH = "staging";
 const DEFAULT_PROD_BRANCH = "main";
@@ -81,10 +84,70 @@ async function executeGithubMergeMain({ founderId, payload }) {
   });
 }
 
+/**
+ * Turns an approved sprint plan into real Milestone/Task documents — the
+ * same models and shape founders.controller.js's own createMilestone/
+ * createTask use, so the result shows up in the real Execution Engine, not
+ * a parallel system. `payload.milestones` is
+ * `[{ title, description, tasks: [{ title, description }] }]`, produced by
+ * AI Product Manager's chat (see agentChat.controller.js) once a plan is
+ * concrete enough to propose — this executor only ever runs after a human
+ * has approved it (propose_sprint_plan is ask_first, not autonomous).
+ */
+async function executeProposeSprintPlan({ founderId, payload }) {
+  const milestones = Array.isArray(payload?.milestones) ? payload.milestones : [];
+  if (milestones.length === 0) {
+    throw new Error("propose_sprint_plan requires a non-empty milestones array.");
+  }
+  const startup = await Startup.findOne({ founderId });
+  if (!startup) {
+    throw new Error("No startup found for this founder — create a startup before proposing a sprint plan.");
+  }
+
+  let sequence = (await Milestone.countDocuments({ founderId, startupId: startup._id })) + 1;
+  const created = [];
+
+  for (const m of milestones) {
+    const title = String(m?.title || "").trim().slice(0, 200);
+    if (!title) continue;
+    const milestone = await Milestone.create({
+      founderId,
+      startupId: startup._id,
+      title,
+      description: String(m?.description || "").slice(0, 5000),
+      weeklyOutcomeId: payload?.weeklyOutcomeId || null,
+      sequence: sequence++,
+      status: "pending",
+    });
+
+    const tasks = [];
+    for (const t of Array.isArray(m?.tasks) ? m.tasks : []) {
+      const taskTitle = String(t?.title || "").trim().slice(0, 200);
+      if (!taskTitle) continue;
+      const task = await Task.create({
+        founderId,
+        startupId: startup._id,
+        title: taskTitle,
+        description: String(t?.description || "").slice(0, 5000),
+        status: "pending",
+        milestoneId: milestone._id,
+      });
+      tasks.push({ id: String(task._id), title: task.title });
+    }
+    created.push({ id: String(milestone._id), title: milestone.title, tasks });
+  }
+
+  if (created.length === 0) {
+    throw new Error("No valid milestones in the proposed plan (every milestone needs at least a title).");
+  }
+  return { milestones: created };
+}
+
 const EXECUTORS = {
   github_open_pr: executeGithubOpenPr,
   github_merge_staging: executeGithubMergeStaging,
   github_merge_main: executeGithubMergeMain,
+  propose_sprint_plan: executeProposeSprintPlan,
 };
 
 export function hasExecutor(actionKey) {
