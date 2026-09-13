@@ -8,7 +8,7 @@
  * means orchestrator.service.js never needs to know which integration
  * backs a given action type.
  */
-import { openPullRequest, mergePullRequest, mergeBranches, getFileContent, getPullRequestFiles } from "./githubAdapter.js";
+import { openPullRequest, mergePullRequest, mergeBranches, getFileContent, getPullRequestFiles, ensureGithubPagesEnabled } from "./githubAdapter.js";
 import { draftText, deepseekConfigured } from "./deepseekClient.js";
 import Startup from "../models/Startup.js";
 import Milestone from "../models/Milestone.js";
@@ -101,14 +101,29 @@ async function executeGithubMergeMain({ founderId, payload }) {
   if (!owner || !repo) {
     throw new Error("deploy_prod requires owner and repo in payload.");
   }
-  return mergeBranches({
+  const base = prodBranch || DEFAULT_PROD_BRANCH;
+  const result = await mergeBranches({
     founderId,
     owner,
     repo,
-    base: prodBranch || DEFAULT_PROD_BRANCH,
+    base,
     head: baseBranch || DEFAULT_STAGING_BRANCH,
     commitMessage: "AI Developer: promote staging to production (human-approved)",
   });
+
+  // Real gap closed: until now, "deployed to production" only ever meant a
+  // git branch got updated — there was no actual hosting anywhere, so a
+  // founder had no real way to click through and see what was built.
+  // Best-effort: a Pages hiccup (e.g. a private repo on a plan that doesn't
+  // support it) must never fail the real deploy that already succeeded.
+  try {
+    const pages = await ensureGithubPagesEnabled({ founderId, owner, repo, branch: base });
+    result.pagesUrl = pages.url;
+  } catch (err) {
+    result.pagesError = err.message;
+  }
+
+  return result;
 }
 
 const README_CANDIDATES = ["README.md", "Readme.md", "readme.md", "README.MD"];

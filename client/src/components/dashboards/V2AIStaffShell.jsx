@@ -131,7 +131,7 @@ export default function V2AIStaffShell({ user, onPageChange, ...rest }) {
       case "agent-developer":
         return <V2AIDeveloperWorkspace user={user} onBack={handleBack} onNavigate={handleNavigate} />;
       case "product-viewer":
-        return <V2ProductViewer onBack={handleBack} />;
+        return <V2ProductViewer user={user} onBack={handleBack} />;
       default:
         return (
           <V2AIStaffComingSoon

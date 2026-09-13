@@ -128,6 +128,8 @@ function summarizeDevEvent(e) {
 function buildSystemPrompt({ startupName, stage, goal, milestonesSummary, devActivitySummary, openTasksSummary, defaultRepo, teamSummary }) {
   return `You are AI Product Manager, a StartupVerse agent and ${startupName ? `${startupName}'s` : "the founder's"} primary day-to-day planning partner.
 
+**Critical, applies to every action below, not just one of them: saying it happened doesn't make it happen.** Only a fenced block (\`\`\`SPRINT_PLAN, \`\`\`BUILD_TASK, etc.) does anything real. Never write "handed to," "opened a real PR," "staged," "proposed," "done," "updated," or anything implying an action was taken unless you emit the exact block in that same reply — if you're missing something you need, say so instead of describing an action you didn't take. The 🛠️ and 📋 confirmation lines you've seen in past replies are appended automatically by the system after a real action actually succeeds — never write those yourself; if you write one without the system having added it, that's exactly the false claim this rule exists to prevent.
+
 Your job:
 - Help the founder figure out what to focus on. Ask clarifying questions when there isn't enough clarity yet — don't force a plan out of a vague idea.
 - Use only the real context given below. Never invent startup data, and never invent or guess at AI Developer's activity beyond what's listed below — if it's not listed, say you don't have visibility into it.
@@ -763,6 +765,25 @@ export const sendMessage = async (req, res) => {
   if (strayOpenName) {
     replyText = replyText.slice(0, replyText.indexOf("```" + strayOpenName)).trim();
     replyText += "\n\n(I also started a second action in that reply but ran out of room to finish it — ask me again once this one's done.)";
+  }
+
+  // Real bug found live: the model can also just write confident prose
+  // claiming a real action happened — using this system's own 🛠️/📋
+  // confirmation style — with no fenced block at all. Confirmed via direct
+  // DB query: a reply read "🛠️ Handed to AI Developer — it opened a real
+  // PR..." and nothing was ever created. The prompt rule above is necessary
+  // but not sufficient — a rule the model can still choose not to follow —
+  // so this is the same "escalate to a structural guard" principle already
+  // used for the multi-marker and owner/repo cases. If no real marker
+  // closed this turn and nothing was actually proposed, those two glyphs
+  // are reserved (per the system prompt) for real, server-appended
+  // confirmations only — their presence here means a fabricated one.
+  if (!closed && !proposedEvent) {
+    const glyphIndexes = ["🛠️", "📋"].map((g) => replyText.indexOf(g)).filter((i) => i >= 0);
+    if (glyphIndexes.length) {
+      replyText = replyText.slice(0, Math.min(...glyphIndexes)).trim();
+      replyText += "\n\n(That last line described an action as if it happened, but nothing was actually sent — ask me again and I'll either do it for real or tell you what's missing.)";
+    }
   }
 
   if (!replyText.trim()) {

@@ -207,7 +207,7 @@ function CoordinationFeed({ items, onViewLog }) {
                 )}
                 {item.link && (
                   <a href={item.link} target="_blank" rel="noreferrer" className="mt-1.5 inline-block font-body text-[10px] font-medium text-v2-purple hover:underline">
-                    View real PR →
+                    {item.linkLabel || "View real PR →"}
                   </a>
                 )}
               </div>

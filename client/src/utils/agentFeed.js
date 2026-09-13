@@ -48,7 +48,13 @@ function describeDevEvent(e) {
       return { from: DEV_ACTOR, to: YOU_ACTOR, text: `Requested a production deploy${repoLabel ? " on " + repoLabel : ""} — needs your approval.`, tag: { label: "Escalated · needs approval", bg: "#FCEBEB", color: "#791F1F" } };
     }
     if (e.status === "human_completed" || e.status === "autonomous_completed") {
-      return { from: DEV_ACTOR, to: null, text: `Deployed to production${repoLabel ? " on " + repoLabel : ""}.`, tag: { label: "Live in production", bg: "#EAF3DE", color: "#27500A" } };
+      return {
+        from: DEV_ACTOR, to: null, text: `Deployed to production${repoLabel ? " on " + repoLabel : ""}.`,
+        tag: { label: "Live in production", bg: "#EAF3DE", color: "#27500A" },
+        // Real link to the actual deployed page (GitHub Pages, enabled the
+        // moment a production deploy first succeeds) — not just a PR diff.
+        link: e.result?.pagesUrl, linkLabel: "View live site →",
+      };
     }
     if (e.status === "declined") {
       return { from: DEV_ACTOR, to: null, text: `Production deploy declined${repoLabel ? " on " + repoLabel : ""}.`, tag: { label: "Declined", bg: "#FCEBEB", color: "#791F1F" } };

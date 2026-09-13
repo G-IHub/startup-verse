@@ -117,6 +117,40 @@ export async function mergeBranches({ founderId, owner, repo, base, head, commit
 }
 
 /**
+ * Ensures a real GitHub Pages site exists for this repo, serving from
+ * `branch` at the repo root — the only real way to give a founder an actual
+ * clickable link to what AI Developer built. Without this, AI Developer's
+ * work only ever lands as a git branch; GitHub does not serve arbitrary repo
+ * files as a website on its own. Idempotent: a GET first checks whether
+ * Pages is already enabled (real founders will hit this on every deploy,
+ * not just the first) and just returns its existing real URL rather than
+ * re-creating it. Real, visible side effect on the founder's own repo
+ * settings — deliberately only ever called after a real production deploy
+ * succeeds, never speculatively.
+ */
+export async function ensureGithubPagesEnabled({ founderId, owner, repo, branch }) {
+  const token = await getFounderToken(founderId);
+  const headers = {
+    Accept: "application/vnd.github+json",
+    Authorization: `Bearer ${token}`,
+    "User-Agent": "StartupVerse-AI-Developer",
+    "X-GitHub-Api-Version": "2022-11-28",
+  };
+
+  const existing = await fetch(`https://api.github.com/repos/${owner}/${repo}/pages`, { headers });
+  if (existing.status === 200) {
+    const data = await existing.json();
+    return { url: data.html_url, alreadyEnabled: true };
+  }
+
+  const created = await gh(token, `/repos/${owner}/${repo}/pages`, {
+    method: "POST",
+    body: JSON.stringify({ source: { branch, path: "/" } }),
+  });
+  return { url: created.html_url || `https://${owner}.github.io/${repo}/`, alreadyEnabled: false };
+}
+
+/**
  * Real file content via the Contents API — added so AI PM can actually read
  * a repo (README, a specific file) instead of only ever seeing metadata
  * about PRs/deploys. GitHub returns file content base64-encoded for files
