@@ -301,6 +301,10 @@ export default function V2AIStaffChat({ user, onNavigate }) {
   const [contextOn, setContextOn] = useState(true);
   const [inputText, setInputText] = useState("");
   const chatEndRef = useRef(null);
+  const chatScrollRef = useRef(null);
+  const chatContentRef = useRef(null);
+  const atBottomRef = useRef(true);
+  const [showJumpToLatest, setShowJumpToLatest] = useState(false);
 
   const [pmMessages, setPmMessages] = useState([]);
   const [pmLoading, setPmLoading] = useState(true);
@@ -335,6 +339,43 @@ export default function V2AIStaffChat({ user, onNavigate }) {
   }, [resolvedFounderId]);
 
   useEffect(() => { refreshLatestPlan(); }, [refreshLatestPlan]);
+
+  // chatEndRef existed already but nothing ever called scrollIntoView on it —
+  // the chat page had zero auto-scroll behavior. Land on the latest message
+  // whenever the page opens or the founder switches staff tabs.
+  const scrollToBottom = useCallback((behavior = "auto") => {
+    chatEndRef.current?.scrollIntoView({ behavior, block: "end" });
+  }, []);
+
+  useEffect(() => {
+    scrollToBottom("auto");
+  }, [activeStaff, scrollToBottom]);
+
+  // Stay pinned to the bottom as new content streams in (a reply arrives, a
+  // message is sent) — but only while the founder is already at the bottom.
+  // If they've scrolled up to read history, don't yank them back down; a
+  // small floating button (below) is how they return to it on their own
+  // terms. A ResizeObserver on the content wrapper (not on pmMessages
+  // directly) means this also works for the DEV tab's own message list,
+  // which this component doesn't hold state for.
+  useEffect(() => {
+    const content = chatContentRef.current;
+    if (!content || typeof ResizeObserver === "undefined") return undefined;
+    const observer = new ResizeObserver(() => {
+      if (atBottomRef.current) scrollToBottom("auto");
+    });
+    observer.observe(content);
+    return () => observer.disconnect();
+  }, [scrollToBottom]);
+
+  const handleChatScroll = useCallback(() => {
+    const el = chatScrollRef.current;
+    if (!el) return;
+    const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
+    const atBottom = distanceFromBottom < 80;
+    atBottomRef.current = atBottom;
+    setShowJumpToLatest(!atBottom);
+  }, []);
 
   useEffect(() => {
     if (!resolvedFounderId) return;
@@ -422,15 +463,36 @@ export default function V2AIStaffChat({ user, onNavigate }) {
         </div>
 
         {/* Chat area */}
-        <div className="min-h-0 flex-1 overflow-y-auto p-5">
-          {activeStaff === "pm" && (
-            <PMMessages messages={pmMessages} loading={pmLoading} sending={pmSending} error={pmError} onNavigate={onNavigate} />
+        <div ref={chatScrollRef} onScroll={handleChatScroll} className="min-h-0 flex-1 overflow-y-auto p-5">
+          <div ref={chatContentRef}>
+            {activeStaff === "pm" && (
+              <PMMessages messages={pmMessages} loading={pmLoading} sending={pmSending} error={pmError} onNavigate={onNavigate} />
+            )}
+            {activeStaff === "dev" && <DEVMessages onToast={showToast} onNavigate={onNavigate} />}
+            {activeStaff !== "pm" && activeStaff !== "dev" && (
+              <PlaceholderChat staff={activeStaffObj} />
+            )}
+            <div ref={chatEndRef} />
+          </div>
+          {/* Sticky, zero-height wrapper: `position: sticky` on a real in-flow
+              element pins reliably to the scroll container's bottom edge as
+              content scrolls, without affecting layout height — tried plain
+              `position: absolute` first and found it drifts with scrollTop
+              in this environment instead of staying pinned to the viewport,
+              so sticky is the deliberately more robust choice here, not a
+              stylistic one. */}
+          {showJumpToLatest && (
+            <div className="sticky bottom-3 z-10 flex h-0 justify-center">
+              <button
+                type="button"
+                onClick={() => scrollToBottom("smooth")}
+                aria-label="Scroll to latest message"
+                className="flex h-7 w-7 items-center justify-center rounded-full border border-v2-border bg-white text-v2-muted shadow-md transition-all hover:text-v2-heading hover:shadow-lg"
+              >
+                <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2.5 4.5L6 8l3.5-3.5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" /></svg>
+              </button>
+            </div>
           )}
-          {activeStaff === "dev" && <DEVMessages onToast={showToast} onNavigate={onNavigate} />}
-          {activeStaff !== "pm" && activeStaff !== "dev" && (
-            <PlaceholderChat staff={activeStaffObj} />
-          )}
-          <div ref={chatEndRef} />
         </div>
 
         {/* Input bar */}
