@@ -41,6 +41,14 @@ const agentEventSchema = new mongoose.Schema(
     resolvedAt: { type: Date, default: null },
 
     parentEventId: { type: mongoose.Schema.Types.ObjectId, ref: "AgentEvent", default: null }, // the handoff chain
+
+    // Set only on a github_open_pr event that originated from a real,
+    // pre-existing Execution Engine Task (AI PM's BUILD_TASK hand-off can
+    // reference one — see agentChat.controller.js). Lets orchestrator.service.js
+    // close the loop: mark the Task done once the matching github_merge_main
+    // for the same targetId reaches production. Null for one-off tasks not
+    // tied to a planned Task (e.g. AI Developer workspace's manual submissions).
+    taskId: { type: mongoose.Schema.Types.ObjectId, ref: "Task", default: null },
   },
   { timestamps: true },
 );

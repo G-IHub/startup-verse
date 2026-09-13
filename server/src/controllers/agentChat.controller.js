@@ -18,6 +18,8 @@ import AgentMessage from "../models/AgentMessage.js";
 import Startup from "../models/Startup.js";
 import WeeklyOutcome from "../models/WeeklyOutcome.js";
 import Milestone from "../models/Milestone.js";
+import Task from "../models/Task.js";
+import mongoose from "mongoose";
 import { error as apiError, success as apiSuccess } from "../utils/apiResponse.js";
 import { chatCompletion, deepseekConfigured } from "../services/deepseekClient.js";
 import { proposeAction } from "../services/orchestrator.service.js";
@@ -26,6 +28,7 @@ import { logger } from "../config/logger.js";
 
 const HISTORY_LIMIT = 20;
 const DEV_ACTIVITY_LIMIT = 6;
+const OPEN_TASKS_LIMIT = 10;
 
 // Both in-band markers AI PM can emit, checked in this order. Kept as a list
 // (not two independent regexes scattered through the function) so the
@@ -68,7 +71,7 @@ function summarizeDevEvent(e) {
   return `${label}${pr}${repo ? ` on ${repo}` : ""} — ${statusText}`;
 }
 
-function buildSystemPrompt({ startupName, stage, goal, milestonesSummary, devActivitySummary }) {
+function buildSystemPrompt({ startupName, stage, goal, milestonesSummary, devActivitySummary, openTasksSummary }) {
   return `You are AI Product Manager, a StartupVerse agent and ${startupName ? `${startupName}'s` : "the founder's"} primary day-to-day planning partner.
 
 Your job:
@@ -81,9 +84,10 @@ Your job:
   Only emit this when you have a genuinely concrete, ready plan — never as a placeholder or hypothetical. It goes to the founder for real review and approval, not executed automatically. Keep it realistic for about one week: 2-4 milestones, a handful of tasks each.
 - If a specific task is ready to hand straight to AI Developer to build, and the founder has told you which real GitHub repo to use, use this fenced block instead (never both blocks in the same reply):
 \`\`\`BUILD_TASK
-{"owner":"...","repo":"...","filePath":"...","taskDescription":"..."}
+{"owner":"...","repo":"...","filePath":"...","taskDescription":"...","taskId":null}
 \`\`\`
   "owner" is just the GitHub username/org (e.g. "oluseyi5280"). "repo" is just the repository name on its own (e.g. "ai-developer-test") — never "owner/repo" combined, never a slash in it. Only do this for one concrete, single-file task, and only once the founder has actually named a real repo — never guess a repo name. If you don't know it yet, ask instead of emitting this block. Unlike the sprint plan, this usually runs immediately and autonomously (opens a real PR right away) — don't tell the founder it needs their approval first unless the actual result you're given afterward says it does.
+  "taskId" closes the loop back to the Execution Engine: if this hand-off is building out one of the real "Open tasks" listed below, copy that task's exact id string into "taskId" so it gets marked done automatically once the build reaches production. If this is a fresh one-off ask that isn't one of those listed tasks, set "taskId" to null — never invent an id.
 - Besides those two real actions, you can't yet do anything else for real — you can't send money, sign documents, or message customers on the founder's behalf. If asked, say so honestly instead of pretending you can.
 - Write like a sharp, direct colleague, not a customer-support bot. No filler, no "I'd be happy to help."
 
@@ -91,6 +95,7 @@ Real context:
 - Stage: ${stage || "not set"}
 - Current weekly goal: ${goal || "none set yet — this might be exactly what you're helping the founder figure out"}
 - Recent milestones: ${milestonesSummary || "none yet"}
+- Open tasks (id — title, status): ${openTasksSummary || "none yet"}
 - Recent AI Developer activity: ${devActivitySummary || "none yet — AI Developer hasn't done anything for this founder yet"}`;
 }
 
@@ -101,6 +106,12 @@ async function loadContext(founderId) {
   const milestonesSummary = milestones
     .map((m) => `${m.title} (${m.status}, ${m.tasksCompleted || 0}/${m.totalTasks || 0} tasks)`)
     .join("; ");
+
+  const openTasks = await Task.find({ founderId, status: { $in: ["pending", "in-progress"] } })
+    .sort({ createdAt: -1 })
+    .limit(OPEN_TASKS_LIMIT)
+    .lean();
+  const openTasksSummary = openTasks.map((t) => `[${t._id}] ${t.title} (${t.status})`).join("; ");
 
   const devAgent = await Agent.findOne({ founderId, agentKey: "dev" }).lean();
   let devActivitySummary = "";
@@ -120,6 +131,7 @@ async function loadContext(founderId) {
     goal: outcome?.goal || "",
     weeklyOutcomeId: outcome?._id ? String(outcome._id) : null,
     milestonesSummary,
+    openTasksSummary,
     devActivitySummary,
   };
 }
@@ -250,6 +262,17 @@ export const sendMessage = async (req, res) => {
           if (parts.length > 1) owner = parts[0];
         }
 
+        // Defensive validation, not just a prompt instruction (same principle
+        // as the owner/repo normalization above): only trust a model-supplied
+        // taskId if it's a real Task belonging to this founder and still
+        // open. A hallucinated, stale, or cross-founder id is silently
+        // dropped rather than linked, so the hand-off still succeeds — it
+        // just doesn't close the loop back to a Task.
+        let linkedTask = null;
+        if (task.taskId && mongoose.isValidObjectId(task.taskId)) {
+          linkedTask = await Task.findOne({ _id: task.taskId, founderId, status: { $in: ["pending", "in-progress"] } });
+        }
+
         const devAgent = await Agent.findOne({ founderId, agentKey: "dev" });
         if (!devAgent) throw new Error("AI Developer isn't set up for this founder yet.");
         const openPrType = await ActionType.findOne({ agentId: devAgent._id, actionKey: "github_open_pr" });
@@ -262,11 +285,13 @@ export const sendMessage = async (req, res) => {
           targetType: "pr",
           targetId: `handoff-${Date.now()}`,
           payload: { owner, repo, filePath: task.filePath, taskDescription: task.taskDescription },
+          taskId: linkedTask?._id || null,
         });
         proposedEvent = result.event;
         proposedEventKind = "build_task";
+        const linkedNote = linkedTask ? ` (linked to task "${linkedTask.title}" — it'll be marked done once this reaches production)` : "";
         if (result.event.result?.prUrl) {
-          replyText += `\n\n🛠️ Handed to AI Developer — it opened a real PR: ${result.event.result.prUrl}`;
+          replyText += `\n\n🛠️ Handed to AI Developer — it opened a real PR: ${result.event.result.prUrl}${linkedNote}`;
         } else if (result.event.status === "failed") {
           replyText += `\n\n(I handed this to AI Developer, but it hit an error: ${result.event.result?.error || "unknown error"})`;
         } else if (result.event.status === "pending_approval") {

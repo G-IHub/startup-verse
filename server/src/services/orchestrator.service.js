@@ -16,11 +16,14 @@
 import ActionType from "../models/ActionType.js";
 import AutonomySetting from "../models/AutonomySetting.js";
 import AgentEvent from "../models/AgentEvent.js";
+import Task from "../models/Task.js";
 import { emitRealtime } from "./realtime.service.js";
 import { SOCKET_EVENTS } from "../realtime/events.js";
 import { startupRoom, userRoom } from "../realtime/rooms.js";
 import { logger } from "../config/logger.js";
 import { hasExecutor, runExecutor } from "./agentExecutors.js";
+import { validateTaskStatusTransition } from "../domain/weeklyLoopRules.js";
+import { syncMilestoneCounters } from "../utils/syncMilestoneCounters.js";
 
 /**
  * Resolves an approverRule string to a real human user id.
@@ -105,13 +108,69 @@ async function findCompletedDuplicate({ founderId, actionTypeId, targetType, tar
 }
 
 /**
+ * Task-completion feedback (docs/ai-agent-roadmap.md Phase 3, step 3): closes
+ * the loop the other direction from the hand-off in agentChat.controller.js.
+ * A hand-off that named a real Execution Engine Task moves it pending ->
+ * in-progress the moment AI Developer starts (this function), and the
+ * matching completeLinkedTask() below moves it in-progress -> completed once
+ * the same pipeline's github_merge_main actually reaches production. Both
+ * are best-effort: a Task-side failure (already completed, bad transition,
+ * task deleted) must never break the real GitHub action it's just recording
+ * against, so every failure here is caught and logged, never thrown.
+ */
+async function advanceTaskToInProgress(taskId) {
+  if (!taskId) return;
+  try {
+    const task = await Task.findById(taskId);
+    if (!task) return;
+    if (!validateTaskStatusTransition(task.status, "in-progress").ok) return;
+    task.status = "in-progress";
+    await task.save();
+    await syncMilestoneCounters(task.milestoneId);
+    if (task.startupId) {
+      emitRealtime(SOCKET_EVENTS.TASK_UPDATED, task, [startupRoom(task.startupId)]);
+    }
+  } catch (err) {
+    logger.error("[orchestrator] failed to advance linked task to in-progress", { taskId: String(taskId), message: err.message });
+  }
+}
+
+/**
+ * Finds the github_open_pr event that started this pipeline (same founderId +
+ * targetId — the grouping key every step of a hand-off's PR/staging/prod
+ * chain already shares, per V2AIDeveloperWorkspace.jsx's own grouping) and,
+ * if it was linked to a real Task, marks that Task completed now that
+ * production deploy has actually happened.
+ */
+async function completeLinkedTask(founderId, targetId) {
+  if (!targetId) return;
+  try {
+    const openPrType = await ActionType.findOne({ actionKey: "github_open_pr" }, { _id: 1 });
+    if (!openPrType) return;
+    const origin = await AgentEvent.findOne({ founderId, targetId, actionTypeId: openPrType._id, taskId: { $ne: null } }).sort({ createdAt: 1 });
+    if (!origin?.taskId) return;
+    const task = await Task.findById(origin.taskId);
+    if (!task) return;
+    if (!validateTaskStatusTransition(task.status, "completed").ok) return;
+    task.status = "completed";
+    await task.save();
+    await syncMilestoneCounters(task.milestoneId);
+    if (task.startupId) {
+      emitRealtime(SOCKET_EVENTS.TASK_UPDATED, task, [startupRoom(task.startupId)]);
+    }
+  } catch (err) {
+    logger.error("[orchestrator] failed to complete linked task", { founderId: String(founderId), targetId, message: err.message });
+  }
+}
+
+/**
  * Step 1 of the decision loop: an agent (or the seed script, in Phase 0)
  * proposes an action. Branches on the ActionType's real risk category and
  * current autonomy mode. Never executes a sensitive_locked action here —
  * only ever logs it as pending_approval and stops, per the architecture
  * doc's Section 2.
  */
-export async function proposeAction({ founderId, startupId, actorType, actorId, actionTypeId, targetType, targetId, payload, parentEventId = null }) {
+export async function proposeAction({ founderId, startupId, actorType, actorId, actionTypeId, targetType, targetId, payload, parentEventId = null, taskId = null }) {
   const actionType = await ActionType.findById(actionTypeId);
   if (!actionType) {
     const err = new Error("Unknown action type.");
@@ -135,7 +194,16 @@ export async function proposeAction({ founderId, startupId, actorType, actorId, 
     targetId: targetId || "",
     payload: payload || {},
     parentEventId,
+    taskId: taskId || null,
   };
+
+  // Hand-off started: if this open_pr is linked to a real planned Task, move
+  // it pending -> in-progress now, regardless of which branch below the
+  // event itself takes (ask_first vs. autonomous — either way, work has
+  // genuinely begun from the founder's point of view).
+  if (actionType.actionKey === "github_open_pr" && taskId) {
+    await advanceTaskToInProgress(taskId);
+  }
 
   // Branch a) sensitive_locked -> ALWAYS pending_approval, regardless of mode.
   // Branch b) reversible + ask_first -> pending_approval (re-checked live, not cached).
@@ -171,6 +239,11 @@ export async function proposeAction({ founderId, startupId, actorType, actorId, 
   }
   const event = await AgentEvent.create({ ...baseDoc, status, result });
   const dto = await publishEvent(event);
+
+  if (actionType.actionKey === "github_merge_main" && status === "autonomous_completed") {
+    await completeLinkedTask(founderId, targetId);
+  }
+
   return { event: dto, executed: status !== "failed" };
 }
 
@@ -257,6 +330,10 @@ export async function resolveApproval({ eventId, decision, approverId }) {
     parentEventId: pending._id,
   });
   const executionDto = await publishEvent(executionEvent);
+
+  if (actionType?.actionKey === "github_merge_main" && execStatus === "human_completed") {
+    await completeLinkedTask(pending.founderId, pending.targetId);
+  }
 
   return { resolved: resolvedDto, execution: executionDto };
 }
