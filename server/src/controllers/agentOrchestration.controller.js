@@ -10,6 +10,7 @@ import AutonomySetting from "../models/AutonomySetting.js";
 import AgentEvent from "../models/AgentEvent.js";
 import { error as apiError, success as apiSuccess } from "../utils/apiResponse.js";
 import { proposeAction, resolveApproval } from "../services/orchestrator.service.js";
+import { ensureCoreAgentsSeeded } from "../services/coreAgentSeeds.js";
 
 function founderGuard(req, founderId) {
   return req.user.isAdmin === true || req.user.id === String(founderId);
@@ -18,6 +19,7 @@ function founderGuard(req, founderId) {
 export const listAgents = async (req, res) => {
   const founderId = req.params.founderId;
   if (!founderGuard(req, founderId)) return apiError(res, "Forbidden.", 403);
+  await ensureCoreAgentsSeeded(founderId);
   const agents = await Agent.find({ founderId }).sort({ createdAt: 1 }).lean();
   return apiSuccess(res, agents);
 };
@@ -25,6 +27,7 @@ export const listAgents = async (req, res) => {
 export const listActionTypes = async (req, res) => {
   const founderId = req.params.founderId;
   if (!founderGuard(req, founderId)) return apiError(res, "Forbidden.", 403);
+  await ensureCoreAgentsSeeded(founderId);
   const agents = await Agent.find({ founderId }, { _id: 1 }).lean();
   const agentIds = agents.map((a) => a._id);
   const actionTypes = await ActionType.find({ agentId: { $in: agentIds } })
@@ -37,6 +40,7 @@ export const listActionTypes = async (req, res) => {
 export const listAutonomySettings = async (req, res) => {
   const founderId = req.params.founderId;
   if (!founderGuard(req, founderId)) return apiError(res, "Forbidden.", 403);
+  await ensureCoreAgentsSeeded(founderId);
   const agents = await Agent.find({ founderId }, { _id: 1 }).lean();
   const agentIds = agents.map((a) => a._id);
   const actionTypes = await ActionType.find({ agentId: { $in: agentIds } })
