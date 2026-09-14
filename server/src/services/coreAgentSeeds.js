@@ -67,6 +67,22 @@ const CORE_AGENT_DEFINITIONS = [
         adjustable: true,
         approverRule: "founder",
       },
+      {
+        // Same tier as update_task: adding real tasks under an already-
+        // approved milestone is reversible (they can be deleted) and no
+        // riskier than editing one, so it gets the same ask_first-by-
+        // default-but-adjustable treatment, not sensitive_locked like
+        // delete. Used both for a founder's own request in chat and for
+        // AI PM's autonomous continuous-planning check-in (2026-09-14) —
+        // either way, creating tasks always needs a real approval before
+        // AI Developer ever starts on them.
+        actionKey: "add_tasks",
+        label: "Add tasks to a milestone",
+        riskCategory: "reversible",
+        defaultMode: "ask_first",
+        adjustable: true,
+        approverRule: "founder",
+      },
     ],
   },
   {

@@ -8,6 +8,7 @@ import Agent from "../models/Agent.js";
 import ActionType from "../models/ActionType.js";
 import AutonomySetting from "../models/AutonomySetting.js";
 import AgentEvent from "../models/AgentEvent.js";
+import Startup from "../models/Startup.js";
 import { error as apiError, success as apiSuccess } from "../utils/apiResponse.js";
 import { proposeAction, resolveApproval } from "../services/orchestrator.service.js";
 import { ensureCoreAgentsSeeded } from "../services/coreAgentSeeds.js";
@@ -147,4 +148,31 @@ export const resolveAgentEvent = async (req, res) => {
   } catch (err) {
     return apiError(res, err.message || "Could not resolve event.", err.statusCode || 500);
   }
+};
+
+/**
+ * Opt-in for AI PM's autonomous continuous-planning check-in (2026-09-14).
+ * Off by default (Startup.autonomousPlanningEnabled) — this is the first
+ * behavior anywhere in this app that acts without the founder asking first,
+ * so it stays a real, explicit per-founder choice rather than on for
+ * everyone. See orchestrator.service.js's maybeTriggerAutonomousPlanning.
+ */
+export const getAutonomousPlanningSetting = async (req, res) => {
+  const founderId = req.params.founderId;
+  if (!founderGuard(req, founderId)) return apiError(res, "Forbidden.", 403);
+  const startup = await Startup.findOne({ founderId }).select("autonomousPlanningEnabled").lean();
+  return apiSuccess(res, { enabled: Boolean(startup?.autonomousPlanningEnabled) });
+};
+
+export const updateAutonomousPlanningSetting = async (req, res) => {
+  const founderId = req.params.founderId;
+  if (!founderGuard(req, founderId)) return apiError(res, "Forbidden.", 403);
+  const enabled = Boolean(req.body?.enabled);
+  const startup = await Startup.findOneAndUpdate(
+    { founderId },
+    { autonomousPlanningEnabled: enabled },
+    { new: true },
+  ).select("autonomousPlanningEnabled");
+  if (!startup) return apiError(res, "Create a startup before changing this setting.", 422);
+  return apiSuccess(res, { enabled: Boolean(startup.autonomousPlanningEnabled) });
 };

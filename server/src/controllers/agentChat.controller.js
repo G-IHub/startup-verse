@@ -44,6 +44,7 @@ const MARKERS = [
   { name: "UPDATE_GOAL", re: /```UPDATE_GOAL\s*([\s\S]*?)```/ },
   { name: "READ_REPO", re: /```READ_REPO\s*([\s\S]*?)```/ },
   { name: "ASK_DEV", re: /```ASK_DEV\s*([\s\S]*?)```/ },
+  { name: "ADD_TASKS", re: /```ADD_TASKS\s*([\s\S]*?)```/ },
 ];
 
 function founderGuard(req, founderId) {
@@ -175,6 +176,11 @@ Your job:
 {"goal":"..."}
 \`\`\`
   Replaces the current weekly goal's text. Only for a founder who already has an active weekly goal (see below) — if none is set, tell them to set one from the Execution Engine first.
+- **You can add real tasks to a milestone that already exists, without drafting a whole new plan.** Use this when there's more real work to add under the current week's plan — a real milestone id from the list below, never invented:
+\`\`\`ADD_TASKS
+{"milestoneId":"...","tasks":[{"title":"...","description":"...","buildTask":false,"filePath":""}]}
+\`\`\`
+  Same task shape as a sprint plan's tasks — set "buildTask":true and a real "filePath" for anything that should go straight to AI Developer once approved. This always needs the founder's approval before any task exists for real, same as everything else here.
 - **You can actually read a real repo now — not just see that something happened to it.** If asked what a repo is, what a PR actually did, or what's in a specific file, emit this (never alongside any other block):
 \`\`\`READ_REPO
 {"owner":"...","repo":"...","target":"readme","prNumber":null,"path":null}
@@ -321,57 +327,23 @@ export const listConversations = async (req, res) => {
   return apiSuccess(res, { conversations });
 };
 
-export const sendMessage = async (req, res) => {
-  const founderId = req.params.founderId;
-  if (!founderGuard(req, founderId)) return apiError(res, "Forbidden.", 403);
-  const content = String(req.body?.content || "").trim();
-  if (!content) return apiError(res, "content is required.", 422);
-
-  await ensureCoreAgentsSeeded(founderId);
-  const agent = await Agent.findOne({ founderId, agentKey: "pm" });
-  if (!agent) return apiError(res, "AI Product Manager isn't available for this founder.", 404);
-
-  // "New chat" (client clears its remembered conversationId) or this
-  // founder's very first ever message both arrive with no conversationId —
-  // start a real new one rather than requiring a separate "create
-  // conversation" round trip first.
-  const requestedConversationId = req.body?.conversationId;
-  const conversationId = requestedConversationId && mongoose.isValidObjectId(requestedConversationId)
-    ? requestedConversationId
-    : new mongoose.Types.ObjectId();
-
-  await AgentMessage.create({ founderId, agentId: agent._id, conversationId, role: "founder", content });
-
-  if (!deepseekConfigured()) {
-    const reply = await AgentMessage.create({
-      founderId,
-      agentId: agent._id,
-      conversationId,
-      role: "agent",
-      content: "DeepSeek isn't configured on this server yet, so I can't respond for real right now.",
-    });
-    return apiSuccess(res, { message: reply, proposedEvent: null, conversationId: String(conversationId) });
-  }
-
-  const ctx = await loadContext(founderId);
-  const history = await AgentMessage.find({ founderId, agentId: agent._id, conversationId })
-    .sort({ createdAt: -1 })
-    .limit(HISTORY_LIMIT)
-    .lean();
-  const messages = history.reverse().map((m) => ({ role: m.role === "founder" ? "user" : "assistant", content: m.content }));
-
-  let raw;
-  try {
-    // A reply that explains its reasoning AND includes a full plan/task JSON
-    // block can genuinely run long — the default 1200-token budget
-    // (draftText's, sized for AI Developer's one-file drafts) cut a real
-    // plan off mid-JSON in testing, so the closing fence never arrived and
-    // the marker regex silently never matched. 3000 gives real headroom.
-    raw = await chatCompletion({ systemPrompt: buildSystemPrompt(ctx), messages, maxTokens: 3000 });
-  } catch (err) {
-    return apiError(res, err.message || "AI Product Manager could not respond.", err.statusCode || 502);
-  }
-
+/**
+ * The reusable core of an AI PM "turn": given a raw completion, parse
+ * whichever real marker it emitted (if any), execute the corresponding real
+ * action, and return the final reply text plus whatever got proposed.
+ * Extracted 2026-09-14 so both a founder's own chat message (sendMessage
+ * below) and AI PM's autonomous continuous-planning check-in
+ * (runAutonomousPmCheckIn) go through the exact same real logic — no
+ * separate, drifting copy of the marker-handling rules for the autonomous
+ * path.
+ *
+ * `allowedMarkerNames`, when given, is a real structural gate (not just a
+ * prompt instruction) restricting which marker this specific turn is
+ * allowed to act on — used by the autonomous check-in to permit ADD_TASKS
+ * but withhold a brand-new SPRINT_PLAN until the current week has actually
+ * run its course, even if the model tries to emit one anyway.
+ */
+async function processAiPmReply({ raw, ctx, messages, founderId, agent, allowedMarkerNames = null }) {
   let replyText = raw;
   let proposedEvent = null;
   let proposedEventKind = null;
@@ -380,7 +352,10 @@ export const sendMessage = async (req, res) => {
   const closed = allClosed.length === 1 ? allClosed[0] : null;
   const openName = closed ? null : findOpenMarkerName(raw);
 
-  if (allClosed.length > 1) {
+  if (closed && allowedMarkerNames && !allowedMarkerNames.includes(closed.name)) {
+    replyText = raw.replace(closed.fullMatch, "").trim();
+    replyText += "\n\n(That's not something I can propose from this kind of check-in right now — ask me directly in chat if you want it.)";
+  } else if (allClosed.length > 1) {
     // Real bug caught live: the model emitted two different markers in one
     // reply despite being told not to. Silently picking one (the old
     // behavior) meant a founder could get the wrong one of two intended
@@ -396,7 +371,7 @@ export const sendMessage = async (req, res) => {
     const label = {
       BUILD_TASK: "task hand-off", SET_DEFAULT_REPO: "repo setting", UPDATE_TASK: "task update",
       DELETE_TASK: "task deletion", DELETE_MILESTONE: "milestone deletion", UPDATE_GOAL: "goal update",
-      READ_REPO: "repo read request", ASK_DEV: "question for AI Developer",
+      READ_REPO: "repo read request", ASK_DEV: "question for AI Developer", ADD_TASKS: "task addition",
     }[openName] || "sprint plan";
     replyText = `${raw.slice(0, raw.indexOf("```" + openName)).trim()}\n\n(I started drafting a ${label} but ran out of room to finish it — mind asking me to try again?)`;
   } else if (closed?.name === "SPRINT_PLAN") {
@@ -826,6 +801,49 @@ export const sendMessage = async (req, res) => {
         replyText = `(I tried to look that up but hit an error: ${err.message})`;
       }
     }
+  } else if (closed?.name === "ADD_TASKS") {
+    // Lighter-weight sibling of SPRINT_PLAN, added 2026-09-14 for
+    // continuous-planning: adds real tasks to an *already-existing*
+    // milestone without inventing a whole new one. Used both when a
+    // founder asks for it directly in chat and by AI PM's autonomous
+    // check-in once AI Developer's build queue empties.
+    replyText = raw.replace(closed.fullMatch, "").trim();
+    let body = null;
+    try {
+      body = JSON.parse(closed.body);
+    } catch {
+      replyText += "\n\n(I tried to add those tasks but the request came out malformed — mind asking me to try again?)";
+    }
+    if (body) {
+      const milestoneId = body.milestoneId && mongoose.isValidObjectId(body.milestoneId) ? body.milestoneId : null;
+      const existingMilestone = milestoneId ? await Milestone.findOne({ _id: milestoneId, founderId }) : null;
+      if (!existingMilestone) {
+        replyText += "\n\n(I don't see a real milestone with that id — mind pointing me at one from the list?)";
+      } else {
+        try {
+          const actionType = await ActionType.findOne({ agentId: agent._id, actionKey: "add_tasks" });
+          if (!actionType) throw new Error("add_tasks action type is not seeded for this agent.");
+          const taskList = Array.isArray(body.tasks) ? body.tasks : [];
+          const result = await proposeAction({
+            founderId, actorType: "agent", actorId: String(agent._id), actionTypeId: actionType._id,
+            targetType: "milestone", targetId: String(existingMilestone._id),
+            payload: { milestoneId: String(existingMilestone._id), tasks: taskList },
+          });
+          proposedEvent = result.event;
+          proposedEventKind = "sprint_plan";
+          if (result.event.status === "failed") {
+            replyText += `\n\n(I tried to add tasks to "${existingMilestone.title}" but hit an error: ${result.event.result?.error || "unknown error"})`;
+          } else if (result.event.status === "pending_approval") {
+            replyText += `\n\n📋 I've proposed adding ${taskList.length} task${taskList.length === 1 ? "" : "s"} to "${existingMilestone.title}" — check your Approval Queue to review and approve.`;
+          } else {
+            replyText += `\n\n✅ Added tasks to "${existingMilestone.title}".`;
+          }
+        } catch (err) {
+          logger.error("[agentChat] failed to propose add_tasks", { message: err.message });
+          replyText += `\n\n(I tried to add those tasks but hit an error: ${err.message})`;
+        }
+      }
+    }
   }
 
   // Real bug found live: the multi-marker guard above only catches two or
@@ -875,6 +893,62 @@ export const sendMessage = async (req, res) => {
     replyText = "(That was a lot to ask in one message and I ran out of room before I could answer — try splitting it into smaller messages, one thing at a time.)";
   }
 
+  return { replyText, proposedEvent, proposedEventKind };
+}
+
+export const sendMessage = async (req, res) => {
+  const founderId = req.params.founderId;
+  if (!founderGuard(req, founderId)) return apiError(res, "Forbidden.", 403);
+  const content = String(req.body?.content || "").trim();
+  if (!content) return apiError(res, "content is required.", 422);
+
+  await ensureCoreAgentsSeeded(founderId);
+  const agent = await Agent.findOne({ founderId, agentKey: "pm" });
+  if (!agent) return apiError(res, "AI Product Manager isn't available for this founder.", 404);
+
+  // "New chat" (client clears its remembered conversationId) or this
+  // founder's very first ever message both arrive with no conversationId —
+  // start a real new one rather than requiring a separate "create
+  // conversation" round trip first.
+  const requestedConversationId = req.body?.conversationId;
+  const conversationId = requestedConversationId && mongoose.isValidObjectId(requestedConversationId)
+    ? requestedConversationId
+    : new mongoose.Types.ObjectId();
+
+  await AgentMessage.create({ founderId, agentId: agent._id, conversationId, role: "founder", content });
+
+  if (!deepseekConfigured()) {
+    const reply = await AgentMessage.create({
+      founderId,
+      agentId: agent._id,
+      conversationId,
+      role: "agent",
+      content: "DeepSeek isn't configured on this server yet, so I can't respond for real right now.",
+    });
+    return apiSuccess(res, { message: reply, proposedEvent: null, conversationId: String(conversationId) });
+  }
+
+  const ctx = await loadContext(founderId);
+  const history = await AgentMessage.find({ founderId, agentId: agent._id, conversationId })
+    .sort({ createdAt: -1 })
+    .limit(HISTORY_LIMIT)
+    .lean();
+  const messages = history.reverse().map((m) => ({ role: m.role === "founder" ? "user" : "assistant", content: m.content }));
+
+  let raw;
+  try {
+    // A reply that explains its reasoning AND includes a full plan/task JSON
+    // block can genuinely run long — the default 1200-token budget
+    // (draftText's, sized for AI Developer's one-file drafts) cut a real
+    // plan off mid-JSON in testing, so the closing fence never arrived and
+    // the marker regex silently never matched. 3000 gives real headroom.
+    raw = await chatCompletion({ systemPrompt: buildSystemPrompt(ctx), messages, maxTokens: 3000 });
+  } catch (err) {
+    return apiError(res, err.message || "AI Product Manager could not respond.", err.statusCode || 502);
+  }
+
+  const { replyText, proposedEvent, proposedEventKind } = await processAiPmReply({ raw, ctx, messages, founderId, agent });
+
   const savedReply = await AgentMessage.create({
     founderId,
     agentId: agent._id,
@@ -887,3 +961,65 @@ export const sendMessage = async (req, res) => {
 
   return apiSuccess(res, { message: savedReply, proposedEvent, conversationId: String(conversationId) });
 };
+
+/**
+ * AI PM's autonomous continuous-planning check-in (2026-09-14) — the first
+ * place anywhere in this app where AI PM acts without a founder message
+ * triggering it. Called by orchestrator.service.js's
+ * maybeTriggerAutonomousPlanning, itself only invoked for founders who
+ * opted in (Startup.autonomousPlanningEnabled) once AI Developer's build
+ * queue is genuinely empty, or by the weekly cron backstop.
+ *
+ * Reuses processAiPmReply — the exact same real marker-handling logic a
+ * founder's own chat message goes through — so this can never do anything
+ * a real chat message couldn't also do. The one real difference: instead of
+ * a founder's own words, a synthetic, clearly-labeled instruction is
+ * appended to real conversation history (same "[Automated ...] " labeling
+ * convention already used for tool-result follow-ups), so the model never
+ * mistakes this for the founder actually having said something.
+ *
+ * Stays silent — posts no message at all — when AI PM decides there's
+ * genuinely nothing to propose right now. Speaking up only when it
+ * actually did something real is the whole point; a "nothing to report"
+ * message would just be noise the founder has to read past.
+ */
+export async function runAutonomousPmCheckIn(founderId, { instruction, allowedMarkerNames }) {
+  if (!deepseekConfigured()) return null;
+  await ensureCoreAgentsSeeded(founderId);
+  const agent = await Agent.findOne({ founderId, agentKey: "pm" });
+  if (!agent) return null;
+
+  const ctx = await loadContext(founderId);
+  const existingConversationId = await resolveConversationId(founderId, agent._id, null);
+  const history = existingConversationId
+    ? await AgentMessage.find({ founderId, agentId: agent._id, conversationId: existingConversationId })
+        .sort({ createdAt: -1 })
+        .limit(HISTORY_LIMIT)
+        .lean()
+    : [];
+  const messages = history.reverse().map((m) => ({ role: m.role === "founder" ? "user" : "assistant", content: m.content }));
+  messages.push({ role: "user", content: `[Automated check-in, not from the founder] ${instruction}` });
+
+  let raw;
+  try {
+    raw = await chatCompletion({ systemPrompt: buildSystemPrompt(ctx), messages, maxTokens: 3000 });
+  } catch (err) {
+    logger.error("[agentChat] autonomous check-in completion failed", { founderId: String(founderId), message: err.message });
+    return null;
+  }
+
+  const { replyText, proposedEvent, proposedEventKind } = await processAiPmReply({ raw, ctx, messages, founderId, agent, allowedMarkerNames });
+  if (!proposedEvent) return null; // nothing real proposed — stay silent rather than posting a "nothing to report" message
+
+  const conversationId = existingConversationId || new mongoose.Types.ObjectId();
+  const savedReply = await AgentMessage.create({
+    founderId,
+    agentId: agent._id,
+    conversationId,
+    role: "agent",
+    content: replyText,
+    proposedEventId: proposedEvent?.id || null,
+    proposedEventKind,
+  });
+  return { message: savedReply, proposedEvent };
+}

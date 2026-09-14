@@ -265,6 +265,45 @@ async function executeProposeSprintPlan({ founderId, payload }) {
 }
 
 /**
+ * Adds real tasks to an *already-existing* milestone — the lighter-weight
+ * sibling of executeProposeSprintPlan above, added 2026-09-14 for AI PM's
+ * continuous-planning check-in: once AI Developer's build queue is empty,
+ * there's often more real work to add under the current week's plan
+ * without inventing a whole new milestone/goal. Reuses the exact same
+ * Task-creation shape; the one real difference is the milestone must
+ * already exist and belong to this founder — never created here.
+ */
+async function executeAddTasks({ founderId, payload }) {
+  const { milestoneId, tasks } = payload || {};
+  if (!milestoneId) throw new Error("add_tasks requires a milestoneId.");
+  const milestone = await Milestone.findOne({ _id: milestoneId, founderId });
+  if (!milestone) throw new Error("No real milestone found with that id for this founder.");
+
+  const list = Array.isArray(tasks) ? tasks : [];
+  const created = [];
+  for (const t of list) {
+    const title = String(t?.title || "").trim().slice(0, 200);
+    if (!title) continue;
+    const task = await Task.create({
+      founderId,
+      startupId: milestone.startupId,
+      title,
+      description: String(t?.description || "").slice(0, 5000),
+      status: "pending",
+      milestoneId: milestone._id,
+      buildTask: Boolean(t?.buildTask),
+      buildFilePath: String(t?.filePath || "").trim().slice(0, 500),
+    });
+    created.push({ id: String(task._id), title: task.title });
+  }
+  if (created.length === 0) {
+    throw new Error("No valid tasks in the add_tasks payload (every task needs at least a title).");
+  }
+  await syncMilestoneCounters(milestone._id);
+  return { milestoneId: String(milestone._id), milestoneTitle: milestone.title, tasks: created };
+}
+
+/**
  * Real task/milestone/goal management for AI PM — docs/ai-agent-roadmap.md
  * Phase 3. Before this, AI PM could only ever *create* things (a sprint
  * plan), never edit or remove anything that already existed — it said so
@@ -366,6 +405,7 @@ const EXECUTORS = {
   update_goal: executeUpdateGoal,
   read_repo_content: executeReadRepoContent,
   explain_dev_work: executeExplainDevWork,
+  add_tasks: executeAddTasks,
 };
 
 export function hasExecutor(actionKey) {

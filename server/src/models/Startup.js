@@ -50,6 +50,14 @@ const startupSchema = new mongoose.Schema(
       owner: { type: String, default: "", trim: true, maxlength: 200 },
       repo: { type: String, default: "", trim: true, maxlength: 200 },
     },
+    // Opt-in for AI PM's autonomous continuous-planning check-in
+    // (2026-09-14) — off by default. When true, the moment AI Developer's
+    // build queue empties, AI PM drafts more tasks (or, if the current
+    // week's goal has actually run its course, a whole new plan) on its
+    // own and proposes it for real approval, without the founder having to
+    // ask first. This is the first behavior anywhere in this app that acts
+    // without being asked, so it stays opt-in rather than on for everyone.
+    autonomousPlanningEnabled: { type: Boolean, default: false },
   },
   { timestamps: true },
 );

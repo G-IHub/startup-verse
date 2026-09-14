@@ -15,7 +15,7 @@ import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { cn } from "../ui/utils";
 import { ChevronDown } from "lucide-react";
 import { useOfficeStore } from "../../state/useOfficeStore";
-import { getAgents, getAutonomySettings, updateAutonomySetting } from "../../utils/api/agentOrchestrationApi";
+import { getAgents, getAutonomySettings, updateAutonomySetting, getAutonomousPlanningSetting, updateAutonomousPlanningSetting } from "../../utils/api/agentOrchestrationApi";
 import { paletteForAgent, initialsForAgent, formatEventTime } from "../../utils/agentDisplay";
 
 /* ── Toast ─────────────────────────────────────────────────────────────────── */
@@ -57,6 +57,13 @@ export default function V2AutonomySettings({ user, onBack, onNavigate }) {
   const [paused, setPaused] = useState(false);
   const [toast, setToast] = useState("");
 
+  // Real, opt-in setting (Startup.autonomousPlanningEnabled) — off until the
+  // founder turns it on. Separate loading state so a slow autonomy-settings
+  // fetch doesn't block this real toggle from rendering.
+  const [autonomousPlanning, setAutonomousPlanning] = useState(false);
+  const [autonomousPlanningLoading, setAutonomousPlanningLoading] = useState(true);
+  const [autonomousPlanningSaving, setAutonomousPlanningSaving] = useState(false);
+
   const showToast = (msg) => { setToast(msg); setTimeout(() => setToast(""), 2400); };
 
   useEffect(() => { if (user) loadWorkspace(user); }, [user, loadWorkspace]);
@@ -77,6 +84,31 @@ export default function V2AutonomySettings({ user, onBack, onNavigate }) {
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
   }, [resolvedFounderId]);
+
+  useEffect(() => {
+    if (!resolvedFounderId) return;
+    let cancelled = false;
+    setAutonomousPlanningLoading(true);
+    getAutonomousPlanningSetting(resolvedFounderId)
+      .then((enabled) => { if (!cancelled) setAutonomousPlanning(enabled); })
+      .catch(() => {})
+      .finally(() => { if (!cancelled) setAutonomousPlanningLoading(false); });
+    return () => { cancelled = true; };
+  }, [resolvedFounderId]);
+
+  const toggleAutonomousPlanning = useCallback(async () => {
+    const next = !autonomousPlanning;
+    setAutonomousPlanningSaving(true);
+    try {
+      const saved = await updateAutonomousPlanningSetting(resolvedFounderId, next);
+      setAutonomousPlanning(saved);
+      showToast(saved ? "AI PM will now plan ahead on its own" : "AI PM will wait for you to ask");
+    } catch (err) {
+      showToast(err?.message || "Could not update that setting.");
+    } finally {
+      setAutonomousPlanningSaving(false);
+    }
+  }, [resolvedFounderId, autonomousPlanning]);
 
   const grouped = useMemo(() => {
     const byAgent = new Map();
@@ -242,6 +274,25 @@ export default function V2AutonomySettings({ user, onBack, onNavigate }) {
 
       {/* ── Right panel ── */}
       <div className="flex w-[320px] shrink-0 flex-col gap-3 overflow-y-auto border-l border-v2-border bg-white p-4">
+
+        {/* AI PM autonomous planning — real, opt-in, off by default */}
+        <div className="rounded-2xl bg-v2-page p-3">
+          <div className="mb-1.5 font-heading text-[11px] font-semibold text-v2-heading">AI PM plans ahead</div>
+          <div className="flex items-center justify-between">
+            <span className="font-body text-[11px] text-v2-heading">{autonomousPlanning ? "On — drafting proactively" : "Off — waits for you to ask"}</span>
+            <button
+              type="button"
+              disabled={autonomousPlanningLoading || autonomousPlanningSaving}
+              onClick={toggleAutonomousPlanning}
+              className={cn("relative h-6 w-10 rounded-full transition-colors disabled:opacity-60", autonomousPlanning ? "bg-[#1D9E75]" : "bg-gray-300")}
+            >
+              <div className={cn("absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-all", autonomousPlanning ? "left-[18px]" : "left-0.5")} />
+            </button>
+          </div>
+          <p className="mt-2 font-body text-[10px] leading-relaxed text-v2-muted">
+            When on, the moment AI Developer's queue is empty, AI PM looks at real progress and drafts more real tasks — or a whole new week's plan once the current one has run its course — without waiting for you to ask. It always still needs your real approval before AI Developer starts on any of it. Off by default.
+          </p>
+        </div>
 
         {/* Pause all */}
         <div className="rounded-2xl bg-v2-page p-3">

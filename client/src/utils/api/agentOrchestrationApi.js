@@ -47,6 +47,20 @@ export async function updateAutonomySetting(founderId, actionTypeId, mode) {
   return withId(setting);
 }
 
+/** Opt-in for AI PM's autonomous continuous-planning check-in — off by default. */
+export async function getAutonomousPlanningSetting(founderId) {
+  const data = await apiRequest(`/founders/${founderId}/autonomous-planning`);
+  return Boolean(data?.enabled);
+}
+
+export async function updateAutonomousPlanningSetting(founderId, enabled) {
+  const data = await apiRequest(`/founders/${founderId}/autonomous-planning`, {
+    method: "PUT",
+    body: JSON.stringify({ enabled }),
+  });
+  return Boolean(data?.enabled);
+}
+
 /** params: { status, approverId } — status can be comma-separated for multiple. */
 export async function getAgentEvents(founderId, params = {}) {
   const query = new URLSearchParams();

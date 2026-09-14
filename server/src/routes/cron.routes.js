@@ -9,6 +9,7 @@ import {
   runCohortInvitationExpiryJob,
   runWeeklyReviewReminderJob,
   runWeeklyOutcomeReminderJob,
+  runAutonomousPlanningCheckJob,
 } from "../services/schedulerJobs.js";
 
 const cronRouter = Router();
@@ -48,6 +49,21 @@ cronRouter.post(
       at: new Date().toISOString(),
       weeklyReviewReminders: reviews.reminded,
       weeklyOutcomeReminders: outcomes.reminded,
+      payload: req.body || {},
+    });
+  }),
+);
+
+cronRouter.post(
+  "/cron/check-autonomous-planning",
+  requireAuth,
+  requireRole("admin"),
+  asyncHandler(async (req, res) => {
+    const result = await runAutonomousPlanningCheckJob();
+    return apiSuccess(res, {
+      type: "check-autonomous-planning",
+      at: new Date().toISOString(),
+      checked: result.checked,
       payload: req.body || {},
     });
   }),

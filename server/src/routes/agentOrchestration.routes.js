@@ -12,5 +12,7 @@ agentOrchestrationRouter.patch("/founders/:founderId/action-types/:actionTypeId/
 agentOrchestrationRouter.get("/founders/:founderId/agent-events", requireAuth, asyncHandler(agentOrchestrationController.listAgentEvents));
 agentOrchestrationRouter.post("/founders/:founderId/agent-events/propose", requireAuth, asyncHandler(agentOrchestrationController.proposeAgentAction));
 agentOrchestrationRouter.post("/agent-events/:eventId/resolve", requireAuth, asyncHandler(agentOrchestrationController.resolveAgentEvent));
+agentOrchestrationRouter.get("/founders/:founderId/autonomous-planning", requireAuth, asyncHandler(agentOrchestrationController.getAutonomousPlanningSetting));
+agentOrchestrationRouter.put("/founders/:founderId/autonomous-planning", requireAuth, asyncHandler(agentOrchestrationController.updateAutonomousPlanningSetting));
 
 export default agentOrchestrationRouter;

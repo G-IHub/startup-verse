@@ -19,6 +19,7 @@ import AgentEvent from "../models/AgentEvent.js";
 import Task from "../models/Task.js";
 import Agent from "../models/Agent.js";
 import Startup from "../models/Startup.js";
+import WeeklyOutcome from "../models/WeeklyOutcome.js";
 import { emitRealtime } from "./realtime.service.js";
 import { SOCKET_EVENTS } from "../realtime/events.js";
 import { startupRoom, userRoom } from "../realtime/rooms.js";
@@ -287,7 +288,14 @@ async function advanceBuildQueueIfIdle(founderId) {
     }
 
     const next = await Task.findOne({ founderId, buildTask: true, status: "pending" }).sort({ createdAt: 1 });
-    if (!next) return;
+    if (!next) {
+      // Real queue-empty moment, 2026-09-14: this is exactly when AI PM's
+      // opt-in continuous-planning check-in should look at whether there's
+      // more real work to draft, rather than AI Developer sitting idle
+      // until a founder happens to open chat again.
+      await maybeTriggerAutonomousPlanning(founderId);
+      return;
+    }
 
     const startup = await Startup.findOne({ founderId }).lean();
     const owner = startup?.defaultGithubRepo?.owner;
@@ -319,6 +327,72 @@ async function advanceBuildQueueIfIdle(founderId) {
     });
   } catch (err) {
     logger.error("[orchestrator] failed to advance build queue", { founderId: String(founderId), message: err.message });
+  }
+}
+
+const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
+
+/**
+ * AI PM's opt-in continuous-planning check-in (2026-09-14). Called from two
+ * places: right here, the moment advanceBuildQueueIfIdle finds the build
+ * queue genuinely empty; and the weekly cron backstop
+ * (schedulerJobs.runAutonomousPlanningCheckJob), for founders whose queue
+ * never empties on its own signal because they have no build tasks running
+ * at all that week (nothing would otherwise ever call this for them).
+ *
+ * Real, structural two-signal gate — enforced here in code, not left to the
+ * model's judgment alone: a brand-new SPRINT_PLAN (a new week's goal and
+ * milestones) is only permitted once the *current* active week has actually
+ * run its course (past its real 7-day boundary, or no active week at all);
+ * short of that, only ADD_TASKS (more tasks under an already-approved
+ * milestone) is allowed, so AI PM can't leapfrog a founder's own real-world
+ * validation work just because AI Developer finished coding first.
+ *
+ * Uses runAutonomousPmCheckIn from agentChat.controller.js via a dynamic
+ * import to avoid a static circular dependency (that module already
+ * imports proposeAction from this one).
+ */
+export async function maybeTriggerAutonomousPlanning(founderId) {
+  try {
+    const startup = await Startup.findOne({ founderId }).select("autonomousPlanningEnabled").lean();
+    if (!startup?.autonomousPlanningEnabled) return;
+
+    const pmAgent = await Agent.findOne({ founderId, agentKey: "pm" }).select("_id").lean();
+    if (!pmAgent) return;
+
+    // Don't propose a second time while an earlier autonomous proposal is
+    // still sitting unapproved — avoid spamming the queue.
+    const relevantTypes = await ActionType.find({
+      agentId: pmAgent._id,
+      actionKey: { $in: ["add_tasks", "propose_sprint_plan"] },
+    }).select("_id").lean();
+    if (relevantTypes.length) {
+      const alreadyPending = await AgentEvent.findOne({
+        founderId,
+        actionTypeId: { $in: relevantTypes.map((t) => t._id) },
+        status: "pending_approval",
+      }).select("_id").lean();
+      if (alreadyPending) return;
+    }
+
+    const activeOutcome = await WeeklyOutcome.findOne({ founderId, status: "active" }).sort({ weekOf: -1 }).lean();
+    const weekHasEnded = !activeOutcome || (Date.now() - new Date(activeOutcome.weekOf).getTime() >= WEEK_MS);
+
+    const { runAutonomousPmCheckIn } = await import("../controllers/agentChat.controller.js");
+
+    if (weekHasEnded) {
+      await runAutonomousPmCheckIn(founderId, {
+        instruction: "AI Developer's build queue is empty, and the current week's goal has run its course (or none is set). Look at real progress so far and make your own call: either draft the next week's goal and milestones as a real sprint plan, or add more real tasks to an existing milestone if that's genuinely the better move. Don't ask a clarifying question here — make the most reasonable real call you can and propose it, flagging any assumptions plainly.",
+        allowedMarkerNames: ["SPRINT_PLAN", "ADD_TASKS"],
+      });
+    } else {
+      await runAutonomousPmCheckIn(founderId, {
+        instruction: "AI Developer's build queue is empty, but this week's goal hasn't run its course yet. Look at what's already real and approved — if there's genuinely more real work worth adding under an existing milestone, propose it. If there's nothing sensible to add right now, say so briefly and propose nothing rather than inventing busywork.",
+        allowedMarkerNames: ["ADD_TASKS"],
+      });
+    }
+  } catch (err) {
+    logger.error("[orchestrator] autonomous planning check-in failed", { founderId: String(founderId), message: err.message });
   }
 }
 
