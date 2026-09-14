@@ -50,6 +50,44 @@ When the file is a web page (HTML/CSS), design it like a real modern product, no
 - **Real responsive behavior**, not just "it happens to fit": use relative units and \`clamp()\` for fluid type sizing (e.g. \`clamp(2rem, 5vw, 3.5rem)\` for a hero headline), and at least one real \`@media\` breakpoint (~640px) that meaningfully changes layout for mobile (stacking a two-column section, reducing padding) — don't just rely on things naturally reflowing.
 - The failure mode to actively avoid: a single centered column of plain black-on-white text with no color accent, no icons, no visual texture, and identical spacing everywhere. If what you're about to write matches that description, revise it before finishing.`;
 
+/**
+ * Real contamination confirmed live, 2026-09-14: despite
+ * AI_DEVELOPER_SYSTEM_PROMPT explicitly saying "no commentary, no code
+ * fences," DeepSeek can still preface real HTML output with a narration
+ * sentence ("Here's the complete self-contained HTML file you asked
+ * for...") and a markdown code fence before the real `<!DOCTYPE html>` —
+ * confirmed by reading two real past PRs where exactly this shipped
+ * straight into a founder's real index.html and broke the page. A prompt
+ * instruction alone isn't sufficient here — the model doesn't reliably
+ * follow it — so this is a real structural guard: find the real document
+ * boundaries and discard anything outside them, for HTML files where those
+ * boundaries are unambiguous; strip a leading fence for anything else.
+ */
+function sanitizeDraftedFileContent(raw, filePath) {
+  let content = raw;
+  const isHtml = /\.html?$/i.test(filePath || "");
+
+  if (isHtml) {
+    const docStart = content.search(/<!doctype\s+html/i);
+    const htmlStart = content.search(/<html[\s>]/i);
+    const realStart = docStart >= 0 ? docStart : htmlStart;
+    if (realStart > 0) content = content.slice(realStart);
+
+    const docEnd = content.search(/<\/html\s*>/i);
+    if (docEnd >= 0) content = content.slice(0, docEnd + "</html>".length);
+  } else {
+    // Generic safety net for any other file type: a leading fence (with or
+    // without a language tag), preceded only by narration, within roughly
+    // the first 400 characters — never legitimate content that early in a
+    // real file.
+    const leadingFence = content.match(/^[\s\S]{0,400}?```[a-zA-Z]*\r?\n/);
+    if (leadingFence) content = content.slice(leadingFence[0].length);
+    content = content.replace(/\r?\n```\s*$/, "");
+  }
+
+  return content.trim();
+}
+
 async function executeGithubOpenPr({ founderId, payload, targetId }) {
   const { owner, repo, filePath, taskDescription, baseBranch } = payload || {};
   if (!owner || !repo || !filePath || !taskDescription) {
@@ -62,7 +100,7 @@ async function executeGithubOpenPr({ founderId, payload, targetId }) {
   // needs more headroom than a short chat reply; 4000 gives real room for
   // a genuine file, with retry escalation (see deepseekClient.js) still
   // able to go to 8000 if a single generation is unusually large.
-  const fileContent = deepseekConfigured()
+  const rawDraft = deepseekConfigured()
     ? await draftText({
         systemPrompt: AI_DEVELOPER_SYSTEM_PROMPT,
         userPrompt: `File path: ${filePath}\n\nTask: ${taskDescription}`,
@@ -78,8 +116,23 @@ async function executeGithubOpenPr({ founderId, payload, targetId }) {
   // empty draft — fail loudly here instead, so the founder sees a real
   // "failed" status and a clear reason, and can just ask AI Developer to
   // retry, instead of an invisible empty file quietly going live.
-  if (!fileContent.trim()) {
+  if (!rawDraft.trim()) {
     throw new Error(`AI Developer's drafting call for "${filePath}" came back empty — nothing was written, so no PR was opened. Try asking again.`);
+  }
+
+  const fileContent = sanitizeDraftedFileContent(rawDraft, filePath);
+
+  // Real bug found live: a genuinely truncated generation (cut off mid-CSS
+  // rule, no closing tags at all) previously shipped as a real "success" —
+  // the file merely had to be non-empty, not actually complete. Confirmed
+  // live twice: real files that ended mid `h1 { font-size: ...` declaration
+  // reached production with status autonomous_completed. For HTML, "real
+  // and complete" is checkable: it must have a real document start and a
+  // real `</html>` close after sanitizing (which only trims contamination
+  // outside those boundaries — a genuinely truncated file has no closing
+  // tag to trim to at all, so this still fails loudly for that case).
+  if (/\.html?$/i.test(filePath) && !/<\/html\s*>\s*$/i.test(fileContent)) {
+    throw new Error(`AI Developer's drafting call for "${filePath}" came back incomplete (no closing </html> found) — nothing was written, so no PR was opened. Try asking again.`);
   }
 
   const branchName = `ai-developer/${targetId || Date.now()}`;
@@ -163,13 +216,20 @@ async function executeReviseFile({ founderId, payload }) {
   if (!owner || !repo || !branch || !filePath || !taskDescription || !feedback || !currentContent) {
     throw new Error("revise_file requires owner, repo, branch, filePath, taskDescription, feedback, and currentContent.");
   }
-  const revisedContent = await draftText({
+  const rawRevision = await draftText({
     systemPrompt: AI_DEVELOPER_SYSTEM_PROMPT,
     userPrompt: `File path: ${filePath}\n\nOriginal task: ${taskDescription}\n\nYour previous draft of this file:\n\n${currentContent}\n\nReal review feedback from AI Product Manager — revise the file to address this specifically, keeping everything that already works:\n\n${feedback}`,
     maxTokens: 4000,
   });
-  if (!revisedContent.trim()) {
+  if (!rawRevision.trim()) {
     throw new Error(`AI Developer's revision call for "${filePath}" came back empty — leaving the previous draft in place.`);
+  }
+  // Same real contamination/completeness guards as the original draft —
+  // a revision is just as capable of shipping narration+fence junk or a
+  // truncated document as the first draft was.
+  const revisedContent = sanitizeDraftedFileContent(rawRevision, filePath);
+  if (/\.html?$/i.test(filePath) && !/<\/html\s*>\s*$/i.test(revisedContent)) {
+    throw new Error(`AI Developer's revision call for "${filePath}" came back incomplete (no closing </html> found) — leaving the previous draft in place.`);
   }
   const result = await updateFileContent({
     founderId, owner, repo, branch, filePath, fileContent: revisedContent,

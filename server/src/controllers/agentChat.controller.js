@@ -34,17 +34,32 @@ const OPEN_TASKS_LIMIT = 10;
 // Both in-band markers AI PM can emit, checked in this order. Kept as a list
 // (not two independent regexes scattered through the function) so the
 // "opened but never closed" truncation guard below covers both the same way.
+// Real bug found live, 2026-09-14: a founder's own BUILD_TASK briefs kept
+// coming back "malformed" — traced to real ground truth (the raw marker
+// body was never logged, so this took reading the actual task text the
+// founder was asking for). The task descriptions were instructing AI
+// Developer to avoid code fences, which meant the JSON payload itself
+// contained literal text like `no \`\`\`html or closing \`\`\``` — a real,
+// inline triple-backtick sequence sitting inside a JSON string value. The
+// old non-greedy closing pattern (`[\s\S]*?` followed directly by ` ``` `)
+// matched that first embedded occurrence as if it were the real closing
+// fence, truncating the JSON body mid-string and corrupting every one of
+// these attempts. A real closing fence is always alone on its own line by
+// markdown convention; an inline mention of backticks inside a sentence or
+// string value never is. Requiring a real newline immediately before the
+// closing ` ``` ` — not just "some whitespace" — fixes this structurally,
+// not by asking the model to phrase things differently.
 const MARKERS = [
-  { name: "SPRINT_PLAN", re: /```SPRINT_PLAN\s*([\s\S]*?)```/ },
-  { name: "BUILD_TASK", re: /```BUILD_TASK\s*([\s\S]*?)```/ },
-  { name: "SET_DEFAULT_REPO", re: /```SET_DEFAULT_REPO\s*([\s\S]*?)```/ },
-  { name: "UPDATE_TASK", re: /```UPDATE_TASK\s*([\s\S]*?)```/ },
-  { name: "DELETE_TASK", re: /```DELETE_TASK\s*([\s\S]*?)```/ },
-  { name: "DELETE_MILESTONE", re: /```DELETE_MILESTONE\s*([\s\S]*?)```/ },
-  { name: "UPDATE_GOAL", re: /```UPDATE_GOAL\s*([\s\S]*?)```/ },
-  { name: "READ_REPO", re: /```READ_REPO\s*([\s\S]*?)```/ },
-  { name: "ASK_DEV", re: /```ASK_DEV\s*([\s\S]*?)```/ },
-  { name: "ADD_TASKS", re: /```ADD_TASKS\s*([\s\S]*?)```/ },
+  { name: "SPRINT_PLAN", re: /```SPRINT_PLAN\s*([\s\S]*?)\n```/ },
+  { name: "BUILD_TASK", re: /```BUILD_TASK\s*([\s\S]*?)\n```/ },
+  { name: "SET_DEFAULT_REPO", re: /```SET_DEFAULT_REPO\s*([\s\S]*?)\n```/ },
+  { name: "UPDATE_TASK", re: /```UPDATE_TASK\s*([\s\S]*?)\n```/ },
+  { name: "DELETE_TASK", re: /```DELETE_TASK\s*([\s\S]*?)\n```/ },
+  { name: "DELETE_MILESTONE", re: /```DELETE_MILESTONE\s*([\s\S]*?)\n```/ },
+  { name: "UPDATE_GOAL", re: /```UPDATE_GOAL\s*([\s\S]*?)\n```/ },
+  { name: "READ_REPO", re: /```READ_REPO\s*([\s\S]*?)\n```/ },
+  { name: "ASK_DEV", re: /```ASK_DEV\s*([\s\S]*?)\n```/ },
+  { name: "ADD_TASKS", re: /```ADD_TASKS\s*([\s\S]*?)\n```/ },
 ];
 
 function founderGuard(req, founderId) {
@@ -418,8 +433,14 @@ async function processAiPmReply({ raw, ctx, messages, founderId, agent, allowedM
     let parseFailed = false;
     try {
       task = JSON.parse(closed.body);
-    } catch {
+    } catch (err) {
       parseFailed = true;
+      // Real gap found live: a "came out malformed" failure previously left
+      // zero trace of what the actual malformed body was — every future
+      // occurrence had to be re-diagnosed blind. Log a real, truncated
+      // preview so a recurrence (or a different malformed shape) is
+      // debuggable from the logs alone.
+      logger.error("[agentChat] BUILD_TASK body failed to parse as JSON", { message: err.message, bodyPreview: closed.body.slice(0, 500) });
     }
     const hasFields = Boolean(task?.owner && task?.repo && task?.filePath && task?.taskDescription);
     if (hasFields) {
