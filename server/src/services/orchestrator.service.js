@@ -594,21 +594,37 @@ export async function proposeAction({ founderId, startupId, actorType, actorId, 
       await advanceTaskToInProgress(taskId);
     }
   }
+  // Real fix, 2026-09-14: everything from here down used to be `await`ed,
+  // which meant whoever called proposeAction — a founder's chat message, or
+  // a click on "Approve" — sat waiting on the *entire* downstream chain
+  // (design review, a real revision, staging, cascading to the next queued
+  // task, another whole review cycle...) before ever getting a response.
+  // Confirmed live: real chat replies took 70-120 real seconds once the
+  // review-and-revise loop and continuous planning could each add several
+  // more chained AI calls on top of what was already a multi-step pipeline.
+  // The event for *this* action is already created and published above —
+  // the caller's own reply/UI update never depended on what happens next —
+  // so none of this needs to block the response. Each of these functions
+  // already catches and logs its own errors internally, so not awaiting
+  // them here is safe: they keep running against the real Node process,
+  // which stays alive between requests, and their real effects (further
+  // AgentEvents, realtime socket pushes) land exactly the same either way,
+  // just after the caller has already moved on.
   if (actionType.actionKey === "github_merge_main" && status === "autonomous_completed") {
-    await completeLinkedTask(founderId, targetId);
+    completeLinkedTask(founderId, targetId);
   }
   // New trigger, 2026-09-14: a task reaching staging (not just full
   // production) is now enough to let the next queued task start building —
   // see advanceBuildQueueIfIdle's own comment for why waiting for
   // production was overly conservative once staging-merge became automatic.
   if (actionType.actionKey === "github_merge_staging" && status === "autonomous_completed") {
-    await advanceBuildQueueIfIdle(founderId);
+    advanceBuildQueueIfIdle(founderId);
   }
   if (actionType.actionKey === "propose_sprint_plan" && status === "autonomous_completed") {
-    await advanceBuildQueueIfIdle(founderId);
+    advanceBuildQueueIfIdle(founderId);
   }
   if (["github_open_pr", "github_merge_staging"].includes(actionType.actionKey) && status !== "failed") {
-    await autoAdvancePipeline({ founderId, startupId, actionKey: actionType.actionKey, status, targetId, payload, result, taskId });
+    autoAdvancePipeline({ founderId, startupId, actionKey: actionType.actionKey, status, targetId, payload, result, taskId });
   }
 
   return { event: dto, executed: status !== "failed" };
@@ -708,17 +724,23 @@ export async function resolveApproval({ eventId, decision, approverId }) {
   if (actionType?.actionKey === "github_open_pr" && pending.taskId && execStatus === "failed") {
     await markLinkedTaskBlocked(pending.taskId, execResult?.error);
   }
+  // Same real fix as proposeAction above, and for the same reason: clicking
+  // "Approve" on a sprint plan or a staging merge used to sit blocked on the
+  // whole downstream chain (review, revision, cascading to the next queued
+  // task) before the queue's own UI ever updated. The resolution event
+  // above is already created and published, so none of this needs to block
+  // the response — each function handles its own errors internally.
   if (actionType?.actionKey === "github_merge_main" && execStatus === "human_completed") {
-    await completeLinkedTask(pending.founderId, pending.targetId);
+    completeLinkedTask(pending.founderId, pending.targetId);
   }
   if (actionType?.actionKey === "github_merge_staging" && execStatus === "human_completed") {
-    await advanceBuildQueueIfIdle(pending.founderId);
+    advanceBuildQueueIfIdle(pending.founderId);
   }
   if (actionType?.actionKey === "propose_sprint_plan" && execStatus === "human_completed") {
-    await advanceBuildQueueIfIdle(pending.founderId);
+    advanceBuildQueueIfIdle(pending.founderId);
   }
   if (["github_open_pr", "github_merge_staging"].includes(actionType?.actionKey) && execStatus !== "failed") {
-    await autoAdvancePipeline({
+    autoAdvancePipeline({
       founderId: pending.founderId,
       startupId: pending.startupId,
       actionKey: actionType.actionKey,

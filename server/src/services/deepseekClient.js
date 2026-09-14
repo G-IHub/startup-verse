@@ -11,25 +11,55 @@ import { logger } from "../config/logger.js";
 // consistent rather than guessing at a different DeepSeek model string.
 const DEEPSEEK_BASE_URL = "https://api.deepseek.com";
 const DEFAULT_MODEL = "deepseek-v4-flash";
+// Real bug found live, 2026-09-14, while investigating "chat is taking very
+// long": this fetch had no timeout at all, so a genuine network hang (not
+// just a slow real generation) blocked a founder's chat reply forever, with
+// no error, no log line, nothing — confirmed by a real request that sat
+// with zero server activity for 5+ minutes while every other endpoint kept
+// responding normally. 90s is well above what a real completion (even with
+// the empty-content retry escalation) has ever taken live this session, so
+// hitting it means the connection is genuinely stuck, not just working.
+const DEEPSEEK_TIMEOUT_MS = 90_000;
 
 export function deepseekConfigured() {
   return Boolean(process.env.DEEPSEEK_API_KEY);
 }
 
 async function callChatCompletions({ apiKey, model, messages, maxTokens, temperature }) {
-  const response = await fetch(`${DEEPSEEK_BASE_URL}/chat/completions`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${apiKey}`,
-    },
-    body: JSON.stringify({ model, messages, max_tokens: maxTokens, temperature }),
-  });
-  const data = await response.json().catch(() => ({}));
-  if (!response.ok) {
-    throw new Error(data?.error?.message || `DeepSeek API error (${response.status})`);
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), DEEPSEEK_TIMEOUT_MS);
+  try {
+    // Real bug caught live, right after first shipping this timeout: `fetch()`
+    // itself only resolves once real response *headers* arrive — the actual
+    // observed stall (confirmed with a direct, isolated test) happens while
+    // reading the *body* afterward, which is a real, separate await. Clearing
+    // the timer in a `finally` around only the `fetch()` call disarmed it the
+    // moment headers arrived, leaving the body-read completely unprotected —
+    // exactly the case that mattered. `response.json()` must stay inside the
+    // same try, under the same still-armed signal, for the whole real
+    // request (headers + body) to actually be covered.
+    const response = await fetch(`${DEEPSEEK_BASE_URL}/chat/completions`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({ model, messages, max_tokens: maxTokens, temperature }),
+      signal: controller.signal,
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      throw new Error(data?.error?.message || `DeepSeek API error (${response.status})`);
+    }
+    return data;
+  } catch (err) {
+    if (err.name === "AbortError") {
+      throw new Error(`DeepSeek API call timed out after ${DEEPSEEK_TIMEOUT_MS / 1000}s — likely a hung connection, not just a long generation.`);
+    }
+    throw err;
+  } finally {
+    clearTimeout(timeoutId);
   }
-  return data;
 }
 
 /**
