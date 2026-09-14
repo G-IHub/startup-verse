@@ -232,22 +232,59 @@ async function completeLinkedTask(founderId, targetId) {
 }
 
 /**
+ * Real-repo conflict check for the build queue below: has this in-progress
+ * build task's own pipeline already reached `staging` (or beyond)? Scoped
+ * to this founder's own `dev` agent's real ActionType ids — ActionType rows
+ * are per-founder (agentId -> Agent -> one founder, not global), so looking
+ * one up by actionKey alone without that scope could match a *different*
+ * founder's row and silently never find a match.
+ */
+async function hasReachedStaging(founderId, targetId) {
+  const devAgent = await Agent.findOne({ founderId, agentKey: "dev" }).select("_id");
+  if (!devAgent) return false;
+  const types = await ActionType.find({
+    agentId: devAgent._id,
+    actionKey: { $in: ["github_merge_staging", "github_merge_main"] },
+  }).select("_id");
+  if (!types.length) return false;
+  return Boolean(await AgentEvent.findOne({
+    founderId,
+    targetId,
+    actionTypeId: { $in: types.map((t) => t._id) },
+    status: { $in: COMPLETED_STATUSES },
+  }));
+}
+
+/**
  * Sequential build-queue trigger (docs/ai-agent-roadmap.md Phase 3): once a
  * founder approves a sprint plan, tasks AI PM flagged as `buildTask: true`
- * should start reaching AI Developer on their own — one at a time, not all
- * at once, since every github_open_pr branches off the same `staging`
- * branch and running several simultaneously risks real merge conflicts with
- * nothing in the system to resolve them. So: if a buildTask is already
- * "in-progress", do nothing (it'll trigger the next one itself when
- * completeLinkedTask marks it done); otherwise, start the oldest still-
- * "pending" one. Called right after a sprint plan's tasks are created (see
- * resolveApproval/proposeAction below) and again every time a task in the
- * queue completes.
+ * should start reaching AI Developer on their own — one at a time onto a
+ * fresh branch each, not all at once, since every github_open_pr branches
+ * off the same `staging` branch and two builds racing to reach staging
+ * simultaneously risk a real merge conflict with nothing in the system to
+ * resolve it.
+ *
+ * Real gap fixed, 2026-09-14: this used to hold the *entire* queue until a
+ * task reached full production — i.e. until the founder clicked approve —
+ * so AI Developer sat idle waiting on a human between every single task,
+ * even though nothing about the next task's *build* depended on that
+ * approval. The actual conflict only exists before a task reaches
+ * `staging`; production approval is a separate, founder-facing gate with no
+ * bearing on repo state. Since github_merge_staging already runs
+ * automatically the moment a PR opens (autoAdvancePipeline below), the real
+ * fix is to gate on "has this task reached staging yet," not "is this task
+ * fully done" — letting AI Developer keep working through the whole week's
+ * queue continuously while production approvals simply queue up for the
+ * founder to work through at their own pace, still one produced PR at a
+ * time on the real branch.
  */
 async function advanceBuildQueueIfIdle(founderId) {
   try {
-    const alreadyRunning = await Task.findOne({ founderId, buildTask: true, status: "in-progress" });
-    if (alreadyRunning) return;
+    const inProgressTasks = await Task.find({ founderId, buildTask: true, status: "in-progress" });
+    for (const task of inProgressTasks) {
+      // eslint-disable-next-line no-await-in-loop -- deliberately sequential, real conflict check per task
+      if (!(await hasReachedStaging(founderId, `sprint-task-${task._id}`))) return; // still building/staging — hold here, same as before
+    }
 
     const next = await Task.findOne({ founderId, buildTask: true, status: "pending" }).sort({ createdAt: 1 });
     if (!next) return;
@@ -424,6 +461,13 @@ export async function proposeAction({ founderId, startupId, actorType, actorId, 
   if (actionType.actionKey === "github_merge_main" && status === "autonomous_completed") {
     await completeLinkedTask(founderId, targetId);
   }
+  // New trigger, 2026-09-14: a task reaching staging (not just full
+  // production) is now enough to let the next queued task start building —
+  // see advanceBuildQueueIfIdle's own comment for why waiting for
+  // production was overly conservative once staging-merge became automatic.
+  if (actionType.actionKey === "github_merge_staging" && status === "autonomous_completed") {
+    await advanceBuildQueueIfIdle(founderId);
+  }
   if (actionType.actionKey === "propose_sprint_plan" && status === "autonomous_completed") {
     await advanceBuildQueueIfIdle(founderId);
   }
@@ -530,6 +574,9 @@ export async function resolveApproval({ eventId, decision, approverId }) {
   }
   if (actionType?.actionKey === "github_merge_main" && execStatus === "human_completed") {
     await completeLinkedTask(pending.founderId, pending.targetId);
+  }
+  if (actionType?.actionKey === "github_merge_staging" && execStatus === "human_completed") {
+    await advanceBuildQueueIfIdle(pending.founderId);
   }
   if (actionType?.actionKey === "propose_sprint_plan" && execStatus === "human_completed") {
     await advanceBuildQueueIfIdle(pending.founderId);
