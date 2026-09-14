@@ -60,10 +60,31 @@ function describeDevEvent(e) {
       return { from: DEV_ACTOR, to: null, text: `Production deploy declined${repoLabel ? " on " + repoLabel : ""}.`, tag: { label: "Declined", bg: "#FCEBEB", color: "#791F1F" } };
     }
   }
+  if (actionKey === "revise_file") {
+    // Real design-review loop (2026-09-14): AI Developer revising its own
+    // work after AI PM's real review flagged something — not a founder or
+    // AI PM request, so no "from" actor beyond AI Developer itself.
+    return {
+      from: DEV_ACTOR, to: null,
+      text: `Revised ${e.payload?.filePath || "a file"} per AI PM's review${repoLabel ? " on " + repoLabel : ""}.`,
+      tag: e.status === "failed" ? { label: "Failed", bg: "#FCEBEB", color: "#791F1F" } : { label: "Autonomous", bg: "#f3f4f6", color: "#6b7280" },
+    };
+  }
   return null;
 }
 
 function describePmEvent(e) {
+  if (e.actionTypeId?.actionKey === "review_dev_work") {
+    // Real design/quality review loop (2026-09-14): AI PM critiquing AI
+    // Developer's actual real output before it reaches staging — not
+    // waiting for a founder to ask. Purely internal (agent-to-agent), so no
+    // "to" actor — the founder sees the outcome, not a request routed to them.
+    const verdict = e.result?.verdict;
+    const filePath = e.payload?.filePath || "a file";
+    return verdict === "revise"
+      ? { from: PM_ACTOR, to: null, text: `Reviewed AI Developer's ${filePath} — sent it back with real feedback.`, tag: { label: "Requested changes", bg: "#FCF7EC", color: "#633806" } }
+      : { from: PM_ACTOR, to: null, text: `Reviewed AI Developer's ${filePath} — approved.`, tag: { label: "Approved", bg: "#EAF3DE", color: "#27500A" } };
+  }
   if (e.actionTypeId?.actionKey !== "propose_sprint_plan") return null;
   const milestones = e.payload?.milestones || [];
   const taskCount = milestones.reduce((n, m) => n + (m.tasks?.length || 0), 0);

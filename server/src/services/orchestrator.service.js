@@ -411,8 +411,70 @@ export async function maybeTriggerAutonomousPlanning(founderId) {
  * Applies uniformly to every github_open_pr, taskId-linked or not, so a
  * one-off direct hand-off now behaves the same as a sprint-plan build task.
  */
+const MAX_REVIEW_ROUNDS = 2;
+
+/**
+ * AI PM's real design/quality review of AI Developer's own real output,
+ * run automatically as part of the pipeline (2026-09-14) — not something a
+ * founder has to remember to ask for. Reads the real file content; if AI
+ * PM's real review verdict is "revise," hands real, specific feedback back
+ * to AI Developer, which revises the SAME file on the SAME branch/PR, then
+ * gets reviewed again — capped at MAX_REVIEW_ROUNDS so a disagreement
+ * between the two can't loop forever. Whatever the state after the cap,
+ * the pipeline still proceeds to staging — this is a real quality pass,
+ * not a gate that can block a founder's build indefinitely. Every review
+ * and revision is a real, inspectable AgentEvent (Workroom/Audit Trail),
+ * even though none of it needs a founder's approval to run.
+ */
+async function reviewAndReviseIfNeeded({ founderId, startupId, owner, repo, branch, filePath, taskDescription, targetId, taskId, fileContent }) {
+  if (!owner || !repo || !branch || !filePath || !taskDescription || !fileContent) return;
+  try {
+    const pmAgent = await Agent.findOne({ founderId, agentKey: "pm" });
+    const devAgent = await Agent.findOne({ founderId, agentKey: "dev" });
+    if (!pmAgent || !devAgent) return;
+    const reviewType = await ActionType.findOne({ agentId: pmAgent._id, actionKey: "review_dev_work" });
+    const reviseType = await ActionType.findOne({ agentId: devAgent._id, actionKey: "revise_file" });
+    if (!reviewType || !reviseType) return;
+
+    let content = fileContent;
+    for (let round = 0; round < MAX_REVIEW_ROUNDS; round++) {
+      // eslint-disable-next-line no-await-in-loop -- deliberately sequential: each round depends on the last one's real result
+      const reviewResult = await proposeAction({
+        founderId, startupId, actorType: "agent", actorId: String(pmAgent._id), actionTypeId: reviewType._id,
+        targetType: "review", targetId: `${targetId}-review-${round}`,
+        payload: { fileContent: content, taskDescription, filePath },
+      });
+      if (reviewResult.event.status === "failed" || reviewResult.event.result?.verdict !== "revise") return;
+      const feedback = reviewResult.event.result?.feedback;
+      if (!feedback) return;
+
+      // eslint-disable-next-line no-await-in-loop
+      const reviseResult = await proposeAction({
+        founderId, startupId, actorType: "agent", actorId: String(devAgent._id), actionTypeId: reviseType._id,
+        targetType: "pr", targetId: `${targetId}-revise-${round}`,
+        payload: { owner, repo, branch, filePath, taskDescription, feedback, currentContent: content },
+        taskId,
+      });
+      if (reviseResult.event.status === "failed") return; // couldn't revise — proceed with what's already on the branch
+      content = reviseResult.event.result?.fileContent || content;
+    }
+  } catch (err) {
+    logger.error("[orchestrator] design review/revise loop failed, proceeding without blocking", { founderId: String(founderId), targetId, message: err.message });
+  }
+}
+
 async function autoAdvancePipeline({ founderId, startupId, actionKey, status, targetId, payload, result, taskId }) {
   if (!["autonomous_completed", "human_completed"].includes(status)) return;
+
+  if (actionKey === "github_open_pr") {
+    await reviewAndReviseIfNeeded({
+      founderId, startupId,
+      owner: payload?.owner, repo: payload?.repo, branch: result?.branch,
+      filePath: payload?.filePath, taskDescription: payload?.taskDescription,
+      targetId, taskId, fileContent: result?.fileContent,
+    });
+  }
+
   const nextActionKey =
     actionKey === "github_open_pr" ? "github_merge_staging" :
     actionKey === "github_merge_staging" ? "github_merge_main" :

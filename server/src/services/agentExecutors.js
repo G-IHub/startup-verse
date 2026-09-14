@@ -8,7 +8,7 @@
  * means orchestrator.service.js never needs to know which integration
  * backs a given action type.
  */
-import { openPullRequest, mergePullRequest, mergeBranches, getFileContent, getPullRequestFiles, ensureGithubPagesEnabled } from "./githubAdapter.js";
+import { openPullRequest, mergePullRequest, mergeBranches, getFileContent, getPullRequestFiles, ensureGithubPagesEnabled, updateFileContent } from "./githubAdapter.js";
 import { draftText, deepseekConfigured } from "./deepseekClient.js";
 import Startup from "../models/Startup.js";
 import Milestone from "../models/Milestone.js";
@@ -38,7 +38,17 @@ const AI_DEVELOPER_SYSTEM_PROMPT = `You are AI Developer, a StartupVerse agent w
 - Stay scoped to exactly what was asked. Do not invent additional files, do not reference or assume changes elsewhere in the codebase you were not asked to touch, and do not expand the task's scope on your own judgment.
 - Prefer small, focused, additive content over trying to do too much in one file — the same "new capability, new small file" discipline this platform holds itself to.
 - Never write a comment, docstring, or claim asserting something is tested, complete, or working if you have no way to know that — do not fabricate confidence you don't have.
-- If the task description is ambiguous or missing information you'd need, write the most reasonable, minimal, honest interpretation rather than guessing elaborately or padding with speculative features.`;
+- If the task description is ambiguous or missing information you'd need, write the most reasonable, minimal, honest interpretation rather than guessing elaborately or padding with speculative features.
+
+When the file is a web page (HTML/CSS), design it like a real modern product, not a plain document — a founder found a real past output "too plain" and that's a real bar to clear, not a style preference:
+- **Typography carries most of the design.** Use a real type scale, not one size everywhere: a hero headline should be dramatically larger (2.5–4rem) and bolder than body text (1rem, comfortable 1.6 line-height). Vary weight (700+ for headings, 400 for body) and color depth (near-black for headings, a mid-gray for supporting text) to create real hierarchy at a glance.
+- **Color needs real depth, not just black on white.** Pick one real accent color (a specific hex, not "blue") used deliberately — a headline word, a button, an icon accent — plus one or two neutral tones for backgrounds/sections (e.g. a very light gray or tinted section behind part of the page, not pure white end to end). Real contrast, but never flat.
+- **Real spacing rhythm**, not cramped or arbitrary: pick a consistent scale (e.g. multiples of 8px — 8/16/24/32/48/64/96) and stick to it for padding, gaps, and section breaks. Generous whitespace around a hero section reads as premium; cramped, inconsistent spacing reads as a first draft.
+- **Break the single-centered-column look.** Not every section should be centered text in one narrow column — use real layout: a two-column hero (text + a visual element), a grid of cards for features, alternating alignment between sections. Visual variety across sections is what separates a real product page from a plain document.
+- **No stock photography** — you have no way to source a real, relevant photo, and a wrong or generic stock image looks worse than none. Build visual interest instead with color, gradients (e.g. a subtle radial or linear gradient behind a hero section), simple geometric shapes, or icons — all achievable in pure CSS with no external files.
+- **Real icons via inline SVG**, not images or icon-font CDNs (which need a network request this self-contained file shouldn't depend on). Write simple, clean inline \`<svg>\` elements with \`viewBox="0 0 24 24"\` and \`stroke="currentColor"\` \`fill="none"\` \`stroke-width="2"\` (matching common line-icon sets like Feather/Lucide) for concepts like a checkmark, arrow, envelope, or shield — reuse this exact style consistently across every icon on the page rather than inventing a different visual style each time.
+- **Real responsive behavior**, not just "it happens to fit": use relative units and \`clamp()\` for fluid type sizing (e.g. \`clamp(2rem, 5vw, 3.5rem)\` for a hero headline), and at least one real \`@media\` breakpoint (~640px) that meaningfully changes layout for mobile (stacking a two-column section, reducing padding) — don't just rely on things naturally reflowing.
+- The failure mode to actively avoid: a single centered column of plain black-on-white text with no color accent, no icons, no visual texture, and identical spacing everywhere. If what you're about to write matches that description, revise it before finishing.`;
 
 async function executeGithubOpenPr({ founderId, payload, targetId }) {
   const { owner, repo, filePath, taskDescription, baseBranch } = payload || {};
@@ -86,6 +96,86 @@ async function executeGithubOpenPr({ founderId, payload, targetId }) {
     body: `Opened autonomously by AI Developer.\n\nTask: ${taskDescription}`,
   });
   return { ...result, fileContent };
+}
+
+/**
+ * AI PM's real design-review pass (2026-09-14) — a genuine second AI
+ * opinion reading AI Developer's actual written code, looking specifically
+ * for the "plain, template-y" failure mode a real founder flagged, plus
+ * obvious structural issues. Honest about what this is and isn't: a real
+ * AI reading real source text, not code that was ever executed or
+ * rendered — it can judge whether the markup/CSS *describes* good design,
+ * not confirm how it actually looks rendered (no screenshot pipeline
+ * exists for that; visual-render review stays a future build).
+ * Read-only — no side effects of its own, always executes immediately.
+ */
+const AI_PM_REVIEW_SYSTEM_PROMPT = `You are AI Product Manager, reviewing real code AI Developer just wrote before it ships toward production. Be a real critic — vague praise or vague criticism helps no one.
+
+Judge two things:
+1. Design quality: real typographic hierarchy (varied size/weight, not one size everywhere), real color depth (not just black text on white), a real spacing rhythm, genuine layout variety (not one centered column top to bottom), real icons if the content calls for them. The failure mode to catch: a plain, template-y page with no visual texture.
+2. Structural correctness: obviously broken or incomplete markup, missing required content from the task, real accessibility basics (alt text, form labels, real color contrast).
+
+Respond with ONLY a JSON object, nothing else, no markdown fence:
+{"verdict":"approve","feedback":""}
+or
+{"verdict":"revise","feedback":"..."}
+
+Use "revise" only for a real, specific, fixable problem — put the exact, concrete change needed in "feedback" ("the hero heading needs a real size jump — make it at least 2.5rem and bold, currently it's the same size as body text" — not "make it look nicer"). Don't revise minor taste preferences with no real impact. This is a real quality bar a founder would be embarrassed to ship below, not your personal aesthetic.`;
+
+async function executeReviewDevWork({ payload }) {
+  const { fileContent, taskDescription, filePath } = payload || {};
+  if (!fileContent || !taskDescription) {
+    throw new Error("review_dev_work requires fileContent and taskDescription.");
+  }
+  if (!deepseekConfigured()) {
+    return { verdict: "approve", feedback: "", note: "DeepSeek not configured — review skipped." };
+  }
+  const raw = await draftText({
+    systemPrompt: AI_PM_REVIEW_SYSTEM_PROMPT,
+    userPrompt: `File: ${filePath}\n\nTask it was meant to accomplish: ${taskDescription}\n\nReal file content to review:\n\n${fileContent}`,
+    maxTokens: 800,
+  });
+  let parsed = null;
+  try {
+    parsed = JSON.parse(raw.trim().replace(/^```(json)?\s*/i, "").replace(/```\s*$/, ""));
+  } catch {
+    parsed = null;
+  }
+  // A malformed or unparseable review response fails open (approve) rather
+  // than blocking the whole pipeline on a formatting hiccup — this is a
+  // real quality gate, not a security one, so availability wins the tie.
+  if (!parsed || !["approve", "revise"].includes(parsed.verdict)) {
+    return { verdict: "approve", feedback: "", note: "Review response could not be parsed as real JSON; proceeding without blocking." };
+  }
+  return { verdict: parsed.verdict, feedback: String(parsed.feedback || "").slice(0, 2000) };
+}
+
+/**
+ * AI Developer revising its own real file on the SAME already-open PR/
+ * branch, in response to AI PM's real review feedback — the piece that
+ * makes the review above actually matter instead of being commentary
+ * nobody acts on. Reuses the exact same drafting system prompt/instincts
+ * as the original write, plus the real previous draft and the real
+ * feedback, so it improves rather than starts over blind.
+ */
+async function executeReviseFile({ founderId, payload }) {
+  const { owner, repo, branch, filePath, taskDescription, feedback, currentContent } = payload || {};
+  if (!owner || !repo || !branch || !filePath || !taskDescription || !feedback || !currentContent) {
+    throw new Error("revise_file requires owner, repo, branch, filePath, taskDescription, feedback, and currentContent.");
+  }
+  const revisedContent = await draftText({
+    systemPrompt: AI_DEVELOPER_SYSTEM_PROMPT,
+    userPrompt: `File path: ${filePath}\n\nOriginal task: ${taskDescription}\n\nYour previous draft of this file:\n\n${currentContent}\n\nReal review feedback from AI Product Manager — revise the file to address this specifically, keeping everything that already works:\n\n${feedback}`,
+    maxTokens: 4000,
+  });
+  if (!revisedContent.trim()) {
+    throw new Error(`AI Developer's revision call for "${filePath}" came back empty — leaving the previous draft in place.`);
+  }
+  const result = await updateFileContent({
+    founderId, owner, repo, branch, filePath, fileContent: revisedContent,
+    commitMessage: `AI Developer: revise ${filePath} per AI PM review`,
+  });
+  return { ...result, fileContent: revisedContent };
 }
 
 async function executeGithubMergeStaging({ founderId, payload }) {
@@ -406,6 +496,8 @@ const EXECUTORS = {
   read_repo_content: executeReadRepoContent,
   explain_dev_work: executeExplainDevWork,
   add_tasks: executeAddTasks,
+  review_dev_work: executeReviewDevWork,
+  revise_file: executeReviseFile,
 };
 
 export function hasExecutor(actionKey) {

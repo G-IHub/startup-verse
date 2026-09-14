@@ -97,6 +97,41 @@ export async function openPullRequest({ founderId, owner, repo, branchName, base
   return { prNumber: pr.number, prUrl: pr.html_url, branch: branchName };
 }
 
+/**
+ * Commits an updated version of a file onto an already-existing branch —
+ * the real primitive AI Developer's design-review revision loop needs
+ * (agentExecutors.js's executeReviseFile, 2026-09-14): the branch and PR
+ * from the original openPullRequest call already exist, only the file
+ * content needs updating. Reuses the exact same existing-sha lookup
+ * openPullRequest itself already does above, since the Contents API
+ * requires the current file's real sha to update rather than create.
+ */
+export async function updateFileContent({ founderId, owner, repo, branch, filePath, fileContent, commitMessage }) {
+  const token = await getFounderToken(founderId);
+  const existing = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${encodeURIComponent(filePath)}?ref=${encodeURIComponent(branch)}`, {
+    headers: {
+      Accept: "application/vnd.github+json",
+      Authorization: `Bearer ${token}`,
+      "User-Agent": "StartupVerse-AI-Developer",
+      "X-GitHub-Api-Version": "2022-11-28",
+    },
+  });
+  if (existing.status !== 200) {
+    throw new Error(`Cannot revise "${filePath}" on branch "${branch}" — the file wasn't found there for real.`);
+  }
+  const existingSha = (await existing.json())?.sha;
+  const result = await gh(token, `/repos/${owner}/${repo}/contents/${encodeURIComponent(filePath)}`, {
+    method: "PUT",
+    body: JSON.stringify({
+      message: commitMessage,
+      content: Buffer.from(fileContent, "utf8").toString("base64"),
+      branch,
+      sha: existingSha,
+    }),
+  });
+  return { updated: true, sha: result.content?.sha || null };
+}
+
 export async function mergePullRequest({ founderId, owner, repo, prNumber, commitMessage }) {
   const token = await getFounderToken(founderId);
   const result = await gh(token, `/repos/${owner}/${repo}/pulls/${prNumber}/merge`, {

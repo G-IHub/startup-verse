@@ -83,6 +83,20 @@ const CORE_AGENT_DEFINITIONS = [
         adjustable: true,
         approverRule: "founder",
       },
+      {
+        // Real design/quality review of AI Developer's own real output
+        // (2026-09-14) — read-only (a chatCompletion call, no external
+        // write of its own), so it always executes immediately and never
+        // blocks on a founder approval. This runs automatically as part of
+        // the real build pipeline (orchestrator.service.js's
+        // autoAdvancePipeline), not just on request.
+        actionKey: "review_dev_work",
+        label: "Review AI Developer's work",
+        riskCategory: "read_only",
+        defaultMode: "autonomous",
+        adjustable: false,
+        approverRule: "founder",
+      },
     ],
   },
   {
@@ -115,6 +129,19 @@ const CORE_AGENT_DEFINITIONS = [
         defaultMode: "ask_first",
         adjustable: false,
         approverRule: "role:engineering",
+      },
+      {
+        // Real revision, on the same already-open PR/branch, in response to
+        // AI PM's real review feedback (2026-09-14) — same tier as
+        // github_open_pr/github_merge_staging, since it's the same kind of
+        // "AI Developer writes real code" action, just triggered by a
+        // review verdict instead of a fresh task.
+        actionKey: "revise_file",
+        label: "Revise a file per review feedback",
+        riskCategory: "reversible",
+        defaultMode: "autonomous",
+        adjustable: true,
+        approverRule: "founder",
       },
       {
         // Read-only, no side effects — always executes immediately regardless
