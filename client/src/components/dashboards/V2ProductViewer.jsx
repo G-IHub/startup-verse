@@ -22,6 +22,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { getAgentEvents } from "../../utils/api/agentOrchestrationApi";
 import { getFounderStartupSafe } from "../../utils/api/founderApi";
+import { getFormSubmissions } from "../../utils/api/formSubmissionsApi";
 import { useOfficeStore } from "../../state/useOfficeStore";
 import { formatEventTime } from "../../utils/agentDisplay";
 
@@ -70,18 +71,20 @@ export default function V2ProductViewer({ user, onBack }) {
   const [loading, setLoading] = useState(true);
   const [startup, setStartup] = useState(null);
   const [history, setHistory] = useState([]);
+  const [submissions, setSubmissions] = useState([]);
 
   useEffect(() => {
     if (!resolvedFounderId) return;
     let cancelled = false;
     setLoading(true);
-    Promise.all([getFounderStartupSafe(resolvedFounderId), getAgentEvents(resolvedFounderId)])
-      .then(([s, events]) => {
+    Promise.all([getFounderStartupSafe(resolvedFounderId), getAgentEvents(resolvedFounderId), getFormSubmissions(resolvedFounderId)])
+      .then(([s, events, formData]) => {
         if (cancelled) return;
         setStartup(s || null);
         setHistory(buildRealHistory(events || []));
+        setSubmissions(formData?.submissions || []);
       })
-      .catch(() => { if (!cancelled) setHistory([]); })
+      .catch(() => { if (!cancelled) { setHistory([]); setSubmissions([]); } })
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
   }, [resolvedFounderId]);
@@ -223,6 +226,39 @@ export default function V2ProductViewer({ user, onBack }) {
                 </div>
               </div>
             ))
+          )}
+        </div>
+
+        {/* Real data captured — form submissions from the actual live site, not simulated */}
+        <div className="rounded-[14px] border border-v2-border bg-white p-4">
+          <div className="flex items-center justify-between">
+            <div className="font-body text-[13px] font-medium text-v2-heading">Real data captured</div>
+            {submissions.length > 0 && (
+              <span className="rounded-full bg-[#EAF3DE] px-2 py-0.5 font-body text-[10px] font-medium text-[#27500A]">{submissions.length} submission{submissions.length === 1 ? "" : "s"}</span>
+            )}
+          </div>
+          <div className="mb-3 font-body text-[11px] text-v2-subtle">Real people who visited the live site and submitted a form — signups, leads, contact requests</div>
+          {loading ? (
+            <div className="py-6 text-center font-body text-[12px] text-v2-muted">Loading…</div>
+          ) : submissions.length === 0 ? (
+            <div className="py-6 text-center font-body text-[12px] text-v2-muted">No real submissions yet. Once a hosted page's form is submitted, it shows up here.</div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full border-collapse">
+                <tbody>
+                  {submissions.map((s) => (
+                    <tr key={s._id} className="border-b border-gray-100 last:border-0">
+                      <td className="w-[110px] py-2 pr-3 align-top font-body text-[10px] text-v2-subtle">{formatEventTime(s.createdAt)}</td>
+                      <td className="py-2 align-top font-body text-[11px] text-v2-heading">
+                        {Object.entries(s.data || {}).map(([k, v]) => (
+                          <span key={k} className="mr-3 inline-block"><span className="text-v2-subtle">{k}:</span> {String(v)}</span>
+                        ))}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           )}
         </div>
       </div>

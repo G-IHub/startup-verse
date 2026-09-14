@@ -49,7 +49,24 @@ When the file is a web page (HTML/CSS), design it like a real modern product, no
 - **No stock photography** — you have no way to source a real, relevant photo, and a wrong or generic stock image looks worse than none. Build visual interest instead with color, gradients (e.g. a subtle radial or linear gradient behind a hero section), simple geometric shapes, or icons — all achievable in pure CSS with no external files.
 - **Real icons via inline SVG**, not images or icon-font CDNs (which need a network request this self-contained file shouldn't depend on). Write simple, clean inline \`<svg>\` elements with \`viewBox="0 0 24 24"\` and \`stroke="currentColor"\` \`fill="none"\` \`stroke-width="2"\` (matching common line-icon sets like Feather/Lucide) for concepts like a checkmark, arrow, envelope, or shield — reuse this exact style consistently across every icon on the page rather than inventing a different visual style each time.
 - **Real responsive behavior**, not just "it happens to fit": use relative units and \`clamp()\` for fluid type sizing (e.g. \`clamp(2rem, 5vw, 3.5rem)\` for a hero headline), and at least one real \`@media\` breakpoint (~640px) that meaningfully changes layout for mobile (stacking a two-column section, reducing padding) — don't just rely on things naturally reflowing.
-- The failure mode to actively avoid: a single centered column of plain black-on-white text with no color accent, no icons, no visual texture, and identical spacing everywhere. If what you're about to write matches that description, revise it before finishing.`;
+- The failure mode to actively avoid: a single centered column of plain black-on-white text with no color accent, no icons, no visual texture, and identical spacing everywhere. If what you're about to write matches that description, revise it before finishing.
+
+If this page includes a data-collection form (waitlist signup, contact form, newsletter, interest form, etc.), make it actually submit somewhere real, not a dead \`fetch()\` to a made-up URL:
+\`\`\`html
+<script>
+document.getElementById('YOUR_FORM_ID').addEventListener('submit', async function(e) {
+  e.preventDefault();
+  const data = Object.fromEntries(new FormData(e.target));
+  if (window.STARTUPVERSE_SUBMIT_URL) {
+    await fetch(window.STARTUPVERSE_SUBMIT_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) }).catch(() => {});
+  }
+  // Always show a real success state, whether or not the URL exists yet —
+  // it's only defined once this page is actually hosted (see below).
+  // ...your existing success UI here...
+});
+</script>
+\`\`\`
+\`window.STARTUPVERSE_SUBMIT_URL\` is a real global this platform defines automatically once your file is deployed — it doesn't exist yet while you're drafting, and it won't exist in a local preview either, which is expected and fine (the \`if\` guard above handles both). Never hardcode a submission URL yourself, never invent a fake backend, and never skip building the real success-state UI just because the URL isn't defined yet at draft time.`;
 
 /**
  * Real contamination confirmed live, 2026-09-14: despite

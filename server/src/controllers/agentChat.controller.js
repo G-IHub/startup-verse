@@ -20,6 +20,7 @@ import WeeklyOutcome from "../models/WeeklyOutcome.js";
 import Milestone from "../models/Milestone.js";
 import Task from "../models/Task.js";
 import User from "../models/User.js";
+import FormSubmission from "../models/FormSubmission.js";
 import mongoose from "mongoose";
 import { error as apiError, success as apiSuccess } from "../utils/apiResponse.js";
 import { chatCompletion, deepseekConfigured } from "../services/deepseekClient.js";
@@ -149,7 +150,7 @@ function summarizeDevEvent(e) {
   return `[${e._id}] ${label}${pr}${repo ? ` on ${repo}` : ""}${desc} — ${statusText}${liveLink}`;
 }
 
-function buildSystemPrompt({ startupName, stage, goal, milestonesSummary, devActivitySummary, openTasksSummary, defaultRepo, teamSummary }) {
+function buildSystemPrompt({ startupName, stage, goal, milestonesSummary, devActivitySummary, openTasksSummary, defaultRepo, teamSummary, submissionsSummary }) {
   return `You are AI Product Manager, a StartupVerse agent and ${startupName ? `${startupName}'s` : "the founder's"} primary day-to-day planning partner.
 
 **Critical, applies to every action below, not just one of them: saying it happened doesn't make it happen.** Only a fenced block (\`\`\`SPRINT_PLAN, \`\`\`BUILD_TASK, etc.) does anything real. Never write "handed to," "opened a real PR," "staged," "proposed," "done," "updated," or anything implying an action was taken unless you emit the exact block in that same reply — if you're missing something you need, say so instead of describing an action you didn't take. The 🛠️ and 📋 confirmation lines you've seen in past replies are appended automatically by the system after a real action actually succeeds — never write those yourself; if you write one without the system having added it, that's exactly the false claim this rule exists to prevent.
@@ -217,7 +218,8 @@ Real context:
 - Milestones (id — title, status): ${milestonesSummary || "none yet"}
 - Tasks (id — title, status): ${openTasksSummary || "none yet"}
 - Team (id — name, for reassignment only): ${teamSummary || "no team members added yet"}
-- Recent AI Developer activity: ${devActivitySummary || "none yet — AI Developer hasn't done anything for this founder yet"}`;
+- Recent AI Developer activity: ${devActivitySummary || "none yet — AI Developer hasn't done anything for this founder yet"}
+- Real form submissions received on the hosted product (signups/leads/contact-form entries — real people who actually visited the live site and submitted something, not simulated): ${submissionsSummary || "none yet"}`;
 }
 
 async function loadContext(founderId) {
@@ -261,6 +263,21 @@ async function loadContext(founderId) {
     ? `${startup.defaultGithubRepo.owner}/${startup.defaultGithubRepo.repo}`
     : "";
 
+  // Real data capture (2026-09-15) — the hosted product's own forms
+  // (see hostedSiteService.js) can now actually collect real submissions.
+  // AI PM gets a real count + a few recent real previews, not the full
+  // dump (could contain a lot of PII-shaped free text) — enough to answer
+  // "how many signups do we have" honestly without needing a new marker.
+  const submissionsCount = await FormSubmission.countDocuments({ founderId });
+  let submissionsSummary = "";
+  if (submissionsCount > 0) {
+    const recentSubmissions = await FormSubmission.find({ founderId }).sort({ createdAt: -1 }).limit(3).lean();
+    const previews = recentSubmissions
+      .map((s) => Object.entries(s.data || {}).slice(0, 3).map(([k, v]) => `${k}: ${v}`).join(", "))
+      .join("; ");
+    submissionsSummary = `${submissionsCount} total. Most recent: ${previews}`;
+  }
+
   return {
     startupName: startup?.name || "",
     stage: startup?.stage || "",
@@ -271,6 +288,7 @@ async function loadContext(founderId) {
     teamSummary,
     devActivitySummary,
     defaultRepo,
+    submissionsSummary,
   };
 }
 

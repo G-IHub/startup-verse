@@ -37,6 +37,7 @@ import offersRouter from "./offers.routes.js";
 import payrollRouter from "./payroll.routes.js";
 import agentOrchestrationRouter from "./agentOrchestration.routes.js";
 import agentChatRouter from "./agentChat.routes.js";
+import formSubmissionsRouter from "./formSubmissions.routes.js";
 
 const apiRouter = Router();
 
@@ -65,6 +66,7 @@ apiRouter.use(offersRouter);
 apiRouter.use(payrollRouter);
 apiRouter.use(agentOrchestrationRouter);
 apiRouter.use(agentChatRouter);
+apiRouter.use(formSubmissionsRouter);
 apiRouter.use(teamMembersRouter);
 apiRouter.use(cronRouter);
 apiRouter.use(eventsRouter);
