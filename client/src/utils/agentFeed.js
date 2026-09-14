@@ -51,9 +51,10 @@ function describeDevEvent(e) {
       return {
         from: DEV_ACTOR, to: null, text: `Deployed to production${repoLabel ? " on " + repoLabel : ""}.`,
         tag: { label: "Live in production", bg: "#EAF3DE", color: "#27500A" },
-        // Real link to the actual deployed page (GitHub Pages, enabled the
-        // moment a production deploy first succeeds) — not just a PR diff.
-        link: e.result?.pagesUrl, linkLabel: "View live site →",
+        // Real link to the actual deployed page — hostedUrl (our own
+        // guaranteed hosting, 2026-09-15) preferred over pagesUrl (GitHub
+        // Pages, best-effort and known to fail on some repo/token setups).
+        link: e.result?.hostedUrl || e.result?.pagesUrl, linkLabel: "View live site →",
       };
     }
     if (e.status === "declined") {

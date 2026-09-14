@@ -5,8 +5,13 @@
  * (a hardcoded fake "HealthTrack" mobile app + fake build history + a fake
  * "Open live site" toast that did nothing). Made real once GitHub Pages
  * hosting existed for AI Developer's deploys (agentExecutors.js's
- * executeGithubMergeMain now enables a real Pages site and returns a real
- * pagesUrl) — before that, there was no real URL anywhere to point this at.
+ * executeGithubMergeMain enables a real Pages site and returns a real
+ * pagesUrl), then made reliable (2026-09-15) with a real, guaranteed
+ * hostedUrl (sites.startupverse.space/{slug}) that doesn't depend on the
+ * founder's GitHub plan or token scope the way Pages does — prefer that
+ * one, fall back to pagesUrl, and only fall further back to a local Blob
+ * preview if a deploy genuinely has neither (both real per-deploy hiccups,
+ * not the common case now).
  *
  * Real data only: the actual live site (a real iframe of the real deployed
  * page, once one exists), and real build history from real AgentEvents.
@@ -51,7 +56,7 @@ function buildRealHistory(events) {
       // private repo on a plan that doesn't support it).
       fileContent: b.openPr.result?.fileContent || null,
       live: Boolean(b.prod),
-      pagesUrl: b.prod?.result?.pagesUrl || null,
+      liveUrl: b.prod?.result?.hostedUrl || b.prod?.result?.pagesUrl || null,
       pagesError: b.prod?.result?.pagesError || null,
       time: b.prod?.createdAt || b.openPr.createdAt,
     }))
@@ -81,7 +86,7 @@ export default function V2ProductViewer({ user, onBack }) {
     return () => { cancelled = true; };
   }, [resolvedFounderId]);
 
-  const latestLive = history.find((h) => h.live && h.pagesUrl) || null;
+  const latestLive = history.find((h) => h.live && h.liveUrl) || null;
 
   // Real fallback for when no public URL exists yet (Pages not enabled, or
   // a real limitation like a private repo on a plan that doesn't support
@@ -128,7 +133,7 @@ export default function V2ProductViewer({ user, onBack }) {
             Back to Workroom
           </button>
           {latestLive ? (
-            <a href={latestLive.pagesUrl} target="_blank" rel="noreferrer" className="rounded-full bg-v2-purple px-3 py-1.5 font-body text-[12px] font-medium text-white hover:opacity-90 transition-opacity">
+            <a href={latestLive.liveUrl} target="_blank" rel="noreferrer" className="rounded-full bg-v2-purple px-3 py-1.5 font-body text-[12px] font-medium text-white hover:opacity-90 transition-opacity">
               Open live site ↗
             </a>
           ) : localPreviewBlobUrl ? (
@@ -167,9 +172,9 @@ export default function V2ProductViewer({ user, onBack }) {
               <div className="w-full overflow-hidden rounded-2xl bg-white" style={{ boxShadow: "0 30px 70px rgba(0,0,0,.45)" }}>
                 <div className="flex h-[30px] items-center gap-1.5 bg-[#26263a] px-3">
                   {["#E24B4A", "#BA7517", "#1D9E75"].map((c) => <div key={c} className="h-[7px] w-[7px] rounded-full" style={{ background: c }} />)}
-                  <div className="ml-2 flex-1 truncate rounded-xl bg-white/[0.08] px-3 py-1 font-body text-[10px] text-[#c9c5f0]">{latestLive.pagesUrl}</div>
+                  <div className="ml-2 flex-1 truncate rounded-xl bg-white/[0.08] px-3 py-1 font-body text-[10px] text-[#c9c5f0]">{latestLive.liveUrl}</div>
                 </div>
-                <iframe title="Live product preview" src={latestLive.pagesUrl} className="h-[420px] w-full border-0" />
+                <iframe title="Live product preview" src={latestLive.liveUrl} className="h-[420px] w-full border-0" />
               </div>
             ) : localPreview ? (
               <div className="w-full overflow-hidden rounded-2xl bg-white" style={{ boxShadow: "0 30px 70px rgba(0,0,0,.45)" }}>
@@ -210,8 +215,8 @@ export default function V2ProductViewer({ user, onBack }) {
                       <WhoBadge initials="DEV" bg="#f3f4f6" color="#6b7280" />
                       <span className="font-body text-[9px] text-v2-subtle">{h.prUrl ? <a href={h.prUrl} target="_blank" rel="noreferrer" className="hover:underline">Built · view PR</a> : "Built"}</span>
                     </div>
-                    {h.live && h.pagesUrl && (
-                      <a href={h.pagesUrl} target="_blank" rel="noreferrer" className="font-body text-[9px] text-v2-blue hover:underline">Live ↗</a>
+                    {h.live && h.liveUrl && (
+                      <a href={h.liveUrl} target="_blank" rel="noreferrer" className="font-body text-[9px] text-v2-blue hover:underline">Live ↗</a>
                     )}
                     <span className="ml-auto font-body text-[9px] text-v2-subtle">{formatEventTime(h.time)}</span>
                   </div>

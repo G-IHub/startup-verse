@@ -10,6 +10,7 @@
  */
 import { openPullRequest, mergePullRequest, mergeBranches, getFileContent, getPullRequestFiles, ensureGithubPagesEnabled, updateFileContent } from "./githubAdapter.js";
 import { draftText, deepseekConfigured } from "./deepseekClient.js";
+import { publishHostedSite } from "./hostedSiteService.js";
 import Startup from "../models/Startup.js";
 import Milestone from "../models/Milestone.js";
 import Task from "../models/Task.js";
@@ -246,7 +247,7 @@ async function executeGithubMergeStaging({ founderId, payload }) {
   return mergePullRequest({ founderId, owner, repo, prNumber, commitMessage: "AI Developer: merge to staging" });
 }
 
-async function executeGithubMergeMain({ founderId, payload }) {
+async function executeGithubMergeMain({ founderId, payload, targetId }) {
   const { owner, repo, baseBranch, prodBranch } = payload || {};
   if (!owner || !repo) {
     throw new Error("deploy_prod requires owner and repo in payload.");
@@ -271,6 +272,35 @@ async function executeGithubMergeMain({ founderId, payload }) {
     result.pagesUrl = pages.url;
   } catch (err) {
     result.pagesError = err.message;
+  }
+
+  // Real, guaranteed hosted link (2026-09-15) — GitHub Pages above is
+  // best-effort and has already hit two separate real failure modes live
+  // (a private repo on a plan without Pages, a token missing Pages scope).
+  // This never depends on the founder's GitHub plan or token permissions:
+  // fetch the file's real, just-merged content straight from the base
+  // branch (not the original open_pr event's stored draft, which can be
+  // stale if AI PM's review-and-revise loop rewrote it since) and mirror
+  // it to our own domain. Best-effort — must never fail the real deploy.
+  try {
+    const openPrEvent = await AgentEvent.findOne({
+      founderId,
+      targetId,
+      "payload.filePath": { $exists: true },
+    }).sort({ createdAt: -1 }).lean();
+    const filePath = openPrEvent?.payload?.filePath;
+    if (filePath && /\.html?$/i.test(filePath)) {
+      const file = await getFileContent({ founderId, owner, repo, path: filePath });
+      if (file?.content) {
+        const startup = await Startup.findOne({ founderId });
+        if (startup) {
+          const hosted = await publishHostedSite({ startup, html: file.content, filePath, sourceEventId: null });
+          result.hostedUrl = hosted.url;
+        }
+      }
+    }
+  } catch (err) {
+    result.hostedError = err.message;
   }
 
   return result;
@@ -348,6 +378,8 @@ async function executeExplainDevWork({ founderId, payload }) {
     // pagesError were sitting in the event's own result the whole time.
     pagesUrl: event.result?.pagesUrl || null,
     pagesError: event.result?.pagesError || null,
+    hostedUrl: event.result?.hostedUrl || null,
+    hostedError: event.result?.hostedError || null,
     status: event.status,
     error: event.status === "failed" ? (event.result?.error || null) : null,
   };

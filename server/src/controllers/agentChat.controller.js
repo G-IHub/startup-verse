@@ -136,12 +136,12 @@ function summarizeDevEvent(e) {
   // needing any GitHub call at all, and just wasn't using it.
   const desc = e.payload?.taskDescription ? ` — "${String(e.payload.taskDescription).slice(0, 140)}"` : "";
   // Real gap found live: a founder asked "is there a link to view this?"
-  // after a real production deploy, and AI PM had no way to answer — the
-  // real pagesUrl (or the real reason Pages couldn't be enabled, e.g. a
-  // private repo on a plan that doesn't support it) was sitting in this
-  // exact event's result the whole time, just never surfaced here.
+  // after a real production deploy, and AI PM had no way to answer. Fixed
+  // twice: first by surfacing GitHub Pages' own real pagesUrl/pagesError,
+  // then (2026-09-15) by adding a real, guaranteed hostedUrl that doesn't
+  // depend on the founder's GitHub plan or token scope — prefer that one.
   const liveLink = e.actionTypeId?.actionKey === "github_merge_main"
-    ? (e.result?.pagesUrl ? ` — live at ${e.result.pagesUrl}` : e.result?.pagesError ? ` — no live link (${e.result.pagesError})` : "")
+    ? (e.result?.hostedUrl ? ` — live at ${e.result.hostedUrl}` : e.result?.pagesUrl ? ` — live at ${e.result.pagesUrl}` : e.result?.pagesError ? ` — no live link (${e.result.pagesError})` : "")
     : "";
   // [id] prefix so AI PM can reference *this specific* event for ASK_DEV
   // (e.g. "what did it actually write for this one") — not just describe
@@ -205,8 +205,8 @@ Your job:
 \`\`\`ASK_DEV
 {"eventId":"...","question":null}
 \`\`\`
-  Leave "question" null to just explain what that event actually was and why in your own words; set it to a specific question ("what does this file do," "why this approach") to answer that instead. This pulls from AI Developer's own real stored record of that action — including the actual file content it wrote, and (for a production-deploy event) the real live GitHub Pages URL if one exists, or the real reason it doesn't — not a live GitHub fetch, so it works even for old events. If nothing useful is stored for that event (e.g. it was a deploy step, not a code-writing one), say so honestly.
-  **If a founder asks for a link to see what was built and there's no real live URL** (check the "Recent AI Developer activity" list below — a deploy line ending in "no live link (reason)" means GitHub Pages couldn't be enabled, most often because the repo is private and the connected GitHub plan doesn't support Pages on private repos): tell them the real reason, and point them at the app's own **Product Viewer** page — it renders the actual file AI Developer wrote directly, with no hosting required, so they can still see and click into it even without a public URL. If they want a real public link too, the fix is making the GitHub repo public (or upgrading their GitHub plan) — say that plainly rather than implying it's unfixable.
+  Leave "question" null to just explain what that event actually was and why in your own words; set it to a specific question ("what does this file do," "why this approach") to answer that instead. This pulls from AI Developer's own real stored record of that action — including the actual file content it wrote, and (for a production-deploy event) the real live URL — not a live GitHub fetch, so it works even for old events. If nothing useful is stored for that event (e.g. it was a deploy step, not a code-writing one), say so honestly.
+  **If a founder asks for a link to see what was built**, every real production deploy now gets a guaranteed real link at sites.startupverse.space — check the "Recent AI Developer activity" list below for "live at [url]" on the deploy line and give them that. If a deploy line instead says "no live link (reason)" — genuinely rare now, only if that specific deploy failed for its own reason — say the real reason honestly and point them at the app's own **Product Viewer** page as a fallback, which renders the actual file AI Developer wrote directly with no hosting required.
 - Besides those real actions, you still can't do anything else for real — you can't send money, sign documents, or message customers on the founder's behalf. If asked, say so honestly instead of pretending you can.
 - Write like a sharp, direct colleague, not a customer-support bot. No filler, no "I'd be happy to help."
 
@@ -802,7 +802,7 @@ async function processAiPmReply({ raw, ctx, messages, founderId, agent, allowedM
               found.taskDescription ? `The real task it was given: "${found.taskDescription}"` : null,
               found.fileContent ? `The real file content it actually wrote:\n\n${found.fileContent}` : "No file content is stored for this event (it wasn't a code-writing action, or it failed before writing anything).",
               found.prUrl ? `Real PR: ${found.prUrl}` : null,
-              found.pagesUrl ? `Real live URL (GitHub Pages): ${found.pagesUrl}` : found.pagesError ? `No live URL — GitHub Pages could not be enabled: ${found.pagesError}` : null,
+              found.hostedUrl ? `Real live URL: ${found.hostedUrl}` : found.pagesUrl ? `Real live URL (GitHub Pages): ${found.pagesUrl}` : found.pagesError ? `No live URL — GitHub Pages could not be enabled: ${found.pagesError}` : null,
             ].filter(Boolean).join("\n\n");
             try {
               replyText = await synthesizeFromToolResult({

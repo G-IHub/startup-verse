@@ -58,12 +58,21 @@ const startupSchema = new mongoose.Schema(
     // ask first. This is the first behavior anywhere in this app that acts
     // without being asked, so it stays opt-in rather than on for everyone.
     autonomousPlanningEnabled: { type: Boolean, default: false },
+    // Real hosted-link feature (2026-09-15): the stable slug a founder's
+    // product lives at — https://sites.startupverse.space/{slug}. No
+    // default (left unset, not "") so the sparse unique index below only
+    // enforces uniqueness once a slug actually exists — see
+    // hostedSiteService.js's ensureStartupSlug, which generates and saves
+    // this lazily the first time a real production deploy needs one,
+    // rather than requiring a migration for every existing Startup.
+    slug: { type: String, trim: true, lowercase: true, maxlength: 80 },
   },
   { timestamps: true },
 );
 
 startupSchema.index({ founderId: 1 }, { unique: true });
 startupSchema.index({ industry: 1, stage: 1 });
+startupSchema.index({ slug: 1 }, { unique: true, sparse: true });
 
 const Startup = mongoose.models.Startup || mongoose.model("Startup", startupSchema);
 

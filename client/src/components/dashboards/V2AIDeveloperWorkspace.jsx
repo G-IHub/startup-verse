@@ -418,8 +418,8 @@ export default function V2AIDeveloperWorkspace({ user, onBack, onNavigate }) {
                           Awaiting your approval — open Approval Queue →
                         </button>
                       )}
-                      {t.stage === "prod_done" && t.prod?.result?.pagesUrl && (
-                        <a href={t.prod.result.pagesUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 rounded-full bg-v2-green px-3 py-1 font-body text-[10px] font-medium text-white hover:opacity-90 transition-opacity">
+                      {t.stage === "prod_done" && (t.prod?.result?.hostedUrl || t.prod?.result?.pagesUrl) && (
+                        <a href={t.prod.result.hostedUrl || t.prod.result.pagesUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 rounded-full bg-v2-green px-3 py-1 font-body text-[10px] font-medium text-white hover:opacity-90 transition-opacity">
                           View live site <ExternalLink className="h-3 w-3" />
                         </a>
                       )}
