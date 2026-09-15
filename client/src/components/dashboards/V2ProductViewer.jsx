@@ -20,6 +20,7 @@
  * rather than faked.
  */
 import React, { useEffect, useMemo, useState } from "react";
+import { Maximize2, Minimize2 } from "lucide-react";
 import { getAgentEvents } from "../../utils/api/agentOrchestrationApi";
 import { getFounderStartupSafe } from "../../utils/api/founderApi";
 import { getFormSubmissions } from "../../utils/api/formSubmissionsApi";
@@ -29,6 +30,46 @@ import { formatEventTime } from "../../utils/agentDisplay";
 function WhoBadge({ initials, bg, color }) {
   return (
     <div className="flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-full font-body text-[7px] font-semibold" style={{ background: bg, color }}>{initials}</div>
+  );
+}
+
+/**
+ * Renders the real preview (a live URL or the local file content) with a
+ * browser-chrome bar, and a real toggle to expand it to a full page within
+ * the app — same "inline by default, pop out for a real full-screen look"
+ * pattern already established for video calls (V2CallShell's variant prop),
+ * built lightweight here rather than pulling in that component tree.
+ */
+function PreviewFrame({ chromeLabel, title, src, srcDoc, expanded, onToggleExpand }) {
+  const chrome = (
+    <div className="flex h-[30px] shrink-0 items-center gap-1.5 bg-[#26263a] px-3">
+      {["#E24B4A", "#BA7517", "#1D9E75"].map((c) => <div key={c} className="h-[7px] w-[7px] rounded-full" style={{ background: c }} />)}
+      <div className="ml-2 flex-1 truncate rounded-xl bg-white/[0.08] px-3 py-1 font-body text-[10px] text-[#c9c5f0]">{chromeLabel}</div>
+      <button
+        type="button"
+        onClick={onToggleExpand}
+        title={expanded ? "Collapse" : "Expand to full page"}
+        className="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg text-[#c9c5f0] hover:bg-white/[0.12] transition-colors"
+      >
+        {expanded ? <Minimize2 className="h-3.5 w-3.5" /> : <Maximize2 className="h-3.5 w-3.5" />}
+      </button>
+    </div>
+  );
+
+  if (expanded) {
+    return (
+      <div className="fixed inset-0 z-[999] flex flex-col bg-white">
+        {chrome}
+        <iframe title={title} src={src} srcDoc={srcDoc} className="w-full flex-1 border-0" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="w-full overflow-hidden rounded-2xl bg-white" style={{ boxShadow: "0 30px 70px rgba(0,0,0,.45)" }}>
+      {chrome}
+      <iframe title={title} src={src} srcDoc={srcDoc} className="h-[420px] w-full border-0" />
+    </div>
   );
 }
 
@@ -72,6 +113,7 @@ export default function V2ProductViewer({ user, onBack }) {
   const [startup, setStartup] = useState(null);
   const [history, setHistory] = useState([]);
   const [submissions, setSubmissions] = useState([]);
+  const [expanded, setExpanded] = useState(false);
 
   useEffect(() => {
     if (!resolvedFounderId) return;
@@ -155,38 +197,35 @@ export default function V2ProductViewer({ user, onBack }) {
         <div className="shrink-0 overflow-hidden rounded-[20px]" style={{ background: "radial-gradient(ellipse at 50% 0%, #241f5c, #100e2e 65%)" }}>
           <div className="px-6 pt-6">
             <div className="font-body text-[15px] font-medium text-white">{startup?.name || "Your product"} — what's actually been built</div>
-            <p className="mt-0.5 max-w-[420px] font-body text-[11px] leading-relaxed text-[#a8a3d9]">
+            <p className="mt-0.5 max-w-[460px] font-body text-[11px] leading-relaxed text-[#a8a3d9]">
               {latestLive
                 ? "Real deploy, embedded live below — this is the actual page AI Developer shipped."
+                : localPreview?.pagesError
+                ? `No public URL yet — ${localPreview.pagesError} Here's exactly what was built below, rendered directly from the real file, no hosting needed.`
                 : localPreview
                 ? "No public URL yet, but here's exactly what was built — rendered directly from the real file, no hosting needed."
                 : "Nothing has reached production yet. Once a real deploy goes live, it renders here."}
             </p>
-            {!latestLive && localPreview?.pagesError && (
-              <p className="mt-2 max-w-[420px] rounded-lg bg-white/[0.06] px-3 py-2 font-body text-[10px] leading-relaxed text-[#c9c5f0]">
-                Why there's no public link: {localPreview.pagesError}
-              </p>
-            )}
           </div>
           <div className="flex min-h-[380px] items-center justify-center p-6">
             {loading ? (
               <div className="font-body text-[12px] text-[#a8a3d9]">Loading real activity…</div>
             ) : latestLive ? (
-              <div className="w-full overflow-hidden rounded-2xl bg-white" style={{ boxShadow: "0 30px 70px rgba(0,0,0,.45)" }}>
-                <div className="flex h-[30px] items-center gap-1.5 bg-[#26263a] px-3">
-                  {["#E24B4A", "#BA7517", "#1D9E75"].map((c) => <div key={c} className="h-[7px] w-[7px] rounded-full" style={{ background: c }} />)}
-                  <div className="ml-2 flex-1 truncate rounded-xl bg-white/[0.08] px-3 py-1 font-body text-[10px] text-[#c9c5f0]">{latestLive.liveUrl}</div>
-                </div>
-                <iframe title="Live product preview" src={latestLive.liveUrl} className="h-[420px] w-full border-0" />
-              </div>
+              <PreviewFrame
+                chromeLabel={latestLive.liveUrl}
+                title="Live product preview"
+                src={latestLive.liveUrl}
+                expanded={expanded}
+                onToggleExpand={() => setExpanded((v) => !v)}
+              />
             ) : localPreview ? (
-              <div className="w-full overflow-hidden rounded-2xl bg-white" style={{ boxShadow: "0 30px 70px rgba(0,0,0,.45)" }}>
-                <div className="flex h-[30px] items-center gap-1.5 bg-[#26263a] px-3">
-                  {["#E24B4A", "#BA7517", "#1D9E75"].map((c) => <div key={c} className="h-[7px] w-[7px] rounded-full" style={{ background: c }} />)}
-                  <div className="ml-2 flex-1 truncate rounded-xl bg-white/[0.08] px-3 py-1 font-body text-[10px] text-[#c9c5f0]">{localPreview.filePath} · local preview, not a public link</div>
-                </div>
-                <iframe title="Local product preview" srcDoc={localPreview.fileContent} className="h-[420px] w-full border-0" />
-              </div>
+              <PreviewFrame
+                chromeLabel={`${localPreview.filePath} · local preview, not a public link`}
+                title="Local product preview"
+                srcDoc={localPreview.fileContent}
+                expanded={expanded}
+                onToggleExpand={() => setExpanded((v) => !v)}
+              />
             ) : (
               <div className="max-w-[320px] text-center font-body text-[12px] leading-relaxed text-[#a8a3d9]">
                 No real deploy yet. Hand AI Developer a task from the Chat page — once it reaches production, the real live page shows up right here.
