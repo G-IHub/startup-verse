@@ -14,7 +14,7 @@
 
 import React, { useState } from "react";
 import { cn } from "../ui/utils";
-import { Bot, Users, Plug, MessageSquare } from "lucide-react";
+import { Bot, Users, Plug, MessageSquare, Rocket } from "lucide-react";
 import V2AppLayout from "../layout/V2AppLayout";
 import V2AgentWorkroom from "./V2AgentWorkroom";
 import V2AIStaffManage from "./V2AIStaffManage";
@@ -32,10 +32,11 @@ import V2ProductViewer from "./V2ProductViewer";
 
 /* ── Tab config ─────────────────────────────────────────────────────────── */
 const TABS = [
-  { id: "workroom",      label: "Workroom",      Icon: Bot },
-  { id: "manage-staff",  label: "Manage Staff",  Icon: Users },
-  { id: "chat",          label: "Chat",          Icon: MessageSquare },
-  { id: "integrations",  label: "Integrations",  Icon: Plug },
+  { id: "workroom",       label: "Workroom",      Icon: Bot },
+  { id: "manage-staff",   label: "Manage Staff",  Icon: Users },
+  { id: "chat",           label: "Chat",          Icon: MessageSquare },
+  { id: "product-viewer", label: "View Product",  Icon: Rocket },
+  { id: "integrations",   label: "Integrations",  Icon: Plug },
 ];
 
 /* ── Coming-soon placeholder for pages not yet built ───────────────────── */
@@ -75,7 +76,6 @@ const SUB_PAGE_LABELS = {
   "agent-legal":      "AI Legal Workspace",
   "agent-developer":  "AI Developer Workspace",
   "ai-staff-chat":    "AI Staff Chat",
-  "product-viewer":   "Product Viewer",
 };
 
 /* ── Toast (tab-bar-level actions, e.g. Chat's Download/Share) ──────────── */
@@ -100,10 +100,10 @@ export default function V2AIStaffShell({ user, onPageChange, ...rest }) {
     if (page === "workroom")      { setSubPage(null); setTab("workroom");      return; }
     if (page === "integrations")  { setSubPage(null); setTab("integrations");  return; }
     if (page === "chat" || page === "ai-staff-chat") { setSubPage(null); setTab("chat"); return; }
+    if (page === "product-viewer") { setSubPage(null); setTab("product-viewer"); return; }
     // Known sub-pages stay inside the shell
     const internalPages = ["approval-queue","autonomy-settings","audit-trail",
-      "agent-marketing","agent-sales","agent-finance","agent-legal","agent-developer",
-      "product-viewer"];
+      "agent-marketing","agent-sales","agent-finance","agent-legal","agent-developer"];
     if (internalPages.includes(page)) { setSubPage(page); return; }
     // Everything else → top-level routing
     onPageChange?.(page);
@@ -130,8 +130,6 @@ export default function V2AIStaffShell({ user, onPageChange, ...rest }) {
         return <V2AILegalWorkspace onBack={handleBack} onNavigate={handleNavigate} />;
       case "agent-developer":
         return <V2AIDeveloperWorkspace user={user} onBack={handleBack} onNavigate={handleNavigate} />;
-      case "product-viewer":
-        return <V2ProductViewer user={user} onBack={handleBack} />;
       default:
         return (
           <V2AIStaffComingSoon
@@ -222,6 +220,8 @@ export default function V2AIStaffShell({ user, onPageChange, ...rest }) {
             />
           ) : tab === "chat" ? (
             <V2AIStaffChat user={user} onNavigate={handleNavigate} />
+          ) : tab === "product-viewer" ? (
+            <V2ProductViewer user={user} onBack={() => setTab("workroom")} />
           ) : (
             <V2AIStaffManage
               user={user}

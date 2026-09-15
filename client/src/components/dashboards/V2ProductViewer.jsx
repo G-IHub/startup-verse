@@ -226,7 +226,10 @@ export default function V2ProductViewer({ user, onBack }) {
         </div>
       </div>
 
-      <div className="mx-auto flex w-full max-w-[1080px] min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-6">
+      <div className="flex min-h-0 flex-1 overflow-hidden">
+
+      {/* Main column — the product itself */}
+      <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-6">
 
         {/* Real live preview */}
         <div className="shrink-0 overflow-hidden rounded-[20px]" style={{ background: "radial-gradient(ellipse at 50% 0%, #241f5c, #100e2e 65%)" }}>
@@ -269,40 +272,6 @@ export default function V2ProductViewer({ user, onBack }) {
           </div>
         </div>
 
-        {/* Build history */}
-        <div className="rounded-[14px] border border-v2-border bg-white p-4">
-          <div className="font-body text-[13px] font-medium text-v2-heading">Build history</div>
-          <div className="mb-3 font-body text-[11px] text-v2-subtle">Every real AI Developer change — PR opened, and whether it reached production</div>
-          {loading ? (
-            <div className="py-6 text-center font-body text-[12px] text-v2-muted">Loading…</div>
-          ) : history.length === 0 ? (
-            <div className="py-6 text-center font-body text-[12px] text-v2-muted">No real AI Developer activity yet.</div>
-          ) : (
-            history.map((h, i) => (
-              <div key={h.targetId} className="flex gap-3 border-b border-gray-100 py-3 last:border-0">
-                <div className="flex shrink-0 flex-col items-center">
-                  <div className="mt-1 h-2.5 w-2.5 rounded-full" style={{ background: h.live ? "#1D9E75" : "#9ca3af" }} />
-                  {i < history.length - 1 && <div className="mt-1 w-px flex-1 bg-gray-200" />}
-                </div>
-                <div className="flex-1 pb-0.5">
-                  <div className="font-body text-[11px] font-medium text-v2-heading">{h.filePath || h.title}</div>
-                  <p className="mt-0.5 font-body text-[11px] leading-relaxed text-v2-muted">{h.title}</p>
-                  <div className="mt-2 flex flex-wrap items-center gap-2.5">
-                    <div className="flex items-center gap-1.5">
-                      <WhoBadge initials="DEV" bg="#f3f4f6" color="#6b7280" />
-                      <span className="font-body text-[9px] text-v2-subtle">{h.prUrl ? <a href={h.prUrl} target="_blank" rel="noreferrer" className="hover:underline">Built · view PR</a> : "Built"}</span>
-                    </div>
-                    {h.live && h.liveUrl && (
-                      <a href={h.liveUrl} target="_blank" rel="noreferrer" className="font-body text-[9px] text-v2-blue hover:underline">Live ↗</a>
-                    )}
-                    <span className="ml-auto font-body text-[9px] text-v2-subtle">{formatEventTime(h.time)}</span>
-                  </div>
-                </div>
-              </div>
-            ))
-          )}
-        </div>
-
         {/* Real data captured — form submissions from the actual live site, not simulated */}
         <div className="rounded-[14px] border border-v2-border bg-white p-4">
           <div className="flex items-center justify-between">
@@ -335,6 +304,42 @@ export default function V2ProductViewer({ user, onBack }) {
             </div>
           )}
         </div>
+      </div>
+
+      {/* Right sidebar — real build history, same width as every other V2 right panel */}
+      <div className="flex w-[320px] shrink-0 flex-col overflow-y-auto border-l border-v2-border bg-white p-4">
+        <div className="font-body text-[13px] font-medium text-v2-heading">Build history</div>
+        <div className="mb-3 font-body text-[11px] text-v2-subtle">Every real AI Developer change — PR opened, and whether it reached production</div>
+        {loading ? (
+          <div className="py-6 text-center font-body text-[12px] text-v2-muted">Loading…</div>
+        ) : history.length === 0 ? (
+          <div className="py-6 text-center font-body text-[12px] text-v2-muted">No real AI Developer activity yet.</div>
+        ) : (
+          history.map((h, i) => (
+            <div key={h.targetId} className="flex gap-2.5 border-b border-gray-100 py-3 last:border-0">
+              <div className="flex shrink-0 flex-col items-center">
+                <div className="mt-1 h-2.5 w-2.5 rounded-full" style={{ background: h.live ? "#1D9E75" : "#9ca3af" }} />
+                {i < history.length - 1 && <div className="mt-1 w-px flex-1 bg-gray-200" />}
+              </div>
+              <div className="min-w-0 flex-1 pb-0.5">
+                <div className="truncate font-body text-[11px] font-medium text-v2-heading">{h.filePath || h.title}</div>
+                <p className="mt-0.5 line-clamp-2 font-body text-[11px] leading-relaxed text-v2-muted">{h.title}</p>
+                <div className="mt-2 flex flex-wrap items-center gap-2">
+                  <div className="flex items-center gap-1.5">
+                    <WhoBadge initials="DEV" bg="#f3f4f6" color="#6b7280" />
+                    <span className="font-body text-[9px] text-v2-subtle">{h.prUrl ? <a href={h.prUrl} target="_blank" rel="noreferrer" className="hover:underline">Built · view PR</a> : "Built"}</span>
+                  </div>
+                  {h.live && h.liveUrl && (
+                    <a href={h.liveUrl} target="_blank" rel="noreferrer" className="font-body text-[9px] text-v2-blue hover:underline">Live ↗</a>
+                  )}
+                </div>
+                <div className="mt-1 font-body text-[9px] text-v2-subtle">{formatEventTime(h.time)}</div>
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+
       </div>
     </div>
   );
