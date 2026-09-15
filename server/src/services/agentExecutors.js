@@ -40,6 +40,7 @@ const AI_DEVELOPER_SYSTEM_PROMPT = `You are AI Developer, a StartupVerse agent w
 - Prefer small, focused, additive content over trying to do too much in one file — the same "new capability, new small file" discipline this platform holds itself to.
 - Never write a comment, docstring, or claim asserting something is tested, complete, or working if you have no way to know that — do not fabricate confidence you don't have.
 - If the task description is ambiguous or missing information you'd need, write the most reasonable, minimal, honest interpretation rather than guessing elaborately or padding with speculative features.
+- **If asked for something large or open-ended** ("more pages," "more sections," "everything better," an unusually long page) — a real, finite generation budget backs every request, and a genuinely huge single file risks never finishing at all, which is worse than a smaller one that's real and complete. Pick a bounded, realistic scope (a handful of focused sections, not an unbounded number of cards or pages) and write a complete, working file within it. A finished, well-designed page with fewer sections always beats a longer one that gets cut off mid-tag.
 
 When the file is a web page (HTML/CSS), design it like a real modern product, not a plain document — a founder found a real past output "too plain" and that's a real bar to clear, not a style preference:
 - **Typography carries most of the design.** Use a real type scale, not one size everywhere: a hero headline should be dramatically larger (2.5–4rem) and bolder than body text (1rem, comfortable 1.6 line-height). Vary weight (700+ for headings, 400 for body) and color depth (near-black for headings, a mid-gray for supporting text) to create real hierarchy at a glance.
@@ -113,16 +114,28 @@ async function executeGithubOpenPr({ founderId, payload, targetId }) {
   }
   // Real finding from live testing: draftText's own default (1200, sized
   // long before this executor existed) was too small for an actual file a
-  // founder would want — a real landing page hit the length limit even
-  // after the empty-content retry escalated 1200 -> 2400. Real code/markup
-  // needs more headroom than a short chat reply; 4000 gives real room for
-  // a genuine file, with retry escalation (see deepseekClient.js) still
-  // able to go to 8000 if a single generation is unusually large.
+  // founder would want. Real code/markup needs more headroom than a short
+  // chat reply; 4000 gives real room for a typical file, with
+  // deepseekClient.js's own escalating retry loop (see maxRetryTokens
+  // below) taking over automatically for anything bigger.
   const rawDraft = deepseekConfigured()
     ? await draftText({
         systemPrompt: AI_DEVELOPER_SYSTEM_PROMPT,
         userPrompt: `File path: ${filePath}\n\nTask: ${taskDescription}`,
         maxTokens: 4000,
+        // Real finding, 2026-09-15: this model can burn its ENTIRE budget on
+        // invisible reasoning tokens before writing any visible content —
+        // confirmed live, a demanding "more pages/cards/everything" style
+        // task hit finish_reason "length" with zero visible output even at
+        // 4000 and 16000 tokens; deepseekClient.js now escalates repeatedly
+        // (4000 -> 8000 -> 16000 -> 32000) rather than giving up after one
+        // retry. 32000 is the real ceiling here, not an arbitrary guess — it
+        // was the first budget that reliably completed the most demanding
+        // real page tested (a maximally open-ended "more pages/cards/
+        // everything" ask). Simple one-file drafts never pay for this
+        // headroom — the loop stops the moment a real, complete response
+        // comes back, usually well under this ceiling.
+        maxRetryTokens: 32000,
       })
     : `# ${taskDescription}\n\n(DeepSeek not configured — placeholder content, not real drafting.)\n`;
 
@@ -238,6 +251,7 @@ async function executeReviseFile({ founderId, payload }) {
     systemPrompt: AI_DEVELOPER_SYSTEM_PROMPT,
     userPrompt: `File path: ${filePath}\n\nOriginal task: ${taskDescription}\n\nYour previous draft of this file:\n\n${currentContent}\n\nReal review feedback from AI Product Manager — revise the file to address this specifically, keeping everything that already works:\n\n${feedback}`,
     maxTokens: 4000,
+    maxRetryTokens: 32000, // same real, evidence-based ceiling as the original draft — see executeGithubOpenPr
   });
   if (!rawRevision.trim()) {
     throw new Error(`AI Developer's revision call for "${filePath}" came back empty — leaving the previous draft in place.`);
