@@ -21,10 +21,19 @@
 import CustomDomain from "../models/CustomDomain.js";
 import HostedSite from "../models/HostedSite.js";
 
+/** Same proxy-aware hostname resolver used in hostedSitePublic.js and app.js */
+function resolveHostname(req) {
+  const fwd = req.headers["x-forwarded-host"];
+  if (fwd) return String(fwd).split(",")[0].trim().split(":")[0].toLowerCase();
+  const raw = req.headers.host;
+  if (raw) return String(raw).split(":")[0].toLowerCase();
+  return (req.hostname || "").toLowerCase();
+}
+
 export default async function customDomainPublicMiddleware(req, res, next) {
   if (req.method !== "GET") return next();
 
-  const hostname = req.hostname;
+  const hostname = resolveHostname(req);
   const record = await CustomDomain.findOne({ domain: hostname, certificateStatus: "issued" }).lean();
   if (!record) return next();
 

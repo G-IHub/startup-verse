@@ -88,6 +88,7 @@ export default function V2AppLayout({
   topbarChips,
   topbarActions,
   className,
+  mainClassName,
 }) {
   return (
     <div
@@ -116,7 +117,8 @@ export default function V2AppLayout({
         ) : null}
 
         {/* Page content — scrolls independently */}
-        <main className="flex-1 overflow-y-auto">
+        {/* When mainClassName is provided the caller owns overflow/flex behaviour */}
+        <main className={cn("flex-1", mainClassName ?? "overflow-y-auto")}>
           {children}
         </main>
       </div>

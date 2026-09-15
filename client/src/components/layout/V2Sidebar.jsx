@@ -12,8 +12,6 @@ import {
   Home,
   Zap,
   Building2,
-  Users,
-  Map,
   UserCheck,
   Bot,
   BookOpen,
@@ -26,12 +24,10 @@ const PRIMARY_NAV = [
   { id: "dashboard",        icon: Home,          label: "Dashboard",        page: "dashboard" },
   { id: "execution-engine", icon: Zap,           label: "Execution Engine", page: "execution-engine" },
   { id: "startup-office",   icon: Building2,     label: "Virtual Office",   page: "startup-office" },
-  { id: "community",        icon: Users,         label: "Community",        page: "community" },
+  { id: "team",             icon: UserCheck,     label: "Team",             page: "team" },
 ];
 
 const SECONDARY_NAV = [
-  { id: "journey",          icon: Map,           label: "Journey Stages",   page: "journey" },
-  { id: "team",             icon: UserCheck,     label: "Team",             page: "team" },
   { id: "talent",           icon: Briefcase,     label: "Talent Marketplace", page: "talent" },
   { id: "ai-staff",         icon: Bot,           label: "AI Staff",         page: "ai-staff" },
   { id: "blueprints",       icon: BookOpen,      label: "Blueprint Library",page: "blueprints" },

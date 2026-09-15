@@ -15,10 +15,31 @@ import { recordFormSubmission } from "../services/hostedSiteService.js";
 
 const SITES_HOSTNAME = process.env.SITES_HOSTNAME || "sites.startupverse.space";
 
+/**
+ * Robust hostname resolution — works both locally (req.hostname) and behind
+ * a reverse proxy / load balancer that may rewrite the Host header or add
+ * X-Forwarded-Host. Checks all three in priority order:
+ *   1. X-Forwarded-Host (set by proxies like Railway, Render, Cloudflare)
+ *   2. req.headers.host (raw Host header from the client)
+ *   3. req.hostname (Express-parsed, falls back to the bound address)
+ */
+function resolveHostname(req) {
+  const fwd = req.headers["x-forwarded-host"];
+  const rawHost = req.headers.host;
+  // x-forwarded-host may be comma-separated when chained; take the first value
+  if (fwd) return String(fwd).split(",")[0].trim().split(":")[0].toLowerCase();
+  if (rawHost) return String(rawHost).split(":")[0].toLowerCase();
+  return (req.hostname || "").toLowerCase();
+}
+
+function isSitesHost(req) {
+  return resolveHostname(req) === SITES_HOSTNAME.toLowerCase();
+}
+
 const router = Router();
 
 router.get("/:slug", async (req, res, next) => {
-  if (req.hostname !== SITES_HOSTNAME) return next();
+  if (!isSitesHost(req)) return next();
 
   const slug = String(req.params.slug || "").toLowerCase();
   const site = await HostedSite.findOne({ slug }).lean();
@@ -40,7 +61,7 @@ router.get("/:slug", async (req, res, next) => {
  * mounted) has already parsed req.body by the time this runs.
  */
 router.post("/:slug/submit", async (req, res, next) => {
-  if (req.hostname !== SITES_HOSTNAME) return next();
+  if (!isSitesHost(req)) return next();
 
   const slug = String(req.params.slug || "").toLowerCase();
   const result = await recordFormSubmission({ slug, rawData: req.body });

@@ -787,7 +787,7 @@ export function V2TaskManagementPanel({
               exit={{ x: "100%" }}
               transition={{ type: "spring", damping: 30, stiffness: 280 }}
               ref={panelRef}
-              className="fixed right-0 top-0 z-[70] flex h-full w-full flex-col overflow-hidden border-l border-v2-border bg-white md:w-[680px]"
+              className="fixed right-0 top-0 z-[70] flex h-full w-full flex-col overflow-hidden border-l border-v2-border bg-white md:w-[820px]"
             >
               <div className="min-h-0 flex-1 overflow-y-auto">
                 <div className="flex flex-col gap-3 px-[18px] pt-4">
@@ -996,12 +996,12 @@ export function V2TaskManagementPanel({
                   </div>
                 ) : (
                   <div
-                    className={`grid h-full min-h-0 gap-2.5 ${columns.length === 4 ? "grid-cols-4" : "grid-cols-3"}`}
+                    className={`grid h-full min-h-0 gap-2.5 ${columns.length === 4 ? "grid-cols-4" : "grid-cols-3"} min-w-0`}
                   >
                     {columns.map((column) => (
                       <div
                         key={column.id}
-                        className="flex min-h-0 flex-col gap-2 overflow-hidden rounded-[10px] bg-gray-50 p-2.5"
+                        className="flex min-h-0 flex-col gap-1.5 overflow-hidden rounded-[6px] bg-gray-50 p-1.5"
                         onDragOver={handleDragOver}
                         onDrop={() => handleDrop(column.id)}
                       >
@@ -1234,14 +1234,14 @@ function V2TaskCard({
       >
         <Card
           onClick={() => onOpenTask?.(task.id)}
-          className={`relative cursor-pointer rounded-lg border border-v2-border bg-white p-2.5 shadow-none transition-colors hover:border-gray-300 ${leftBorderClass}`}
+          className={`relative cursor-pointer rounded-[6px] border border-v2-border bg-white px-1.5 py-1 shadow-none transition-colors hover:border-gray-300 ${leftBorderClass}`}
         >
-          <CardContent className="space-y-1.5 p-0">
-            <div className="pr-4 text-[12px] font-medium leading-snug text-v2-heading">
+          <CardContent className="space-y-0.5 p-0">
+            <div className="w-full pr-3 text-[9px] font-medium leading-snug text-v2-heading break-words">
               {task.title}
             </div>
-            <div className="flex items-center gap-1.5 text-[11px] text-gray-400">
-              <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${statusDotClass}`} aria-hidden />
+            <div className="flex items-center gap-1 text-[8px] text-gray-400">
+              <span className={`h-1 w-1 shrink-0 rounded-full ${statusDotClass}`} aria-hidden />
               {task.assignedToName || "Unassigned"}
             </div>
             {task.status === "blocked" && task.blockerNote && (

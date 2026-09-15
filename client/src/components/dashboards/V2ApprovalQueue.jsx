@@ -47,6 +47,8 @@ function toQueueItem(event, currentUserId) {
       event.targetType ? ` · target: ${event.targetType}${event.targetId ? ` (${event.targetId})` : ""}` : ""
     }.`,
     agentName,
+    actionKey: actionType.actionKey || "",
+    targetId: event.targetId || "",
     waitingOn: isYou ? "you" : "a teammate",
     time: formatEventTime(event.createdAt),
     createdAt: event.createdAt,
@@ -110,76 +112,195 @@ function Toast({ msg }) {
   );
 }
 
-/* ── Review modal — a readable breakdown of the real payload, not raw JSON ── */
-function ReviewModal({ item, onClose }) {
+/* ── Pipeline step labels by actionKey ────────────────────────────────────── */
+const PIPELINE_STEP_LABEL = {
+  github_open_pr:       "Code written · PR opened",
+  github_merge_staging: "Merged to staging",
+  github_merge_main:    "Deploy to production",
+  propose_sprint_plan:  "Sprint plan proposed",
+  write_code:           "Code drafted",
+};
+
+/* ── Review modal — full decision brief, not raw JSON ────────────────────── */
+function ReviewModal({ item, allEvents, onClose, onApprove, onDecline, busy }) {
+  // All hooks must come before any conditional return
+  const pipeline = React.useMemo(() => {
+    if (!item?.targetId || !allEvents?.length) return [];
+    const siblings = allEvents
+      .filter((e) => e.targetId === item.targetId)
+      .sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
+    return siblings.map((e) => {
+      const at = e.actionTypeId || {};
+      const key = at.actionKey || "";
+      const isDone = e.status !== "pending_approval";
+      const isCurrent = e.id === item.id;
+      return { key, label: PIPELINE_STEP_LABEL[key] || at.label || key, isDone, isCurrent, time: formatEventTime(e.createdAt) };
+    });
+  }, [item?.targetId, item?.id, allEvents]);
+
   if (!item) return null;
-  const { owner, repo, prNumber, filePath, taskDescription, ...rest } = item.payload || {};
+
+  const { owner, repo, prNumber, filePath, taskDescription } = item.payload || {};
   const repoUrl = owner && repo ? `https://github.com/${owner}/${repo}` : null;
   const prUrl = repoUrl && prNumber ? `${repoUrl}/pull/${prNumber}` : null;
-  const hasKnownFields = Boolean(repoUrl || filePath || taskDescription);
-  const otherEntries = Object.entries(rest).filter(([, v]) => v !== undefined && v !== null && v !== "");
+  const mainUrl = repoUrl ? `${repoUrl}/tree/main` : null;
+
+  // Pick the best task description from the pipeline (earliest PR open event has it)
+  const prEvent = allEvents?.find((e) => e.targetId === item.targetId && (e.actionTypeId?.actionKey || "") === "github_open_pr");
+  const resolvedTaskDesc = taskDescription || prEvent?.payload?.taskDescription || "";
+
+  // What happens next copy — tailored by actionKey
+  const consequence = (() => {
+    switch (item.actionKey) {
+      case "github_merge_main":
+        return {
+          approve: prNumber
+            ? `PR #${prNumber} gets merged into the main branch and the code goes live in production.`
+            : "The code gets merged into main and goes live in production.",
+          decline: "The code stays on staging. AI Developer is notified and no production change is made.",
+        };
+      case "propose_sprint_plan":
+        return {
+          approve: "The sprint plan is saved as real milestones and tasks in your Execution Engine. AI Developer starts building.",
+          decline: "The plan is discarded. You can ask AI PM for a revised plan any time.",
+        };
+      default:
+        return {
+          approve: "The proposed action is executed.",
+          decline: "The action is cancelled and the agent is notified.",
+        };
+    }
+  })();
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-5" onClick={onClose}>
-      <div className="w-full max-w-[440px] overflow-hidden rounded-2xl bg-white shadow-2xl" onClick={(e) => e.stopPropagation()}>
+      <div className="w-full max-w-[560px] overflow-hidden rounded-2xl bg-white shadow-2xl" onClick={(e) => e.stopPropagation()}>
+
+        {/* Header */}
         <div className="flex items-start justify-between gap-3 border-b border-gray-100 px-5 py-4">
           <div className="min-w-0">
-            <div className="font-body text-[14px] font-medium text-v2-heading">{item.title}</div>
-            <div className="mt-0.5 font-body text-[11px] text-v2-muted">Proposed by {item.agentName} · {item.time}</div>
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="font-body text-[15px] font-semibold text-v2-heading">{item.title}</span>
+              <span className="rounded-[6px] px-2 py-0.5 font-body text-[9px] font-medium" style={{ background: item.riskBg, color: item.riskColor }}>{item.riskLabel}</span>
+            </div>
+            <div className="mt-0.5 font-body text-[11px] text-v2-muted">
+              Requested by <strong className="text-gray-600">{item.agentName}</strong> · {item.time}
+            </div>
           </div>
           <button type="button" onClick={onClose} className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-gray-100 text-gray-500 hover:bg-gray-200">
             <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M1 1l10 10M11 1L1 11" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/></svg>
           </button>
         </div>
 
-        <div className="space-y-3 px-5 py-4">
-          <span className="inline-flex rounded-[6px] px-2 py-0.5 font-body text-[9px] font-medium" style={{ background: item.riskBg, color: item.riskColor }}>{item.riskLabel}</span>
+        <div className="max-h-[70vh] overflow-y-auto">
+          <div className="space-y-4 px-5 py-4">
 
-          {repoUrl && (
-            <div className="flex items-center justify-between font-body text-[12px]">
-              <span className="text-v2-muted">Repository</span>
-              <a href={repoUrl} target="_blank" rel="noreferrer" className="font-medium text-v2-blue hover:underline">{owner}/{repo} ↗</a>
+            {/* Project & action */}
+            <div className="rounded-xl bg-v2-page p-3 space-y-2">
+              <div className="font-body text-[10px] font-semibold uppercase tracking-wide text-v2-muted">What's being approved</div>
+              {repoUrl && (
+                <div className="flex items-center justify-between font-body text-[12px]">
+                  <span className="text-v2-muted">Project / repo</span>
+                  <a href={repoUrl} target="_blank" rel="noreferrer" className="font-semibold text-v2-heading hover:underline">{owner}/{repo} ↗</a>
+                </div>
+              )}
+              {prUrl && (
+                <div className="flex items-center justify-between font-body text-[12px]">
+                  <span className="text-v2-muted">Pull request</span>
+                  <a href={prUrl} target="_blank" rel="noreferrer" className="font-medium text-[#1B4FD8] hover:underline">PR #{prNumber} — view on GitHub ↗</a>
+                </div>
+              )}
+              {filePath && (
+                <div className="flex items-center justify-between font-body text-[12px]">
+                  <span className="text-v2-muted">File changed</span>
+                  <span className="rounded bg-gray-100 px-1.5 py-0.5 font-mono text-[11px] text-v2-heading">{filePath}</span>
+                </div>
+              )}
+              {mainUrl && item.actionKey === "github_merge_main" && (
+                <div className="flex items-center justify-between font-body text-[12px]">
+                  <span className="text-v2-muted">Destination</span>
+                  <a href={mainUrl} target="_blank" rel="noreferrer" className="font-medium text-[#1B4FD8] hover:underline">main branch ↗</a>
+                </div>
+              )}
             </div>
-          )}
-          {prUrl && (
-            <div className="flex items-center justify-between font-body text-[12px]">
-              <span className="text-v2-muted">Pull request</span>
-              <a href={prUrl} target="_blank" rel="noreferrer" className="font-medium text-v2-blue hover:underline">#{prNumber} ↗</a>
-            </div>
-          )}
-          {filePath && (
-            <div className="flex items-center justify-between font-body text-[12px]">
-              <span className="text-v2-muted">File</span>
-              <span className="font-medium text-v2-heading">{filePath}</span>
-            </div>
-          )}
-          {taskDescription && (
-            <div className="font-body text-[12px]">
-              <div className="text-v2-muted">Task description</div>
-              <p className="mt-1 leading-relaxed text-v2-heading">{taskDescription}</p>
-            </div>
-          )}
-          {otherEntries.length > 0 && (
-            <div className="font-body text-[11px]">
-              <div className="text-v2-muted">Other details</div>
-              <div className="mt-1 space-y-1 rounded-lg bg-gray-50 p-2">
-                {otherEntries.map(([k, v]) => (
-                  <div key={k} className="flex items-center justify-between">
-                    <span className="text-gray-500">{k}</span>
-                    <span className="text-v2-heading">{typeof v === "object" ? JSON.stringify(v) : String(v)}</span>
-                  </div>
-                ))}
+
+            {/* Task description */}
+            {resolvedTaskDesc && (
+              <div className="rounded-xl border border-v2-border bg-white p-3">
+                <div className="mb-1.5 font-body text-[10px] font-semibold uppercase tracking-wide text-v2-muted">Original task</div>
+                <p className="font-body text-[12px] leading-relaxed text-v2-heading">{resolvedTaskDesc}</p>
+              </div>
+            )}
+
+            {/* Pipeline timeline */}
+            {pipeline.length > 0 && (
+              <div>
+                <div className="mb-2 font-body text-[10px] font-semibold uppercase tracking-wide text-v2-muted">What AI Developer did</div>
+                <div className="space-y-1.5">
+                  {pipeline.map((step, i) => (
+                    <div key={i} className={cn(
+                      "flex items-start gap-2.5 rounded-lg px-3 py-2 font-body text-[12px]",
+                      step.isCurrent ? "bg-[#FFF8E6] border border-[#F5C344]/40" : "bg-v2-page"
+                    )}>
+                      <span className={cn(
+                        "mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-[9px] font-bold",
+                        step.isCurrent ? "bg-[#F5C344] text-white" :
+                        step.isDone ? "bg-[#EAF3DE] text-[#27500A]" : "bg-gray-100 text-gray-400"
+                      )}>
+                        {step.isCurrent ? "?" : step.isDone ? "✓" : "○"}
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <span className={step.isCurrent ? "font-semibold text-[#633806]" : step.isDone ? "text-v2-heading" : "text-v2-muted"}>
+                          {step.label}
+                        </span>
+                        {step.isCurrent && <span className="ml-2 font-body text-[10px] text-[#633806]">← awaiting your approval</span>}
+                      </div>
+                      <span className="shrink-0 text-[10px] text-gray-400">{step.time}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* What happens next */}
+            <div className="grid grid-cols-2 gap-2">
+              <div className="rounded-xl bg-[#EAF3DE] p-3">
+                <div className="mb-1 font-body text-[10px] font-semibold text-[#27500A]">If you approve</div>
+                <p className="font-body text-[11px] leading-relaxed text-[#27500A]/80">{consequence.approve}</p>
+              </div>
+              <div className="rounded-xl bg-[#FCEBEB] p-3">
+                <div className="mb-1 font-body text-[10px] font-semibold text-[#791F1F]">If you decline</div>
+                <p className="font-body text-[11px] leading-relaxed text-[#791F1F]/80">{consequence.decline}</p>
               </div>
             </div>
+
+          </div>
+        </div>
+
+        {/* Footer — decide right here */}
+        <div className="flex items-center justify-between gap-3 border-t border-gray-100 px-5 py-3">
+          <button type="button" onClick={onClose} className="font-body text-[12px] text-v2-muted hover:text-v2-heading transition-colors">← Back to queue</button>
+          {!item.isFyi && (
+            <div className="flex gap-2">
+              {busy ? (
+                <span className="font-body text-[12px] text-v2-muted">Working…</span>
+              ) : (
+                <>
+                  <button type="button" onClick={onDecline} className="rounded-full border border-gray-200 bg-white px-4 py-1.5 font-body text-[12px] font-medium text-v2-heading hover:bg-gray-50 transition-colors">
+                    Decline
+                  </button>
+                  <button type="button" onClick={onApprove} className="rounded-full bg-[#1D9E75] px-4 py-1.5 font-body text-[12px] font-medium text-white hover:opacity-90 transition-opacity">
+                    Approve →
+                  </button>
+                </>
+              )}
+            </div>
           )}
-          {!hasKnownFields && otherEntries.length === 0 && (
-            <p className="font-body text-[12px] text-v2-muted">No additional detail attached to this action yet.</p>
+          {item.isFyi && (
+            <span className="font-body text-[11px] text-v2-muted">Waiting on a teammate to decide</span>
           )}
         </div>
 
-        <div className="flex justify-end border-t border-gray-100 px-5 py-3">
-          <button type="button" onClick={onClose} className="rounded-full border border-v2-border px-4 py-1.5 font-body text-[12px] font-medium text-v2-heading hover:bg-gray-50">Close</button>
-        </div>
       </div>
     </div>
   );
@@ -466,6 +587,7 @@ export default function V2ApprovalQueue({ user, onBack, onNavigate }) {
                     <button type="button" onClick={() => setReviewingItem(item)} className="rounded-[9px] border border-gray-200 bg-white px-3 py-1.5 font-body text-[11px] font-medium text-v2-heading hover:bg-gray-50 transition-colors">
                       Review
                     </button>
+
                     {busyIds.has(item.id) ? (
                       <span className="font-body text-[11px] text-v2-muted">Working…</span>
                     ) : item.isFyi ? (
@@ -569,7 +691,22 @@ export default function V2ApprovalQueue({ user, onBack, onNavigate }) {
         </div>
       </div>
 
-      <ReviewModal item={reviewingItem} onClose={() => setReviewingItem(null)} />
+      <ReviewModal
+        item={reviewingItem}
+        allEvents={events}
+        onClose={() => setReviewingItem(null)}
+        busy={reviewingItem ? busyIds.has(reviewingItem.id) : false}
+        onApprove={() => {
+          if (!reviewingItem) return;
+          resolve(reviewingItem.id, "approved", "Approved ✓");
+          setReviewingItem(null);
+        }}
+        onDecline={() => {
+          if (!reviewingItem) return;
+          resolve(reviewingItem.id, "declined", "Declined");
+          setReviewingItem(null);
+        }}
+      />
       <Toast msg={toast} />
     </div>
   );

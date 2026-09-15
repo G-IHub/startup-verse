@@ -15,6 +15,21 @@ const app = express();
 
 const SITES_HOSTNAME = process.env.SITES_HOSTNAME || "sites.startupverse.space";
 
+/**
+ * Robust hostname resolution — works behind proxies (Railway, Render,
+ * Cloudflare) that rewrite Host or add X-Forwarded-Host. Checks in order:
+ *   1. X-Forwarded-Host (proxy-set, may be comma-separated — take the first)
+ *   2. req.headers.host (raw Host header from the client, includes port)
+ *   3. req.hostname (Express-parsed fallback)
+ */
+function resolveHostname(req) {
+  const fwd = req.headers["x-forwarded-host"];
+  if (fwd) return String(fwd).split(",")[0].trim().split(":")[0].toLowerCase();
+  const raw = req.headers.host;
+  if (raw) return String(raw).split(":")[0].toLowerCase();
+  return (req.hostname || "").toLowerCase();
+}
+
 // Real hosted-site CORS carve-out (2026-09-15): sites.startupverse.space is
 // a fully public, unauthenticated surface (hosted pages + their real
 // form-submit endpoint, hostedSitePublic.js) that must accept a request
@@ -25,7 +40,7 @@ const SITES_HOSTNAME = process.env.SITES_HOSTNAME || "sites.startupverse.space";
 // before this host's own routes ever got a chance to respond. Every other
 // host falls through to the real app-wide policy completely unchanged.
 app.use((req, res, next) => {
-  if (req.hostname !== SITES_HOSTNAME) return next();
+  if (resolveHostname(req) !== SITES_HOSTNAME.toLowerCase()) return next();
   res.header("Access-Control-Allow-Origin", "*");
   res.header("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
   res.header("Access-Control-Allow-Headers", "Content-Type");
