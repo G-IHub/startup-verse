@@ -38,6 +38,18 @@ function isSitesHost(req) {
 
 const router = Router();
 
+// Temporary debug route — remove after diagnosing the sites hostname issue
+router.get("/__debug_host", (req, res) => {
+  res.json({
+    "x-forwarded-host": req.headers["x-forwarded-host"],
+    "host": req.headers.host,
+    "req.hostname": req.hostname,
+    "resolveHostname": resolveHostname(req),
+    "SITES_HOSTNAME": SITES_HOSTNAME,
+    "isSitesHost": isSitesHost(req),
+  });
+});
+
 router.get("/:slug", async (req, res, next) => {
   if (!isSitesHost(req)) return next();
 
