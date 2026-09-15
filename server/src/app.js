@@ -7,10 +7,31 @@ import notFound from "./middleware/notFound.js";
 import requestId from "./middleware/requestId.js";
 import apiRouter from "./routes/index.js";
 import hostedSitePublicRouter from "./routes/hostedSitePublic.js";
+import customDomainPublicMiddleware from "./routes/customDomainPublic.js";
 import { getUploadRoot } from "./services/storage.js";
 import { success as apiSuccess } from "./utils/apiResponse.js";
 
 const app = express();
+
+const SITES_HOSTNAME = process.env.SITES_HOSTNAME || "sites.startupverse.space";
+
+// Real hosted-site CORS carve-out (2026-09-15): sites.startupverse.space is
+// a fully public, unauthenticated surface (hosted pages + their real
+// form-submit endpoint, hostedSitePublic.js) that must accept a request
+// from ANY origin — including a founder's own real custom domain (Part 3),
+// which is a genuinely cross-origin request from that domain's point of
+// view. Runs BEFORE the main app's restrictive, allowlisted CORS policy
+// below, which would otherwise reject an unrecognized origin's preflight
+// before this host's own routes ever got a chance to respond. Every other
+// host falls through to the real app-wide policy completely unchanged.
+app.use((req, res, next) => {
+  if (req.hostname !== SITES_HOSTNAME) return next();
+  res.header("Access-Control-Allow-Origin", "*");
+  res.header("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+  res.header("Access-Control-Allow-Headers", "Content-Type");
+  if (req.method === "OPTIONS") return res.status(204).end();
+  return next();
+});
 
 app.use(cors(corsOptions));
 app.use(cookieParser());
@@ -26,6 +47,13 @@ app.use(
   "/uploads",
   express.static(getUploadRoot(), { fallthrough: true, maxAge: "1d" }),
 );
+
+// Real custom-domain feature (2026-09-15, Part 3): checks the request's
+// real hostname against a real, verified CustomDomain before anything
+// else gets a chance to respond — must run before the generic "/" handler
+// below, which otherwise has no hostname awareness at all. Falls through
+// via next() for every host that isn't a real matched custom domain.
+app.use(customDomainPublicMiddleware);
 
 app.get("/", (req, res) => {
   return apiSuccess(res, {

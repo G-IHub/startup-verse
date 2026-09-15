@@ -13,6 +13,8 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { cn } from "../ui/utils";
 import * as githubApi from "../../utils/api/githubApi";
+import * as customDomainApi from "../../utils/api/customDomainApi";
+import { useOfficeStore } from "../../state/useOfficeStore";
 
 /* ── Data ─────────────────────────────────────────────────────────────────── */
 const SECTIONS = [
@@ -31,6 +33,7 @@ const SECTIONS = [
     items: [
       { id: "github", iconBg: "#171515", iconLabel: "🐙", name: "GitHub",  sub: "Repo, PRs, commits",              connected: true,  agents: ["🤖 AI Developer", "🤖 AI Designer"], meta: "Last synced 8:32am today · PR #15 flagged" },
       { id: "vercel", iconBg: "#000",    iconLabel: "▲",  name: "Vercel",  sub: "Staging & production deploys",    connected: true,  agents: ["🤖 AI Developer"],                   meta: "Last deploy 6:22am today · v3" },
+      { id: "custom-domain", iconBg: "#1B4FD8", iconLabel: "🌐", name: "Custom domain", sub: "Point your own domain at your product", connected: false, agents: ["🤖 AI Developer"], meta: "Not set up yet" },
     ],
   },
   {
@@ -103,14 +106,18 @@ function Modal({ data, onClose, onToast, onNavigate }) {
           </button>
         </div>
         <div className="px-5 py-4">
-          <div className="flex flex-col gap-1.5">
-            {data.scopes.map((s, i) => (
-              <div key={i} className="flex items-start gap-2 font-body text-[11px] text-gray-600">
-                <span className="shrink-0 text-[#1D9E75]">✓</span>
-                <span>{s}</span>
-              </div>
-            ))}
-          </div>
+          {data.customDomain ? (
+            <CustomDomainModalBody data={data} />
+          ) : (
+            <div className="flex flex-col gap-1.5">
+              {(data.scopes || []).map((s, i) => (
+                <div key={i} className="flex items-start gap-2 font-body text-[11px] text-gray-600">
+                  <span className="shrink-0 text-[#1D9E75]">✓</span>
+                  <span>{s}</span>
+                </div>
+              ))}
+            </div>
+          )}
           {data.note && (
             <p className="mt-3 font-body text-[11px] text-v2-muted">{data.note}</p>
           )}
@@ -138,27 +145,116 @@ function Modal({ data, onClose, onToast, onNavigate }) {
         </div>
         <div className="flex justify-end gap-2 border-t border-gray-100 px-5 py-3">
           <button type="button" onClick={onClose} className="rounded-full border border-v2-border px-4 py-1.5 font-body text-[12px] font-medium text-v2-heading hover:bg-gray-50">Close</button>
+          {!data.customDomain && (
+            <button
+              type="button"
+              disabled={data.busy || (data.real && !data.onAction)}
+              onClick={async () => {
+                if (data.onAction) {
+                  await data.onAction();
+                  return;
+                }
+                onClose();
+                onToast(data.connectToast);
+              }}
+              className={cn(
+                "rounded-full px-4 py-1.5 font-body text-[12px] font-medium transition-opacity hover:opacity-90 disabled:opacity-60",
+                data.connectDanger
+                  ? "border border-[#f3c9c9] bg-white text-[#791F1F]"
+                  : "bg-v2-purple text-white"
+              )}
+            >
+              {data.busy ? "Working…" : data.connectLabel}
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Real custom-domain modal body (2026-09-15, Part 3) — distinct enough
+ * from the generic scopes-list + single-button modal (a live text input,
+ * real DNS instructions, a status that changes over time) to warrant its
+ * own dedicated render rather than bolting more special cases onto the
+ * generic Modal shell the way repoPicker does.
+ */
+function CustomDomainModalBody({ data }) {
+  if (!data.railwayConfigured) {
+    return (
+      <p className="font-body text-[12px] leading-relaxed text-v2-muted">
+        Custom domains aren't set up on this server yet — this needs a real Railway API token and project configuration. Ask an admin to finish that setup before founders can connect their own domain.
+      </p>
+    );
+  }
+
+  if (!data.domain) {
+    return (
+      <div>
+        <p className="font-body text-[11px] leading-relaxed text-v2-muted">
+          Already own a domain (from Namecheap, GoDaddy, etc.)? Point it at your real StartupVerse product.
+        </p>
+        <div className="mt-3 flex gap-2">
+          <input
+            type="text"
+            value={data.inputValue || ""}
+            onChange={(e) => data.onInputChange?.(e.target.value)}
+            placeholder="myapp.com"
+            className="flex-1 rounded-lg border border-v2-border bg-white px-2.5 py-1.5 font-body text-[12px] text-v2-heading"
+          />
           <button
             type="button"
-            disabled={data.busy || (data.real && !data.onAction)}
-            onClick={async () => {
-              if (data.onAction) {
-                await data.onAction();
-                return;
-              }
-              onClose();
-              onToast(data.connectToast);
-            }}
-            className={cn(
-              "rounded-full px-4 py-1.5 font-body text-[12px] font-medium transition-opacity hover:opacity-90 disabled:opacity-60",
-              data.connectDanger
-                ? "border border-[#f3c9c9] bg-white text-[#791F1F]"
-                : "bg-v2-purple text-white"
-            )}
+            disabled={data.busy || !data.inputValue?.trim()}
+            onClick={data.onAdd}
+            className="shrink-0 rounded-full bg-v2-purple px-4 py-1.5 font-body text-[12px] font-medium text-white hover:opacity-90 disabled:opacity-60"
           >
-            {data.busy ? "Working…" : data.connectLabel}
+            {data.busy ? "Adding…" : "Add domain"}
           </button>
         </div>
+      </div>
+    );
+  }
+
+  const { domain: name, cnameTarget, verificationToken, certificateStatus } = data.domain;
+  const isLive = certificateStatus === "issued";
+
+  return (
+    <div>
+      <div className="flex items-center gap-2">
+        <span className="font-body text-[13px] font-medium text-v2-heading">{name}</span>
+        <span
+          className="rounded-full px-2 py-0.5 font-body text-[10px] font-medium"
+          style={isLive ? { background: "#EAF3DE", color: "#27500A" } : certificateStatus === "failed" ? { background: "#FCEBEB", color: "#791F1F" } : { background: "#f3f4f6", color: "#6b7280" }}
+        >
+          {isLive ? "Live" : certificateStatus === "failed" ? "Failed" : "Pending DNS"}
+        </span>
+      </div>
+
+      {!isLive && (
+        <div className="mt-3 space-y-2 rounded-lg bg-v2-page p-3">
+          <p className="font-body text-[11px] font-medium text-v2-heading">Add these real DNS records at your domain's registrar:</p>
+          <div className="font-body text-[10px] text-v2-muted">
+            <div className="font-medium text-v2-heading">CNAME</div>
+            <div className="break-all">{cnameTarget || "(shown once Railway provisions this domain)"}</div>
+          </div>
+          <div className="font-body text-[10px] text-v2-muted">
+            <div className="font-medium text-v2-heading">TXT (verification)</div>
+            <div className="break-all">{verificationToken || "(shown once Railway provisions this domain)"}</div>
+          </div>
+          <p className="font-body text-[10px] text-v2-muted">DNS changes can take anywhere from a few minutes to a few hours to propagate. Refresh status once you've added both records.</p>
+        </div>
+      )}
+
+      <div className="mt-3 flex gap-2">
+        {!isLive && (
+          <button type="button" disabled={data.busy} onClick={data.onRefreshStatus} className="rounded-full border border-v2-border px-3 py-1.5 font-body text-[11px] font-medium text-v2-heading hover:bg-gray-50 disabled:opacity-60">
+            {data.busy ? "Checking…" : "Refresh status"}
+          </button>
+        )}
+        <button type="button" disabled={data.busy} onClick={data.onRemove} className="rounded-full border border-[#f3c9c9] bg-white px-3 py-1.5 font-body text-[11px] font-medium text-[#791F1F] hover:bg-gray-50 disabled:opacity-60">
+          Remove domain
+        </button>
       </div>
     </div>
   );
@@ -222,7 +318,9 @@ function IntCard({ item, onOpen }) {
 }
 
 /* ── Main ─────────────────────────────────────────────────────────────────── */
-export default function V2Integrations({ onBack, onNavigate }) {
+export default function V2Integrations({ user, onBack, onNavigate }) {
+  const officeFounderId = useOfficeStore((s) => s.founderId);
+  const founderId = officeFounderId || String(user?._id ?? user?.id ?? "");
   const [modal, setModal] = useState(null);
   const [toast, setToast] = useState("");
   const [gh, setGh] = useState({ connected: false, configured: true, githubLogin: "" });
@@ -230,8 +328,66 @@ export default function V2Integrations({ onBack, onNavigate }) {
   const [defaultRepo, setDefaultRepoState] = useState({ owner: "", repo: "" });
   const [repoOptions, setRepoOptions] = useState([]);
   const [repoBusy, setRepoBusy] = useState(false);
+  const [cd, setCd] = useState({ domain: null, railwayConfigured: false });
+  const [cdBusy, setCdBusy] = useState(false);
+  const [cdInput, setCdInput] = useState("");
 
   const showToast = (msg) => { setToast(msg); setTimeout(() => setToast(""), 2400); };
+
+  const refreshCustomDomain = useCallback(async () => {
+    if (!founderId) return;
+    try {
+      const data = await customDomainApi.getCustomDomain(founderId);
+      setCd(data);
+    } catch (err) {
+      showToast(err?.message || "Could not check custom domain status.");
+    }
+  }, [founderId]);
+
+  useEffect(() => { refreshCustomDomain(); }, [refreshCustomDomain]);
+
+  const addCustomDomain = async () => {
+    const domain = cdInput.trim().toLowerCase();
+    if (!domain) return;
+    setCdBusy(true);
+    try {
+      await customDomainApi.createCustomDomain(founderId, domain);
+      await refreshCustomDomain();
+      setCdInput("");
+      showToast(`${domain} added — configure the real DNS records below to finish.`);
+    } catch (err) {
+      showToast(err?.message || "Could not add that domain.");
+    } finally {
+      setCdBusy(false);
+    }
+  };
+
+  const refreshCustomDomainStatus = async () => {
+    setCdBusy(true);
+    try {
+      const data = await customDomainApi.refreshCustomDomainStatus(founderId);
+      setCd((prev) => ({ ...prev, domain: data.domain }));
+      showToast(data.domain?.certificateStatus === "issued" ? "Domain is live!" : "Still pending — DNS can take a while to propagate.");
+    } catch (err) {
+      showToast(err?.message || "Could not refresh domain status.");
+    } finally {
+      setCdBusy(false);
+    }
+  };
+
+  const removeCustomDomain = async () => {
+    setCdBusy(true);
+    try {
+      await customDomainApi.deleteCustomDomain(founderId);
+      await refreshCustomDomain();
+      setModal(null);
+      showToast("Custom domain removed.");
+    } catch (err) {
+      showToast(err?.message || "Could not remove the domain.");
+    } finally {
+      setCdBusy(false);
+    }
+  };
 
   const refreshGithub = useCallback(async () => {
     try {
@@ -331,6 +487,16 @@ export default function V2Integrations({ onBack, onNavigate }) {
       });
       return;
     }
+    if (key === "custom-domain") {
+      setModal({
+        title: "Custom domain", sub: "Point a domain you already own at your real hosted product",
+        customDomain: true, real: true, busy: cdBusy,
+        domain: cd.domain, railwayConfigured: cd.railwayConfigured,
+        inputValue: cdInput, onInputChange: setCdInput,
+        onAdd: addCustomDomain, onRefreshStatus: refreshCustomDomainStatus, onRemove: removeCustomDomain,
+      });
+      return;
+    }
     setModal(MODALS[key] ?? null);
   };
   const closeModal = () => setModal(null);
@@ -339,9 +505,19 @@ export default function V2Integrations({ onBack, onNavigate }) {
     ...section,
     items: section.items.map((item) => item.id === "github"
       ? { ...item, connected: gh.connected, meta: gh.connected ? `Connected as ${gh.githubLogin}` : "Not connected yet" }
+      : item.id === "custom-domain"
+      ? { ...item, connected: cd.domain?.certificateStatus === "issued", meta: cd.domain ? `${cd.domain.domain} — ${cd.domain.certificateStatus}` : "Not set up yet" }
       : item),
   }));
   const connectedCount = sections.flatMap((s) => s.items).filter((i) => i.connected).length;
+
+  // The custom-domain modal's input/status are live top-level state (typed
+  // characters, a status refresh) rather than a one-time snapshot taken
+  // when the modal opened — re-merge the freshest values in on every
+  // render instead of trusting what openModal captured at open time.
+  const modalData = modal?.customDomain
+    ? { ...modal, busy: cdBusy, domain: cd.domain, railwayConfigured: cd.railwayConfigured, inputValue: cdInput }
+    : modal;
 
   return (
     <div className="flex min-h-0 flex-1 overflow-hidden bg-v2-page">
@@ -418,7 +594,7 @@ export default function V2Integrations({ onBack, onNavigate }) {
 
       </div>
 
-      <Modal data={modal} onClose={closeModal} onToast={showToast} onNavigate={onNavigate} />
+      <Modal data={modalData} onClose={closeModal} onToast={showToast} onNavigate={onNavigate} />
       <Toast msg={toast} />
     </div>
   );

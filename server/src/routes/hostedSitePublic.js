@@ -30,13 +30,14 @@ router.get("/:slug", async (req, res, next) => {
 });
 
 /**
- * Real, public form-capture endpoint (2026-09-15) — same origin as the
- * hosted page itself (window.STARTUPVERSE_SUBMIT_URL, injected by
- * hostedSiteService.js's publishHostedSite), so a same-origin fetch()
- * needs no CORS headers here at all. No auth, by design — the page is
- * public, so its own forms must be able to post without a founder's
- * session. express.json() (app.js, applied globally before this router
- * is mounted) has already parsed req.body by the time this runs.
+ * Real, public form-capture endpoint (2026-09-15). A page served from
+ * sites.startupverse.space submits here same-origin; a page served from a
+ * founder's own real custom domain (Part 3) submits here cross-origin —
+ * app.js has a dedicated permissive CORS carve-out for this whole host
+ * (ahead of the main app's restrictive, allowlisted CORS policy) so that
+ * still works. No auth here, by design — the page itself is public.
+ * express.json() (app.js, applied globally before this router is
+ * mounted) has already parsed req.body by the time this runs.
  */
 router.post("/:slug/submit", async (req, res, next) => {
   if (req.hostname !== SITES_HOSTNAME) return next();

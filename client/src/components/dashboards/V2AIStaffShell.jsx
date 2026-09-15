@@ -216,6 +216,7 @@ export default function V2AIStaffShell({ user, onPageChange, ...rest }) {
             />
           ) : tab === "integrations" ? (
             <V2Integrations
+              user={user}
               onBack={() => setTab("workroom")}
               onNavigate={handleNavigate}
             />
