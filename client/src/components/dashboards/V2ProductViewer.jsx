@@ -20,7 +20,7 @@
  * rather than faked.
  */
 import React, { useEffect, useMemo, useState } from "react";
-import { Maximize2, Minimize2 } from "lucide-react";
+import { Maximize2, Minimize2, Smartphone, Monitor } from "lucide-react";
 import { getAgentEvents } from "../../utils/api/agentOrchestrationApi";
 import { getFounderStartupSafe } from "../../utils/api/founderApi";
 import { getFormSubmissions } from "../../utils/api/formSubmissionsApi";
@@ -35,16 +35,45 @@ function WhoBadge({ initials, bg, color }) {
 
 /**
  * Renders the real preview (a live URL or the local file content) with a
- * browser-chrome bar, and a real toggle to expand it to a full page within
- * the app — same "inline by default, pop out for a real full-screen look"
+ * browser-chrome bar, a real mobile/desktop responsive-width toggle (the
+ * original illustrative mock had a Mobile/Website switch; this is the real
+ * equivalent — it actually resizes the real iframe's viewport, exercising
+ * whatever real @media breakpoint AI Developer's own design brief already
+ * asks it to build), and a real toggle to expand to a full page within the
+ * app — same "inline by default, pop out for a real full-screen look"
  * pattern already established for video calls (V2CallShell's variant prop),
  * built lightweight here rather than pulling in that component tree.
  */
 function PreviewFrame({ chromeLabel, title, src, srcDoc, expanded, onToggleExpand }) {
+  const [device, setDevice] = useState("desktop");
+
   const chrome = (
     <div className="flex h-[30px] shrink-0 items-center gap-1.5 bg-[#26263a] px-3">
       {["#E24B4A", "#BA7517", "#1D9E75"].map((c) => <div key={c} className="h-[7px] w-[7px] rounded-full" style={{ background: c }} />)}
       <div className="ml-2 flex-1 truncate rounded-xl bg-white/[0.08] px-3 py-1 font-body text-[10px] text-[#c9c5f0]">{chromeLabel}</div>
+      <div className="flex shrink-0 items-center gap-0.5 rounded-lg bg-white/[0.08] p-0.5">
+        <button
+          type="button"
+          onClick={() => setDevice("desktop")}
+          title="Desktop width"
+          className={`flex h-5 w-5 items-center justify-center rounded-md transition-colors ${device === "desktop" ? "bg-white/[0.18] text-white" : "text-[#c9c5f0] hover:bg-white/[0.12]"}`}
+        >
+          <Monitor className="h-3 w-3" />
+        </button>
+        <button
+          type="button"
+          onClick={() => setDevice("mobile")}
+          title="Mobile width"
+          className={`flex h-5 w-5 items-center justify-center rounded-md transition-colors ${device === "mobile" ? "bg-white/[0.18] text-white" : "text-[#c9c5f0] hover:bg-white/[0.12]"}`}
+        >
+          <Smartphone className="h-3 w-3" />
+        </button>
+      </div>
+      {src && (
+        <a href={src} target="_blank" rel="noreferrer" title="Open in a new tab" className="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg text-[#c9c5f0] hover:bg-white/[0.12] transition-colors">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6" /><path d="M15 3h6v6" /><path d="M10 14L21 3" /></svg>
+        </a>
+      )}
       <button
         type="button"
         onClick={onToggleExpand}
@@ -56,11 +85,15 @@ function PreviewFrame({ chromeLabel, title, src, srcDoc, expanded, onToggleExpan
     </div>
   );
 
+  const frameWidth = device === "mobile" ? "375px" : "100%";
+
   if (expanded) {
     return (
-      <div className="fixed inset-0 z-[999] flex flex-col bg-white">
-        {chrome}
-        <iframe title={title} src={src} srcDoc={srcDoc} className="w-full flex-1 border-0" />
+      <div className="fixed inset-0 z-[999] flex flex-col items-center bg-white">
+        <div className="w-full">{chrome}</div>
+        <div className="flex min-h-0 flex-1 w-full items-center justify-center overflow-auto bg-gray-100 p-4">
+          <iframe title={title} src={src} srcDoc={srcDoc} className="h-full border-0 bg-white transition-[width] duration-200" style={{ width: frameWidth }} />
+        </div>
       </div>
     );
   }
@@ -68,7 +101,9 @@ function PreviewFrame({ chromeLabel, title, src, srcDoc, expanded, onToggleExpan
   return (
     <div className="w-full overflow-hidden rounded-2xl bg-white" style={{ boxShadow: "0 30px 70px rgba(0,0,0,.45)" }}>
       {chrome}
-      <iframe title={title} src={src} srcDoc={srcDoc} className="h-[420px] w-full border-0" />
+      <div className="flex items-center justify-center bg-gray-100">
+        <iframe title={title} src={src} srcDoc={srcDoc} className="h-[420px] border-0 bg-white transition-[width] duration-200" style={{ width: frameWidth }} />
+      </div>
     </div>
   );
 }
@@ -197,7 +232,7 @@ export default function V2ProductViewer({ user, onBack }) {
         <div className="shrink-0 overflow-hidden rounded-[20px]" style={{ background: "radial-gradient(ellipse at 50% 0%, #241f5c, #100e2e 65%)" }}>
           <div className="px-6 pt-6">
             <div className="font-body text-[15px] font-medium text-white">{startup?.name || "Your product"} — what's actually been built</div>
-            <p className="mt-0.5 max-w-[460px] font-body text-[11px] leading-relaxed text-[#a8a3d9]">
+            <p className="mt-0.5 max-w-full font-body text-[11px] leading-relaxed text-[#a8a3d9]">
               {latestLive
                 ? "Real deploy, embedded live below — this is the actual page AI Developer shipped."
                 : localPreview?.pagesError
