@@ -750,45 +750,65 @@ function AppContent() {
 // ---------------------------------------------------------------------------
 
 function PolicyPage() {
+  const s = { p: { marginBottom: 14, color: "#374151" }, h2: { fontSize: 17, fontWeight: 600, margin: "32px 0 10px" }, ul: { paddingLeft: 20, marginBottom: 14, color: "#374151" }, li: { marginBottom: 6 } };
   return (
     <div style={{ fontFamily: "-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif", fontSize: 15, lineHeight: 1.7, color: "#1a1a1a", background: "#fff", minHeight: "100vh", padding: "48px 24px" }}>
       <div style={{ maxWidth: 720, margin: "0 auto" }}>
         <h1 style={{ fontSize: 28, fontWeight: 700, marginBottom: 6 }}>Privacy Policy</h1>
         <p style={{ color: "#6b7280", fontSize: 13, marginBottom: 40 }}>StartupVerse · Last updated: September 2026</p>
-        <p style={{ marginBottom: 14, color: "#374151" }}>StartupVerse ("we", "our", or "us") operates the StartupVerse platform, an AI-powered execution environment for founders. This Privacy Policy explains how we collect, use, and protect information when you use our services, including integrations with third-party platforms such as LinkedIn.</p>
-        <h2 style={{ fontSize: 17, fontWeight: 600, margin: "32px 0 10px" }}>1. Information We Collect</h2>
-        <p style={{ marginBottom: 14, color: "#374151" }}>When you connect a third-party account (such as LinkedIn), we may collect:</p>
-        <ul style={{ paddingLeft: 20, marginBottom: 14, color: "#374151" }}>
-          <li style={{ marginBottom: 6 }}>Your name and profile picture provided by the third-party platform</li>
-          <li style={{ marginBottom: 6 }}>A unique identifier (e.g. LinkedIn person URN) used to publish content on your behalf</li>
-          <li style={{ marginBottom: 6 }}>OAuth access tokens required to perform actions you have authorized</li>
+        <p style={s.p}>StartupVerse ("we", "our", or "us") operates startupverse.space — an AI-powered execution platform built for founders. We provide tools including an AI staff layer, virtual office, execution engine, investor view, startup profile management, and integrations with third-party services. This Privacy Policy explains what data we collect, how we use it, and your rights over it.</p>
+        <h2 style={s.h2}>1. Information We Collect</h2>
+        <p style={s.p}><strong>Account information:</strong> When you register, we collect your name, email address, role, and startup details you provide during onboarding.</p>
+        <p style={s.p}><strong>Startup and business data:</strong> Information you enter about your startup — product description, target market, milestones, financials, team members — used to power AI staff features and your Startup Profile.</p>
+        <p style={s.p}><strong>Usage data:</strong> Actions you take in the platform (tasks created, AI conversations, execution events) used to improve your experience and support the AI agents working on your behalf.</p>
+        <p style={s.p}><strong>Third-party integration data:</strong> When you connect external accounts (LinkedIn, Gmail, WhatsApp, GitHub, Calendly, etc.), we collect only what is needed to provide that integration:</p>
+        <ul style={s.ul}>
+          <li style={s.li}>OAuth access tokens and identifiers to perform the actions you authorize</li>
+          <li style={s.li}>Basic profile info (name, profile picture) returned by the connected platform</li>
+          <li style={s.li}>We do not collect your passwords or payment details for any connected platform</li>
         </ul>
-        <p style={{ marginBottom: 14, color: "#374151" }}>We do not collect passwords, payment card numbers, or sensitive personal data through third-party OAuth integrations.</p>
-        <h2 style={{ fontSize: 17, fontWeight: 600, margin: "32px 0 10px" }}>2. How We Use Your Information</h2>
-        <ul style={{ paddingLeft: 20, marginBottom: 14, color: "#374151" }}>
-          <li style={{ marginBottom: 6 }}><strong>LinkedIn integration:</strong> We use your OAuth token and person identifier to publish posts to your LinkedIn profile on your behalf, only when you explicitly initiate a post from within StartupVerse.</li>
-          <li style={{ marginBottom: 6 }}>We do not use your data for advertising, profiling, or selling to third parties.</li>
-          <li style={{ marginBottom: 6 }}>We do not read your LinkedIn inbox, connections, or any data beyond what is required to publish a post.</li>
+        <h2 style={s.h2}>2. How We Use Your Information</h2>
+        <ul style={s.ul}>
+          <li style={s.li}><strong>To operate the platform:</strong> Running your AI staff (AI PM, AI Developer, AI Sales, AI Marketing, AI Finance, AI Legal), Execution Engine, Virtual Office, and all other core features</li>
+          <li style={s.li}><strong>To power integrations you enable:</strong> For example, publishing a LinkedIn post, sending a Gmail sequence, sending a WhatsApp message, creating a GitHub PR — only when you initiate the action</li>
+          <li style={s.li}><strong>To personalize AI outputs:</strong> Your startup data and past interactions help AI agents give more relevant, context-aware responses</li>
+          <li style={s.li}><strong>To communicate with you:</strong> Account notifications, reminders, and product updates</li>
+          <li style={s.li}>We do not use your data for advertising, sell it to data brokers, or profile you for third parties</li>
         </ul>
-        <h2 style={{ fontSize: 17, fontWeight: 600, margin: "32px 0 10px" }}>3. Data Storage and Security</h2>
-        <p style={{ marginBottom: 14, color: "#374151" }}>OAuth access tokens are stored securely in our database with access restricted to your founder account. We use industry-standard security practices to protect stored credentials. Tokens are never logged or exposed in client-side code.</p>
-        <h2 style={{ fontSize: 17, fontWeight: 600, margin: "32px 0 10px" }}>4. Data Sharing</h2>
-        <ul style={{ paddingLeft: 20, marginBottom: 14, color: "#374151" }}>
-          <li style={{ marginBottom: 6 }}>To the platform you have connected (e.g. LinkedIn receives your post content when you publish)</li>
-          <li style={{ marginBottom: 6 }}>Where required by law or to protect the rights and safety of our users</li>
+        <h2 style={s.h2}>3. Third-Party Integrations</h2>
+        <p style={s.p}>StartupVerse connects to the following categories of third-party services on your behalf, only when you choose to enable them:</p>
+        <ul style={s.ul}>
+          <li style={s.li}><strong>Social & content:</strong> LinkedIn (post publishing), Instagram, Facebook — AI drafts content, you control what gets sent</li>
+          <li style={s.li}><strong>Communication:</strong> Gmail (outreach emails), WhatsApp Business (outreach messages), Calendly (booking links and events)</li>
+          <li style={s.li}><strong>Development:</strong> GitHub (pull requests, code repos), Vercel (deploys)</li>
+          <li style={s.li}><strong>Productivity:</strong> Google Calendar, DocuSign</li>
+          <li style={s.li}><strong>Finance:</strong> Stripe, bank connections (read-only), QuickBooks</li>
         </ul>
-        <h2 style={{ fontSize: 17, fontWeight: 600, margin: "32px 0 10px" }}>5. Your Rights and Controls</h2>
-        <ul style={{ paddingLeft: 20, marginBottom: 14, color: "#374151" }}>
-          <li style={{ marginBottom: 6 }}><strong>Disconnect at any time:</strong> Go to StartupVerse → Integrations → LinkedIn → Disconnect.</li>
-          <li style={{ marginBottom: 6 }}><strong>Revoke via LinkedIn:</strong> LinkedIn Settings → Security → Authorized applications.</li>
-          <li style={{ marginBottom: 6 }}><strong>Data deletion:</strong> Contact us at the address below.</li>
+        <p style={s.p}>Each integration uses only the minimum permissions required. Their own privacy policies also apply — we encourage you to review them for any connected platform.</p>
+        <h2 style={s.h2}>4. Data Storage and Security</h2>
+        <p style={s.p}>Your data is stored securely in our database, accessible only to your account. OAuth tokens and credentials are stored with access controls and are never exposed in client-side code or logs. We use industry-standard practices to protect data at rest and in transit.</p>
+        <h2 style={s.h2}>5. Data Sharing</h2>
+        <p style={s.p}>We do not sell or rent your personal data. We share data only in these limited cases:</p>
+        <ul style={s.ul}>
+          <li style={s.li}>With the third-party platforms you have connected, to perform the actions you request</li>
+          <li style={s.li}>With infrastructure providers (hosting, database, storage) who process data on our behalf under confidentiality agreements</li>
+          <li style={s.li}>Where required by law or to protect the rights and safety of users</li>
         </ul>
-        <h2 style={{ fontSize: 17, fontWeight: 600, margin: "32px 0 10px" }}>6. Third-Party Platforms</h2>
-        <p style={{ marginBottom: 14, color: "#374151" }}>When you connect LinkedIn or other platforms, their own privacy policies also apply. See <a href="https://www.linkedin.com/legal/privacy-policy" target="_blank" rel="noopener noreferrer" style={{ color: "#4f46e5" }}>LinkedIn's Privacy Policy</a>.</p>
-        <h2 style={{ fontSize: 17, fontWeight: 600, margin: "32px 0 10px" }}>7. Changes to This Policy</h2>
-        <p style={{ marginBottom: 14, color: "#374151" }}>We may update this Privacy Policy from time to time. Continued use of StartupVerse after changes are posted constitutes your acceptance of the revised policy.</p>
-        <h2 style={{ fontSize: 17, fontWeight: 600, margin: "32px 0 10px" }}>8. Contact Us</h2>
-        <p style={{ marginBottom: 14, color: "#374151" }}>Questions about your data: <a href="mailto:genomachub@gmail.com" style={{ color: "#4f46e5" }}>genomachub@gmail.com</a></p>
+        <h2 style={s.h2}>6. Your Rights and Controls</h2>
+        <ul style={s.ul}>
+          <li style={s.li}><strong>Disconnect integrations:</strong> Go to StartupVerse → Integrations → select any integration → Disconnect. Tokens are removed immediately.</li>
+          <li style={s.li}><strong>Revoke via the platform:</strong> You can also revoke access directly in the connected platform's own settings</li>
+          <li style={s.li}><strong>Access your data:</strong> Contact us to request a copy of the data we hold about you</li>
+          <li style={s.li}><strong>Delete your account:</strong> Contact us to permanently delete your account and associated data</li>
+        </ul>
+        <h2 style={s.h2}>7. Cookies and Local Storage</h2>
+        <p style={s.p}>We use cookies and browser local storage to maintain your session and remember your preferences (e.g. selected view, theme). We do not use tracking or advertising cookies.</p>
+        <h2 style={s.h2}>8. Children's Privacy</h2>
+        <p style={s.p}>StartupVerse is not directed at children under 16. We do not knowingly collect data from anyone under 16. If you believe we have done so in error, contact us and we will delete it promptly.</p>
+        <h2 style={s.h2}>9. Changes to This Policy</h2>
+        <p style={s.p}>We may update this Privacy Policy from time to time. We will notify you of significant changes by updating the date at the top of this page. Continued use of StartupVerse after changes are posted constitutes your acceptance of the revised policy.</p>
+        <h2 style={s.h2}>10. Contact Us</h2>
+        <p style={s.p}>Questions, data requests, or deletion requests: <a href="mailto:genomachub@gmail.com" style={{ color: "#4f46e5" }}>genomachub@gmail.com</a></p>
         <div style={{ marginTop: 48, paddingTop: 24, borderTop: "1px solid #e5e7eb", fontSize: 13, color: "#9ca3af" }}>© 2026 StartupVerse. All rights reserved.</div>
       </div>
     </div>
