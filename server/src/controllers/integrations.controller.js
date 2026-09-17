@@ -12,7 +12,7 @@ export async function listIntegrations(req, res) {
   try {
     const { founderId } = req.params;
     const integrations = await Integration.find({ founderId }).select("-credentials").lean();
-    return res.json({ ok: true, data: integrations });
+    return res.json({ success: true, data: integrations });
   } catch (err) {
     logger.error("integrations.list.error", { error: err.message });
     return res.status(500).json({ ok: false, message: "Failed to load integrations." });
@@ -53,7 +53,7 @@ export async function connectGmail(req, res) {
     // Return without credentials
     const safe = integration.toObject();
     delete safe.credentials;
-    return res.json({ ok: true, data: safe });
+    return res.json({ success: true, data: safe });
   } catch (err) {
     logger.error("integrations.gmail.connect.error", { error: err.message });
     return res.status(500).json({ ok: false, message: "Failed to connect Gmail." });
@@ -68,7 +68,7 @@ export async function disconnectGmail(req, res) {
       { founderId, type: "gmail" },
       { status: "disconnected", credentials: { email: "", appPassword: "" }, errorMessage: "" },
     );
-    return res.json({ ok: true });
+    return res.json({ success: true, data: {} });
   } catch (err) {
     logger.error("integrations.gmail.disconnect.error", { error: err.message });
     return res.status(500).json({ ok: false, message: "Failed to disconnect Gmail." });
@@ -88,7 +88,7 @@ export async function sendOutreachEmail(req, res) {
     }
 
     const record = await sendFounderEmail(founderId, { recipientEmail, recipientName, subject, htmlBody, agentEventId });
-    return res.json({ ok: true, data: record });
+    return res.json({ success: true, data: record });
   } catch (err) {
     logger.error("integrations.email.send.error", { error: err.message });
     return res.status(500).json({ ok: false, message: err.message });
@@ -106,7 +106,7 @@ export async function sendOutreachSequence(req, res) {
     }
 
     const records = await sendFounderEmailSequence(founderId, { recipientEmail, recipientName, steps, agentEventId });
-    return res.json({ ok: true, data: records });
+    return res.json({ success: true, data: records });
   } catch (err) {
     logger.error("integrations.email.sequence.error", { error: err.message });
     return res.status(500).json({ ok: false, message: err.message });
@@ -151,7 +151,7 @@ export async function connectWhatsApp(req, res) {
 
     const safe = integration.toObject();
     delete safe.credentials;
-    return res.json({ ok: true, data: safe });
+    return res.json({ success: true, data: safe });
   } catch (err) {
     logger.error("integrations.whatsapp.connect.error", { error: err.message });
     return res.status(500).json({ ok: false, message: "Failed to connect WhatsApp." });
@@ -166,7 +166,7 @@ export async function disconnectWhatsApp(req, res) {
       { founderId, type: "whatsapp" },
       { status: "disconnected", credentials: {}, meta: {}, errorMessage: "" },
     );
-    return res.json({ ok: true });
+    return res.json({ success: true, data: {} });
   } catch (err) {
     logger.error("integrations.whatsapp.disconnect.error", { error: err.message });
     return res.status(500).json({ ok: false, message: "Failed to disconnect WhatsApp." });
@@ -184,7 +184,7 @@ export async function sendWhatsAppOutreach(req, res) {
     }
 
     const result = await sendWhatsAppMessage(founderId, { recipientPhone, message });
-    return res.json({ ok: true, data: result });
+    return res.json({ success: true, data: result });
   } catch (err) {
     logger.error("integrations.whatsapp.send.error", { error: err.message });
     return res.status(500).json({ ok: false, message: err.message });
@@ -226,7 +226,7 @@ export async function connectSocial(req, res) {
 
     const safe = integration.toObject();
     delete safe.credentials;
-    return res.json({ ok: true, data: safe });
+    return res.json({ success: true, data: safe });
   } catch (err) {
     logger.error("integrations.social.connect.error", { error: err.message });
     return res.status(500).json({ ok: false, message: "Failed to save social profile." });
@@ -241,7 +241,7 @@ export async function disconnectSocial(req, res) {
       { founderId, type },
       { status: "disconnected", credentials: {}, meta: {}, errorMessage: "" },
     );
-    return res.json({ ok: true });
+    return res.json({ success: true, data: {} });
   } catch (err) {
     logger.error("integrations.social.disconnect.error", { error: err.message });
     return res.status(500).json({ ok: false, message: "Failed to disconnect." });
@@ -257,7 +257,7 @@ export async function linkedInOAuthStart(req, res) {
   }
   const { founderId } = req.params;
   const authUrl = linkedinService.buildAuthUrl(founderId);
-  return res.json({ ok: true, authUrl, configured: true });
+  return res.json({ success: true, data: { authUrl, configured: true } });
 }
 
 /** GET /integrations/linkedin/oauth/callback  (no requireAuth — browser redirect from LinkedIn) */
@@ -304,7 +304,7 @@ export async function postToLinkedIn(req, res) {
 
   try {
     const result = await linkedinService.publishPost(founderId, text);
-    return res.json({ ok: true, data: result });
+    return res.json({ success: true, data: result });
   } catch (err) {
     logger.error("linkedin.post.error", { error: err.message, founderId });
     return res.status(500).json({ ok: false, message: err.message });
@@ -319,7 +319,7 @@ export async function disconnectLinkedIn(req, res) {
       { founderId, type: "linkedin" },
       { status: "disconnected", credentials: {}, meta: {}, errorMessage: "" },
     );
-    return res.json({ ok: true });
+    return res.json({ success: true, data: {} });
   } catch (err) {
     logger.error("linkedin.disconnect.error", { error: err.message });
     return res.status(500).json({ ok: false, message: "Failed to disconnect LinkedIn." });
@@ -339,7 +339,7 @@ export async function getEmailHistory(req, res) {
       .limit(Math.min(Number(limit), 200))
       .lean();
 
-    return res.json({ ok: true, data: emails });
+    return res.json({ success: true, data: emails });
   } catch (err) {
     logger.error("integrations.email.history.error", { error: err.message });
     return res.status(500).json({ ok: false, message: "Failed to load email history." });
