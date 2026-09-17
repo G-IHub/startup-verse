@@ -95,6 +95,19 @@ const taskSchema = new mongoose.Schema(
       trim: true,
       maxlength: [200, "GitHub repo cannot exceed 200 characters"],
     },
+    // Set by AI PM while drafting a sprint plan (see agentChat.controller.js's
+    // SPRINT_PLAN marker) to flag "this is real code work for AI Developer,
+    // not something a human/other agent does." orchestrator.service.js's
+    // advanceBuildQueueIfIdle() uses these two fields to hand the task off
+    // automatically, one at a time, once the founder approves the plan —
+    // no need for the founder to come back and ask for the hand-off by hand.
+    buildTask: { type: Boolean, default: false },
+    buildFilePath: {
+      type: String,
+      default: "",
+      trim: true,
+      maxlength: [500, "Build file path cannot exceed 500 characters"],
+    },
     incentive: { 
       type: String, 
       default: "",

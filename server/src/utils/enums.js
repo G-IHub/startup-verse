@@ -37,6 +37,16 @@ export const STARTUP_POST_COMPENSATION_PHILOSOPHIES = [
 
 export const STARTUP_POST_VISIBILITIES = ["public", "team", "private"];
 
+export const OFFER_STATUSES = ["pending", "accepted", "declined", "expired", "withdrawn"];
+export const OFFER_KPI_TIERS = ["Star", "Strong", "Meets"];
+export const OFFER_ROLE_TYPES = ["Full-time", "Part-time", "Contract", "Co-founder"];
+export const OFFER_EMPLOYMENT_TYPES = ["Full-time employee", "Part-time", "Contract", "Advisor"];
+export const OFFER_WORK_LOCATIONS = ["Remote-first", "On-site", "Hybrid"];
+export const OFFER_COMPENSATION_MODELS = ["salary", "equity-only", "hybrid", "task-based", "revenue-share"];
+export const OFFER_PAYMENT_SCHEDULES = ["1st", "15th", "biweekly"];
+export const OFFER_BONUS_STRUCTURES = ["performance-tiers", "milestone", "flat-monthly", "none"];
+export const OFFER_ACCELERATED_VESTING_OPTIONS = ["tier3-accelerate", "double-trigger", "none"];
+
 /** Organization-assigned cohort deliverable template kinds */
 export const DELIVERABLE_TYPES = [
   "general",

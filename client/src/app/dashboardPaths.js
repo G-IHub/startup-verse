@@ -48,6 +48,7 @@ const PATH_TO_PAGE = Object.freeze({
   "/browse-startups": "browse-startups",
   "/startup-detail": "startup-detail",
   "/talent-profile": "talent-profile",
+  "/talent-offers": "talent-offers",
   "/compensation-demo": "compensation-demo",
 });
 
@@ -71,7 +72,10 @@ export const DASHBOARD_PATH_PREFIXES = Object.freeze(
       "browse-startups",
       "startup-detail",
       "talent-profile",
+      "talent-offers",
       "compensation-demo",
+      // V2 Autonomous OS — all sub-paths share the "v2" prefix
+      "v2",
     ],
   ),
 );
@@ -374,6 +378,8 @@ export function dashboardStateToPath(state) {
       return "/post-startup";
     case "browse-startups":
       return "/browse-startups";
+    case "talent-offers":
+      return "/talent-offers";
     case "startup-detail":
       return startupId
         ? appendEntityParams("/startup-detail", {
@@ -401,6 +407,11 @@ export function dashboardStateToPath(state) {
 
 /** Paths registered as `<Route>` elements for the dashboard shell (Phase 1 + internal pages). */
 export const DASHBOARD_ROUTE_PATHS = Object.freeze([
+  // V2 Autonomous OS paths are intentionally NOT listed here — this array
+  // generates <Route> elements pointing at the V1 dashboardHybridElement.
+  // V2 is routed separately in App.jsx via dedicated /v2 + /v2/* routes to
+  // v2ShellElement. Guard coverage for the "v2" prefix lives in
+  // DASHBOARD_PATH_PREFIXES above, not here.
   "/home",
   "/office",
   "/office/tasks/:taskId",
@@ -428,6 +439,7 @@ export const DASHBOARD_ROUTE_PATHS = Object.freeze([
   "/browse-startups",
   "/startup-detail",
   "/talent-profile",
+  "/talent-offers",
   "/compensation-demo",
 ]);
 

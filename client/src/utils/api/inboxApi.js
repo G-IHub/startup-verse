@@ -180,9 +180,10 @@ export async function addInterestMessage(interestId, message) {
 }
 
 // Mark interest as onboarded (after compensation setup)
-export async function markInterestAsOnboarded(interestId) {
+export async function markInterestAsOnboarded(interestId, compensationConfig = null) {
   return apiRequest(`/interests/${interestId}/onboard`, {
     method: "POST",
+    body: compensationConfig ? JSON.stringify({ compensationConfig }) : undefined,
   });
 }
 

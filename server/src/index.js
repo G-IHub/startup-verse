@@ -14,6 +14,7 @@ import {
   runDeliverableDueSoonJob,
   runEventReminderJob,
   runCohortInvitationExpiryJob,
+  runAutonomousPlanningCheckJob,
 } from "./services/schedulerJobs.js";
 
 function startBackgroundWorkers() {
@@ -56,6 +57,12 @@ function startBackgroundWorkers() {
     opts,
   );
   cron.schedule("*/30 * * * *", safe("event-reminder", runEventReminderJob), opts);
+  // Weekly backstop for AI PM's opt-in autonomous-planning check-in — the
+  // real, more responsive trigger is queue-empty-driven (orchestrator.
+  // service.js); this catches founders that never reaches, e.g. no build
+  // tasks running at all this week. An hour after the existing weekly
+  // reminder, same day.
+  cron.schedule("0 19 * * 0", safe("autonomous-planning-check", runAutonomousPlanningCheckJob), opts);
   logger.info("Server cron scheduler started.", { timezone: tz || "system local" });
 }
 

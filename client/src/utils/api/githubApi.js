@@ -20,6 +20,27 @@ export async function listGithubRepos(page = 1) {
   return payload?.data || payload || { repos: [] };
 }
 
+export async function createGithubRepo(name, isPrivate = false) {
+  const payload = await request("/github/repos", {
+    method: "POST",
+    body: JSON.stringify({ name, private: isPrivate }),
+  });
+  return payload?.data || payload;
+}
+
+export async function getDefaultGithubRepo() {
+  const payload = await request("/github/default-repo", { method: "GET" });
+  return payload?.data || payload || { owner: "", repo: "" };
+}
+
+export async function setDefaultGithubRepo(owner, repo) {
+  const payload = await request("/github/default-repo", {
+    method: "PUT",
+    body: JSON.stringify({ owner, repo }),
+  });
+  return payload?.data || payload;
+}
+
 export async function listGithubIssues(owner, repo, page = 1) {
   const payload = await request(
     `/github/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/issues?page=${page}`,

@@ -122,6 +122,9 @@ export async function getStartupTeamMembers(startupId, params = {}) {
           avatar: m.avatar || "",
           title: m.title || "",
           skills: Array.isArray(m.skills) ? m.skills : [],
+          bio: m.bio || "",
+          compensation: m.compensation || null,
+          createdAt: m.createdAt || null,
           connection: presence?.connection || "offline",
           isOnline: presence ? Boolean(presence.isOnline) : false,
           statusText: presence ? String(presence.statusText || "") : "",
@@ -388,6 +391,45 @@ export async function leaveStartup(userId) {
   return apiRequest(`/team-members/${userId}/leave`, { method: "POST" });
 }
 
+/**
+ * Real per-member completion-rate for every team member under one founder
+ * in a single call (the self-or-admin-only /team-members/:id/performance
+ * route can't serve a founder viewing their whole team). Returns the same
+ * honest {teamMemberId, totalTasks, completedTasks, completionRate} shape —
+ * label it "Completion rate" in the UI, never a fabricated "KPI score".
+ */
+export async function getFounderTeamPerformance(founderId) {
+  return apiRequest(`/founders/${founderId}/team-performance`, { method: "GET" });
+}
+
+/** Real per-team-member onboarding checklist (null if none has been created yet). */
+export async function getOnboardingChecklist(teamMemberId) {
+  return apiRequest(`/team-members/${teamMemberId}/onboarding-checklist`, { method: "GET" });
+}
+
+/** Founder creates/replaces a member's checklist. tasks: [{title}] or omit for real defaults. */
+export async function saveOnboardingChecklist(teamMemberId, { founderId, startupId, tasks } = {}) {
+  return apiRequest(`/team-members/${teamMemberId}/onboarding-checklist`, {
+    method: "POST",
+    body: JSON.stringify({ founderId, startupId, tasks }),
+  });
+}
+
+export async function updateOnboardingChecklistTask(teamMemberId, taskId, updates) {
+  return apiRequest(`/team-members/${teamMemberId}/onboarding-checklist/tasks/${taskId}`, {
+    method: "PATCH",
+    body: JSON.stringify(updates),
+  });
+}
+
+/** Founder-only: update an already-onboarded team member's real compensation config. */
+export async function updateTeamMemberCompensation(teamMemberId, compensationConfig) {
+  return apiRequest(`/team-members/${teamMemberId}/compensation`, {
+    method: "PATCH",
+    body: JSON.stringify({ compensationConfig }),
+  });
+}
+
 export default {
   // Profile
   saveTeamMemberProfile,
@@ -413,4 +455,11 @@ export default {
 
   // Membership
   leaveStartup,
+
+  // Performance & onboarding checklist (founder-side)
+  getFounderTeamPerformance,
+  getOnboardingChecklist,
+  saveOnboardingChecklist,
+  updateOnboardingChecklistTask,
+  updateTeamMemberCompensation,
 };

@@ -10,6 +10,9 @@ githubRouter.get("/github/oauth/callback", asyncHandler(githubController.callbac
 githubRouter.get("/github/connection", requireAuth, asyncHandler(githubController.getConnection));
 githubRouter.delete("/github/connection", requireAuth, asyncHandler(githubController.deleteConnection));
 githubRouter.get("/github/repos", requireAuth, asyncHandler(githubController.listRepos));
+githubRouter.post("/github/repos", requireAuth, asyncHandler(githubController.createRepo));
+githubRouter.get("/github/default-repo", requireAuth, asyncHandler(githubController.getDefaultRepo));
+githubRouter.put("/github/default-repo", requireAuth, asyncHandler(githubController.setDefaultRepo));
 githubRouter.get(
   "/github/repos/:owner/:repo/issues",
   requireAuth,

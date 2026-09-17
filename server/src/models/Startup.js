@@ -41,12 +41,38 @@ const startupSchema = new mongoose.Schema(
       maxlength: [1000, "Logo URL cannot exceed 1000 characters"]
     },
     data: { type: mongoose.Schema.Types.Mixed, default: {} },
+    // The real repo AI Developer builds into for this startup, so AI PM's
+    // automatic build-task hand-offs (orchestrator.service.js's
+    // advanceBuildQueueIfIdle) know where to open a PR without asking the
+    // founder every time. Set from the Integrations page's GitHub card, or
+    // by AI PM itself the first time a founder names a repo in chat.
+    defaultGithubRepo: {
+      owner: { type: String, default: "", trim: true, maxlength: 200 },
+      repo: { type: String, default: "", trim: true, maxlength: 200 },
+    },
+    // Opt-in for AI PM's autonomous continuous-planning check-in
+    // (2026-09-14) — off by default. When true, the moment AI Developer's
+    // build queue empties, AI PM drafts more tasks (or, if the current
+    // week's goal has actually run its course, a whole new plan) on its
+    // own and proposes it for real approval, without the founder having to
+    // ask first. This is the first behavior anywhere in this app that acts
+    // without being asked, so it stays opt-in rather than on for everyone.
+    autonomousPlanningEnabled: { type: Boolean, default: false },
+    // Real hosted-link feature (2026-09-15): the stable slug a founder's
+    // product lives at — https://sites.startupverse.space/{slug}. No
+    // default (left unset, not "") so the sparse unique index below only
+    // enforces uniqueness once a slug actually exists — see
+    // hostedSiteService.js's ensureStartupSlug, which generates and saves
+    // this lazily the first time a real production deploy needs one,
+    // rather than requiring a migration for every existing Startup.
+    slug: { type: String, trim: true, lowercase: true, maxlength: 80 },
   },
   { timestamps: true },
 );
 
 startupSchema.index({ founderId: 1 }, { unique: true });
 startupSchema.index({ industry: 1, stage: 1 });
+startupSchema.index({ slug: 1 }, { unique: true, sparse: true });
 
 const Startup = mongoose.models.Startup || mongoose.model("Startup", startupSchema);
 

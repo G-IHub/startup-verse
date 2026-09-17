@@ -8,8 +8,8 @@ const savedItemSchema = new mongoose.Schema(
       required: [true, "Item type is required"],
       index: true,
       enum: {
-        values: ["job", "startup"],
-        message: "{VALUE} is not a valid saved item type (allowed: job, startup)",
+        values: ["job", "startup", "talent"],
+        message: "{VALUE} is not a valid saved item type (allowed: job, startup, talent)",
       },
     },
     itemId: { type: mongoose.Schema.Types.ObjectId, required: true, index: true },

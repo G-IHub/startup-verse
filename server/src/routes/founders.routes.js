@@ -60,6 +60,7 @@ foundersRouter.get(
 foundersRouter.get("/founders/:founderId/posts", requireAuth, asyncHandler(foundersController.getPosts));
 foundersRouter.post("/founders/:founderId/posts", requireAuth, asyncHandler(foundersController.createPost));
 foundersRouter.delete("/founders/:founderId/posts/:postId", requireAuth, asyncHandler(foundersController.deletePost));
+foundersRouter.get("/founders/:founderId/applications", requireAuth, asyncHandler(foundersController.getApplicationsForFounder));
 
 foundersRouter.get("/founders/:founderId/invitations", requireAuth, asyncHandler(foundersController.getInvitations));
 foundersRouter.post("/founders/invitations", requireAuth, asyncHandler(foundersController.createInvitation));

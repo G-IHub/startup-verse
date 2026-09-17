@@ -12,6 +12,7 @@ import CohortMembership from "../models/CohortMembership.js";
 import { createNotification, broadcastNotification } from "./notificationService.js";
 import { officeDeepLink } from "../utils/deepLinks.js";
 import { logger } from "../config/logger.js";
+import { maybeTriggerAutonomousPlanning } from "./orchestrator.service.js";
 
 function startOfWeek(d) {
   const x = new Date(d);
@@ -235,6 +236,31 @@ export async function runCohortInvitationExpiryJob() {
 }
 
 /** Manual trigger: run deliverable + event reminders (used by agenda daily). */
+/**
+ * Weekly backstop for AI PM's opt-in continuous-planning check-in
+ * (2026-09-14). The real, more responsive trigger lives in
+ * orchestrator.service.js — it fires the moment AI Developer's build queue
+ * actually empties. This job exists for founders that trigger would never
+ * reach on its own: anyone with no build tasks running at all this week
+ * (nothing ever calls the queue-empty check for them), or whose queue
+ * happens to still be up to date the moment their week actually ends.
+ * maybeTriggerAutonomousPlanning already no-ops for founders who haven't
+ * opted in and for anyone with an unresolved proposal already pending, so
+ * it's safe to sweep every founder here the same way the other jobs do.
+ * @returns {Promise<{ checked: number }>}
+ */
+export async function runAutonomousPlanningCheckJob() {
+  const founders = await User.find({ role: "founder" }).select("_id").lean();
+  for (const f of founders) {
+    // eslint-disable-next-line no-await-in-loop -- one founder's real chat completion at a time, not a burst
+    await maybeTriggerAutonomousPlanning(f._id).catch((err) => {
+      logger.error("scheduler.autonomous-planning-check.failed", { founderId: String(f._id), message: err.message });
+    });
+  }
+  logger.info("scheduler.autonomous-planning-check", { checked: founders.length });
+  return { checked: founders.length };
+}
+
 export async function runDailyDigestJobs() {
   const [deliverables, events, invites] = await Promise.all([
     runDeliverableDueSoonJob(),

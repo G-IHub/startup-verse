@@ -823,6 +823,55 @@ export async function broadcastUnreadCountUpdate() {
 }
 
 // ========================================
+// AI STAFF ORCHESTRATION — agent-event:updated
+// Mirrors server/src/services/orchestrator.service.js publishEvent(), which
+// emits the raw AgentEvent DTO (not wrapped in a { agentEvent: ... } object)
+// to the founder's user room, per docs/ai-agent-roadmap.md Phase 0.
+// ========================================
+
+export function subscribeToAgentEvents(founderId, onUpdate) {
+  const socket = SocketEngine.getSocket();
+  const roomId = userSocketRoom(founderId);
+
+  const onEventUpdated = (event) => {
+    if (event) onUpdate(event);
+  };
+
+  joinRoom(roomId);
+  socket.on("agent-event:updated", onEventUpdated);
+
+  return () => {
+    socket.off("agent-event:updated", onEventUpdated);
+    leaveRoom(roomId);
+  };
+}
+
+/**
+ * Transient "AI Developer/AI PM is working right now" signal — mirrors
+ * orchestrator.service.js's emitActionStarted(), which is never persisted
+ * as an AgentEvent (every AgentEvent is only ever written after a real
+ * action finishes). The caller is responsible for clearing its own local
+ * state once the matching agent-event:updated for the same targetId
+ * arrives (or after a short timeout, as a safety net if that never comes).
+ */
+export function subscribeToAgentActionStarted(founderId, onStarted) {
+  const socket = SocketEngine.getSocket();
+  const roomId = userSocketRoom(founderId);
+
+  const onActionStarted = (payload) => {
+    if (payload) onStarted(payload);
+  };
+
+  joinRoom(roomId);
+  socket.on("agent-action:started", onActionStarted);
+
+  return () => {
+    socket.off("agent-action:started", onActionStarted);
+    leaveRoom(roomId);
+  };
+}
+
+// ========================================
 // CLEANUP
 // ========================================
 

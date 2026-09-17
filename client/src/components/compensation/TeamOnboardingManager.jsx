@@ -171,7 +171,10 @@ export default function TeamOnboardingManager({ user }) {
         );
         return;
       }
-      await inboxApi.markInterestAsOnboarded(selectedTalent.interestId);
+      await inboxApi.markInterestAsOnboarded(
+        selectedTalent.interestId,
+        compensationConfig,
+      );
       toast.success(
         `🎉 ${selectedTalent.talentName} has been successfully onboarded to your team!`,
       );

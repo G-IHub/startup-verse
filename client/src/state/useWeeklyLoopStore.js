@@ -30,9 +30,9 @@ function normalizeListPayload(payload, key) {
 /** Avoid stale GET responses after POST (browser / proxy caches). */
 function noStoreGetConfig(bustCache) {
   if (!bustCache) return {};
+  // Use only a query param — custom headers trigger CORS preflight failures on the backend
   return {
     params: { _: Date.now() },
-    headers: { "Cache-Control": "no-cache", Pragma: "no-cache" },
   };
 }
 

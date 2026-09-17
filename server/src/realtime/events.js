@@ -34,4 +34,13 @@ export const SOCKET_EVENTS = Object.freeze({
   ANNOUNCEMENT_UPDATED: "announcement:updated",
   ANNOUNCEMENT_DELETED: "announcement:deleted",
   ANNOUNCEMENT_READ: "announcement:read",
+  // AI Staff orchestration — docs/ai-agent-roadmap.md Phase 0
+  AGENT_EVENT_UPDATED: "agent-event:updated",
+  // Transient, not persisted to AgentEvent — every AgentEvent today is only
+  // ever written *after* a real action finishes (success or fail), so there
+  // was no live "AI Developer is working right now" signal anywhere. Emitted
+  // right before a real executor runs; the client clears it itself once the
+  // matching AGENT_EVENT_UPDATED for the same targetId arrives, or after a
+  // short timeout as a safety net if that never comes.
+  AGENT_ACTION_STARTED: "agent-action:started",
 });
