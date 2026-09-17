@@ -21,11 +21,19 @@
  */
 import React, { useEffect, useMemo, useState } from "react";
 import { Maximize2, Minimize2, Smartphone, Monitor } from "lucide-react";
-import { getAgentEvents } from "../../utils/api/agentOrchestrationApi";
+import { getAgentEvents, resolveAgentEvent } from "../../utils/api/agentOrchestrationApi";
 import { getFounderStartupSafe } from "../../utils/api/founderApi";
 import { getFormSubmissions } from "../../utils/api/formSubmissionsApi";
 import { useOfficeStore } from "../../state/useOfficeStore";
 import { formatEventTime } from "../../utils/agentDisplay";
+
+// In dev, VITE_SITES_BASE_URL=http://localhost:5000 so the iframe loads from
+// the local server. In production, hosted URLs are already correct as-is.
+const SITES_BASE_URL = import.meta.env.VITE_SITES_BASE_URL || null;
+function normalizeSiteUrl(url) {
+  if (!url || !SITES_BASE_URL) return url;
+  return url.replace(/^https?:\/\/sites\.startupverse\.space/, SITES_BASE_URL);
+}
 
 function WhoBadge({ initials, bg, color }) {
   return (
@@ -108,17 +116,48 @@ function PreviewFrame({ chromeLabel, title, src, srcDoc, expanded, onToggleExpan
   );
 }
 
+/** Infer a human-readable category from filePath + task description. */
+function inferCategory(filePath, title) {
+  const text = ((filePath || "") + " " + (title || "")).toLowerCase();
+  if (/form|signup|sign.up|contact|waitlist|lead|apply|register/.test(text)) return "Form";
+  if (/dashboard|admin|panel|analytics|metric|report/.test(text)) return "Dashboard";
+  if (/pricing|price|plan|subscription/.test(text)) return "Pricing Page";
+  if (/blog|post|article|news/.test(text)) return "Blog";
+  if (/about|team|story|mission/.test(text)) return "About Page";
+  if (/onboard|welcome|get.started/.test(text)) return "Onboarding";
+  return "Landing Page";
+}
+
+/** Deduplicate history by filePath — one card per unique file, newest version wins. */
+function buildGalleryItems(history) {
+  const seen = new Map();
+  for (const h of history) {
+    const key = (h.filePath || h.targetId || "").toLowerCase();
+    if (!seen.has(key)) seen.set(key, h);
+  }
+  const items = Array.from(seen.values());
+  // Group by category
+  const groups = new Map();
+  for (const item of items) {
+    const cat = inferCategory(item.filePath, item.title);
+    if (!groups.has(cat)) groups.set(cat, []);
+    groups.get(cat).push(item);
+  }
+  return groups;
+}
+
 /** Groups real github_open_pr/staging/main events by pipeline (targetId) into one real build-history row each, newest first. */
 function buildRealHistory(events) {
   const byTarget = new Map();
   for (const e of events) {
     if (e.actionTypeId?.agentId?.agentKey !== "dev") continue;
     const key = e.targetId || e.id;
-    if (!byTarget.has(key)) byTarget.set(key, { targetId: key, openPr: null, prod: null });
+    if (!byTarget.has(key)) byTarget.set(key, { targetId: key, openPr: null, prod: null, pendingProd: null });
     const bucket = byTarget.get(key);
     const actionKey = e.actionTypeId?.actionKey;
     if (actionKey === "github_open_pr") bucket.openPr = e;
     if (actionKey === "github_merge_main" && (e.status === "autonomous_completed" || e.status === "human_completed")) bucket.prod = e;
+    if (actionKey === "github_merge_main" && e.status === "pending_approval") bucket.pendingProd = e;
   }
   return Array.from(byTarget.values())
     .filter((b) => b.openPr)
@@ -133,8 +172,9 @@ function buildRealHistory(events) {
       // private repo on a plan that doesn't support it).
       fileContent: b.openPr.result?.fileContent || null,
       live: Boolean(b.prod),
-      liveUrl: b.prod?.result?.hostedUrl || b.prod?.result?.pagesUrl || null,
+      liveUrl: normalizeSiteUrl(b.prod?.result?.hostedUrl || b.prod?.result?.pagesUrl || null),
       pagesError: b.prod?.result?.pagesError || null,
+      pendingProdId: b.pendingProd?.id || null,
       time: b.prod?.createdAt || b.openPr.createdAt,
     }))
     .sort((a, b) => new Date(b.time) - new Date(a.time));
@@ -149,6 +189,26 @@ export default function V2ProductViewer({ user, onBack }) {
   const [history, setHistory] = useState([]);
   const [submissions, setSubmissions] = useState([]);
   const [expanded, setExpanded] = useState(false);
+  const [approvedIds, setApprovedIds] = useState(new Set());
+  const [busyApprove, setBusyApprove] = useState(new Set());
+  const [approveToast, setApproveToast] = useState("");
+  const [showGallery, setShowGallery] = useState(false);
+  const [selectedArtifact, setSelectedArtifact] = useState(null);
+
+  const handleApprove = async (eventId) => {
+    setBusyApprove((prev) => new Set(prev).add(eventId));
+    try {
+      await resolveAgentEvent(eventId, "approved");
+      setApprovedIds((prev) => new Set(prev).add(eventId));
+      setApproveToast("Production deploy approved — merging to main now…");
+      setTimeout(() => setApproveToast(""), 3000);
+    } catch (err) {
+      setApproveToast(err?.message || "Could not approve — try from the Approval Queue.");
+      setTimeout(() => setApproveToast(""), 3000);
+    } finally {
+      setBusyApprove((prev) => { const s = new Set(prev); s.delete(eventId); return s; });
+    }
+  };
 
   useEffect(() => {
     if (!resolvedFounderId) return;
@@ -166,15 +226,14 @@ export default function V2ProductViewer({ user, onBack }) {
     return () => { cancelled = true; };
   }, [resolvedFounderId]);
 
-  const latestLive = history.find((h) => h.live && h.liveUrl) || null;
+  const galleryGroups = useMemo(() => buildGalleryItems(history), [history]);
 
-  // Real fallback for when no public URL exists yet (Pages not enabled, or
-  // a real limitation like a private repo on a plan that doesn't support
-  // it) — the actual HTML AI Developer wrote is already stored, so it can
-  // be rendered directly with zero hosting, and "Open in new tab" works via
-  // a real Blob URL rather than needing an actual server anywhere.
+  // Effective preview target: gallery selection overrides automatic defaults
+  const effectivePreview = selectedArtifact || history.find((h) => h.live && h.liveUrl) || null;
+  const latestLive = effectivePreview?.live && effectivePreview?.liveUrl ? effectivePreview : null;
+
   const localPreview = !latestLive
-    ? history.find((h) => h.fileContent && /\.html?$/i.test(h.filePath || "")) || null
+    ? (selectedArtifact || history.find((h) => h.fileContent && /\.html?$/i.test(h.filePath || "")) || null)
     : null;
 
   const localPreviewBlobUrl = useMemo(() => {
@@ -212,6 +271,15 @@ export default function V2ProductViewer({ user, onBack }) {
           <button type="button" onClick={onBack} className="rounded-full border border-v2-border bg-white px-3 py-1.5 font-body text-[12px] font-medium text-v2-heading hover:bg-gray-50 transition-colors">
             Back to Workroom
           </button>
+          {history.length > 0 && (
+            <button
+              type="button"
+              onClick={() => setShowGallery(true)}
+              className="rounded-full border border-v2-purple/30 bg-[#F5F3FF] px-3 py-1.5 font-body text-[12px] font-medium text-v2-purple hover:bg-[#EDE9FF] transition-colors"
+            >
+              View artifacts ✦
+            </button>
+          )}
           {latestLive ? (
             <a href={latestLive.liveUrl} target="_blank" rel="noreferrer" className="rounded-full bg-v2-purple px-3 py-1.5 font-body text-[12px] font-medium text-white hover:opacity-90 transition-opacity">
               Open live site ↗
@@ -318,7 +386,7 @@ export default function V2ProductViewer({ user, onBack }) {
           history.map((h, i) => (
             <div key={h.targetId} className="flex gap-2.5 border-b border-gray-100 py-3 last:border-0">
               <div className="flex shrink-0 flex-col items-center">
-                <div className="mt-1 h-2.5 w-2.5 rounded-full" style={{ background: h.live ? "#1D9E75" : "#9ca3af" }} />
+                <div className="mt-1 h-2.5 w-2.5 rounded-full" style={{ background: h.live ? "#1D9E75" : (h.pendingProdId && !approvedIds.has(h.pendingProdId)) ? "#F5C344" : "#9ca3af" }} />
                 {i < history.length - 1 && <div className="mt-1 w-px flex-1 bg-gray-200" />}
               </div>
               <div className="min-w-0 flex-1 pb-0.5">
@@ -334,13 +402,108 @@ export default function V2ProductViewer({ user, onBack }) {
                   )}
                 </div>
                 <div className="mt-1 font-body text-[9px] text-v2-subtle">{formatEventTime(h.time)}</div>
+                {h.pendingProdId && !approvedIds.has(h.pendingProdId) && (
+                  <button
+                    type="button"
+                    disabled={busyApprove.has(h.pendingProdId)}
+                    onClick={() => handleApprove(h.pendingProdId)}
+                    className="mt-2 w-full rounded-lg border border-[#F5C344]/50 bg-[#FFF8E6] px-2 py-1.5 font-body text-[10px] font-medium text-[#633806] transition-colors hover:bg-[#FFF3CC] disabled:opacity-60"
+                  >
+                    {busyApprove.has(h.pendingProdId) ? "Approving…" : "Approve production deploy →"}
+                  </button>
+                )}
               </div>
             </div>
           ))
         )}
       </div>
-
+      {approveToast && (
+        <div className="pointer-events-none fixed bottom-6 left-1/2 z-[60] -translate-x-1/2 rounded-full bg-gray-900 px-5 py-2.5 font-body text-[12px] font-medium text-white shadow-lg">
+          {approveToast}
+        </div>
+      )}
       </div>
+
+      {/* ── Artifact gallery popup ── */}
+      {showGallery && (
+        <div
+          className="fixed inset-0 z-[200] flex items-center justify-center"
+          style={{ background: "rgba(10,8,30,0.72)", backdropFilter: "blur(6px)" }}
+          onClick={() => setShowGallery(false)}
+        >
+          <div
+            className="relative flex max-h-[88vh] w-[min(960px,94vw)] flex-col overflow-hidden rounded-[24px] bg-white shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Modal header */}
+            <div className="flex shrink-0 items-center justify-between border-b border-gray-100 px-7 py-5">
+              <div>
+                <div className="font-body text-[18px] font-semibold text-v2-heading">Built by AI Developer</div>
+                <div className="mt-0.5 font-body text-[12px] text-v2-muted">
+                  {Array.from(galleryGroups.values()).flat().length} artifact{Array.from(galleryGroups.values()).flat().length === 1 ? "" : "s"} · click any card to preview
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowGallery(false)}
+                className="flex h-8 w-8 items-center justify-center rounded-full bg-gray-100 text-gray-500 hover:bg-gray-200 transition-colors"
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M18 6L6 18M6 6l12 12"/></svg>
+              </button>
+            </div>
+
+            {/* Scrollable content */}
+            <div className="min-h-0 flex-1 overflow-y-auto px-7 py-6 space-y-8">
+              {galleryGroups.size === 0 ? (
+                <div className="py-16 text-center font-body text-[13px] text-v2-muted">No artifacts yet — hand AI Developer a task from Chat.</div>
+              ) : (
+                Array.from(galleryGroups.entries()).map(([category, items]) => (
+                  <div key={category}>
+                    <div className="mb-3 font-body text-[11px] font-semibold uppercase tracking-widest text-v2-muted">{category}</div>
+                    <div className="grid grid-cols-[repeat(auto-fill,minmax(220px,1fr))] gap-4">
+                      {items.map((item) => {
+                        const isSelected = selectedArtifact?.targetId === item.targetId;
+                        const dotColor = item.live ? "#1D9E75" : item.pendingProdId ? "#F5C344" : "#9ca3af";
+                        const statusLabel = item.live ? "Live" : item.pendingProdId ? "Pending" : "Built";
+                        return (
+                          <button
+                            key={item.targetId}
+                            type="button"
+                            onClick={() => { setSelectedArtifact(item); setShowGallery(false); }}
+                            className={`group flex flex-col overflow-hidden rounded-[16px] border text-left transition-all hover:shadow-lg ${isSelected ? "border-v2-purple shadow-md" : "border-gray-200 hover:border-v2-purple/40"}`}
+                          >
+                            {/* Card thumbnail area */}
+                            <div className="flex h-[120px] items-center justify-center" style={{ background: "radial-gradient(ellipse at 50% 0%, #241f5c, #100e2e 80%)" }}>
+                              <div className="flex flex-col items-center gap-1.5">
+                                <div className="font-body text-[28px]">
+                                  {category === "Form" ? "📋" : category === "Dashboard" ? "📊" : category === "Pricing Page" ? "💳" : category === "Blog" ? "📝" : category === "About Page" ? "👥" : category === "Onboarding" ? "🚀" : "🌐"}
+                                </div>
+                                <div className="font-body text-[9px] font-medium uppercase tracking-wider text-[#a8a3d9]">{category}</div>
+                              </div>
+                            </div>
+                            {/* Card body */}
+                            <div className="flex flex-1 flex-col gap-1.5 p-3.5">
+                              <div className="truncate font-body text-[12px] font-semibold text-v2-heading">{item.filePath || "file"}</div>
+                              <p className="line-clamp-2 font-body text-[10px] leading-relaxed text-v2-muted">{item.title}</p>
+                              <div className="mt-auto flex items-center justify-between pt-2">
+                                <span className="inline-flex items-center gap-1 font-body text-[10px]" style={{ color: dotColor }}>
+                                  <span className="h-1.5 w-1.5 rounded-full" style={{ background: dotColor }} />
+                                  {statusLabel}
+                                </span>
+                                <span className="font-body text-[10px] text-v2-purple opacity-0 transition-opacity group-hover:opacity-100">Preview →</span>
+                              </div>
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

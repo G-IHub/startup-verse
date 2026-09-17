@@ -14,6 +14,18 @@ import React, { useState, useEffect, useCallback } from "react";
 import { cn } from "../ui/utils";
 import * as githubApi from "../../utils/api/githubApi";
 import * as customDomainApi from "../../utils/api/customDomainApi";
+import * as calendlyApi from "../../utils/api/calendlyApi";
+import {
+  getIntegrations,
+  connectGmail as apiConnectGmail,
+  disconnectGmail as apiDisconnectGmail,
+  connectWhatsApp as apiConnectWhatsApp,
+  disconnectWhatsApp as apiDisconnectWhatsApp,
+  connectSocial as apiConnectSocial,
+  disconnectSocial as apiDisconnectSocial,
+  getLinkedInAuthUrl,
+  disconnectLinkedIn as apiDisconnectLinkedIn,
+} from "../../utils/api/integrationsApi";
 import { useOfficeStore } from "../../state/useOfficeStore";
 
 /* ── Data ─────────────────────────────────────────────────────────────────── */
@@ -47,8 +59,12 @@ const SECTIONS = [
     title: "Communication & outreach",
     sub: "What AI Sales and AI Marketing use to reach people",
     items: [
-      { id: "zikorail", iconBg: "#25D366", iconLabel: "W",  name: "WhatsApp Business (Zikorail)", sub: "Outreach, pipeline, booking",        connected: true,  agents: ["🤖 AI Sales", "🤖 AI Marketing"],           meta: "Last synced 7:52am today · 10 messages queued" },
-      { id: "gmail",    iconBg: "#EA4335", iconLabel: "✉",  name: "Gmail",                        sub: "Email drafts, notifications",        connected: false, agents: ["🤖 AI Marketing", "🤖 AI Product Manager"],  meta: "Would enable email nurture sequences" },
+      { id: "calendly",  iconBg: "#006BFF", iconLabel: "📅", name: "Calendly",                     sub: "Booking links, auto-create meeting tasks", connected: false, agents: ["🤖 AI PM", "🤖 AI Sales", "🤖 AI Marketing"], meta: "Not connected yet" },
+      { id: "whatsapp", iconBg: "#25D366", iconLabel: "W",  name: "WhatsApp Business",            sub: "Send AI-drafted messages directly from your number", connected: false, agents: ["🤖 AI Sales", "🤖 AI Marketing"], meta: "Enables real WhatsApp sending", dynamic: true },
+      { id: "gmail",    iconBg: "#EA4335", iconLabel: "✉",  name: "Gmail",                        sub: "Send outreach emails from your inbox", connected: false, agents: ["🤖 AI Sales", "🤖 AI Marketing"],  meta: "Would enable email nurture sequences", dynamic: true },
+      { id: "linkedin", iconBg: "#0A66C2", iconLabel: "in", name: "LinkedIn",                     sub: "AI drafts messages, you send manually", connected: false, agents: ["🤖 AI Sales", "🤖 AI Marketing"], meta: "Copy-to-clipboard sending", dynamic: true },
+      { id: "instagram",iconBg: "#E1306C", iconLabel: "IG", name: "Instagram",                    sub: "AI drafts captions & DMs, you post manually", connected: false, agents: ["🤖 AI Marketing"], meta: "Copy-to-clipboard sending", dynamic: true },
+      { id: "facebook", iconBg: "#1877F2", iconLabel: "f",  name: "Facebook",                     sub: "AI drafts posts & messages, you send manually", connected: false, agents: ["🤖 AI Marketing"], meta: "Copy-to-clipboard sending", dynamic: true },
       { id: "gcal",     iconBg: "#4285F4", iconLabel: "📅", name: "Google Calendar",              sub: "Booking, mentor sessions",           connected: false, agents: ["🤖 AI Sales"],                               meta: "Would enable direct clinic booking sync" },
     ],
   },
@@ -56,10 +72,11 @@ const SECTIONS = [
 
 const AGENT_NEEDS = [
   { initials: "FIN", bg: "#FAEEDA", color: "#633806", name: "AI Finance",         uses: "Stripe, GTBank · QuickBooks pending" },
-  { initials: "DEV", bg: "#f3f4f6", color: "#6b7280", name: "AI Developer",       uses: "GitHub, Vercel" },
+  { initials: "DEV", bg: "#f3f4f6", color: "#6b7280", name: "AI Developer",       uses: "GitHub, Vercel · Calendly booking URL" },
+  { initials: "PM",  bg: "#EDE9FE", color: "#5B21B6", name: "AI Product Manager", uses: "Calendly (booking context for pages)" },
   { initials: "LGL", bg: "#FCEBEB", color: "#791F1F", name: "AI Legal",           uses: "DocuSign" },
-  { initials: "SA",  bg: "#E6F1FB", color: "#0C447C", name: "AI Sales",           uses: "WhatsApp · Calendar pending" },
-  { initials: "MK",  bg: "#EAF3DE", color: "#27500A", name: "AI Marketing",       uses: "WhatsApp · Gmail pending" },
+  { initials: "SA",  bg: "#E6F1FB", color: "#0C447C", name: "AI Sales",           uses: "WhatsApp, Calendly · Google Calendar pending" },
+  { initials: "MK",  bg: "#EAF3DE", color: "#27500A", name: "AI Marketing",       uses: "WhatsApp, Calendly · Gmail pending" },
 ];
 
 const RECENT = [
@@ -180,6 +197,282 @@ function Modal({ data, onClose, onToast, onNavigate }) {
  * own dedicated render rather than bolting more special cases onto the
  * generic Modal shell the way repoPicker does.
  */
+/* ── WhatsApp modals ──────────────────────────────────────────────────────── */
+function WhatsAppConnectModal({ form, onChange, error, busy, onClose, onSubmit }) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-5" onClick={onClose}>
+      <div className="w-full max-w-[460px] overflow-hidden rounded-2xl bg-white shadow-2xl" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-start justify-between gap-3 border-b border-gray-100 px-5 py-4">
+          <div>
+            <div className="font-body text-[14px] font-medium text-v2-heading">Connect WhatsApp Business</div>
+            <div className="mt-0.5 font-body text-[11px] text-v2-muted">Via Meta WhatsApp Cloud API — sends from your registered business number</div>
+          </div>
+          <button type="button" onClick={onClose} className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-gray-100 text-gray-500 hover:bg-gray-200">
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M1 1l10 10M11 1L1 11" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/></svg>
+          </button>
+        </div>
+        <form onSubmit={onSubmit} className="px-5 py-4">
+          <div className="mb-4 rounded-lg bg-v2-page px-3 py-2.5 font-body text-[11px] leading-relaxed text-v2-muted">
+            <p className="mb-1"><strong className="text-v2-heading">Where to find these:</strong></p>
+            <p>1. Go to <strong>Meta Business Manager → WhatsApp Manager → API Setup</strong></p>
+            <p>2. Copy your <strong>Phone Number ID</strong> and <strong>Permanent Access Token</strong> (create a System User token for production).</p>
+          </div>
+          <div className="flex flex-col gap-3">
+            <div>
+              <label className="mb-1 block font-body text-[11px] font-medium text-v2-heading">Phone Number ID</label>
+              <input required type="text" placeholder="e.g. 123456789012345" value={form.phoneNumberId}
+                onChange={(e) => onChange({ ...form, phoneNumberId: e.target.value })}
+                className="w-full rounded-lg border border-v2-border bg-white px-2.5 py-1.5 font-body text-[12px] text-v2-heading focus:outline-none focus:ring-1 focus:ring-v2-purple" />
+            </div>
+            <div>
+              <label className="mb-1 block font-body text-[11px] font-medium text-v2-heading">Permanent Access Token</label>
+              <input required type="password" placeholder="EAAxxxxxx..." value={form.accessToken}
+                onChange={(e) => onChange({ ...form, accessToken: e.target.value })}
+                className="w-full rounded-lg border border-v2-border bg-white px-2.5 py-1.5 font-body text-[12px] text-v2-heading focus:outline-none focus:ring-1 focus:ring-v2-purple" />
+            </div>
+            <div>
+              <label className="mb-1 block font-body text-[11px] font-medium text-v2-heading">Business display name (optional)</label>
+              <input type="text" placeholder="e.g. HealthTrack by Adaeze" value={form.displayName}
+                onChange={(e) => onChange({ ...form, displayName: e.target.value })}
+                className="w-full rounded-lg border border-v2-border bg-white px-2.5 py-1.5 font-body text-[12px] text-v2-heading focus:outline-none focus:ring-1 focus:ring-v2-purple" />
+            </div>
+          </div>
+          {error && <div className="mt-3 rounded-lg bg-red-50 px-3 py-2 font-body text-[11px] text-red-700">{error}</div>}
+          <div className="mt-4 flex justify-end gap-2">
+            <button type="button" onClick={onClose} className="rounded-full border border-v2-border bg-white px-4 py-1.5 font-body text-[12px] font-medium text-v2-heading hover:bg-gray-50">Cancel</button>
+            <button type="submit" disabled={busy || !form.accessToken || !form.phoneNumberId}
+              className="rounded-full bg-[#25D366] px-4 py-1.5 font-body text-[12px] font-medium text-white hover:opacity-90 disabled:opacity-60">
+              {busy ? "Verifying…" : "Connect WhatsApp →"}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+function WhatsAppManageModal({ meta, busy, onClose, onDisconnect }) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-5" onClick={onClose}>
+      <div className="w-full max-w-[420px] overflow-hidden rounded-2xl bg-white shadow-2xl" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-start justify-between gap-3 border-b border-gray-100 px-5 py-4">
+          <div>
+            <div className="font-body text-[14px] font-medium text-v2-heading">WhatsApp Business</div>
+            <div className="mt-0.5 font-body text-[11px] text-v2-muted">{meta?.displayName || "Connected"} · {meta?.fromPhoneNumber || ""}</div>
+          </div>
+          <button type="button" onClick={onClose} className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-gray-100 text-gray-500 hover:bg-gray-200">
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M1 1l10 10M11 1L1 11" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/></svg>
+          </button>
+        </div>
+        <div className="px-5 py-4">
+          <div className="mb-3 flex items-center gap-2 rounded-lg bg-[#EAF3DE] px-3 py-2">
+            <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-[#1D9E75]" />
+            <span className="font-body text-[11px] font-medium text-[#27500A]">Connected via Meta Cloud API</span>
+          </div>
+          <div className="flex flex-col gap-1.5">
+            {["Send outreach messages from your WhatsApp Business number", "AI Sales drafts, you review — sent with one click", "Delivery receipts logged in AI Sales pipeline"].map((s) => (
+              <div key={s} className="flex items-start gap-2 font-body text-[11px] text-gray-600">
+                <span className="shrink-0 text-[#1D9E75]">✓</span><span>{s}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+        <div className="flex justify-end gap-2 border-t border-gray-100 px-5 py-3">
+          <button type="button" onClick={onClose} className="rounded-full border border-v2-border bg-white px-4 py-1.5 font-body text-[12px] font-medium text-v2-heading hover:bg-gray-50">Close</button>
+          <button type="button" disabled={busy} onClick={onDisconnect} className="rounded-full border border-[#f3c9c9] bg-white px-4 py-1.5 font-body text-[12px] font-medium text-[#791F1F] hover:bg-gray-50 disabled:opacity-60">
+            {busy ? "Disconnecting…" : "Disconnect"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ── Social modals (LinkedIn / Instagram / Facebook) ─────────────────────── */
+const SOCIAL_META = {
+  linkedin:  { name: "LinkedIn",  color: "#0A66C2", placeholder: "https://linkedin.com/in/yourprofile", hint: "LinkedIn has no public DM API for cold outreach. AI Sales drafts your messages — you paste them in LinkedIn directly. Linking your profile URL lets the workspace open LinkedIn in one click." },
+  instagram: { name: "Instagram", color: "#E1306C", placeholder: "https://instagram.com/yourhandle",   hint: "Instagram DM API is restricted to accounts that have messaged you first. AI Marketing drafts your captions & DMs — you post manually. Linking your handle opens Instagram in one click." },
+  facebook:  { name: "Facebook",  color: "#1877F2", placeholder: "https://facebook.com/yourpage",     hint: "AI Marketing drafts your posts and messages — you post them manually. Linking your page URL opens Facebook in one click from the workspace." },
+};
+
+function SocialConnectModal({ type, form, onChange, error, busy, onClose, onSubmit }) {
+  const meta = SOCIAL_META[type] || {};
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-5" onClick={onClose}>
+      <div className="w-full max-w-[440px] overflow-hidden rounded-2xl bg-white shadow-2xl" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-start justify-between gap-3 border-b border-gray-100 px-5 py-4">
+          <div>
+            <div className="font-body text-[14px] font-medium text-v2-heading">Link {meta.name}</div>
+            <div className="mt-0.5 font-body text-[11px] text-v2-muted">AI drafts · you send manually</div>
+          </div>
+          <button type="button" onClick={onClose} className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-gray-100 text-gray-500 hover:bg-gray-200">
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M1 1l10 10M11 1L1 11" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/></svg>
+          </button>
+        </div>
+        <form onSubmit={onSubmit} className="px-5 py-4">
+          <p className="mb-4 rounded-lg bg-v2-page px-3 py-2.5 font-body text-[11px] leading-relaxed text-v2-muted">{meta.hint}</p>
+          <div className="flex flex-col gap-3">
+            <div>
+              <label className="mb-1 block font-body text-[11px] font-medium text-v2-heading">Your {meta.name} profile / page URL *</label>
+              <input required type="url" placeholder={meta.placeholder} value={form.profileUrl}
+                onChange={(e) => onChange({ ...form, profileUrl: e.target.value })}
+                className="w-full rounded-lg border border-v2-border bg-white px-2.5 py-1.5 font-body text-[12px] text-v2-heading focus:outline-none focus:ring-1 focus:ring-v2-purple" />
+            </div>
+            <div>
+              <label className="mb-1 block font-body text-[11px] font-medium text-v2-heading">Display name (optional)</label>
+              <input type="text" placeholder="e.g. HealthTrack Official" value={form.displayName}
+                onChange={(e) => onChange({ ...form, displayName: e.target.value })}
+                className="w-full rounded-lg border border-v2-border bg-white px-2.5 py-1.5 font-body text-[12px] text-v2-heading focus:outline-none focus:ring-1 focus:ring-v2-purple" />
+            </div>
+          </div>
+          {error && <div className="mt-3 rounded-lg bg-red-50 px-3 py-2 font-body text-[11px] text-red-700">{error}</div>}
+          <div className="mt-4 flex justify-end gap-2">
+            <button type="button" onClick={onClose} className="rounded-full border border-v2-border bg-white px-4 py-1.5 font-body text-[12px] font-medium text-v2-heading hover:bg-gray-50">Cancel</button>
+            <button type="submit" disabled={busy || !form.profileUrl}
+              style={{ background: meta.color }}
+              className="rounded-full px-4 py-1.5 font-body text-[12px] font-medium text-white hover:opacity-90 disabled:opacity-60">
+              {busy ? "Saving…" : `Link ${meta.name} →`}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+function SocialManageModal({ type, meta, busy, onClose, onDisconnect }) {
+  const info = SOCIAL_META[type] || {};
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-5" onClick={onClose}>
+      <div className="w-full max-w-[420px] overflow-hidden rounded-2xl bg-white shadow-2xl" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-start justify-between gap-3 border-b border-gray-100 px-5 py-4">
+          <div>
+            <div className="font-body text-[14px] font-medium text-v2-heading">{info.name}</div>
+            <div className="mt-0.5 font-body text-[11px] text-v2-muted">{meta?.displayName || "Profile linked"}</div>
+          </div>
+          <button type="button" onClick={onClose} className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-gray-100 text-gray-500 hover:bg-gray-200">
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M1 1l10 10M11 1L1 11" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/></svg>
+          </button>
+        </div>
+        <div className="px-5 py-4">
+          <div className="mb-3 flex items-center gap-2 rounded-lg bg-[#EAF3DE] px-3 py-2">
+            <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-[#1D9E75]" />
+            <span className="font-body text-[11px] font-medium text-[#27500A]">Profile linked</span>
+          </div>
+          {meta?.profileUrl && (
+            <a href={meta.profileUrl} target="_blank" rel="noopener noreferrer"
+              className="mb-3 flex items-center gap-1.5 font-body text-[11px] text-[#0A66C2] hover:underline">
+              {meta.profileUrl}
+            </a>
+          )}
+          <p className="font-body text-[11px] text-v2-muted">AI Sales and AI Marketing will open your {info.name} profile in a new tab alongside the drafted content, ready for you to paste and send.</p>
+        </div>
+        <div className="flex justify-end gap-2 border-t border-gray-100 px-5 py-3">
+          <button type="button" onClick={onClose} className="rounded-full border border-v2-border bg-white px-4 py-1.5 font-body text-[12px] font-medium text-v2-heading hover:bg-gray-50">Close</button>
+          <button type="button" disabled={busy} onClick={onDisconnect} className="rounded-full border border-[#f3c9c9] bg-white px-4 py-1.5 font-body text-[12px] font-medium text-[#791F1F] hover:bg-gray-50 disabled:opacity-60">
+            {busy ? "Removing…" : "Remove link"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ── Gmail modals ────────────────────────────────────────────────────────── */
+function GmailConnectModal({ form, onChange, error, busy, onClose, onSubmit }) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-5" onClick={onClose}>
+      <div className="w-full max-w-[440px] overflow-hidden rounded-2xl bg-white shadow-2xl" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-start justify-between gap-3 border-b border-gray-100 px-5 py-4">
+          <div>
+            <div className="font-body text-[14px] font-medium text-v2-heading">Connect Gmail</div>
+            <div className="mt-0.5 font-body text-[11px] text-v2-muted">Send outreach emails from your own inbox</div>
+          </div>
+          <button type="button" onClick={onClose} className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-gray-100 text-gray-500 hover:bg-gray-200">
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M1 1l10 10M11 1L1 11" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/></svg>
+          </button>
+        </div>
+        <form onSubmit={onSubmit} className="px-5 py-4">
+          <p className="mb-3 font-body text-[12px] leading-relaxed text-gray-600">
+            Connect your Gmail using a <strong>Google App Password</strong> — not your regular password. This lets AI Sales and AI Marketing send outreach emails directly from your inbox so replies land with you.
+          </p>
+          <p className="mb-4 rounded-lg bg-v2-page px-3 py-2 font-body text-[11px] leading-relaxed text-v2-muted">
+            To generate an App Password: Google Account → Security → 2-Step Verification → App passwords. Create one for "Mail".
+          </p>
+          <div className="flex flex-col gap-3">
+            <div>
+              <label className="mb-1 block font-body text-[11px] font-medium text-v2-heading">Gmail address</label>
+              <input type="email" required placeholder="you@gmail.com" value={form.email}
+                onChange={(e) => onChange({ ...form, email: e.target.value })}
+                className="w-full rounded-lg border border-v2-border bg-white px-2.5 py-1.5 font-body text-[12px] text-v2-heading focus:outline-none focus:ring-1 focus:ring-v2-purple" />
+            </div>
+            <div>
+              <label className="mb-1 block font-body text-[11px] font-medium text-v2-heading">App Password (16 characters)</label>
+              <input type="password" required placeholder="xxxx xxxx xxxx xxxx" value={form.appPassword}
+                onChange={(e) => onChange({ ...form, appPassword: e.target.value })}
+                className="w-full rounded-lg border border-v2-border bg-white px-2.5 py-1.5 font-body text-[12px] text-v2-heading focus:outline-none focus:ring-1 focus:ring-v2-purple" />
+            </div>
+            <div>
+              <label className="mb-1 block font-body text-[11px] font-medium text-v2-heading">Display name in emails (optional)</label>
+              <input type="text" placeholder="e.g. Adaeze from HealthTrack" value={form.displayName}
+                onChange={(e) => onChange({ ...form, displayName: e.target.value })}
+                className="w-full rounded-lg border border-v2-border bg-white px-2.5 py-1.5 font-body text-[12px] text-v2-heading focus:outline-none focus:ring-1 focus:ring-v2-purple" />
+            </div>
+          </div>
+          {error && (
+            <div className="mt-3 rounded-lg bg-red-50 px-3 py-2 font-body text-[11px] text-red-700">{error}</div>
+          )}
+          <div className="mt-4 flex justify-end gap-2">
+            <button type="button" onClick={onClose} className="rounded-full border border-v2-border bg-white px-4 py-1.5 font-body text-[12px] font-medium text-v2-heading hover:bg-gray-50">Cancel</button>
+            <button type="submit" disabled={busy || !form.email || !form.appPassword}
+              className="rounded-full bg-[#1B4FD8] px-4 py-1.5 font-body text-[12px] font-medium text-white opacity-100 hover:opacity-90 disabled:opacity-60">
+              {busy ? "Verifying…" : "Connect Gmail →"}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+function GmailManageModal({ displayName, busy, onClose, onDisconnect }) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-5" onClick={onClose}>
+      <div className="w-full max-w-[420px] overflow-hidden rounded-2xl bg-white shadow-2xl" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-start justify-between gap-3 border-b border-gray-100 px-5 py-4">
+          <div>
+            <div className="font-body text-[14px] font-medium text-v2-heading">Gmail</div>
+            <div className="mt-0.5 font-body text-[11px] text-v2-muted">Connected as {displayName}</div>
+          </div>
+          <button type="button" onClick={onClose} className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-gray-100 text-gray-500 hover:bg-gray-200">
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M1 1l10 10M11 1L1 11" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/></svg>
+          </button>
+        </div>
+        <div className="px-5 py-4">
+          <div className="mb-3 flex items-center gap-2 rounded-lg bg-[#EAF3DE] px-3 py-2">
+            <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-[#1D9E75]" />
+            <span className="font-body text-[11px] font-medium text-[#27500A]">Connected</span>
+          </div>
+          <div className="flex flex-col gap-1.5">
+            {["Send outreach emails directly from your inbox", "Log sent emails in the AI Sales pipeline", "Track sequence open/reply status per recipient"].map((s) => (
+              <div key={s} className="flex items-start gap-2 font-body text-[11px] text-gray-600">
+                <span className="shrink-0 text-[#1D9E75]">✓</span><span>{s}</span>
+              </div>
+            ))}
+          </div>
+          <p className="mt-3 font-body text-[11px] text-v2-muted">To revoke access, disconnect below. You can reconnect anytime with a new App Password.</p>
+        </div>
+        <div className="flex justify-end gap-2 border-t border-gray-100 px-5 py-3">
+          <button type="button" onClick={onClose} className="rounded-full border border-v2-border bg-white px-4 py-1.5 font-body text-[12px] font-medium text-v2-heading hover:bg-gray-50">Close</button>
+          <button type="button" disabled={busy} onClick={onDisconnect} className="rounded-full border border-[#f3c9c9] bg-white px-4 py-1.5 font-body text-[12px] font-medium text-[#791F1F] hover:bg-gray-50 disabled:opacity-60">
+            {busy ? "Disconnecting…" : "Disconnect Gmail"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function CustomDomainModalBody({ data }) {
   if (!data.railwayConfigured) {
     return (
@@ -260,6 +553,87 @@ function CustomDomainModalBody({ data }) {
   );
 }
 
+/* ── LinkedIn OAuth modals ────────────────────────────────────────────────── */
+function LinkedInConnectModal({ configured, busy, onClose, onConnect }) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-5" onClick={onClose}>
+      <div className="w-full max-w-[440px] overflow-hidden rounded-2xl bg-white shadow-2xl" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-start justify-between gap-3 border-b border-gray-100 px-5 py-4">
+          <div>
+            <div className="font-body text-[14px] font-medium text-v2-heading">Connect LinkedIn</div>
+            <div className="mt-0.5 font-body text-[11px] text-v2-muted">Post AI-drafted content directly from your LinkedIn account</div>
+          </div>
+          <button type="button" onClick={onClose} className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-gray-100 text-gray-500 hover:bg-gray-200">
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M1 1l10 10M11 1L1 11" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/></svg>
+          </button>
+        </div>
+        <div className="px-5 py-4">
+          <p className="mb-4 rounded-lg bg-v2-page px-3 py-2.5 font-body text-[11px] leading-relaxed text-v2-muted">
+            You'll be redirected to LinkedIn to authorize access. Once connected, AI Marketing can publish posts directly to your profile — no copy-pasting needed.
+          </p>
+          <div className="flex flex-col gap-1.5">
+            {["Publish posts to your LinkedIn profile on your behalf", "AI Marketing drafts the content — you review before it posts", "Token stored securely, revocable from LinkedIn settings anytime"].map((s) => (
+              <div key={s} className="flex items-start gap-2 font-body text-[11px] text-gray-600">
+                <span className="shrink-0 text-[#1D9E75]">✓</span><span>{s}</span>
+              </div>
+            ))}
+          </div>
+          {!configured && (
+            <div className="mt-3 rounded-lg bg-amber-50 px-3 py-2 font-body text-[11px] text-amber-700">
+              LinkedIn OAuth isn't configured on this server yet — set LINKEDIN_CLIENT_ID and LINKEDIN_CLIENT_SECRET in the server .env.
+            </div>
+          )}
+        </div>
+        <div className="flex justify-end gap-2 border-t border-gray-100 px-5 py-3">
+          <button type="button" onClick={onClose} className="rounded-full border border-v2-border bg-white px-4 py-1.5 font-body text-[12px] font-medium text-v2-heading hover:bg-gray-50">Cancel</button>
+          <button type="button" disabled={busy || !configured} onClick={onConnect}
+            className="rounded-full bg-[#0A66C2] px-4 py-1.5 font-body text-[12px] font-medium text-white hover:opacity-90 disabled:opacity-60">
+            {busy ? "Opening LinkedIn…" : "Connect via LinkedIn →"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function LinkedInManageModal({ meta, busy, onClose, onDisconnect }) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-5" onClick={onClose}>
+      <div className="w-full max-w-[420px] overflow-hidden rounded-2xl bg-white shadow-2xl" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-start justify-between gap-3 border-b border-gray-100 px-5 py-4">
+          <div>
+            <div className="font-body text-[14px] font-medium text-v2-heading">LinkedIn</div>
+            <div className="mt-0.5 font-body text-[11px] text-v2-muted">Connected as {meta?.displayName || "your account"}</div>
+          </div>
+          <button type="button" onClick={onClose} className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-gray-100 text-gray-500 hover:bg-gray-200">
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M1 1l10 10M11 1L1 11" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/></svg>
+          </button>
+        </div>
+        <div className="px-5 py-4">
+          <div className="mb-3 flex items-center gap-2 rounded-lg bg-[#EAF3DE] px-3 py-2">
+            <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-[#1D9E75]" />
+            <span className="font-body text-[11px] font-medium text-[#27500A]">Connected via LinkedIn OAuth — real posting enabled</span>
+          </div>
+          <div className="flex flex-col gap-1.5">
+            {["AI Marketing can publish posts directly to your LinkedIn", "Review content in the Marketing workspace before posting", "Token is scoped to posting only — cannot read your inbox or connections"].map((s) => (
+              <div key={s} className="flex items-start gap-2 font-body text-[11px] text-gray-600">
+                <span className="shrink-0 text-[#1D9E75]">✓</span><span>{s}</span>
+              </div>
+            ))}
+          </div>
+          <p className="mt-3 font-body text-[11px] text-v2-muted">To fully revoke access, also remove the app from your LinkedIn settings → Security → Authorized apps.</p>
+        </div>
+        <div className="flex justify-end gap-2 border-t border-gray-100 px-5 py-3">
+          <button type="button" onClick={onClose} className="rounded-full border border-v2-border bg-white px-4 py-1.5 font-body text-[12px] font-medium text-v2-heading hover:bg-gray-50">Close</button>
+          <button type="button" disabled={busy} onClick={onDisconnect} className="rounded-full border border-[#f3c9c9] bg-white px-4 py-1.5 font-body text-[12px] font-medium text-[#791F1F] hover:bg-gray-50 disabled:opacity-60">
+            {busy ? "Disconnecting…" : "Disconnect LinkedIn"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /* ── Integration card ──────────────────────────────────────────────────────── */
 function IntCard({ item, onOpen }) {
   return (
@@ -331,6 +705,35 @@ export default function V2Integrations({ user, onBack, onNavigate }) {
   const [cd, setCd] = useState({ domain: null, railwayConfigured: false });
   const [cdBusy, setCdBusy] = useState(false);
   const [cdInput, setCdInput] = useState("");
+  const [cal, setCal] = useState({ connected: false, configured: true, bookingUrl: "" });
+  const [calBusy, setCalBusy] = useState(false);
+  const [gmailConnected, setGmailConnected] = useState(false);
+  const [gmailMeta, setGmailMeta] = useState({ displayName: "" });
+  const [gmailBusy, setGmailBusy] = useState(false);
+  const [gmailModal, setGmailModal] = useState(null); // null | "connect" | "manage"
+  const [gmailForm, setGmailForm] = useState({ email: "", appPassword: "", displayName: "" });
+  const [gmailError, setGmailError] = useState("");
+
+  // WhatsApp Business
+  const [waConnected, setWaConnected] = useState(false);
+  const [waMeta, setWaMeta] = useState({});
+  const [waBusy, setWaBusy] = useState(false);
+  const [waModal, setWaModal] = useState(null); // null | "connect" | "manage"
+  const [waForm, setWaForm] = useState({ accessToken: "", phoneNumberId: "", displayName: "" });
+  const [waError, setWaError] = useState("");
+
+  // Social profiles (instagram, facebook — copy-paste mode)
+  const [socialConnections, setSocialConnections] = useState({}); // { instagram: { connected, meta }, facebook: { connected, meta } }
+  const [socialModal, setSocialModal] = useState(null); // null | { mode:"connect"|"manage", type }
+  const [socialForm, setSocialForm] = useState({ profileUrl: "", displayName: "" });
+  const [socialBusy, setSocialBusy] = useState(false);
+  const [socialError, setSocialError] = useState("");
+
+  // LinkedIn OAuth (real posting)
+  const [liConnected, setLiConnected] = useState(false);
+  const [liMeta, setLiMeta] = useState({});
+  const [liBusy, setLiBusy] = useState(false);
+  const [liModal, setLiModal] = useState(null); // null | "connect" | "manage"
 
   const showToast = (msg) => { setToast(msg); setTimeout(() => setToast(""), 2400); };
 
@@ -388,6 +791,82 @@ export default function V2Integrations({ user, onBack, onNavigate }) {
       setCdBusy(false);
     }
   };
+
+  const refreshCalendly = useCallback(async () => {
+    if (!founderId) return;
+    try {
+      const status = await calendlyApi.getCalendlyConnection(founderId);
+      setCal(status);
+    } catch { /* non-fatal */ }
+  }, [founderId]);
+
+  useEffect(() => { refreshCalendly(); }, [refreshCalendly]);
+
+  const connectCalendly = () => {
+    setCalBusy(true);
+    calendlyApi.getCalendlyAuthorizeUrl()
+      .then((data) => {
+        if (!data.authUrl) throw new Error("Calendly authorize URL missing.");
+        const popup = window.open(data.authUrl, "Calendly OAuth", "width=600,height=700");
+        if (!popup) throw new Error("Allow popups to connect Calendly.");
+        const timer = setInterval(() => {
+          if (popup.closed) {
+            clearInterval(timer);
+            refreshCalendly().finally(() => { setCalBusy(false); setModal(null); showToast("Calendly connected — new bookings will appear in your Execution Engine"); });
+          }
+        }, 500);
+      })
+      .catch((err) => { showToast(err?.message || "Could not start Calendly connect."); setCalBusy(false); });
+  };
+
+  const disconnectCalendlyConn = async () => {
+    setCalBusy(true);
+    try {
+      await calendlyApi.disconnectCalendly(founderId);
+      await refreshCalendly();
+      showToast("Disconnected Calendly — new bookings won't create tasks until you reconnect.");
+    } catch (err) {
+      showToast(err?.message || "Could not disconnect Calendly.");
+    } finally {
+      setCalBusy(false);
+      setModal(null);
+    }
+  };
+
+  const refreshDynamicIntegrations = useCallback(async () => {
+    if (!founderId) return;
+    try {
+      const list = await getIntegrations(founderId);
+      const byType = Object.fromEntries(list.map((i) => [i.type, i]));
+
+      const gm = byType["gmail"];
+      setGmailConnected(gm?.status === "connected");
+      setGmailMeta(gm?.meta || { displayName: "" });
+
+      const wa = byType["whatsapp"];
+      setWaConnected(wa?.status === "connected");
+      setWaMeta(wa?.meta || {});
+
+      // LinkedIn — OAuth mode (personUrn present) takes precedence over copy-paste mode
+      const li = byType["linkedin"];
+      const liIsOAuth = li?.status === "connected" && Boolean(li?.meta?.personUrn);
+      setLiConnected(liIsOAuth);
+      setLiMeta(li?.meta || {});
+
+      const SOCIAL_TYPES = ["instagram", "facebook"];
+      const social = {};
+      for (const type of SOCIAL_TYPES) {
+        const rec = byType[type];
+        social[type] = { connected: rec?.status === "connected", meta: rec?.meta || {} };
+      }
+      setSocialConnections(social);
+    } catch { /* non-fatal */ }
+  }, [founderId]);
+
+  useEffect(() => { refreshDynamicIntegrations(); }, [refreshDynamicIntegrations]);
+
+  // Keep old alias so existing openModal("gmail") code still works
+  const refreshGmail = refreshDynamicIntegrations;
 
   const refreshGithub = useCallback(async () => {
     try {
@@ -458,6 +937,72 @@ export default function V2Integrations({ user, onBack, onNavigate }) {
   };
 
   const openModal = async (key) => {
+    if (key === "gmail") {
+      if (gmailConnected) {
+        setGmailModal("manage");
+      } else {
+        setGmailForm({ email: "", appPassword: "", displayName: "" });
+        setGmailError("");
+        setGmailModal("connect");
+      }
+      return;
+    }
+    if (key === "whatsapp") {
+      if (waConnected) {
+        setWaModal("manage");
+      } else {
+        setWaForm({ accessToken: "", phoneNumberId: "", displayName: "" });
+        setWaError("");
+        setWaModal("connect");
+      }
+      return;
+    }
+    if (key === "linkedin") {
+      if (liConnected) {
+        setLiModal("manage");
+      } else {
+        setLiModal("connect");
+      }
+      return;
+    }
+    if (key === "instagram" || key === "facebook") {
+      const conn = socialConnections[key] || {};
+      if (conn.connected) {
+        setSocialModal({ mode: "manage", type: key });
+      } else {
+        setSocialForm({ profileUrl: "", displayName: "" });
+        setSocialError("");
+        setSocialModal({ mode: "connect", type: key });
+      }
+      return;
+    }
+    if (key === "calendly") {
+      if (cal.connected) {
+        setModal({
+          title: "Calendly", sub: `Connected · ${cal.bookingUrl}`,
+          scopes: [
+            "Your real booking URL is shared with AI PM and AI Developer automatically",
+            "New Calendly bookings create tasks in your Execution Engine",
+          ],
+          note: "Disconnecting removes the webhook — new bookings won't create tasks until you reconnect.",
+          connectLabel: "Disconnect", connectDanger: true, real: true, busy: calBusy, onAction: disconnectCalendlyConn,
+        });
+        return;
+      }
+      setModal({
+        title: "Connect Calendly", sub: "Let AI PM, AI Sales, and AI Developer use your real booking URL",
+        scopes: [
+          "Read your Calendly booking URL",
+          "Subscribe to booking events — new meetings appear as Execution Engine tasks",
+        ],
+        note: cal.configured
+          ? "You'll be redirected to Calendly to authorize access. AI Developer will automatically wire your booking URL into any landing page or outreach flow it builds."
+          : "Calendly OAuth isn't configured on this server yet — ask an admin to set CALENDLY_CLIENT_ID/SECRET.",
+        connectLabel: cal.configured ? "Connect →" : "Not available",
+        real: true, busy: calBusy, onAction: cal.configured ? connectCalendly : undefined,
+      });
+      return;
+    }
     if (key === "github") {
       if (gh.connected) {
         setModal({
@@ -507,6 +1052,16 @@ export default function V2Integrations({ user, onBack, onNavigate }) {
       ? { ...item, connected: gh.connected, meta: gh.connected ? `Connected as ${gh.githubLogin}` : "Not connected yet" }
       : item.id === "custom-domain"
       ? { ...item, connected: cd.domain?.certificateStatus === "issued", meta: cd.domain ? `${cd.domain.domain} — ${cd.domain.certificateStatus}` : "Not set up yet" }
+      : item.id === "calendly"
+      ? { ...item, connected: cal.connected, meta: cal.connected ? `Connected · ${cal.bookingUrl}` : "Not connected yet" }
+      : item.id === "gmail"
+      ? { ...item, connected: gmailConnected, meta: gmailConnected ? `Sending as ${gmailMeta?.displayName || "Gmail"}` : "Would enable email nurture sequences" }
+      : item.id === "whatsapp"
+      ? { ...item, connected: waConnected, meta: waConnected ? `Connected · ${waMeta?.fromPhoneNumber || waMeta?.displayName || "WhatsApp Business"}` : "Enables real WhatsApp sending" }
+      : item.id === "linkedin"
+      ? { ...item, connected: liConnected, meta: liConnected ? `Connected as ${liMeta?.displayName || "LinkedIn"} · posts directly` : "Connect via OAuth to post directly" }
+      : (item.id === "instagram" || item.id === "facebook")
+      ? (() => { const c = socialConnections[item.id] || {}; return { ...item, connected: c.connected, meta: c.connected ? `Profile linked · copy & open to send` : "Copy-to-clipboard sending" }; })()
       : item),
   }));
   const connectedCount = sections.flatMap((s) => s.items).filter((i) => i.connected).length;
@@ -560,7 +1115,17 @@ export default function V2Integrations({ user, onBack, onNavigate }) {
         {/* Which agents need what */}
         <div className="rounded-2xl bg-v2-page p-3">
           <div className="mb-2 font-heading text-[11px] font-semibold text-v2-heading">Which agents need what</div>
-          {AGENT_NEEDS.map((a) => (
+          {[
+            ...AGENT_NEEDS.filter((a) => !["SA","MK"].includes(a.initials)),
+            {
+              initials: "SA", bg: "#E6F1FB", color: "#0C447C", name: "AI Sales",
+              uses: [waConnected && "WhatsApp ✓", "Gmail", liConnected ? "LinkedIn ✓" : "LinkedIn", "Google Calendar"].filter(Boolean).join(" · ") + (waConnected ? "" : " (WhatsApp pending)"),
+            },
+            {
+              initials: "MK", bg: "#EAF3DE", color: "#27500A", name: "AI Marketing",
+              uses: [gmailConnected && "Gmail ✓", waConnected && "WhatsApp ✓", liConnected ? "LinkedIn ✓" : "LinkedIn", "Instagram", "Facebook"].filter(Boolean).join(" · ") + (!gmailConnected && !waConnected && !liConnected ? " (all pending)" : ""),
+            },
+          ].map((a) => (
             <div key={a.initials} className="flex items-start gap-2.5 border-b border-gray-100 py-2 last:border-b-0">
               <div className="flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-[7px] font-body text-[8px] font-semibold" style={{ background: a.bg, color: a.color }}>
                 {a.initials}
@@ -596,6 +1161,199 @@ export default function V2Integrations({ user, onBack, onNavigate }) {
 
       <Modal data={modalData} onClose={closeModal} onToast={showToast} onNavigate={onNavigate} />
       <Toast msg={toast} />
+
+      {/* Gmail modals */}
+      {/* WhatsApp modals */}
+      {waModal === "connect" && (
+        <WhatsAppConnectModal
+          form={waForm}
+          onChange={setWaForm}
+          error={waError}
+          busy={waBusy}
+          onClose={() => setWaModal(null)}
+          onSubmit={async (e) => {
+            e.preventDefault();
+            if (!waForm.accessToken || !waForm.phoneNumberId) return;
+            setWaBusy(true);
+            setWaError("");
+            try {
+              await apiConnectWhatsApp(founderId, { accessToken: waForm.accessToken, phoneNumberId: waForm.phoneNumberId, displayName: waForm.displayName });
+              setWaModal(null);
+              showToast("WhatsApp Business connected");
+              await refreshDynamicIntegrations();
+            } catch (err) {
+              setWaError(err?.message || "Could not verify WhatsApp credentials.");
+            } finally {
+              setWaBusy(false);
+            }
+          }}
+        />
+      )}
+      {waModal === "manage" && waConnected && (
+        <WhatsAppManageModal
+          meta={waMeta}
+          busy={waBusy}
+          onClose={() => setWaModal(null)}
+          onDisconnect={async () => {
+            setWaBusy(true);
+            try {
+              await apiDisconnectWhatsApp(founderId);
+              setWaConnected(false);
+              setWaMeta({});
+              setWaModal(null);
+              showToast("Disconnected WhatsApp Business");
+            } catch { showToast("Could not disconnect WhatsApp."); }
+            finally { setWaBusy(false); }
+          }}
+        />
+      )}
+
+      {/* Social (LinkedIn / Instagram / Facebook) modals */}
+      {socialModal?.mode === "connect" && (
+        <SocialConnectModal
+          type={socialModal.type}
+          form={socialForm}
+          onChange={setSocialForm}
+          error={socialError}
+          busy={socialBusy}
+          onClose={() => setSocialModal(null)}
+          onSubmit={async (e) => {
+            e.preventDefault();
+            if (!socialForm.profileUrl) return;
+            setSocialBusy(true);
+            setSocialError("");
+            try {
+              await apiConnectSocial(founderId, { type: socialModal.type, profileUrl: socialForm.profileUrl, displayName: socialForm.displayName });
+              setSocialModal(null);
+              showToast(`${socialModal.type.charAt(0).toUpperCase() + socialModal.type.slice(1)} profile linked`);
+              await refreshDynamicIntegrations();
+            } catch (err) {
+              setSocialError(err?.message || "Could not save profile.");
+            } finally {
+              setSocialBusy(false);
+            }
+          }}
+        />
+      )}
+      {socialModal?.mode === "manage" && (
+        <SocialManageModal
+          type={socialModal.type}
+          meta={(socialConnections[socialModal.type] || {}).meta || {}}
+          busy={socialBusy}
+          onClose={() => setSocialModal(null)}
+          onDisconnect={async () => {
+            setSocialBusy(true);
+            try {
+              await apiDisconnectSocial(founderId, socialModal.type);
+              setSocialConnections((prev) => ({ ...prev, [socialModal.type]: { connected: false, meta: {} } }));
+              setSocialModal(null);
+              showToast(`Disconnected ${socialModal.type}`);
+            } catch { showToast("Could not disconnect."); }
+            finally { setSocialBusy(false); }
+          }}
+        />
+      )}
+
+      {gmailModal === "connect" && (
+        <GmailConnectModal
+          form={gmailForm}
+          onChange={(f) => setGmailForm(f)}
+          error={gmailError}
+          busy={gmailBusy}
+          onClose={() => setGmailModal(null)}
+          onSubmit={async (e) => {
+            e.preventDefault();
+            if (!gmailForm.email || !gmailForm.appPassword) return;
+            setGmailBusy(true);
+            setGmailError("");
+            try {
+              await apiConnectGmail(founderId, {
+                email: gmailForm.email,
+                appPassword: gmailForm.appPassword,
+                displayName: gmailForm.displayName || gmailForm.email,
+              });
+              setGmailModal(null);
+              showToast("Gmail connected — AI Sales and AI Marketing can now send emails from your inbox");
+              await refreshGmail();
+            } catch (err) {
+              setGmailError(err?.message || "Could not verify Gmail credentials. Check your email and App Password.");
+            } finally {
+              setGmailBusy(false);
+            }
+          }}
+        />
+      )}
+
+      {gmailModal === "manage" && gmailConnected && (
+        <GmailManageModal
+          displayName={gmailMeta?.displayName || "Gmail"}
+          busy={gmailBusy}
+          onClose={() => setGmailModal(null)}
+          onDisconnect={async () => {
+            setGmailBusy(true);
+            try {
+              await apiDisconnectGmail(founderId);
+              setGmailConnected(false);
+              setGmailMeta({ displayName: "" });
+              setGmailModal(null);
+              showToast("Disconnected Gmail");
+            } catch {
+              showToast("Could not disconnect Gmail.");
+            } finally {
+              setGmailBusy(false);
+            }
+          }}
+        />
+      )}
+
+      {/* LinkedIn OAuth modals */}
+      {liModal === "connect" && (
+        <LinkedInConnectModal
+          configured={true}
+          busy={liBusy}
+          onClose={() => setLiModal(null)}
+          onConnect={async () => {
+            setLiBusy(true);
+            try {
+              const data = await getLinkedInAuthUrl(founderId);
+              if (!data?.authUrl) throw new Error(data?.message || "LinkedIn OAuth is not configured on this server — set LINKEDIN_CLIENT_ID and LINKEDIN_CLIENT_SECRET in the server .env.");
+              const popup = window.open(data.authUrl, "LinkedIn OAuth", "width=600,height=700");
+              if (!popup) throw new Error("Allow popups to connect LinkedIn.");
+              const timer = setInterval(() => {
+                if (popup.closed) {
+                  clearInterval(timer);
+                  refreshDynamicIntegrations().finally(() => {
+                    setLiBusy(false);
+                    setLiModal(null);
+                    showToast("LinkedIn connected — AI Marketing can now post directly");
+                  });
+                }
+              }, 500);
+            } catch (err) {
+              showToast(err?.message || "Could not start LinkedIn connect.");
+              setLiBusy(false);
+            }
+          }}
+        />
+      )}
+      {liModal === "manage" && liConnected && (
+        <LinkedInManageModal
+          meta={liMeta}
+          busy={liBusy}
+          onClose={() => setLiModal(null)}
+          onDisconnect={async () => {
+            setLiBusy(true);
+            try {
+              await apiDisconnectLinkedIn(founderId);
+              setLiConnected(false);
+              setLiMeta({});
+              setLiModal(null);
+              showToast("Disconnected LinkedIn");
+            } catch { showToast("Could not disconnect LinkedIn."); }
+            finally { setLiBusy(false); }
+          }}
+        />
+      )}
     </div>
   );
 }

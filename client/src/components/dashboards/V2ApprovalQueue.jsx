@@ -138,6 +138,16 @@ function ReviewModal({ item, allEvents, onClose, onApprove, onDecline, busy }) {
     });
   }, [item?.targetId, item?.id, allEvents]);
 
+  // Pull the real file AI Developer wrote from the sibling github_open_pr event —
+  // already stored on that event's result, no extra fetch needed.
+  const previewFileContent = React.useMemo(() => {
+    if (item?.actionKey !== "github_merge_main") return null;
+    const prEvent = allEvents?.find(
+      (e) => e.targetId === item.targetId && (e.actionTypeId?.actionKey || "") === "github_open_pr"
+    );
+    return prEvent?.result?.fileContent || null;
+  }, [item?.actionKey, item?.targetId, allEvents]);
+
   if (!item) return null;
 
   const { owner, repo, prNumber, filePath, taskDescription } = item.payload || {};
@@ -174,7 +184,7 @@ function ReviewModal({ item, allEvents, onClose, onApprove, onDecline, busy }) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-5" onClick={onClose}>
-      <div className="w-full max-w-[560px] overflow-hidden rounded-2xl bg-white shadow-2xl" onClick={(e) => e.stopPropagation()}>
+      <div className={cn("w-full overflow-hidden rounded-2xl bg-white shadow-2xl", previewFileContent ? "max-w-[800px]" : "max-w-[560px]")} onClick={(e) => e.stopPropagation()}>
 
         {/* Header */}
         <div className="flex items-start justify-between gap-3 border-b border-gray-100 px-5 py-4">
@@ -258,6 +268,25 @@ function ReviewModal({ item, allEvents, onClose, onApprove, onDecline, busy }) {
                       <span className="shrink-0 text-[10px] text-gray-400">{step.time}</span>
                     </div>
                   ))}
+                </div>
+              </div>
+            )}
+
+            {/* Inline preview — only for github_merge_main items that have file content */}
+            {previewFileContent && (
+              <div>
+                <div className="mb-2 font-body text-[10px] font-semibold uppercase tracking-wide text-v2-muted">Preview — what's being deployed</div>
+                <div className="overflow-hidden rounded-xl border border-v2-border">
+                  <div className="flex h-6 items-center gap-1.5 bg-[#26263a] px-3">
+                    {["#E24B4A","#BA7517","#1D9E75"].map(c => <div key={c} className="h-1.5 w-1.5 rounded-full" style={{background:c}}/>)}
+                    <div className="ml-2 flex-1 truncate font-body text-[9px] text-[#c9c5f0]">{filePath || "preview"}</div>
+                  </div>
+                  <iframe
+                    title="preview"
+                    srcDoc={previewFileContent}
+                    className="h-[280px] w-full border-0 bg-white"
+                    sandbox="allow-scripts allow-same-origin"
+                  />
                 </div>
               </div>
             )}

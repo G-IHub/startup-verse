@@ -12,7 +12,7 @@ import mongoose from "mongoose";
 
 const hostedSiteSchema = new mongoose.Schema(
   {
-    startupId: { type: mongoose.Schema.Types.ObjectId, ref: "Startup", required: true, unique: true },
+    startupId: { type: mongoose.Schema.Types.ObjectId, ref: "Startup", required: true },
     founderId: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
     slug: { type: String, required: true, trim: true, lowercase: true, maxlength: 80 },
     html: { type: String, required: true },
@@ -22,6 +22,7 @@ const hostedSiteSchema = new mongoose.Schema(
   { timestamps: true },
 );
 
+hostedSiteSchema.index({ startupId: 1, filePath: 1 }, { unique: true });
 hostedSiteSchema.index({ slug: 1 }, { unique: true });
 
 const HostedSite = mongoose.models.HostedSite || mongoose.model("HostedSite", hostedSiteSchema);

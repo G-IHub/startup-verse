@@ -11,7 +11,9 @@
 import { openPullRequest, mergePullRequest, mergeBranches, getFileContent, getPullRequestFiles, ensureGithubPagesEnabled, updateFileContent } from "./githubAdapter.js";
 import { draftText, deepseekConfigured } from "./deepseekClient.js";
 import { publishHostedSite } from "./hostedSiteService.js";
+import CalendlyConnection from "../models/CalendlyConnection.js";
 import Startup from "../models/Startup.js";
+import { salesMarketingExecutors } from "./salesMarketingExecutors.js";
 import Milestone from "../models/Milestone.js";
 import Task from "../models/Task.js";
 import WeeklyOutcome from "../models/WeeklyOutcome.js";
@@ -67,7 +69,9 @@ document.getElementById('YOUR_FORM_ID').addEventListener('submit', async functio
 });
 </script>
 \`\`\`
-\`window.STARTUPVERSE_SUBMIT_URL\` is a real global this platform defines automatically once your file is deployed — it doesn't exist yet while you're drafting, and it won't exist in a local preview either, which is expected and fine (the \`if\` guard above handles both). Never hardcode a submission URL yourself, never invent a fake backend, and never skip building the real success-state UI just because the URL isn't defined yet at draft time.`;
+\`window.STARTUPVERSE_SUBMIT_URL\` is a real global this platform defines automatically once your file is deployed — it doesn't exist yet while you're drafting, and it won't exist in a local preview either, which is expected and fine (the \`if\` guard above handles both). Never hardcode a submission URL yourself, never invent a fake backend, and never skip building the real success-state UI just because the URL isn't defined yet at draft time.
+
+If this page also includes a **scheduling or booking CTA** ("Book a call", "Schedule a demo", "Get 20 minutes with us"), wire it as a real \`<a href="CALENDLY_URL" target="_blank">\` button pointing to whatever booking URL is given in the task description. If no booking URL was given but the task asks for one, use a clearly visible placeholder like \`href="YOUR_CALENDLY_LINK"\` — never invent a fake Calendly URL. A single page can have both: a native form (submits to \`window.STARTUPVERSE_SUBMIT_URL\`) for visitors who want to leave their details, and a booking link for visitors who want to talk now — these serve different visitor intents and should both be present when the task calls for it.`;
 
 /**
  * Real contamination confirmed live, 2026-09-14: despite
@@ -112,6 +116,18 @@ async function executeGithubOpenPr({ founderId, payload, targetId }) {
   if (!owner || !repo || !filePath || !taskDescription) {
     throw new Error("write_code requires owner, repo, filePath, and taskDescription in payload.");
   }
+
+  // If the founder has Calendly connected, append the real booking URL to the
+  // user prompt so AI Developer wires it automatically into any booking CTA —
+  // no need for AI PM to remember to include it in the task description.
+  let calendlyLine = "";
+  try {
+    const calendlyConn = await CalendlyConnection.findOne({ founderId, revokedAt: null }).lean();
+    if (calendlyConn?.bookingUrl) {
+      calendlyLine = `\n\nFounder's real Calendly booking URL: ${calendlyConn.bookingUrl} — use this as the href for any "Book a call", "Schedule a demo", or similar CTA button on this page.`;
+    }
+  } catch { /* non-fatal */ }
+
   // Real finding from live testing: draftText's own default (1200, sized
   // long before this executor existed) was too small for an actual file a
   // founder would want. Real code/markup needs more headroom than a short
@@ -121,7 +137,7 @@ async function executeGithubOpenPr({ founderId, payload, targetId }) {
   const rawDraft = deepseekConfigured()
     ? await draftText({
         systemPrompt: AI_DEVELOPER_SYSTEM_PROMPT,
-        userPrompt: `File path: ${filePath}\n\nTask: ${taskDescription}`,
+        userPrompt: `File path: ${filePath}\n\nTask: ${taskDescription}${calendlyLine}`,
         maxTokens: 4000,
         // Real finding, 2026-09-15: this model can burn its ENTIRE budget on
         // invisible reasoning tokens before writing any visible content —
@@ -621,6 +637,7 @@ const EXECUTORS = {
   add_tasks: executeAddTasks,
   review_dev_work: executeReviewDevWork,
   revise_file: executeReviseFile,
+  ...salesMarketingExecutors,
 };
 
 export function hasExecutor(actionKey) {

@@ -60,7 +60,6 @@ export default function V2CallRoom({
       audio={true}
       video={isVideoCall}
       className="h-full min-h-0 w-full"
-      data-lk-theme="default"
       onDisconnected={handleLeave}
     >
       <RoomAudioRenderer />

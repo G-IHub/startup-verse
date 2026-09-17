@@ -11,6 +11,13 @@ import HostedSite from "../models/HostedSite.js";
 import FormSubmission from "../models/FormSubmission.js";
 
 export const SITES_HOSTNAME = process.env.SITES_HOSTNAME || "sites.startupverse.space";
+// In development, return a localhost URL so the Product Viewer iframe actually
+// loads from the local server (no tunnel needed). In production, always use
+// the real public domain.
+const SITES_BASE_URL =
+  process.env.NODE_ENV === "development"
+    ? `http://localhost:${process.env.PORT || 5000}`
+    : `https://${SITES_HOSTNAME}`;
 const MAX_SLUG_LENGTH = 60;
 const MAX_SLUG_ATTEMPTS = 50;
 const MAX_SUBMISSION_FIELDS = 30;
@@ -71,21 +78,27 @@ function injectSubmitScript(html, slug) {
   return script + html;
 }
 
+function fileSlug(startupSlug, filePath) {
+  if (!filePath || /^index\.html?$/i.test(filePath)) return startupSlug;
+  const name = filePath.split("/").pop().replace(/\.html?$/i, "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 40);
+  return `${startupSlug}-${name}`.slice(0, MAX_SLUG_LENGTH);
+}
+
 /**
- * Upserts the real, latest production HTML for a startup's hosted site.
- * One site per startup (the startup's current real product), not one per
- * build — matches how the Product Viewer already treats "latest production
- * HTML" as the current build.
+ * Upserts the production HTML for a specific file — one HostedSite document
+ * per { startupId, filePath } so deploying pipeline-demo.html never
+ * overwrites index.html, and each file gets its own stable URL.
  */
 export async function publishHostedSite({ startup, html, filePath, sourceEventId }) {
-  const slug = await ensureStartupSlug(startup);
+  const startupSlug = await ensureStartupSlug(startup);
+  const slug = fileSlug(startupSlug, filePath);
   const servedHtml = injectSubmitScript(html, slug);
   await HostedSite.findOneAndUpdate(
-    { startupId: startup._id },
+    { startupId: startup._id, filePath: filePath || "" },
     { startupId: startup._id, founderId: startup.founderId, slug, html: servedHtml, filePath: filePath || "", sourceEventId: sourceEventId || null },
     { upsert: true, new: true },
   );
-  return { slug, url: `https://${SITES_HOSTNAME}/${slug}` };
+  return { slug, url: `${SITES_BASE_URL}/${slug}` };
 }
 
 /**

@@ -4,9 +4,15 @@
     {
       "name": "startupverse-v2-client",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["--prefix", "client", "run", "dev"],
+      "runtimeArgs": ["--prefix", "../startup-verse-v2/client", "run", "dev"],
       "port": 3000,
       "autoPort": true
+    },
+    {
+      "name": "startupverse-v2-server",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["--prefix", "../startup-verse-v2/server", "run", "dev"],
+      "port": 5000
     }
   ]
 }

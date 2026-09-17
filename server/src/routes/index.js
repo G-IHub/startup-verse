@@ -39,6 +39,9 @@ import agentOrchestrationRouter from "./agentOrchestration.routes.js";
 import agentChatRouter from "./agentChat.routes.js";
 import formSubmissionsRouter from "./formSubmissions.routes.js";
 import customDomainRouter from "./customDomain.routes.js";
+import calendlyRouter from "./calendly.routes.js";
+import salesMarketingRouter from "./salesMarketing.routes.js";
+import integrationsRouter from "./integrations.routes.js";
 
 const apiRouter = Router();
 
@@ -69,6 +72,9 @@ apiRouter.use(agentOrchestrationRouter);
 apiRouter.use(agentChatRouter);
 apiRouter.use(formSubmissionsRouter);
 apiRouter.use(customDomainRouter);
+apiRouter.use(calendlyRouter);
+apiRouter.use(salesMarketingRouter);
+apiRouter.use(integrationsRouter);
 apiRouter.use(teamMembersRouter);
 apiRouter.use(cronRouter);
 apiRouter.use(eventsRouter);

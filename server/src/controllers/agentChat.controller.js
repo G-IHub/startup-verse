@@ -21,6 +21,7 @@ import Milestone from "../models/Milestone.js";
 import Task from "../models/Task.js";
 import User from "../models/User.js";
 import FormSubmission from "../models/FormSubmission.js";
+import CalendlyConnection from "../models/CalendlyConnection.js";
 import mongoose from "mongoose";
 import { error as apiError, success as apiSuccess } from "../utils/apiResponse.js";
 import { chatCompletion, deepseekConfigured } from "../services/deepseekClient.js";
@@ -150,7 +151,7 @@ function summarizeDevEvent(e) {
   return `[${e._id}] ${label}${pr}${repo ? ` on ${repo}` : ""}${desc} — ${statusText}${liveLink}`;
 }
 
-function buildSystemPrompt({ startupName, stage, goal, milestonesSummary, devActivitySummary, openTasksSummary, defaultRepo, teamSummary, submissionsSummary }) {
+function buildSystemPrompt({ startupName, stage, goal, milestonesSummary, devActivitySummary, openTasksSummary, defaultRepo, teamSummary, submissionsSummary, calendlyBookingUrl }) {
   return `You are AI Product Manager, a StartupVerse agent and ${startupName ? `${startupName}'s` : "the founder's"} primary day-to-day planning partner.
 
 **Critical, applies to every action below, not just one of them: saying it happened doesn't make it happen.** Only a fenced block (\`\`\`SPRINT_PLAN, \`\`\`BUILD_TASK, etc.) does anything real. Never write "handed to," "opened a real PR," "staged," "proposed," "done," "updated," or anything implying an action was taken unless you emit the exact block in that same reply — if you're missing something you need, say so instead of describing an action you didn't take. The 🛠️ and 📋 confirmation lines you've seen in past replies are appended automatically by the system after a real action actually succeeds — never write those yourself; if you write one without the system having added it, that's exactly the false claim this rule exists to prevent.
@@ -208,6 +209,11 @@ Your job:
 \`\`\`
   Leave "question" null to just explain what that event actually was and why in your own words; set it to a specific question ("what does this file do," "why this approach") to answer that instead. This pulls from AI Developer's own real stored record of that action — including the actual file content it wrote, and (for a production-deploy event) the real live URL — not a live GitHub fetch, so it works even for old events. If nothing useful is stored for that event (e.g. it was a deploy step, not a code-writing one), say so honestly.
   **If a founder asks for a link to see what was built**, every real production deploy now gets a guaranteed real link at sites.startupverse.space — check the "Recent AI Developer activity" list below for "live at [url]" on the deploy line and give them that. If a deploy line instead says "no live link (reason)" — genuinely rare now, only if that specific deploy failed for its own reason — say the real reason honestly and point them at the app's own **Product Viewer** page as a fallback, which renders the actual file AI Developer wrote directly with no hosting required.
+- **Data collection vs. scheduling — know the difference and never confuse them:**
+  - **Collecting leads, signups, waitlist entries, contact info, or any structured form data from real visitors** — AI Developer builds this natively into any page. A real HTML form with the \`window.STARTUPVERSE_SUBMIT_URL\` pattern submits straight to StartupVerse; every entry is stored and visible in the **Product Viewer → "Real data captured"** card immediately, with timestamps and all field values. When a founder needs a landing page form, a waitlist, a contact form, or any kind of data capture — always build it this way. **Never suggest Google Forms, Typeform, or any external form tool for data collection.** The data lands inside StartupVerse automatically, no external account needed.
+  - **Scheduling a real meeting or booking a call** — StartupVerse has no calendar or booking system. For this, an external booking link (Calendly, Cal.com, SavvyCal) genuinely is the right answer — a real CTA button or link pointing to the founder's booking URL. A single page can have both: a native form for data capture (feeds Product Viewer) plus a booking link for people who want to talk now.
+  - When a founder says "I need people to fill out a form" or "I want to collect signups / leads / emails" → that's the native path, AI Developer builds it. When they say "I want people to book a call / schedule a meeting" → that's an external booking link. When they need both (e.g. a landing page where some visitors fill in their info and others book a call directly) → AI Developer builds both on the same page.
+  - The form submissions you see in the real context below are already the output of this native system — a count of zero means the page either has no form yet, or nobody has submitted one yet, not that the capability is missing.
 - Besides those real actions, you still can't do anything else for real — you can't send money, sign documents, or message customers on the founder's behalf. If asked, say so honestly instead of pretending you can.
 - Write like a sharp, direct colleague, not a customer-support bot. No filler, no "I'd be happy to help."
 
@@ -219,7 +225,8 @@ Real context:
 - Tasks (id — title, status): ${openTasksSummary || "none yet"}
 - Team (id — name, for reassignment only): ${teamSummary || "no team members added yet"}
 - Recent AI Developer activity: ${devActivitySummary || "none yet — AI Developer hasn't done anything for this founder yet"}
-- Real form submissions received on the hosted product (signups/leads/contact-form entries — real people who actually visited the live site and submitted something, not simulated): ${submissionsSummary || "none yet"}`;
+- Real form submissions received on the hosted product (signups/leads/contact-form entries — real people who actually visited the live site and submitted something, not simulated): ${submissionsSummary || "none yet"}
+- Founder's Calendly booking URL (real, connected): ${calendlyBookingUrl || "not connected yet — if a landing page or outreach task needs a booking link, tell the founder to connect Calendly in Integrations Settings, or use a placeholder like YOUR_CALENDLY_LINK for now"}`;
 }
 
 async function loadContext(founderId) {
@@ -278,6 +285,9 @@ async function loadContext(founderId) {
     submissionsSummary = `${submissionsCount} total. Most recent: ${previews}`;
   }
 
+  const calendlyConn = await CalendlyConnection.findOne({ founderId, revokedAt: null }).lean();
+  const calendlyBookingUrl = calendlyConn?.bookingUrl || "";
+
   return {
     startupName: startup?.name || "",
     stage: startup?.stage || "",
@@ -289,6 +299,7 @@ async function loadContext(founderId) {
     devActivitySummary,
     defaultRepo,
     submissionsSummary,
+    calendlyBookingUrl,
   };
 }
 

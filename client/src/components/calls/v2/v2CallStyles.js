@@ -7,7 +7,7 @@ import { cn } from "../../ui/utils";
  * ../callStyles unchanged.
  */
 export const v2CallShell = {
-  root: "relative flex h-full min-h-0 w-full flex-col bg-v2-page",
+  root: "relative flex h-full min-h-0 w-full flex-col",
   header:
     "flex shrink-0 items-start justify-between gap-3 border-b border-v2-border bg-v2-surface px-4 py-3 sm:px-5 sm:py-4",
   headerTitle: "font-heading text-lg font-semibold leading-tight text-v2-heading sm:text-xl",
@@ -22,28 +22,28 @@ export const v2CallShell = {
     "inline-flex shrink-0 items-center rounded-full border border-v2-border bg-v2-page px-2.5 py-1.5 font-body text-xs font-medium text-v2-heading",
   bodyRow: "flex min-h-0 flex-1 flex-row",
   videoColumn: "flex min-h-0 min-w-0 flex-1 flex-col",
-  videoMain: "flex min-h-0 flex-1 flex-col px-3 pb-3 pt-2 sm:px-4",
+  videoMain: "flex min-h-0 flex-1 flex-col px-2 pt-1 pb-2",
   stageCard:
     "relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-2xl border border-v2-border bg-slate-950",
-  controlsRow: "mt-3 flex w-full shrink-0 items-center justify-center",
+  controlsRow: "flex w-full shrink-0",
   stage: "relative flex min-h-0 flex-1 flex-col bg-slate-950",
   stageOverlay:
     "absolute inset-0 z-10 flex items-center justify-center bg-v2-page/80 font-body text-sm text-v2-heading backdrop-blur-sm",
   controlBar:
-    "mx-auto inline-flex items-center gap-2 rounded-full border border-v2-border/80 bg-v2-surface/95 px-3 py-2 shadow-sm backdrop-blur-md",
+    "mx-auto inline-flex items-center gap-1.5 rounded-full border border-v2-border/80 bg-v2-surface/95 px-2.5 py-1.5 shadow-sm backdrop-blur-md",
   controlIconBtn: cn(
-    "inline-flex h-11 w-11 items-center justify-center rounded-full border border-transparent bg-v2-page text-v2-heading",
-    "transition-all duration-200 hover:bg-v2-blue-tint hover:text-v2-blue-dark",
+    "inline-flex h-7 w-7 items-center justify-center !rounded-full !border !border-gray-300 !bg-white text-v2-heading",
+    "transition-all duration-200 hover:!bg-v2-blue-tint hover:text-v2-blue-dark hover:!border-blue-300",
     "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-v2-blue/35",
     "active:scale-95",
   ),
   controlIconBtnActive:
-    "border-v2-blue/25 bg-v2-blue-tint text-v2-blue-dark hover:bg-v2-blue-tint hover:text-v2-blue-dark",
-  controlIconBtnMuted: "border-red-200 bg-red-50 text-red-600 hover:bg-red-100 hover:text-red-600",
+    "!border-blue-300 !bg-v2-blue-tint text-v2-blue-dark hover:!bg-v2-blue-tint hover:text-v2-blue-dark",
+  controlIconBtnMuted: "!border-red-200 !bg-red-50 text-red-600 hover:!bg-red-100 hover:text-red-600",
   controlIconBtnShareActive:
-    "border-v2-purple/25 bg-v2-purple-tint text-v2-purple-dark hover:bg-v2-purple-tint hover:text-v2-purple-dark",
+    "!border-purple-300 !bg-v2-purple-tint text-v2-purple-dark hover:!bg-v2-purple-tint hover:text-v2-purple-dark",
   endCallBtn: cn(
-    "inline-flex h-11 w-11 items-center justify-center rounded-full bg-red-600 text-white shadow-sm",
+    "inline-flex h-8 w-8 items-center justify-center rounded-full bg-red-600 text-white shadow-sm",
     "transition-all duration-200 hover:bg-red-700 active:scale-95",
     "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-300",
   ),

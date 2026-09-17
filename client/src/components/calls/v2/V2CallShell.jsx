@@ -2,21 +2,17 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import { ConnectionState } from "livekit-client";
 import * as FocusScope from "@radix-ui/react-focus-scope";
 import {
-  useChat,
   useConnectionState,
-  useLocalParticipant,
   useRoomContext,
 } from "@livekit/components-react";
 import { v2CallShell } from "./v2CallStyles";
 import V2CallHeader from "./V2CallHeader";
 import V2CallStage from "./V2CallStage";
 import V2CallControlBar from "./V2CallControlBar";
-import V2CallCollapsibleSidePanel from "./V2CallCollapsibleSidePanel";
 import V2CallInlineLeaveConfirm from "./V2CallInlineLeaveConfirm";
 import { useCallSession } from "../CallSessionContext";
 import { useCallPresence } from "../useCallPresence";
 import { useCallKeyboardShortcuts } from "../useCallKeyboardShortcuts";
-import { useCallSidePanelCollapsed } from "../useCallSidePanelCollapsed";
 
 /**
  * V2 restyle of calls/CallShell.jsx. Adds a `variant` ("inline" | "fullpage")
@@ -34,8 +30,6 @@ export default function V2CallShell({
 }) {
   const connectionState = useConnectionState();
   const room = useRoomContext();
-  const { localParticipant } = useLocalParticipant();
-  const { chatMessages } = useChat();
   const {
     currentUserId,
     startupId,
@@ -47,10 +41,7 @@ export default function V2CallShell({
   } = useCallSession();
 
   const [wasConnected, setWasConnected] = useState(false);
-  const [activeTab, setActiveTab] = useState("participants");
   const [leaveDialogOpen, setLeaveDialogOpen] = useState(false);
-  const { collapsed: sidePanelCollapsed, toggleCollapsed: toggleSidePanel, setCollapsed } =
-    useCallSidePanelCollapsed();
   const micControlRef = useRef(null);
   const previousFocusRef = useRef(null);
   const isFullpage = variant === "fullpage";
@@ -101,11 +92,6 @@ export default function V2CallShell({
   else if (isReconnecting) overlayMessage = "Reconnecting…";
   else if (isDisconnected) overlayMessage = "Connection lost";
 
-  const openSidePanelTab = (tab) => {
-    setActiveTab(tab);
-    setCollapsed?.(false);
-  };
-
   const handleRequestLeave = useCallback(() => {
     setLeaveDialogOpen(true);
   }, []);
@@ -152,26 +138,18 @@ export default function V2CallShell({
               )}
             </div>
 
-            <div className={v2CallShell.controlsRow}>
+            {/* Control bar — its own card below the video frame */}
+            <div className="mt-2 shrink-0 rounded-2xl border border-gray-200 bg-gray-50">
               <V2CallControlBar
                 ref={micControlRef}
                 callType={callType}
                 isInitiator={isInitiator}
                 onRequestLeave={handleRequestLeave}
-                onOpenParticipants={() => openSidePanelTab("participants")}
-                onOpenMessages={() => openSidePanelTab("messages")}
+                callTitle={callTitle}
               />
             </div>
           </div>
         </div>
-
-        <V2CallCollapsibleSidePanel
-          collapsed={sidePanelCollapsed}
-          onToggle={toggleSidePanel}
-          activeTab={activeTab}
-          onTabChange={setActiveTab}
-          messageCount={chatMessages.length}
-        />
       </div>
 
       <V2CallInlineLeaveConfirm

@@ -14,6 +14,7 @@ import HostedSite from "../models/HostedSite.js";
 import { recordFormSubmission } from "../services/hostedSiteService.js";
 
 const SITES_HOSTNAME = process.env.SITES_HOSTNAME || "sites.startupverse.space";
+const IS_DEV = process.env.NODE_ENV === "development";
 
 /**
  * Robust hostname resolution — works both locally (req.hostname) and behind
@@ -32,23 +33,16 @@ function resolveHostname(req) {
   return (req.hostname || "").toLowerCase();
 }
 
+// In development, bypass the hostname guard so founders can test their deployed
+// pages at http://localhost:5000/{slug} without needing a tunnel.
+// The same-origin/XSS isolation concern only applies in production where real
+// session cookies exist alongside real founder data.
 function isSitesHost(req) {
+  if (IS_DEV) return true;
   return resolveHostname(req) === SITES_HOSTNAME.toLowerCase();
 }
 
 const router = Router();
-
-// Temporary debug route — remove after diagnosing the sites hostname issue
-router.get("/__debug_host", (req, res) => {
-  res.json({
-    "x-forwarded-host": req.headers["x-forwarded-host"],
-    "host": req.headers.host,
-    "req.hostname": req.hostname,
-    "resolveHostname": resolveHostname(req),
-    "SITES_HOSTNAME": SITES_HOSTNAME,
-    "isSitesHost": isSitesHost(req),
-  });
-});
 
 router.get("/:slug", async (req, res, next) => {
   if (!isSitesHost(req)) return next();
