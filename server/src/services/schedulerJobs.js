@@ -253,7 +253,7 @@ export async function runAutonomousPlanningCheckJob() {
   const founders = await User.find({ role: "founder" }).select("_id").lean();
   for (const f of founders) {
     // eslint-disable-next-line no-await-in-loop -- one founder's real chat completion at a time, not a burst
-    await maybeTriggerAutonomousPlanning(f._id).catch((err) => {
+    await maybeTriggerAutonomousPlanning(f._id, "It's the weekly planning check-in").catch((err) => {
       logger.error("scheduler.autonomous-planning-check.failed", { founderId: String(f._id), message: err.message });
     });
   }

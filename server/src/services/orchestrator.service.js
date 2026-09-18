@@ -427,6 +427,23 @@ async function triggerAgentAssignedTasks(founderId) {
         taskId: task._id,
       });
     }
+    // Real second autonomous-planning trigger (2026-09-18), alongside the
+    // existing dev-queue-idle one below — the founder asked directly for
+    // AI PM's check-in to fire after real Sales/Marketing work too, not
+    // only after AI Developer's queue empties. Unlike the dev queue (which
+    // drains slowly, one task at a time, so "empty" is a real, persisting
+    // state worth checking), every agent-assigned task here gets dispatched
+    // in this same pass — there's no "still draining" state to wait out —
+    // so the right moment is simply "a real batch just got dispatched,"
+    // gated on there having been at least one, not on every add_tasks/
+    // propose_sprint_plan completion regardless of what it contained.
+    // maybeTriggerAutonomousPlanning's own guard (no second proposal while
+    // an earlier one is still pending_approval) makes this safe to call
+    // alongside advanceBuildQueueIfIdle's own trigger without risking a
+    // duplicate plan.
+    if (pendingTasks.length > 0) {
+      await maybeTriggerAutonomousPlanning(founderId, "A real batch of Sales/Marketing work was just dispatched");
+    }
   } catch (err) {
     logger.error("[orchestrator] failed to trigger agent-assigned tasks", { founderId: String(founderId), message: err.message });
   }
@@ -453,8 +470,18 @@ const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
  * Uses runAutonomousPmCheckIn from agentChat.controller.js via a dynamic
  * import to avoid a static circular dependency (that module already
  * imports proposeAction from this one).
+ *
+ * `trigger` describes *why* this fired — real correctness fix, 2026-09-18:
+ * the instruction text used to hardcode "AI Developer's build queue is
+ * empty" unconditionally, which became actively false the moment a second
+ * real call site (triggerAgentAssignedTasks, after real Sales/Marketing
+ * work) started calling this too — AI PM would be told a premise that
+ * wasn't true, which risks it reasoning from a false "dev has nothing to
+ * do" assumption when dev might still be mid-build. Defaults to the
+ * original dev-queue wording so the two existing call sites (dev-queue-idle,
+ * the weekly cron) are unaffected.
  */
-export async function maybeTriggerAutonomousPlanning(founderId) {
+export async function maybeTriggerAutonomousPlanning(founderId, trigger = "AI Developer's build queue is empty") {
   try {
     const startup = await Startup.findOne({ founderId }).select("autonomousPlanningEnabled").lean();
     if (!startup?.autonomousPlanningEnabled) return;
@@ -484,12 +511,12 @@ export async function maybeTriggerAutonomousPlanning(founderId) {
 
     if (weekHasEnded) {
       await runAutonomousPmCheckIn(founderId, {
-        instruction: "AI Developer's build queue is empty, and the current week's goal has run its course (or none is set). Look at real progress so far and make your own call: either draft the next week's goal and milestones as a real sprint plan, or add more real tasks to an existing milestone if that's genuinely the better move. Don't ask a clarifying question here — make the most reasonable real call you can and propose it, flagging any assumptions plainly.",
+        instruction: `${trigger}, and the current week's goal has run its course (or none is set). Look at real progress so far and make your own call: either draft the next week's goal and milestones as a real sprint plan, or add more real tasks to an existing milestone if that's genuinely the better move. Don't ask a clarifying question here — make the most reasonable real call you can and propose it, flagging any assumptions plainly.`,
         allowedMarkerNames: ["SPRINT_PLAN", "ADD_TASKS"],
       });
     } else {
       await runAutonomousPmCheckIn(founderId, {
-        instruction: "AI Developer's build queue is empty, but this week's goal hasn't run its course yet. Look at what's already real and approved — if there's genuinely more real work worth adding under an existing milestone, propose it. If there's nothing sensible to add right now, say so briefly and propose nothing rather than inventing busywork.",
+        instruction: `${trigger}, but this week's goal hasn't run its course yet. Look at what's already real and approved — if there's genuinely more real work worth adding under an existing milestone, propose it. If there's nothing sensible to add right now, say so briefly and propose nothing rather than inventing busywork.`,
         allowedMarkerNames: ["ADD_TASKS"],
       });
     }
