@@ -121,9 +121,9 @@ export default function V2AIStaffShell({ user, onPageChange, ...rest }) {
       case "audit-trail":
         return <V2AuditTrail user={user} onBack={handleBack} onNavigate={handleNavigate} />;
       case "agent-marketing":
-        return <V2AIMarketingWorkspace onBack={handleBack} onNavigate={handleNavigate} />;
+        return <V2AIMarketingWorkspace user={user} onBack={handleBack} onNavigate={handleNavigate} />;
       case "agent-sales":
-        return <V2AISalesWorkspace onBack={handleBack} onNavigate={handleNavigate} />;
+        return <V2AISalesWorkspace user={user} onBack={handleBack} onNavigate={handleNavigate} />;
       case "agent-finance":
         return <V2AIFinanceWorkspace onBack={handleBack} onNavigate={handleNavigate} />;
       case "agent-legal":

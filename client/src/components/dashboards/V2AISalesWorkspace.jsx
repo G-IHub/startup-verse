@@ -378,8 +378,9 @@ function SendOutreachModal({ item, founderId, onClose, onSent }) {
 }
 
 /* ─── main ────────────────────────────────────────────────────────────────── */
-export default function V2AISalesWorkspace({ onBack }) {
-  const founderId = useOfficeStore((s) => s.founderId);
+export default function V2AISalesWorkspace({ user, onBack }) {
+  const officeFounderId = useOfficeStore((s) => s.founderId);
+  const founderId = officeFounderId || String(user?._id ?? user?.id ?? "");
   const [outputs, setOutputs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showGenerate, setShowGenerate] = useState(false);
@@ -387,7 +388,7 @@ export default function V2AISalesWorkspace({ onBack }) {
   const [sendToast, setSendToast] = useState("");
 
   const load = useCallback(async () => {
-    if (!founderId) return;
+    if (!founderId) { setLoading(false); return; }
     try { const d = await getSalesOutputs(founderId); setOutputs(d || []); }
     catch { setOutputs([]); }
     finally { setLoading(false); }

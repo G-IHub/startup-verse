@@ -443,8 +443,9 @@ function SendSequenceModal({ item, founderId, onClose, onSent }) {
   );
 }
 
-export default function V2AIMarketingWorkspace({ onBack }) {
-  const founderId = useOfficeStore((s) => s.founderId);
+export default function V2AIMarketingWorkspace({ user, onBack }) {
+  const officeFounderId = useOfficeStore((s) => s.founderId);
+  const founderId = officeFounderId || String(user?._id ?? user?.id ?? "");
   const [outputs, setOutputs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showGenerate, setShowGenerate] = useState(false);
@@ -456,7 +457,7 @@ export default function V2AIMarketingWorkspace({ onBack }) {
   const [liConnected, setLiConnected] = useState(false);
 
   const load = useCallback(async () => {
-    if (!founderId) return;
+    if (!founderId) { setLoading(false); return; }
     try { const d = await getMarketingOutputs(founderId); setOutputs(d || []); }
     catch { setOutputs([]); }
     finally { setLoading(false); }
