@@ -23,9 +23,20 @@ function requireFounder(req, res) {
   return false;
 }
 
+// Real bug found live, 2026-09-18: the opener's popup-completion check only
+// ever watched for the popup window closing — it had no way to tell a real
+// successful authorization apart from the user closing/cancelling the popup,
+// or this page's own script erroring before the postMessage below existed.
+// A stale/reconnect attempt could "close the popup" without ever completing
+// OAuth and the founder would still see a false "GitHub connected" toast.
+// Posting the real outcome to the opener lets it react to what actually
+// happened instead of guessing from "the window closed."
 function popupHtml(ok, message) {
   const safe = String(message || "").replace(/[<>]/g, "");
-  return `<!doctype html><html><body><p>${ok ? "Connected." : safe}</p><script>window.close();</script></body></html>`;
+  return `<!doctype html><html><body><p>${ok ? "Connected." : safe}</p><script>
+    try { window.opener && window.opener.postMessage({ source: "startupverse-github-oauth", ok: ${ok ? "true" : "false"} }, "*"); } catch (e) {}
+    window.close();
+  </script></body></html>`;
 }
 
 async function githubJson(url, token, options = {}) {

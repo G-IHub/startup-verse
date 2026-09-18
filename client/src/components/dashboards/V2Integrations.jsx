@@ -162,6 +162,26 @@ function Modal({ data, onClose, onToast, onNavigate }) {
         </div>
         <div className="flex justify-end gap-2 border-t border-gray-100 px-5 py-3">
           <button type="button" onClick={onClose} className="rounded-full border border-v2-border px-4 py-1.5 font-body text-[12px] font-medium text-v2-heading hover:bg-gray-50">Close</button>
+          {/* Real gap found live, 2026-09-18: an already-connected integration
+              whose stored token has gone stale server-side (GitHub returning
+              "Bad credentials") had no way to force a fresh OAuth authorization
+              — only "Disconnect" was offered, and a founder has no reason to
+              think to disconnect first when the card still proudly says
+              "Connected". A generic optional secondary action lets a specific
+              integration's modal (see GitHub's connected-state config below)
+              offer "Reconnect" alongside "Disconnect", reusing the exact same
+              real connect flow, without a special-cased second button per
+              integration. */}
+          {data.secondaryLabel && (
+            <button
+              type="button"
+              disabled={data.busy}
+              onClick={() => data.secondaryAction?.()}
+              className="rounded-full border border-v2-border px-4 py-1.5 font-body text-[12px] font-medium text-v2-heading transition-opacity hover:bg-gray-50 disabled:opacity-60"
+            >
+              {data.secondaryLabel}
+            </button>
+          )}
           {!data.customDomain && (
             <button
               type="button"
@@ -889,11 +909,33 @@ export default function V2Integrations({ user, onBack, onNavigate }) {
         if (!data.authUrl) throw new Error("GitHub authorize URL missing.");
         const popup = window.open(data.authUrl, "GitHub OAuth", "width=600,height=700");
         if (!popup) throw new Error("Allow popups to connect GitHub.");
+        // Real bug found live, 2026-09-18: this used to declare success the
+        // instant the popup window closed, regardless of whether OAuth
+        // actually completed — a founder whose token had gone stale on
+        // GitHub's side (real "Bad credentials" errors) reconnected, saw
+        // "GitHub connected," and the token was never actually refreshed.
+        // Now waits for the real outcome the callback page posts (see
+        // github.controller.js's popupHtml) instead of guessing from the
+        // window closing — a closed popup with no real signal is treated as
+        // "didn't complete," not silently assumed to be success.
+        let settled = false;
+        const finish = (ok) => {
+          if (settled) return;
+          settled = true;
+          window.removeEventListener("message", onMessage);
+          clearInterval(timer);
+          refreshGithub().finally(() => {
+            setGhBusy(false);
+            setModal(null);
+            showToast(ok ? "GitHub connected" : "GitHub connect didn't complete — try again.");
+          });
+        };
+        const onMessage = (event) => {
+          if (event.data?.source === "startupverse-github-oauth") finish(Boolean(event.data.ok));
+        };
+        window.addEventListener("message", onMessage);
         const timer = setInterval(() => {
-          if (popup.closed) {
-            clearInterval(timer);
-            refreshGithub().finally(() => { setGhBusy(false); setModal(null); showToast("GitHub connected"); });
-          }
+          if (popup.closed) finish(false);
         }, 500);
       })
       .catch((err) => { showToast(err?.message || "Could not start GitHub connect."); setGhBusy(false); });
@@ -1008,8 +1050,9 @@ export default function V2Integrations({ user, onBack, onNavigate }) {
         setModal({
           title: "GitHub", sub: `Connected as ${gh.githubLogin}`,
           scopes: ["Open pull requests, push branches", "Merge to staging autonomously", "Deploy to production — always locked, always waits for you"],
-          note: "Deploying to production is permanently locked in Autonomy Settings, regardless of what this token permits.",
+          note: "Deploying to production is permanently locked in Autonomy Settings, regardless of what this token permits. If AI Developer starts failing with \"Bad credentials\", your token has likely gone stale on GitHub's side — use Reconnect below rather than assuming something here is broken.",
           connectLabel: "Disconnect", connectDanger: true, real: true, busy: ghBusy, onAction: disconnectGithub,
+          secondaryLabel: gh.configured ? "Reconnect →" : undefined, secondaryAction: gh.configured ? connectGithub : undefined,
           repoPicker: true, repoOptions, repoBusy,
           selectedRepo: defaultRepo.owner && defaultRepo.repo ? `${defaultRepo.owner}/${defaultRepo.repo}` : "",
           onSelectRepo: selectDefaultRepo,
