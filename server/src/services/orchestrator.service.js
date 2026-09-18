@@ -120,6 +120,24 @@ async function emitActionStarted({ founderId, startupId, actionType, targetId, p
 
 const COMPLETED_STATUSES = ["autonomous_completed", "human_completed"];
 
+// Real bug found live, 2026-09-18: findCompletedDuplicate below was applied
+// unconditionally to every executor-registered action, but its whole premise
+// — "the same (targetType, targetId) means the same real action, never redo
+// it" — is only actually true for the GitHub pipeline, where a targetId
+// really does represent one specific real PR/deploy that must never be
+// double-opened. For update_task, the targetId is just the task's own real
+// id — the SAME task legitimately gets updated multiple times over its
+// lifecycle (pending -> in-progress -> completed, or an edited field), each
+// a genuinely distinct real request. Applying the guard there meant every
+// update after the first one on a given task silently no-opped and reused
+// the first update's stale "success" result — confirmed live: three
+// consecutive real UPDATE_TASK calls each reported "✅ Updated" with zero
+// actual change, because the very first (blocked -> in-progress) call's
+// completed event satisfied the duplicate check for every later one on the
+// same task. Scoped the guard to only the action keys where "never repeat"
+// is actually the correct behavior.
+const DEDUPE_BY_TARGET_ACTION_KEYS = ["github_open_pr", "github_merge_staging", "github_merge_main"];
+
 /**
  * Idempotency guard for executable actions (docs/ai-agent-roadmap.md Phase 1
  * checklist item). Keyed on (founderId, actionTypeId, targetType, targetId) —
@@ -128,7 +146,9 @@ const COMPLETED_STATUSES = ["autonomous_completed", "human_completed"];
  * running the real adapter again, so a network-retried propose/resolve can't
  * double-open a PR or double-deploy. Only applies to action types with a real
  * executor — actions with no side effect (Phase 0's log-only path) don't need
- * it, and duplicates there are harmless.
+ * it, and duplicates there are harmless. Callers must also check
+ * DEDUPE_BY_TARGET_ACTION_KEYS first — this function itself doesn't know
+ * which action types it's safe for.
  */
 async function findCompletedDuplicate({ founderId, actionTypeId, targetType, targetId }) {
   if (!targetId) return null;
@@ -600,7 +620,9 @@ export async function proposeAction({ founderId, startupId, actorType, actorId, 
   let status = "autonomous_completed";
   let result = null;
   if (hasExecutor(actionType.actionKey)) {
-    const duplicate = await findCompletedDuplicate({ founderId, actionTypeId: actionType._id, targetType, targetId });
+    const duplicate = DEDUPE_BY_TARGET_ACTION_KEYS.includes(actionType.actionKey)
+      ? await findCompletedDuplicate({ founderId, actionTypeId: actionType._id, targetType, targetId })
+      : null;
     if (duplicate) {
       result = { ...duplicate.result, reusedFromEventId: String(duplicate._id) };
       logger.warn(`[orchestrator] duplicate propose for ${actionType.actionKey}/${targetId} — reusing prior result instead of re-executing.`);
@@ -726,12 +748,14 @@ export async function resolveApproval({ eventId, decision, approverId }) {
   let execStatus = "human_completed";
   let execResult = null;
   if (actionType && hasExecutor(actionType.actionKey)) {
-    const duplicate = await findCompletedDuplicate({
-      founderId: pending.founderId,
-      actionTypeId: actionType._id,
-      targetType: pending.targetType,
-      targetId: pending.targetId,
-    });
+    const duplicate = DEDUPE_BY_TARGET_ACTION_KEYS.includes(actionType.actionKey)
+      ? await findCompletedDuplicate({
+          founderId: pending.founderId,
+          actionTypeId: actionType._id,
+          targetType: pending.targetType,
+          targetId: pending.targetId,
+        })
+      : null;
     if (duplicate) {
       execResult = { ...duplicate.result, reusedFromEventId: String(duplicate._id) };
       logger.warn(`[orchestrator] duplicate resolve for ${actionType.actionKey}/${pending.targetId} — reusing prior result instead of re-executing.`);
