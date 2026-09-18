@@ -402,7 +402,7 @@ export const listConversations = async (req, res) => {
  * but withhold a brand-new SPRINT_PLAN until the current week has actually
  * run its course, even if the model tries to emit one anyway.
  */
-async function processAiPmReply({ raw, ctx, messages, founderId, agent, allowedMarkerNames = null }) {
+async function attemptAiPmReply({ raw, ctx, messages, founderId, agent, allowedMarkerNames = null }) {
   let replyText = raw;
   let proposedEvent = null;
   let proposedEventKind = null;
@@ -1046,20 +1046,46 @@ async function processAiPmReply({ raw, ctx, messages, founderId, agent, allowedM
   // closed this turn and nothing was actually proposed, these glyphs are
   // reserved (per the system prompt) for real, server-appended
   // confirmations only — their presence here means a fabricated one.
-  // Real bug found live again, 2026-09-18, on the real production account:
-  // a reply read "✅ Updated \"Book 10 agency owners this week\"." — the
-  // exact template UPDATE_TASK's own real success branch uses — with no
-  // marker closed and no event created (confirmed against the real Audit
-  // Trail: entry count never moved). The model had seen that real phrasing
-  // earlier in the same conversation (from an actual successful update) and
-  // imitated it. ✅ was missing from this list — added, closing the gap on
-  // the exact glyph the newest marker (UPDATE_TASK) introduced.
+  //
+  // Real bug found live again and again, 2026-09-18, on the real production
+  // account — FIVE separate occurrences in one session, each on different
+  // phrasing: "✅ Updated ..." (the exact real UPDATE_TASK success template,
+  // imitated from earlier in the same conversation), "Needs your approval
+  // before the task exists — check your Approval Queue" (no glyph at all,
+  // but "check your Approval Queue" only ever appears in real server-
+  // appended confirmations, so it's just as reliable a tell), and — the
+  // genuinely hard cases — pure present/future-tense narration with no
+  // fixed phrase at all ("Sending the scoped build now...", "Moving it to
+  // in-progress now..."). No fixed string list can catch that last category;
+  // chasing individual phrasings one at a time is exactly the whack-a-mole
+  // this comment history was turning into. So this is now a genuine
+  // structural guard instead of a growing keyword list: `fabricated` is also
+  // set whenever no marker closed AND the request being answered — the
+  // founder's own message, or the automated check-in's synthetic
+  // instruction — clearly asked for a real action (assign/add/delete/
+  // update/hand off/retry/emit/etc). A reply to a real action request that
+  // took no real action is *always* either an honest "I can't, here's why"
+  // (in which case a corrective retry costs one extra call and changes
+  // nothing) or a fabrication (in which case the retry is exactly what's
+  // needed) — never a case where retrying does harm. `processAiPmReply`
+  // below uses this flag to trigger one real, automatic retry rather than
+  // just showing the founder an apology and waiting for a human to notice
+  // and ask again — the actual fix, not just better detection.
+  let fabricated = false;
   if (!closed && !proposedEvent) {
-    const glyphIndexes = ["🛠️", "📋", "✅"].map((g) => replyText.indexOf(g)).filter((i) => i >= 0);
-    if (glyphIndexes.length) {
-      replyText = replyText.slice(0, Math.min(...glyphIndexes)).trim();
-      replyText += "\n\n(That last line described an action as if it happened, but nothing was actually sent — ask me again and I'll either do it for real or tell you what's missing.)";
+    const tellIndexes = ["🛠️", "📋", "✅", "check your approval queue"]
+      .map((g) => replyText.toLowerCase().indexOf(g.toLowerCase()))
+      .filter((i) => i >= 0);
+    if (tellIndexes.length) {
+      replyText = replyText.slice(0, Math.min(...tellIndexes)).trim();
+      fabricated = true;
+    } else if (ACTION_REQUEST_RE.test(String(messages?.[messages.length - 1]?.content || ""))) {
+      fabricated = true;
     }
+    // No apology text appended here — processAiPmReply below decides what
+    // the founder actually sees, since this same result can be either a
+    // silent intermediate step (about to auto-retry) or the final shown
+    // reply (retry exhausted), and those need different wording.
   }
 
   if (!replyText.trim()) {
@@ -1073,7 +1099,57 @@ async function processAiPmReply({ raw, ctx, messages, founderId, agent, allowedM
     replyText = "(That was a lot to ask in one message and I ran out of room before I could answer — try splitting it into smaller messages, one thing at a time.)";
   }
 
-  return { replyText, proposedEvent, proposedEventKind };
+  return { replyText, proposedEvent, proposedEventKind, fabricated };
+}
+
+// Deliberately conservative (specific verbs/phrases actually used tonight,
+// not a generic word like "task" alone) to keep false positives — and the
+// one real cost of a false positive, an extra chatCompletion call — rare.
+// A false positive is harmless either way: the corrective retry instruction
+// below never pushes the model to act, only to be structurally honest about
+// whether it did.
+const ACTION_REQUEST_RE = /\b(assign|reassign|add (a |one |this )?task|create (a |one )?task|delete|remove|mark\s+.{0,40}\b(complete|completed|in-progress|blocked)\b|update (the|this|that|task)|hand(ed)?\s*(it|this|that)?\s*off|hand-off|retry|try again|emit the|propose|publish|approve|decline)\b/i;
+
+/**
+ * Real automatic-retry wrapper (2026-09-18) around attemptAiPmReply — see
+ * that function's own fabrication-detection comment for the full "why."
+ * Capped at exactly one retry, matching this codebase's existing philosophy
+ * of real, tested ceilings rather than unbounded loops (deepseekClient.js's
+ * own empty-content retry is the precedent). If the retry *also* looks
+ * fabricated, its own (already-honest) apology text is what the founder
+ * sees — never a raw, unexplained loop.
+ */
+async function processAiPmReply({ raw, ctx, messages, founderId, agent, allowedMarkerNames = null }) {
+  const first = await attemptAiPmReply({ raw, ctx, messages, founderId, agent, allowedMarkerNames });
+  if (!first.fabricated) return first;
+
+  try {
+    const correctionMessages = [
+      ...messages,
+      { role: "assistant", content: raw },
+      {
+        role: "user",
+        content: "[Automated check, not from the founder] Your last reply described an action as if it happened, " +
+          "but no real action was actually taken. If you intended to do something real, emit the exact fenced " +
+          "marker block for it now, with nothing else claiming success. If you can't, or don't have what you need, " +
+          "say so plainly — do not use completion language (\"done\", \"added\", \"updated\", \"handed off\", " +
+          "checkmarks, or anything implying it already happened) unless you are emitting the real marker in this same reply.",
+      },
+    ];
+    const retryRaw = await chatCompletion({ systemPrompt: buildSystemPrompt(ctx), messages: correctionMessages, maxTokens: 3000 });
+    const retry = await attemptAiPmReply({ raw: retryRaw, ctx, messages, founderId, agent, allowedMarkerNames });
+    // Retry actually took a real action (or gave an honest non-action
+    // answer this time) — its own content already explains itself, no
+    // apology needed. Only the still-fabricated / errored paths below need
+    // one, since those are genuinely the end of the line for this turn.
+    if (!retry.fabricated) return retry;
+    retry.replyText += "\n\n(I tried twice to back that up with a real action and couldn't get it to actually happen — mind asking me again yourself?)";
+    return retry;
+  } catch (err) {
+    logger.error("[agentChat] automatic fabrication-retry failed", { founderId: String(founderId), message: err.message });
+    first.replyText += "\n\n(That last reply described an action without actually taking it, and my automatic retry hit an error — mind asking me again?)";
+    return first;
+  }
 }
 
 export const sendMessage = async (req, res) => {
