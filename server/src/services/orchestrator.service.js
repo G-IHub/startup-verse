@@ -745,6 +745,20 @@ export async function proposeAction({ founderId, startupId, actorType, actorId, 
     advanceBuildQueueIfIdle(founderId);
     triggerAgentAssignedTasks(founderId);
   }
+  // Real gap found live, 2026-09-18: watching AI PM actually work, it
+  // correctly reaches for ADD_TASKS (not a whole new SPRINT_PLAN) for
+  // ongoing incremental work — the right call, a plan shouldn't be
+  // manufactured just to add one real task. But that meant an
+  // agent-assigned task added this way had no trigger at all and would sit
+  // "pending" forever, silently defeating the point of assigning it in the
+  // first place. Unlike buildTask (still not wired for add_tasks, a
+  // pre-existing, separate, lower-stakes gap — a founder can always ask AI
+  // Developer directly), a stranded agent-assigned task is a real dead end
+  // with no equivalent manual fallback in the UI yet, so this one's worth
+  // closing.
+  if (actionType.actionKey === "add_tasks" && status === "autonomous_completed") {
+    triggerAgentAssignedTasks(founderId);
+  }
   if (["github_open_pr", "github_merge_staging"].includes(actionType.actionKey) && status !== "failed") {
     autoAdvancePipeline({ founderId, startupId, actionKey: actionType.actionKey, status, targetId, payload, result, taskId });
   }
@@ -870,6 +884,9 @@ export async function resolveApproval({ eventId, decision, approverId }) {
   }
   if (actionType?.actionKey === "propose_sprint_plan" && execStatus === "human_completed") {
     advanceBuildQueueIfIdle(pending.founderId);
+    triggerAgentAssignedTasks(pending.founderId);
+  }
+  if (actionType?.actionKey === "add_tasks" && execStatus === "human_completed") {
     triggerAgentAssignedTasks(pending.founderId);
   }
   if (["github_open_pr", "github_merge_staging"].includes(actionType?.actionKey) && execStatus !== "failed") {
