@@ -566,6 +566,13 @@ async function executeUpdateTask({ founderId, payload }) {
   if (updates.status) allowed.status = updates.status;
   if (Object.prototype.hasOwnProperty.call(updates, "assignedTo")) allowed.assignedTo = updates.assignedTo || null;
   if (Object.prototype.hasOwnProperty.call(updates, "assignedToName")) allowed.assignedToName = String(updates.assignedToName ?? "").slice(0, 200);
+  // Real AI-agent assignment (2026-09-18) — same whitelist principle as the
+  // human fields above: only ever written here, never trusted as free text
+  // from the caller without the id already having been resolved against a
+  // real Agent document upstream (see agentChat.controller.js's UPDATE_TASK
+  // handler, which is the only caller that ever sets these).
+  if (Object.prototype.hasOwnProperty.call(updates, "assignedAgentId")) allowed.assignedAgentId = updates.assignedAgentId || null;
+  if (Object.prototype.hasOwnProperty.call(updates, "assignedAgentKey")) allowed.assignedAgentKey = String(updates.assignedAgentKey ?? "").slice(0, 40);
   if (updates.priority) allowed.priority = String(updates.priority).toLowerCase();
   if (Object.prototype.hasOwnProperty.call(updates, "blockerReason")) allowed.blockerReason = String(updates.blockerReason ?? "").slice(0, 1000);
   if (Object.prototype.hasOwnProperty.call(updates, "blockerNote")) allowed.blockerNote = String(updates.blockerNote ?? "").slice(0, 1000);

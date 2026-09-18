@@ -44,6 +44,17 @@ export function formatEventTime(iso) {
   return `${d.toLocaleDateString([], { month: "short", day: "numeric" })}, ${time}`;
 }
 
+// Real Task-level agent assignment (2026-09-18, see Task.js's assignedAgentKey)
+// — a small, shared label so every place a human assignee's avatar/name
+// renders can show "🤖 AI Sales"/"🤖 AI Marketing" instead, without each
+// screen inventing its own copy of this mapping.
+const AGENT_ASSIGNMENT_LABELS = { sales: "AI Sales", mkt: "AI Marketing" };
+
+export function agentAssignmentLabel(agentKey) {
+  const label = AGENT_ASSIGNMENT_LABELS[agentKey];
+  return label ? `🤖 ${label}` : null;
+}
+
 export function riskDisplay(riskCategory) {
   if (riskCategory === "sensitive_locked") return { label: "Sensitive", bg: "#FCEBEB", color: "#791F1F" };
   if (riskCategory === "read_only") return { label: "Read-only", bg: "#f3f4f6", color: "#6b7280" };

@@ -210,6 +210,20 @@ const CORE_AGENT_DEFINITIONS = [
         adjustable: true,
         approverRule: "founder",
       },
+      {
+        // Real external publish, unlike every other marketing action above
+        // (which only ever draft content, nothing goes out). Defaults to
+        // ask_first, per the founder's own explicit choice — same reasoning
+        // as send_outreach_email: this reaches the founder's real public
+        // LinkedIn page and can't be quietly undone. Left adjustable since a
+        // founder may reasonably want to trust routine posting once proven.
+        actionKey: "publish_linkedin_post",
+        label: "Publish LinkedIn post",
+        riskCategory: "reversible",
+        defaultMode: "ask_first",
+        adjustable: true,
+        approverRule: "founder",
+      },
     ],
   },
   {

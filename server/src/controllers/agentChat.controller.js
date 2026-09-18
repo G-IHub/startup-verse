@@ -179,10 +179,11 @@ Your job:
 - You can also manage real tasks, milestones, and the weekly goal directly — not just create them. Always use a real id from the "Tasks" or "Milestones" lists below; never invent one, and if you don't see the one the founder means, say so and ask rather than guessing.
   **Critical: saying it happened doesn't make it happen. Only the fenced block below does anything real.** Never write "staged," "proposed," "done," "updated," or anything implying an action was taken unless you emit the exact block in that same reply — if you're not ready to act, say what you're missing instead of describing an action you didn't take.
 \`\`\`UPDATE_TASK
-{"taskId":"...","updates":{"status":"...","title":"...","description":"...","priority":"...","assignedTo":null,"blockerReason":"...","blockerNote":"..."}}
+{"taskId":"...","updates":{"status":"...","title":"...","description":"...","priority":"...","assignedTo":null,"blockerReason":"...","blockerNote":"..."},"agentActionKey":null,"agentPayload":null}
 \`\`\`
   Only include the fields actually changing in "updates" — leave the rest out entirely, don't send empty strings for things you're not touching. Status must be a real one (pending, in-progress, blocked, completed) and a legal transition (e.g. you can't jump pending straight to completed — move it to in-progress first). Marking something "blocked" requires both blockerReason and blockerNote.
-  **Reassigning a task**: "assignedTo" must be a real id copied exactly from the "Team" list below, or the literal string "founder" to assign it to the founder themself — never a name, never invented. If the founder names someone not on that list, say plainly you don't see them on the team and ask them to check, rather than writing their name in anyway — a name with no real id behind it doesn't actually notify anyone or link to a real person, it would just look assigned without being assigned.
+  **Reassigning a task**: "assignedTo" must be a real id copied exactly from the "Team" list below, the literal string "founder" to assign it to the founder themself, or the literal string "sales"/"mkt" to assign it to AI Sales/AI Marketing as a real teammate — never a name, never invented. If the founder names someone not on that list, say plainly you don't see them on the team and ask them to check, rather than writing their name in anyway — a name with no real id behind it doesn't actually notify anyone or link to a real person, it would just look assigned without being assigned.
+  **Assigning to an agent is a real, visible hand-off, not just a label — it can also start the actual work in the same step.** When "assignedTo" is "sales" or "mkt", also set "agentActionKey" to a real action for that agent (see the AGENT_TASK section below for the real ones) and "agentPayload" to that action's real payload — this proposes the real work immediately, linked to this task, so the task moves to "completed" on its own once the hand-off actually finishes (same as AI Developer's taskId linkage). Leave "agentActionKey"/"agentPayload" null if you just want to label the assignment without starting real work yet.
 \`\`\`DELETE_TASK
 {"taskId":"..."}
 \`\`\`
@@ -223,9 +224,10 @@ Your job:
   - \`draft_outreach\` (sales): \`{"channel":"linkedin"|"email"|"whatsapp"|"instagram"|"facebook","targetDescription":"who this is for","customContext":"..."}\` — drafts one outreach message. Completes immediately, no approval needed (nothing is sent yet).
   - \`draft_email_sequence\` (sales): \`{"audience":"...","goal":"cold_outreach"|"nurture"|"re_engage","sequenceName":"..."}\` — drafts a multi-email sequence. Also immediate, nothing sent.
   - \`qualify_lead\` (sales): \`{"conversationText":"...","leadDetails":"..."}\` — scores a real lead from a real conversation you already have. Immediate.
-  - \`send_outreach_email\` (sales) — **the one real send**: \`{"recipientEmail":"...","recipientName":"...","subject":"...","body":"..."}\`. This actually emails a real person from the founder's connected Gmail — it is NOT reversible once sent. **Never invent a recipientEmail.** Only use one the founder has explicitly given you in this real conversation. If you don't have a real email address yet, ask the founder for one before emitting this block — do not guess, scrape, or fabricate a contact. This always needs the founder's real approval before it sends (check your Approval Queue) — never tell them it already went out until you're told it succeeded.
+  - \`send_outreach_email\` (sales) — **a real send**: \`{"recipientEmail":"...","recipientName":"...","subject":"...","body":"..."}\`. This actually emails a real person from the founder's connected Gmail — it is NOT reversible once sent. **Never invent a recipientEmail.** Only use one the founder has explicitly given you in this real conversation. If you don't have a real email address yet, ask the founder for one before emitting this block — do not guess, scrape, or fabricate a contact. This always needs the founder's real approval before it sends (check your Approval Queue) — never tell them it already went out until you're told it succeeded.
+  - \`publish_linkedin_post\` (mkt) — **the other real send**: \`{"text":"..."}\`. This actually publishes to the founder's real, connected LinkedIn page via LinkedIn's own API — public, live, and NOT reversible once posted (LinkedIn has no real "unpublish via API" this app can call). Always needs the founder's real approval first — never tell them it's live until you're told it succeeded. If LinkedIn isn't connected yet, the real attempt will fail with a clear error; tell the founder to connect it from Integrations first rather than guessing why it failed.
   - Other real actions exist too (\`create_social_post\`, \`plan_campaign\`, \`create_content_calendar\`, \`analyze_icp\`, \`create_sales_script\` on mkt/sales) — same shape, reachable from their workspace pages if a founder wants to use them directly.
-  - **What's genuinely not real yet, be honest about this**: there is no way to find or scrape real prospect contacts — "find me 10 people to interview" needs the founder to supply real names/emails/LinkedIn profiles themselves. There's no automated LinkedIn DM/connection-request capability either — LinkedIn's real API doesn't support it, and attempting it risks the founder's real account. AI Marketing can publish a real public LinkedIn post, nothing more on LinkedIn.
+  - **What's genuinely not real yet, be honest about this**: there is no way to find or scrape real prospect contacts — "find me 10 people to interview" needs the founder to supply real names/emails/LinkedIn profiles themselves. There's no automated LinkedIn DM/connection-request capability either — LinkedIn's real API doesn't support it, and attempting it risks the founder's real account. Publishing a real public LinkedIn post is the one real LinkedIn action — nothing more on LinkedIn.
 - Besides those real actions, you still can't do anything else for real — you can't send money or sign documents on the founder's behalf. If asked, say so honestly instead of pretending you can.
 - Write like a sharp, direct colleague, not a customer-support bot. No filler, no "I'd be happy to help."
 
@@ -595,20 +597,44 @@ async function processAiPmReply({ raw, ctx, messages, founderId, agent, allowedM
           if (!actionType) throw new Error("update_task action type is not seeded for this agent.");
           const updates = { ...(body.updates || {}) };
           let assignmentNote = "";
+          let handOffAgentKey = null;
           // Real bug fixed: a model-supplied name with no real id behind it
           // would previously get written as assignedToName alone — looks
           // assigned, notifies no one, links to no real person. Only trust
           // "assignedTo" here, resolved against a real User, never free text.
+          // Real AI-agent assignment (2026-09-18): "assignedTo" can also be a
+          // real agentKey ("sales"/"mkt") — resolved against a real Agent
+          // document the same way a human id is resolved against a real User,
+          // never trusted as free text either.
           if (Object.prototype.hasOwnProperty.call(updates, "assignedTo")) {
             if (updates.assignedTo === null) {
               updates.assignedToName = "";
+              updates.assignedAgentId = null;
+              updates.assignedAgentKey = "";
             } else if (String(updates.assignedTo) === "founder") {
               updates.assignedTo = founderId;
               updates.assignedToName = "";
+              updates.assignedAgentId = null;
+              updates.assignedAgentKey = "";
+            } else if (updates.assignedTo === "sales" || updates.assignedTo === "mkt") {
+              const targetAgent = await Agent.findOne({ founderId, agentKey: updates.assignedTo });
+              if (targetAgent) {
+                updates.assignedAgentId = targetAgent._id;
+                updates.assignedAgentKey = updates.assignedTo;
+                handOffAgentKey = updates.assignedTo;
+                delete updates.assignedTo;
+                updates.assignedToName = "";
+              } else {
+                const label = updates.assignedTo === "sales" ? "AI Sales" : "AI Marketing";
+                delete updates.assignedTo;
+                assignmentNote = ` (${label} isn't set up for this founder yet, so I left the assignment as it was)`;
+              }
             } else if (mongoose.isValidObjectId(updates.assignedTo)) {
               const realMember = await User.findOne({ _id: updates.assignedTo, founderId, role: { $in: ["team-member", "team"] } }, { name: 1 });
               if (realMember) {
                 updates.assignedToName = realMember.name;
+                updates.assignedAgentId = null;
+                updates.assignedAgentKey = "";
               } else {
                 delete updates.assignedTo;
                 delete updates.assignedToName;
@@ -617,7 +643,7 @@ async function processAiPmReply({ raw, ctx, messages, founderId, agent, allowedM
             } else {
               delete updates.assignedTo;
               delete updates.assignedToName;
-              assignmentNote = " (that wasn't a real team member id, so I left the assignment as it was)";
+              assignmentNote = " (that wasn't a real team member id or a real agent, so I left the assignment as it was)";
             }
           }
           const result = await proposeAction({
@@ -633,6 +659,41 @@ async function processAiPmReply({ raw, ctx, messages, founderId, agent, allowedM
             replyText += `\n\n📋 I've proposed an update to "${existingTask.title}"${assignmentNote} — check your Approval Queue to review and approve it.`;
           } else {
             replyText += `\n\n✅ Updated "${existingTask.title}"${assignmentNote}.`;
+          }
+          // Real hand-off, not just a label: assigning to an agent only means
+          // something if real work actually gets proposed to it. Fires once
+          // the assignment itself succeeded (not pending an update approval),
+          // using the same real proposeAction path AGENT_TASK uses — with
+          // taskId set so orchestrator.service.js's completeGenericLinkedTask
+          // marks this Task done for real once the hand-off completes.
+          if (handOffAgentKey && body.agentActionKey && result.event.status !== "failed" && result.event.status !== "pending_approval") {
+            const label = handOffAgentKey === "sales" ? "AI Sales" : "AI Marketing";
+            try {
+              const targetAgent = await Agent.findOne({ founderId, agentKey: handOffAgentKey });
+              const handOffActionType = targetAgent
+                ? await ActionType.findOne({ agentId: targetAgent._id, actionKey: body.agentActionKey })
+                : null;
+              if (!targetAgent || !handOffActionType) {
+                replyText += `\n\n(I assigned this to ${label} but "${body.agentActionKey}" isn't a real action for it — nothing was handed off.)`;
+              } else {
+                const handOff = await proposeAction({
+                  founderId, actorType: "agent", actorId: String(targetAgent._id), actionTypeId: handOffActionType._id,
+                  targetType: handOffAgentKey, targetId: `${handOffAgentKey}-${body.agentActionKey}-${Date.now()}`,
+                  payload: { ...(body.agentPayload || {}), taskDescription: existingTask.title },
+                  taskId: existingTask._id,
+                });
+                if (handOff.event.status === "pending_approval") {
+                  replyText += `\n\n📋 I've also handed the real work to ${label} — it needs your approval before it acts, check your Approval Queue.`;
+                } else if (handOff.event.status === "failed") {
+                  replyText += `\n\n(I assigned this to ${label}, but the real hand-off hit an error: ${handOff.event.result?.error || "unknown error"})`;
+                } else {
+                  replyText += `\n\n🛠️ ${label} is on it — check its workspace for the output.`;
+                }
+              }
+            } catch (err) {
+              logger.error("[agentChat] failed to hand off assigned task to agent", { message: err.message });
+              replyText += `\n\n(I assigned this to ${label} but hit an error handing off the real work: ${err.message})`;
+            }
           }
         } catch (err) {
           logger.error("[agentChat] failed to propose task update", { message: err.message });

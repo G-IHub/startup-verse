@@ -14,6 +14,7 @@ import ActionType from "../models/ActionType.js";
 import Agent from "../models/Agent.js";
 import { draftText } from "./deepseekClient.js";
 import { sendFounderEmail } from "./founderEmailService.js";
+import { publishPost } from "./linkedinService.js";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -454,6 +455,25 @@ export async function executeSendOutreachEmail(event) {
   };
 }
 
+/**
+ * Real external publish, 2026-09-18 — wires to the already-existing, already-
+ * working linkedinService.publishPost(founderId, text) (real REST call to
+ * LinkedIn's own API via the founder's connected OAuth token), previously
+ * built but never called from any executor. ask_first by default (see
+ * coreAgentSeeds.js) — this posts to the founder's real public LinkedIn page
+ * and can't be quietly undone, so it always needs a real approval first,
+ * same reasoning as executeSendOutreachEmail above.
+ */
+export async function executePublishLinkedinPost(event) {
+  const { founderId, payload = {} } = event;
+  const text = String(payload.text || "").trim();
+  if (!text) {
+    throw new Error("publish_linkedin_post requires non-empty text.");
+  }
+  const { postId } = await publishPost(founderId, text);
+  return { published: true, postId: postId || null, text };
+}
+
 export const salesMarketingExecutors = {
   analyze_icp: executeAnalyzeIcp,
   draft_outreach: executeDraftOutreach,
@@ -464,4 +484,5 @@ export const salesMarketingExecutors = {
   plan_campaign: executePlanCampaign,
   create_content_calendar: executeCreateContentCalendar,
   send_outreach_email: executeSendOutreachEmail,
+  publish_linkedin_post: executePublishLinkedinPost,
 };

@@ -233,6 +233,34 @@ async function completeLinkedTask(founderId, targetId) {
 }
 
 /**
+ * Task-completion linkage for a taskId-linked agent action that isn't part
+ * of the multi-step GitHub pipeline (open_pr -> staging -> prod), e.g. a
+ * task assigned to AI Sales/Marketing. Those actions are single-step —
+ * there's no "reached staging" middle state to wait for — so a successful
+ * completion here means the whole hand-off is done, not just one leg of it.
+ * Same best-effort contract as completeLinkedTask: a Task-side hiccup must
+ * never surface as a failure of the real action it's recording against.
+ */
+async function completeGenericLinkedTask(taskId) {
+  if (!taskId) return;
+  try {
+    const task = await Task.findById(taskId);
+    if (!task) return;
+    if (!validateTaskStatusTransition(task.status, "completed").ok) return;
+    task.status = "completed";
+    await task.save();
+    await syncMilestoneCounters(task.milestoneId);
+    if (task.startupId) {
+      emitRealtime(SOCKET_EVENTS.TASK_UPDATED, task, [startupRoom(task.startupId)]);
+    }
+  } catch (err) {
+    logger.error("[orchestrator] failed to complete generic linked task", { taskId: String(taskId), message: err.message });
+  }
+}
+
+const GITHUB_PIPELINE_ACTION_KEYS = ["github_open_pr", "github_merge_staging", "github_merge_main"];
+
+/**
  * Real-repo conflict check for the build queue below: has this in-progress
  * build task's own pipeline already reached `staging` (or beyond)? Scoped
  * to this founder's own `dev` agent's real ActionType ids — ActionType rows
@@ -554,7 +582,10 @@ export async function proposeAction({ founderId, startupId, actorType, actorId, 
     const dto = await publishEvent(event);
     // Hand-off requested: a linked Task can move to in-progress now — nothing
     // has failed yet at this point, only real failures below skip this.
-    if (actionType.actionKey === "github_open_pr" && taskId) {
+    // Generalized (2026-09-18) from a github_open_pr-only check to any
+    // taskId-linked action, so a task assigned straight to AI Sales/
+    // Marketing (which has no PR concept) also reflects real progress.
+    if (taskId) {
       await advanceTaskToInProgress(taskId);
     }
     return { event: dto, executed: false };
@@ -587,9 +618,14 @@ export async function proposeAction({ founderId, startupId, actorType, actorId, 
   const event = await AgentEvent.create({ ...baseDoc, status, result });
   const dto = await publishEvent(event);
 
-  if (actionType.actionKey === "github_open_pr" && taskId) {
+  if (taskId) {
     if (status === "failed") {
       await markLinkedTaskBlocked(taskId, result?.error);
+    } else if (!GITHUB_PIPELINE_ACTION_KEYS.includes(actionType.actionKey)) {
+      // Single-step action (e.g. a Sales/Marketing hand-off) — reaching
+      // autonomous_completed here means the whole thing is done, unlike
+      // GitHub's multi-step pipeline which only completes at merge_main.
+      await completeGenericLinkedTask(taskId);
     } else {
       await advanceTaskToInProgress(taskId);
     }
@@ -665,10 +701,11 @@ export async function resolveApproval({ eventId, decision, approverId }) {
 
   if (decision === "declined") {
     if (pending.taskId) {
-      const declinedActionType = await ActionType.findById(pending.actionTypeId);
-      if (declinedActionType?.actionKey === "github_open_pr") {
-        await markLinkedTaskBlocked(pending.taskId, "The founder declined this hand-off in the Approval Queue.");
-      }
+      // Generalized from a github_open_pr-only check — a declined Sales/
+      // Marketing hand-off leaves its linked Task just as stuck as a
+      // declined GitHub one would, so it needs the same real "blocked"
+      // outcome rather than sitting at "pending" forever.
+      await markLinkedTaskBlocked(pending.taskId, "The founder declined this hand-off in the Approval Queue.");
     }
     return { resolved: resolvedDto, execution: null };
   }
@@ -721,8 +758,15 @@ export async function resolveApproval({ eventId, decision, approverId }) {
   });
   const executionDto = await publishEvent(executionEvent);
 
-  if (actionType?.actionKey === "github_open_pr" && pending.taskId && execStatus === "failed") {
+  if (pending.taskId && execStatus === "failed") {
     await markLinkedTaskBlocked(pending.taskId, execResult?.error);
+  } else if (
+    pending.taskId &&
+    execStatus === "human_completed" &&
+    actionType &&
+    !GITHUB_PIPELINE_ACTION_KEYS.includes(actionType.actionKey)
+  ) {
+    await completeGenericLinkedTask(pending.taskId);
   }
   // Same real fix as proposeAction above, and for the same reason: clicking
   // "Approve" on a sprint plan or a staging merge used to sit blocked on the

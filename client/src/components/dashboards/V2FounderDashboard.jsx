@@ -43,6 +43,7 @@ import { useStageTaskStore } from "../../state/useStageTaskStore";
 import { useMembershipsStore } from "../../state/useMembershipsStore";
 import { JOURNEY_STAGES } from "../../utils/journeyProgress";
 import { STAGE_TASKS } from "../../domains/founder/stageTasks";
+import { agentAssignmentLabel } from "../../utils/agentDisplay";
 
 // ── Icons ─────────────────────────────────────────────────────────────────
 import {
@@ -342,8 +343,8 @@ function TaskRow({ task }) {
         <p className="truncate font-body text-[12px] font-medium text-v2-heading">
           {task.title}
         </p>
-        {task.assignedToName ? (
-          <p className="font-body text-[11px] text-v2-muted">→ {task.assignedToName}</p>
+        {task.assignedAgentKey || task.assignedToName ? (
+          <p className="font-body text-[11px] text-v2-muted">→ {agentAssignmentLabel(task.assignedAgentKey) ?? task.assignedToName}</p>
         ) : null}
       </div>
       <V2Chip variant={chip.variant} dot>{chip.label}</V2Chip>
@@ -504,7 +505,11 @@ function TaskBoardRow({ task, strikethrough }) {
       <span className={cn("flex-1 font-body text-[11px]", strikethrough ? "text-v2-muted line-through" : "text-v2-heading")}>
         {task.title}
       </span>
-      {task.assignedToName ? (
+      {task.assignedAgentKey ? (
+        <span className="shrink-0 rounded-full bg-v2-purple/10 px-1.5 py-0.5 font-body text-[9px] font-medium text-v2-purple">
+          {agentAssignmentLabel(task.assignedAgentKey)}
+        </span>
+      ) : task.assignedToName ? (
         <V2Avatar name={task.assignedToName} size={20} />
       ) : null}
     </div>

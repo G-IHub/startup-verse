@@ -29,6 +29,7 @@ import {
 import { useWeeklyLoopStore } from "../../state/useWeeklyLoopStore";
 import { useExecutionScoreStore } from "../../state/useExecutionScoreStore";
 import { useJourneyStore } from "../../state/useJourneyStore";
+import { agentAssignmentLabel } from "../../utils/agentDisplay";
 
 import {
   Target,
@@ -373,7 +374,7 @@ function BlockerBanner({ task }) {
       </svg>
       <div className="min-w-0 flex-1">
         <p className="font-body text-[10px] font-medium" style={{ color: "#791F1F" }}>
-          Blocker — {task.assignedToName ?? "Team"}
+          Blocker — {agentAssignmentLabel(task.assignedAgentKey) ?? task.assignedToName ?? "Team"}
         </p>
         <p className="mt-[1px] font-body text-[10px] leading-snug" style={{ color: "#A32D2D" }}>
           {task.blockerNote ?? task.notes ?? "Waiting on external dependency"}
@@ -438,7 +439,13 @@ function TaskLine({ task, onToggle }) {
       <span className={cn("flex-1 font-body text-[12px]", isDone ? "text-v2-muted line-through" : "text-v2-heading")}>
         {task.title}
       </span>
-      {task.assignedToName ? <V2Avatar name={task.assignedToName} size={20} /> : null}
+      {task.assignedAgentKey ? (
+        <span className="shrink-0 rounded-full bg-v2-purple/10 px-1.5 py-0.5 font-body text-[9px] font-medium text-v2-purple">
+          {agentAssignmentLabel(task.assignedAgentKey)}
+        </span>
+      ) : task.assignedToName ? (
+        <V2Avatar name={task.assignedToName} size={20} />
+      ) : null}
       {/* Day label as small colored chip */}
       <span className={cn("shrink-0 rounded-[5px] px-1.5 py-0.5 font-body text-[10px] font-medium", dayChipStyle)}>
         {day.label}
@@ -710,19 +717,20 @@ function ExecutionRightPanel({ scoreData, outcomes, tasks, milestones, milestone
   // AI PM nudge — derive from blocked tasks
   const blockedTasks = tasks.filter((t) => t.status === "blocked");
   const aiNudge = blockedTasks.length > 0
-    ? `${blockedTasks[0].assignedToName ?? "A team member"} is blocked on "${blockedTasks[0].title}". Resolve this blocker before it delays the rest of the milestone.`
+    ? `${agentAssignmentLabel(blockedTasks[0].assignedAgentKey) ?? blockedTasks[0].assignedToName ?? "A team member"} is blocked on "${blockedTasks[0].title}". Resolve this blocker before it delays the rest of the milestone.`
     : "You're on track this week! Stay focused on your top milestone to hit your weekly goal.";
 
-  // Team task load — group by assignee
+  // Team task load — group by assignee (human or agent)
   const teamLoad = useMemo(() => {
     const map = {};
     for (const t of tasks) {
-      if (!t.assignedToName) continue;
-      if (!map[t.assignedToName]) map[t.assignedToName] = { done: 0, active: 0, blocked: 0, pending: 0 };
-      if (t.status === "completed")   map[t.assignedToName].done++;
-      else if (t.status === "in-progress") map[t.assignedToName].active++;
-      else if (t.status === "blocked") map[t.assignedToName].blocked++;
-      else map[t.assignedToName].pending++;
+      const key = agentAssignmentLabel(t.assignedAgentKey) ?? t.assignedToName;
+      if (!key) continue;
+      if (!map[key]) map[key] = { done: 0, active: 0, blocked: 0, pending: 0 };
+      if (t.status === "completed")   map[key].done++;
+      else if (t.status === "in-progress") map[key].active++;
+      else if (t.status === "blocked") map[key].blocked++;
+      else map[key].pending++;
     }
     return Object.entries(map).map(([name, c]) => ({
       name,

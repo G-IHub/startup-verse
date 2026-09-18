@@ -29,6 +29,15 @@ const taskSchema = new mongoose.Schema(
     assignedTo: { type: mongoose.Schema.Types.ObjectId, ref: "User", index: true },
     assignedToName: { type: String, default: "", trim: true, maxlength: 200 },
     assignedToAvatar: { type: String, default: "", trim: true, maxlength: 2000 },
+    // Real AI-agent assignment (2026-09-18) — deliberately separate from
+    // assignedTo/assignedToName rather than overloading them, since an
+    // Agent document is a different real collection than User and
+    // populate() would silently fail if mixed into the same ref field.
+    // A task is assigned to a human OR an agent, never both — the
+    // assignment logic (agentChat.controller.js's UPDATE_TASK handling)
+    // clears whichever set isn't being used.
+    assignedAgentId: { type: mongoose.Schema.Types.ObjectId, ref: "Agent", default: null },
+    assignedAgentKey: { type: String, default: "", trim: true, maxlength: 40 },
     milestoneId: { type: mongoose.Schema.Types.ObjectId, ref: "Milestone", index: true },
     priority: {
       type: String,
