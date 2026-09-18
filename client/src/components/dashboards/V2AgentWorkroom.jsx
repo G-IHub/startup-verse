@@ -25,10 +25,14 @@ import {
 /* ─────────────────────────────────────────────
    Static mock data  (wire to API when ready)
 ───────────────────────────────────────────── */
+// Real agentKeys used as ids here (pm/dev/mkt/sales) so realStatus — built
+// generically from real Agent/AgentEvent data below — can key straight off
+// them. "ga" (AI Growth Analyst) has no real agentKey in coreAgentSeeds.js
+// yet, so it stays honest mock, same as before.
 const AGENTS = [
   { id: "pm",       initials: "PM",  name: "AI Product Manager",  bg: "#EEEDFE", color: "#534AB7", status: "working",  statusLabel: "Working · sprint plan" },
-  { id: "mk",       initials: "MK",  name: "AI Marketing",        bg: "#EAF3DE", color: "#27500A", status: "idle",     statusLabel: "Idle · output delivered" },
-  { id: "sa",       initials: "SA",  name: "AI Sales",            bg: "#E6F1FB", color: "#0C447C", status: "blocked",  statusLabel: "Blocked · needs approval" },
+  { id: "mkt",      initials: "MK",  name: "AI Marketing",        bg: "#EAF3DE", color: "#27500A", status: "idle",     statusLabel: "Idle · output delivered" },
+  { id: "sales",    initials: "SA",  name: "AI Sales",            bg: "#E6F1FB", color: "#0C447C", status: "blocked",  statusLabel: "Blocked · needs approval" },
   { id: "dev",      initials: "DEV", name: "AI Developer",        bg: "#f3f4f6", color: "#6b7280", status: "blocked",  statusLabel: "Blocked · needs approval" },
   { id: "ga",       initials: "GA",  name: "AI Growth Analyst",   bg: "#E6F1FB", color: "#0C447C", status: "idle",     statusLabel: "Idle · waiting on data" },
 ];
@@ -171,7 +175,7 @@ function CoordinationFeed({ items, liveActions = [], onViewLog }) {
       <div className="mb-3 flex items-end justify-between">
         <div>
           <div className="font-heading text-[13px] font-semibold text-v2-heading">Coordination feed</div>
-          <div className="mt-0.5 font-body text-[11px] text-v2-muted">Real activity from AI Product Manager and AI Developer — the only two agents with a real backend so far</div>
+          <div className="mt-0.5 font-body text-[11px] text-v2-muted">Real activity across your AI Staff — AI Growth Analyst isn't a real agent yet, so it never appears here</div>
         </div>
         <button type="button" onClick={onViewLog} className="shrink-0 font-body text-[11px] text-v2-blue hover:underline">View full log →</button>
       </div>
@@ -466,10 +470,14 @@ export default function V2AgentWorkroom({ user, onNavigate }) {
         setRealAgents(realAgentList);
         setFeedItems(buildRealFeed(realEvents));
         setApprovals(realApprovals);
-        setRealStatus({
-          pm: summarizeAgentStatus("pm", realEvents),
-          dev: summarizeAgentStatus("dev", realEvents),
-        });
+        // Real bug found live, 2026-09-18: this only ever built status for
+        // pm/dev, so Sales/Marketing's real activity (they got real actions
+        // that same night) never overlaid onto this widget's mock status —
+        // built generically off whichever real agents this founder actually
+        // has, using summarizeAgentStatus's own agentKey-generic logic.
+        setRealStatus(
+          Object.fromEntries(realAgentList.map((a) => [a.agentKey, summarizeAgentStatus(a.agentKey, realEvents)])),
+        );
         setHeroStats(stats);
         setDepMapNodes(buildRealDepMap(realAgentList, realEvents, realApprovals.length));
         setAutonomySummary(buildAutonomySummary(actionTypes || [], stats));
@@ -614,7 +622,7 @@ export default function V2AgentWorkroom({ user, onNavigate }) {
               // `ai-${id}` — not a real page name anywhere in V2AIStaffShell,
               // so it silently did nothing. Both now go straight to their
               // real page instead.
-              const AGENT_PAGES = { mk: "agent-marketing", sa: "agent-sales", dev: "agent-developer", pm: "ai-staff-chat" };
+              const AGENT_PAGES = { mkt: "agent-marketing", sales: "agent-sales", dev: "agent-developer", pm: "ai-staff-chat" };
               const page = AGENT_PAGES[agent.id];
               if (page) { onNavigate?.(page); } else { setModal({ type: "agent", data: agent }); }
             }}

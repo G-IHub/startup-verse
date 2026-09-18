@@ -31,6 +31,9 @@ import {
 import { useOfficeStore } from "../../state/useOfficeStore";
 import { useWeeklyLoopStore } from "../../state/useWeeklyLoopStore";
 import { V2TeamChatPane } from "../office/v2/V2TeamChatPane";
+import { subscribeToAgentEvents, subscribeToAgentActionStarted } from "../../utils/socketIoRealtime";
+import { getAgentEvents } from "../../utils/api/agentOrchestrationApi";
+import { buildRealFeed } from "../../utils/agentFeed";
 import { useCallCoordinator } from "../../contexts/CallCoordinatorContext";
 // Lazy — pulls in the LiveKit SDK, previously downloaded by every founder
 // who simply opened Virtual Office (a common page) whether or not they
@@ -415,6 +418,73 @@ function InlineChatCard({ user, startupId, teamMembers, onExpand }) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────
+// AI STAFF — LIVE NOW
+// ─────────────────────────────────────────────────────────────────────────
+
+/**
+ * Real, live "what's an AI agent actually doing right now" card (2026-09-18)
+ * — the same real signal already built for the Workroom (agent-action:started,
+ * a transient realtime-only event fired right before a real executor runs;
+ * see orchestrator.service.js's emitActionStarted), just also surfaced here
+ * since the founder asked to see it in the Virtual Office too, not only in
+ * AI Staff. Deliberately a separate card from the human ActivityFeedCard
+ * below rather than merged into the same list — that one is backed by the
+ * real Activity model (presence/tasks/wins), this one by real AgentEvents;
+ * mixing the two shapes into one feed would blur what's actually a person
+ * doing something vs. an agent, which is exactly the distinction this whole
+ * feature exists to make clear.
+ */
+function AiStaffLiveCard({ liveActions, recentItems, onOpenWorkroom }) {
+  return (
+    <V2Card className="px-4 py-3">
+      <div className="mb-2.5 flex items-center justify-between">
+        <span className="font-heading text-[12px] font-semibold text-v2-heading">AI Staff — live now</span>
+        <button type="button" onClick={onOpenWorkroom} className="font-body text-[11px] font-medium text-v2-blue hover:underline">
+          Open Workroom →
+        </button>
+      </div>
+
+      {liveActions.length > 0 && (
+        <div className="mb-2.5 flex flex-col gap-1.5 rounded-xl bg-v2-blue-tint/30 p-2.5">
+          {liveActions.map((a) => (
+            <div key={`${a.targetId}-${a.startedAt}`} className="flex items-center gap-2 font-body text-[11px] text-v2-heading">
+              <span className="relative flex h-2 w-2 shrink-0">
+                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-v2-blue opacity-75" />
+                <span className="relative inline-flex h-2 w-2 rounded-full bg-v2-blue" />
+              </span>
+              <span className="font-medium">{a.agentId?.name || "An agent"}</span>
+              <span className="text-v2-muted">is working now —</span>
+              <span className="truncate text-v2-muted">{a.taskDescription || a.actionLabel}</span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {recentItems.length === 0 && liveActions.length === 0 ? (
+        <p className="py-4 text-center font-body text-[11px] text-v2-muted">
+          No real AI Staff activity yet — give AI Developer a task or chat with AI Product Manager to see it here.
+        </p>
+      ) : (
+        <div className="flex flex-col divide-y divide-gray-200">
+          {recentItems.map((item) => (
+            <div key={item.id} className="flex items-center gap-2 py-2">
+              <div
+                className="flex h-5 w-5 shrink-0 items-center justify-center rounded font-body text-[8px] font-semibold"
+                style={{ background: item.from.bg, color: item.from.color }}
+              >
+                {item.from.initials}
+              </div>
+              <p className="min-w-0 flex-1 truncate font-body text-[11px] text-v2-heading">{item.text}</p>
+              <span className="shrink-0 font-body text-[9px] text-v2-subtle">{item.time}</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </V2Card>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────
 // LIVE ACTIVITY FEED
 // ─────────────────────────────────────────────────────────────────────────
 
@@ -669,6 +739,32 @@ export default function V2VirtualOffice({ user, onPageChange }) {
   const startupName = user?.startup?.name ?? "Your Startup";
   const onlineCount = presenceRows.filter((r) => r.isOnline).length;
   const userId = String(user?._id ?? user?.id ?? "");
+  // Same real founderId fallback already established elsewhere in this shell
+  // (V2Integrations.jsx, V2ProductViewer.jsx) — useOfficeStore's founderId
+  // isn't always populated depending on how this page was reached.
+  const resolvedFounderId = founderId || userId;
+
+  const [aiLiveActions, setAiLiveActions] = useState([]);
+  const [aiFeedItems, setAiFeedItems] = useState([]);
+  useEffect(() => {
+    if (!resolvedFounderId) return undefined;
+    getAgentEvents(resolvedFounderId)
+      .then((events) => setAiFeedItems(buildRealFeed(events || [], 6)))
+      .catch(() => {});
+    const unsubEvents = subscribeToAgentEvents(resolvedFounderId, (event) => {
+      getAgentEvents(resolvedFounderId).then((events) => setAiFeedItems(buildRealFeed(events || [], 6))).catch(() => {});
+      if (event?.targetId) {
+        setAiLiveActions((prev) => prev.filter((a) => a.targetId !== event.targetId));
+      }
+    });
+    const unsubStarted = subscribeToAgentActionStarted(resolvedFounderId, (payload) => {
+      setAiLiveActions((prev) => [...prev.filter((a) => a.targetId !== payload.targetId), payload]);
+      setTimeout(() => {
+        setAiLiveActions((prev) => prev.filter((a) => a.targetId !== payload.targetId || a.startedAt !== payload.startedAt));
+      }, 90000);
+    });
+    return () => { unsubEvents?.(); unsubStarted?.(); };
+  }, [resolvedFounderId]);
 
   const teamMembersWithPresence = useMemo(() => {
     const presenceById = {};
@@ -767,6 +863,12 @@ export default function V2VirtualOffice({ user, onPageChange }) {
             onExpand={() => setChatOpen(true)}
           />
         </div>
+
+        <AiStaffLiveCard
+          liveActions={aiLiveActions}
+          recentItems={aiFeedItems}
+          onOpenWorkroom={() => onPageChange("ai-staff")}
+        />
 
         <ActivityFeedCard
           activities={activities}

@@ -15,7 +15,25 @@ import { formatEventTime, paletteForAgent, initialsForAgent } from "./agentDispl
 
 export const PM_ACTOR = { initials: "PM", bg: "#EEEDFE", color: "#534AB7", isAgent: true };
 export const DEV_ACTOR = { initials: "DEV", bg: "#f3f4f6", color: "#6b7280", isAgent: true };
+export const MK_ACTOR = { initials: "MK", bg: "#EAF3DE", color: "#27500A", isAgent: true };
+export const SA_ACTOR = { initials: "SA", bg: "#E6F1FB", color: "#0C447C", isAgent: true };
 export const YOU_ACTOR = { initials: "You", bg: "#EFB0AF", color: "#791F1F", isAgent: false };
+
+// Real, human-readable labels for the Sales/Marketing draft-only actions —
+// none of these send/publish anything (see send_outreach_email and
+// publish_linkedin_post below, the two real exceptions), so every one of
+// these events is inherently "drafted, nothing sent" — described that way
+// rather than implying real-world contact happened.
+const SALES_MARKETING_LABELS = {
+  analyze_icp: "analyzed the market & ICP",
+  create_social_post: "drafted a social post",
+  plan_campaign: "planned a marketing campaign",
+  draft_email_sequence: "drafted an email sequence",
+  create_content_calendar: "drafted a content calendar",
+  draft_outreach: "drafted an outreach message",
+  qualify_lead: "qualified a lead",
+  create_sales_script: "drafted a sales call script",
+};
 
 function describeDevEvent(e) {
   const targetId = e.targetId || "";
@@ -96,11 +114,64 @@ function describePmEvent(e) {
   return { from: PM_ACTOR, to: YOU_ACTOR, text, tag };
 }
 
+/**
+ * Real Sales/Marketing activity (2026-09-18) — same treatment as
+ * describeDevEvent/describePmEvent above, generalized once these two agents
+ * got real actions (AGENT_TASK hand-off, task-assignment hand-off, or a
+ * founder using their workspace pages directly). `actor` distinguishes the
+ * two agents sharing this one describer (their action keys don't overlap,
+ * but the label text and actor avatar both need to reflect whichever agent
+ * actually ran it).
+ */
+function describeSalesMarketingEvent(e, actor) {
+  const actionKey = e.actionTypeId?.actionKey;
+
+  if (actionKey === "publish_linkedin_post") {
+    if (e.status === "pending_approval") {
+      return { from: actor, to: YOU_ACTOR, text: "Drafted a real LinkedIn post — needs your approval before it goes public.", tag: { label: "Escalated · needs approval", bg: "#FCEBEB", color: "#791F1F" } };
+    }
+    if (e.status === "declined") {
+      return { from: actor, to: null, text: "LinkedIn post declined — nothing was published.", tag: { label: "Declined", bg: "#FCEBEB", color: "#791F1F" } };
+    }
+    if (e.status === "failed") {
+      return { from: actor, to: null, text: `Tried to publish to LinkedIn — failed: ${e.result?.error || "error"}.`, tag: { label: "Failed", bg: "#FCEBEB", color: "#791F1F" } };
+    }
+    return { from: actor, to: null, text: "Published a real post to LinkedIn.", tag: { label: "Live on LinkedIn", bg: "#EAF3DE", color: "#27500A" } };
+  }
+  if (actionKey === "send_outreach_email") {
+    if (e.status === "pending_approval") {
+      return { from: actor, to: YOU_ACTOR, text: `Drafted a real outreach email to ${e.payload?.recipientEmail || "a recipient"} — needs your approval before it sends.`, tag: { label: "Escalated · needs approval", bg: "#FCEBEB", color: "#791F1F" } };
+    }
+    if (e.status === "declined") {
+      return { from: actor, to: null, text: "Outreach email declined — nothing was sent.", tag: { label: "Declined", bg: "#FCEBEB", color: "#791F1F" } };
+    }
+    if (e.status === "failed") {
+      return { from: actor, to: null, text: `Tried to send an outreach email — failed: ${e.result?.error || "error"}.`, tag: { label: "Failed", bg: "#FCEBEB", color: "#791F1F" } };
+    }
+    return { from: actor, to: null, text: `Sent a real outreach email to ${e.payload?.recipientEmail || "a recipient"}.`, tag: { label: "Sent", bg: "#EAF3DE", color: "#27500A" } };
+  }
+
+  const label = SALES_MARKETING_LABELS[actionKey];
+  if (!label) return null;
+  const text = `${label.charAt(0).toUpperCase()}${label.slice(1)}.`;
+  const tag = e.status === "failed"
+    ? { label: `Failed — ${e.result?.error || "error"}`, bg: "#FCEBEB", color: "#791F1F" }
+    : { label: "Drafted · nothing sent", bg: "#f3f4f6", color: "#6b7280" };
+  return { from: actor, to: null, text, tag };
+}
+
+const FEED_DESCRIBERS = {
+  dev: describeDevEvent,
+  pm: describePmEvent,
+  mkt: (e) => describeSalesMarketingEvent(e, MK_ACTOR),
+  sales: (e) => describeSalesMarketingEvent(e, SA_ACTOR),
+};
+
 export function buildRealFeed(events, limit = 8) {
   return events
     .map((e) => {
-      const agentKey = e.actionTypeId?.agentId?.agentKey;
-      const desc = agentKey === "dev" ? describeDevEvent(e) : agentKey === "pm" ? describePmEvent(e) : null;
+      const describe = FEED_DESCRIBERS[e.actionTypeId?.agentId?.agentKey];
+      const desc = describe ? describe(e) : null;
       if (!desc) return null;
       return { id: e.id, time: formatEventTime(e.createdAt), ...desc };
     })
@@ -108,11 +179,13 @@ export function buildRealFeed(events, limit = 8) {
     .slice(0, limit); // events already sorted newest-first by getAgentEvents
 }
 
+const APPROVAL_ACTORS = { pm: PM_ACTOR, dev: DEV_ACTOR, mkt: MK_ACTOR, sales: SA_ACTOR };
+
 export function buildRealApprovals(events) {
   return events
-    .filter((e) => e.status === "pending_approval" && ["pm", "dev"].includes(e.actionTypeId?.agentId?.agentKey))
+    .filter((e) => e.status === "pending_approval" && APPROVAL_ACTORS[e.actionTypeId?.agentId?.agentKey])
     .map((e) => {
-      const isDev = e.actionTypeId?.agentId?.agentKey === "dev";
+      const agentKey = e.actionTypeId?.agentId?.agentKey;
       const repoLabel = e.payload?.owner && e.payload?.repo ? `${e.payload.owner}/${e.payload.repo}` : "";
       const milestones = e.payload?.milestones;
       const totalTasks = Array.isArray(milestones) ? milestones.reduce((n, m) => n + (m.tasks?.length || 0), 0) : 0;
@@ -121,12 +194,12 @@ export function buildRealApprovals(events) {
         : null;
       return {
         id: e.id,
-        agent: isDev ? DEV_ACTOR : PM_ACTOR,
+        agent: APPROVAL_ACTORS[agentKey] || PM_ACTOR,
         title: e.actionTypeId?.label || "Pending action",
         risk: e.actionTypeId?.riskCategory === "sensitive_locked" ? "Sensitive" : "Low risk",
         riskBg: e.actionTypeId?.riskCategory === "sensitive_locked" ? "#FCEBEB" : "#f3f4f6",
         riskColor: e.actionTypeId?.riskCategory === "sensitive_locked" ? "#791F1F" : "#6b7280",
-        desc: e.payload?.taskDescription || planDesc || (repoLabel ? `On ${repoLabel}.` : "Real action awaiting your review."),
+        desc: e.payload?.taskDescription || planDesc || e.payload?.recipientEmail || (repoLabel ? `On ${repoLabel}.` : "Real action awaiting your review."),
         waitingOn: "you",
         isFyi: false,
         primaryLabel: "Approve →",
@@ -142,7 +215,7 @@ export function summarizeAgentStatus(agentKey, events) {
   return { status: "working", statusLabel: "Active — real work on file" };
 }
 
-const KNOWN_INITIALS = { pm: "PM", dev: "DEV" };
+const KNOWN_INITIALS = { pm: "PM", dev: "DEV", mkt: "MK", sales: "SA" };
 function styleForAgent(agent) {
   const palette = paletteForAgent(agent.id || agent.agentKey);
   return { initials: KNOWN_INITIALS[agent.agentKey] || initialsForAgent(agent.name), bg: palette.bg, color: palette.color };
