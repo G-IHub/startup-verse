@@ -13,6 +13,9 @@ import AgentEvent from "../models/AgentEvent.js";
 import ActionType from "../models/ActionType.js";
 import Agent from "../models/Agent.js";
 import { draftText } from "./deepseekClient.js";
+import { sendFounderEmail } from "./founderEmailService.js";
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 const AI_SALES_SYSTEM_PROMPT = `You are AI Sales — a sharp, results-driven sales agent working exclusively for an early-stage startup founder.
 
@@ -415,6 +418,42 @@ Include 2 posts per day across active platforms in the calendar, spaced across t
   return safeParseJson(raw);
 }
 
+/**
+ * Real external send, 2026-09-18 — every executor above only ever drafts;
+ * this is the one action that actually reaches a real person. Requires a
+ * real, founder-supplied recipient — AI PM's own system prompt is told to
+ * never invent one, and this is the structural backstop for that rule, the
+ * same "prompt steer + real guard" pattern used throughout this codebase:
+ * a bare format check can't confirm the address is a real, wanted contact,
+ * but it does reject the more common failure (a hallucinated or malformed
+ * address) before it ever reaches a live send call.
+ */
+export async function executeSendOutreachEmail(event) {
+  const { founderId, payload = {} } = event;
+  const { recipientEmail, recipientName = "", subject, body } = payload;
+
+  if (!recipientEmail || !EMAIL_RE.test(String(recipientEmail).trim())) {
+    throw new Error("send_outreach_email requires a real, valid recipientEmail.");
+  }
+  if (!subject || !body) {
+    throw new Error("send_outreach_email requires both subject and body.");
+  }
+
+  const record = await sendFounderEmail(founderId, {
+    recipientEmail: String(recipientEmail).trim(),
+    recipientName: String(recipientName || "").trim(),
+    subject: String(subject),
+    htmlBody: String(body),
+  });
+
+  return {
+    sent: record.status === "sent",
+    recipientEmail: record.recipientEmail,
+    subject: record.subject,
+    sentAt: record.sentAt || null,
+  };
+}
+
 export const salesMarketingExecutors = {
   analyze_icp: executeAnalyzeIcp,
   draft_outreach: executeDraftOutreach,
@@ -424,4 +463,5 @@ export const salesMarketingExecutors = {
   create_social_post: executeCreateSocialPost,
   plan_campaign: executePlanCampaign,
   create_content_calendar: executeCreateContentCalendar,
+  send_outreach_email: executeSendOutreachEmail,
 };

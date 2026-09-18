@@ -146,6 +146,21 @@ const CORE_AGENT_DEFINITIONS = [
         adjustable: true,
         approverRule: "founder",
       },
+      {
+        // Real external send, unlike every other sales action above (which
+        // only ever draft content nothing has sent yet). Defaults to
+        // ask_first — not autonomous — because this reaches a real person
+        // and can't be unsent, the same reasoning github_merge_main is
+        // locked for. Left adjustable (unlike merge_main) since a founder
+        // may reasonably want to trust routine outreach once proven, but it
+        // never starts that way.
+        actionKey: "send_outreach_email",
+        label: "Send outreach email",
+        riskCategory: "reversible",
+        defaultMode: "ask_first",
+        adjustable: true,
+        approverRule: "founder",
+      },
     ],
   },
   {

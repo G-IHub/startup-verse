@@ -62,6 +62,7 @@ const MARKERS = [
   { name: "READ_REPO", re: /```READ_REPO\s*([\s\S]*?)\n```/ },
   { name: "ASK_DEV", re: /```ASK_DEV\s*([\s\S]*?)\n```/ },
   { name: "ADD_TASKS", re: /```ADD_TASKS\s*([\s\S]*?)\n```/ },
+  { name: "AGENT_TASK", re: /```AGENT_TASK\s*([\s\S]*?)\n```/ },
 ];
 
 function founderGuard(req, founderId) {
@@ -214,7 +215,18 @@ Your job:
   - **Scheduling a real meeting or booking a call** — StartupVerse has no calendar or booking system. For this, an external booking link (Calendly, Cal.com, SavvyCal) genuinely is the right answer — a real CTA button or link pointing to the founder's booking URL. A single page can have both: a native form for data capture (feeds Product Viewer) plus a booking link for people who want to talk now.
   - When a founder says "I need people to fill out a form" or "I want to collect signups / leads / emails" → that's the native path, AI Developer builds it. When they say "I want people to book a call / schedule a meeting" → that's an external booking link. When they need both (e.g. a landing page where some visitors fill in their info and others book a call directly) → AI Developer builds both on the same page.
   - The form submissions you see in the real context below are already the output of this native system — a count of zero means the page either has no form yet, or nobody has submitted one yet, not that the capability is missing.
-- Besides those real actions, you still can't do anything else for real — you can't send money, sign documents, or message customers on the founder's behalf. If asked, say so honestly instead of pretending you can.
+- **You can now hand real outreach/marketing work to AI Sales or AI Marketing** — they have real capabilities, not mock. Use this fenced block (never alongside any other block):
+\`\`\`AGENT_TASK
+{"agentKey":"sales","actionKey":"draft_outreach","payload":{...},"taskDescription":"..."}
+\`\`\`
+  "agentKey" is "sales" or "mkt". "actionKey" and "payload" depend on what's actually needed — the real ones for reaching out to people:
+  - \`draft_outreach\` (sales): \`{"channel":"linkedin"|"email"|"whatsapp"|"instagram"|"facebook","targetDescription":"who this is for","customContext":"..."}\` — drafts one outreach message. Completes immediately, no approval needed (nothing is sent yet).
+  - \`draft_email_sequence\` (sales): \`{"audience":"...","goal":"cold_outreach"|"nurture"|"re_engage","sequenceName":"..."}\` — drafts a multi-email sequence. Also immediate, nothing sent.
+  - \`qualify_lead\` (sales): \`{"conversationText":"...","leadDetails":"..."}\` — scores a real lead from a real conversation you already have. Immediate.
+  - \`send_outreach_email\` (sales) — **the one real send**: \`{"recipientEmail":"...","recipientName":"...","subject":"...","body":"..."}\`. This actually emails a real person from the founder's connected Gmail — it is NOT reversible once sent. **Never invent a recipientEmail.** Only use one the founder has explicitly given you in this real conversation. If you don't have a real email address yet, ask the founder for one before emitting this block — do not guess, scrape, or fabricate a contact. This always needs the founder's real approval before it sends (check your Approval Queue) — never tell them it already went out until you're told it succeeded.
+  - Other real actions exist too (\`create_social_post\`, \`plan_campaign\`, \`create_content_calendar\`, \`analyze_icp\`, \`create_sales_script\` on mkt/sales) — same shape, reachable from their workspace pages if a founder wants to use them directly.
+  - **What's genuinely not real yet, be honest about this**: there is no way to find or scrape real prospect contacts — "find me 10 people to interview" needs the founder to supply real names/emails/LinkedIn profiles themselves. There's no automated LinkedIn DM/connection-request capability either — LinkedIn's real API doesn't support it, and attempting it risks the founder's real account. AI Marketing can publish a real public LinkedIn post, nothing more on LinkedIn.
+- Besides those real actions, you still can't do anything else for real — you can't send money or sign documents on the founder's behalf. If asked, say so honestly instead of pretending you can.
 - Write like a sharp, direct colleague, not a customer-support bot. No filler, no "I'd be happy to help."
 
 Real context:
@@ -416,6 +428,7 @@ async function processAiPmReply({ raw, ctx, messages, founderId, agent, allowedM
       BUILD_TASK: "task hand-off", SET_DEFAULT_REPO: "repo setting", UPDATE_TASK: "task update",
       DELETE_TASK: "task deletion", DELETE_MILESTONE: "milestone deletion", UPDATE_GOAL: "goal update",
       READ_REPO: "repo read request", ASK_DEV: "question for AI Developer", ADD_TASKS: "task addition",
+      AGENT_TASK: "task hand-off",
     }[openName] || "sprint plan";
     replyText = `${raw.slice(0, raw.indexOf("```" + openName)).trim()}\n\n(I started drafting a ${label} but ran out of room to finish it — mind asking me to try again?)`;
   } else if (closed?.name === "SPRINT_PLAN") {
@@ -893,6 +906,53 @@ async function processAiPmReply({ raw, ctx, messages, founderId, agent, allowedM
           replyText += `\n\n(I tried to add those tasks but hit an error: ${err.message})`;
         }
       }
+    }
+  } else if (closed?.name === "AGENT_TASK") {
+    // Real hand-off to AI Sales or AI Marketing — same shape as BUILD_TASK's
+    // hand-off to AI Developer, generalized across whichever real action a
+    // task actually needs. Goes through the same real proposeAction path,
+    // so risk category / autonomy setting genuinely applies (send_outreach_email
+    // is ask_first by default — a founder approval is real, not theater).
+    replyText = raw.replace(closed.fullMatch, "").trim();
+    let task = null;
+    let parseFailed = false;
+    try {
+      task = JSON.parse(closed.body);
+    } catch (err) {
+      parseFailed = true;
+      logger.error("[agentChat] AGENT_TASK body failed to parse as JSON", { message: err.message, bodyPreview: closed.body.slice(0, 500) });
+    }
+    const agentKey = task?.agentKey === "sales" || task?.agentKey === "mkt" ? task.agentKey : null;
+    const agentLabel = agentKey === "sales" ? "AI Sales" : "AI Marketing";
+    const hasFields = Boolean(agentKey && task?.actionKey && task?.taskDescription);
+    if (hasFields) {
+      try {
+        const targetAgent = await Agent.findOne({ founderId, agentKey });
+        if (!targetAgent) throw new Error(`${agentLabel} isn't set up for this founder yet.`);
+        const actionType = await ActionType.findOne({ agentId: targetAgent._id, actionKey: task.actionKey });
+        if (!actionType) throw new Error(`"${task.actionKey}" isn't a real action for ${agentLabel}.`);
+        const result = await proposeAction({
+          founderId, actorType: "agent", actorId: String(targetAgent._id), actionTypeId: actionType._id,
+          targetType: agentKey, targetId: `${agentKey}-${task.actionKey}-${Date.now()}`,
+          payload: { ...(task.payload || {}), taskDescription: task.taskDescription },
+        });
+        if (result.event.status === "failed") {
+          replyText += `\n\n(I handed this to ${agentLabel}, but it hit an error: ${result.event.result?.error || "unknown error"})`;
+        } else if (result.event.status === "pending_approval") {
+          proposedEvent = result.event;
+          proposedEventKind = "sprint_plan"; // reuses the existing Approval Queue link
+          replyText += `\n\n📋 I've handed this to ${agentLabel} — it needs your approval before it actually sends, check your Approval Queue.`;
+        } else {
+          replyText += `\n\n🛠️ Handed to ${agentLabel} — done. Check the ${agentLabel} workspace for the output.`;
+        }
+      } catch (err) {
+        logger.error("[agentChat] failed to hand off task to Sales/Marketing", { message: err.message });
+        replyText += `\n\n(I tried to hand this off to ${agentLabel} but hit an error: ${err.message})`;
+      }
+    } else if (parseFailed) {
+      replyText += "\n\n(I tried to hand off a task but it came out malformed — mind asking me to try again?)";
+    } else {
+      replyText += "\n\n(I started to hand off a task but was missing some details — mind asking me to try again?)";
     }
   }
 
