@@ -623,8 +623,17 @@ export async function proposeAction({ founderId, startupId, actorType, actorId, 
       await markLinkedTaskBlocked(taskId, result?.error);
     } else if (!GITHUB_PIPELINE_ACTION_KEYS.includes(actionType.actionKey)) {
       // Single-step action (e.g. a Sales/Marketing hand-off) — reaching
-      // autonomous_completed here means the whole thing is done, unlike
-      // GitHub's multi-step pipeline which only completes at merge_main.
+      // autonomous_completed here means the whole thing is done in one
+      // shot, unlike GitHub's multi-step pipeline which only completes at
+      // merge_main. Real bug found live, 2026-09-18: calling
+      // completeGenericLinkedTask directly from "pending" silently no-opped,
+      // because validateTaskStatusTransition rejects a bare pending ->
+      // completed jump (same rule the UPDATE_TASK system prompt documents)
+      // — the task was still stuck at "pending" after the hand-off finished.
+      // Advancing through in-progress first (safe even though the "in
+      // progress" moment was instantaneous here) makes the completed
+      // transition legal.
+      await advanceTaskToInProgress(taskId);
       await completeGenericLinkedTask(taskId);
     } else {
       await advanceTaskToInProgress(taskId);
