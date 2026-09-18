@@ -12,23 +12,39 @@
  *   anything else       → V2AIStaffComingSoon (generic placeholder)
  */
 
-import React, { useState } from "react";
+import React, { useState, lazy, Suspense } from "react";
 import { cn } from "../ui/utils";
 import { Bot, Users, Plug, MessageSquare, Rocket } from "lucide-react";
 import V2AppLayout from "../layout/V2AppLayout";
+// Workroom and Manage Staff stay eager — Workroom is the default landing tab
+// (always needed on first paint) and Manage Staff is the other high-traffic
+// tab, so lazy-loading either would only add a loading flash on the common
+// path with no real bundle-size win. Everything else here is situational —
+// a founder may go a whole session without opening most of these — so it's
+// only downloaded the moment it's actually navigated to. Real, measured win:
+// this shell's own chunk was 326KB before lazy-loading (V2AIMarketingWorkspace
+// and V2AISalesWorkspace alone are ~900 and ~780 lines).
 import V2AgentWorkroom from "./V2AgentWorkroom";
 import V2AIStaffManage from "./V2AIStaffManage";
-import V2ApprovalQueue from "./V2ApprovalQueue";
-import V2AutonomySettings from "./V2AutonomySettings";
-import V2AuditTrail from "./V2AuditTrail";
-import V2AIMarketingWorkspace from "./V2AIMarketingWorkspace";
-import V2AISalesWorkspace from "./V2AISalesWorkspace";
-import V2AIFinanceWorkspace from "./V2AIFinanceWorkspace";
-import V2AILegalWorkspace from "./V2AILegalWorkspace";
-import V2AIDeveloperWorkspace from "./V2AIDeveloperWorkspace";
-import V2AIStaffChat from "./V2AIStaffChat";
-import V2Integrations from "./V2Integrations";
-import V2ProductViewer from "./V2ProductViewer";
+const V2ApprovalQueue = lazy(() => import("./V2ApprovalQueue"));
+const V2AutonomySettings = lazy(() => import("./V2AutonomySettings"));
+const V2AuditTrail = lazy(() => import("./V2AuditTrail"));
+const V2AIMarketingWorkspace = lazy(() => import("./V2AIMarketingWorkspace"));
+const V2AISalesWorkspace = lazy(() => import("./V2AISalesWorkspace"));
+const V2AIFinanceWorkspace = lazy(() => import("./V2AIFinanceWorkspace"));
+const V2AILegalWorkspace = lazy(() => import("./V2AILegalWorkspace"));
+const V2AIDeveloperWorkspace = lazy(() => import("./V2AIDeveloperWorkspace"));
+const V2AIStaffChat = lazy(() => import("./V2AIStaffChat"));
+const V2Integrations = lazy(() => import("./V2Integrations"));
+const V2ProductViewer = lazy(() => import("./V2ProductViewer"));
+
+function LazyPageFallback() {
+  return (
+    <div className="flex flex-1 items-center justify-center bg-v2-page">
+      <div className="font-body text-[13px] text-v2-muted">Loading…</div>
+    </div>
+  );
+}
 
 /* ── Tab config ─────────────────────────────────────────────────────────── */
 const TABS = [
@@ -203,33 +219,35 @@ export default function V2AIStaffShell({ user, onPageChange, ...rest }) {
 
         {/* ── Content ── */}
         <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-          {subPage ? (
-            renderSubPage()
-          ) : tab === "workroom" ? (
-            <V2AgentWorkroom
-              user={user}
-              onPageChange={onPageChange}
-              onNavigate={handleNavigate}
-              {...rest}
-            />
-          ) : tab === "integrations" ? (
-            <V2Integrations
-              user={user}
-              onBack={() => setTab("workroom")}
-              onNavigate={handleNavigate}
-            />
-          ) : tab === "chat" ? (
-            <V2AIStaffChat user={user} onNavigate={handleNavigate} />
-          ) : tab === "product-viewer" ? (
-            <V2ProductViewer user={user} onBack={() => setTab("workroom")} />
-          ) : (
-            <V2AIStaffManage
-              user={user}
-              onChat={() => setTab("workroom")}
-              onNavigate={handleNavigate}
-              {...rest}
-            />
-          )}
+          <Suspense fallback={<LazyPageFallback />}>
+            {subPage ? (
+              renderSubPage()
+            ) : tab === "workroom" ? (
+              <V2AgentWorkroom
+                user={user}
+                onPageChange={onPageChange}
+                onNavigate={handleNavigate}
+                {...rest}
+              />
+            ) : tab === "integrations" ? (
+              <V2Integrations
+                user={user}
+                onBack={() => setTab("workroom")}
+                onNavigate={handleNavigate}
+              />
+            ) : tab === "chat" ? (
+              <V2AIStaffChat user={user} onNavigate={handleNavigate} />
+            ) : tab === "product-viewer" ? (
+              <V2ProductViewer user={user} onBack={() => setTab("workroom")} />
+            ) : (
+              <V2AIStaffManage
+                user={user}
+                onChat={() => setTab("workroom")}
+                onNavigate={handleNavigate}
+                {...rest}
+              />
+            )}
+          </Suspense>
         </div>
 
       </div>

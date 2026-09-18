@@ -6,9 +6,18 @@ import React, {
   useMemo,
   useRef,
   useState,
+  lazy,
+  Suspense,
 } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import CallRoom from "../components/calls/CallRoom";
+// Lazy — CallRoom pulls in the LiveKit SDK, a large real-time dependency
+// that was previously loaded eagerly on every single page for every
+// founder, whether or not they ever start a call. Safe: it only ever
+// renders once a call is genuinely active (see the renderOverlay &&
+// activeCall condition below), and V2's own provider instance sets
+// renderOverlay={false} and never renders this at all — that whole
+// bundle weight was being downloaded for V2 founders for zero benefit.
+const CallRoom = lazy(() => import("../components/calls/CallRoom"));
 import IncomingCallBanner from "../components/calls/IncomingCallBanner";
 import TeamCallModal from "../components/calls/TeamCallModal";
 import useCallToken from "../hooks/useCallToken";
@@ -469,19 +478,23 @@ export function CallCoordinatorProvider({
       )}
       {renderOverlay && activeCall && !restoringCall && (
         <div className="fixed inset-0 z-[999] h-dvh w-full">
-          <CallRoomComponent
-            token={activeCall.token}
-            roomName={activeCall.roomName}
-            callType={activeCall.callType}
-            callTitle={callTitle}
-            currentUserId={currentUserId}
-            initiatorId={activeCall.initiatorId}
-            startupId={activeCall.startupId || startupId}
-            userName={user?.name}
-            userRole={user?.role}
-            teamRoster={teamRoster}
-            onLeave={leaveCall}
-          />
+          <Suspense fallback={
+            <div className="flex h-full w-full items-center justify-center bg-black/80 text-white">Connecting…</div>
+          }>
+            <CallRoomComponent
+              token={activeCall.token}
+              roomName={activeCall.roomName}
+              callType={activeCall.callType}
+              callTitle={callTitle}
+              currentUserId={currentUserId}
+              initiatorId={activeCall.initiatorId}
+              startupId={activeCall.startupId || startupId}
+              userName={user?.name}
+              userRole={user?.role}
+              teamRoster={teamRoster}
+              onLeave={leaveCall}
+            />
+          </Suspense>
         </div>
       )}
     </CallCoordinatorContext.Provider>
