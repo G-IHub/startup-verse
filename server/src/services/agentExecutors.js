@@ -433,6 +433,25 @@ async function executeExplainDevWork({ founderId, payload }) {
 }
 
 /**
+ * Real Sales/Marketing hand-off flag on a sprint-plan/add-tasks task
+ * (2026-09-18) — the Sales/Marketing analog of `buildTask`/`filePath` above.
+ * `assignAgentKey` must be a real agentKey ("sales"/"mkt"); anything else is
+ * silently ignored here — the actual agent/actionType existence check
+ * happens later in orchestrator.service.js's triggerAgentAssignedTasks(),
+ * same "store now, resolve for real later" pattern buildFilePath already
+ * uses (it doesn't validate the repo exists at creation time either).
+ */
+function agentAssignmentFields(t) {
+  const assignAgentKey = t?.assignAgentKey === "sales" || t?.assignAgentKey === "mkt" ? t.assignAgentKey : "";
+  if (!assignAgentKey) return {};
+  return {
+    assignedAgentKey: assignAgentKey,
+    agentActionKey: String(t?.agentActionKey || "").trim().slice(0, 60),
+    agentPayload: t?.agentPayload && typeof t.agentPayload === "object" ? t.agentPayload : null,
+  };
+}
+
+/**
  * Turns an approved sprint plan into real Milestone/Task documents — the
  * same models and shape founders.controller.js's own createMilestone/
  * createTask use, so the result shows up in the real Execution Engine, not
@@ -481,6 +500,7 @@ async function executeProposeSprintPlan({ founderId, payload }) {
         milestoneId: milestone._id,
         buildTask: Boolean(t?.buildTask),
         buildFilePath: String(t?.filePath || "").trim().slice(0, 500),
+        ...agentAssignmentFields(t),
       });
       tasks.push({ id: String(task._id), title: task.title });
     }
@@ -522,6 +542,7 @@ async function executeAddTasks({ founderId, payload }) {
       milestoneId: milestone._id,
       buildTask: Boolean(t?.buildTask),
       buildFilePath: String(t?.filePath || "").trim().slice(0, 500),
+      ...agentAssignmentFields(t),
     });
     created.push({ id: String(task._id), title: task.title });
   }

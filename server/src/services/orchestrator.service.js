@@ -205,7 +205,10 @@ async function markLinkedTaskBlocked(taskId, reason) {
     if (!task) return;
     if (!validateTaskStatusTransition(task.status, "blocked").ok) return;
     task.status = "blocked";
-    task.blockerReason = "AI Developer hand-off failed";
+    // Generic wording since this now covers any taskId-linked hand-off
+    // (AI Developer's own GitHub pipeline, or a Sales/Marketing action), not
+    // just AI Developer's.
+    task.blockerReason = "Real AI hand-off failed";
     task.blockerNote = String(reason || "Unknown error").slice(0, 1000);
     await task.save();
     await syncMilestoneCounters(task.milestoneId);
@@ -375,6 +378,57 @@ async function advanceBuildQueueIfIdle(founderId) {
     });
   } catch (err) {
     logger.error("[orchestrator] failed to advance build queue", { founderId: String(founderId), message: err.message });
+  }
+}
+
+/**
+ * Real Sales/Marketing hand-off trigger (2026-09-18) — the non-GitHub analog
+ * of advanceBuildQueueIfIdle above, for tasks AI PM flagged at sprint-plan
+ * time with a real assignedAgentKey + agentActionKey (see
+ * agentExecutors.js's agentAssignmentFields helper). Unlike the build queue,
+ * these don't need sequential one-at-a-time gating — a create_social_post
+ * and a draft_outreach call don't share a branch to conflict over — so every
+ * still-pending agent-assigned task fires its real hand-off immediately,
+ * once the plan that created it is approved. Each hand-off carries the
+ * task's own real id as `taskId`, so the existing generic completion
+ * linkage (completeGenericLinkedTask, or the pending_approval path for the
+ * two real "send" actions) closes the loop automatically — no separate
+ * queue-advance step needed the way the build queue's staging gate requires.
+ */
+async function triggerAgentAssignedTasks(founderId) {
+  try {
+    const pendingTasks = await Task.find({
+      founderId,
+      status: "pending",
+      assignedAgentKey: { $in: ["sales", "mkt"] },
+      agentActionKey: { $ne: "" },
+    });
+    for (const task of pendingTasks) {
+      // eslint-disable-next-line no-await-in-loop -- each hand-off is a real, independent proposeAction call; no reason to parallelize and every await keeps errors isolated per task
+      const agent = await Agent.findOne({ founderId, agentKey: task.assignedAgentKey });
+      if (!agent) continue;
+      // eslint-disable-next-line no-await-in-loop
+      const actionType = await ActionType.findOne({ agentId: agent._id, actionKey: task.agentActionKey });
+      if (!actionType) {
+        // eslint-disable-next-line no-await-in-loop
+        await markLinkedTaskBlocked(task._id, `AI PM assigned this to a real agent, but "${task.agentActionKey}" isn't a real action for it.`);
+        continue;
+      }
+      // eslint-disable-next-line no-await-in-loop
+      await proposeAction({
+        founderId,
+        startupId: task.startupId,
+        actorType: "agent",
+        actorId: String(agent._id),
+        actionTypeId: actionType._id,
+        targetType: task.assignedAgentKey,
+        targetId: `${task.assignedAgentKey}-${task.agentActionKey}-${task._id}`,
+        payload: { ...(task.agentPayload || {}), taskDescription: task.description || task.title },
+        taskId: task._id,
+      });
+    }
+  } catch (err) {
+    logger.error("[orchestrator] failed to trigger agent-assigned tasks", { founderId: String(founderId), message: err.message });
   }
 }
 
@@ -689,6 +743,7 @@ export async function proposeAction({ founderId, startupId, actorType, actorId, 
   }
   if (actionType.actionKey === "propose_sprint_plan" && status === "autonomous_completed") {
     advanceBuildQueueIfIdle(founderId);
+    triggerAgentAssignedTasks(founderId);
   }
   if (["github_open_pr", "github_merge_staging"].includes(actionType.actionKey) && status !== "failed") {
     autoAdvancePipeline({ founderId, startupId, actionKey: actionType.actionKey, status, targetId, payload, result, taskId });
@@ -815,6 +870,7 @@ export async function resolveApproval({ eventId, decision, approverId }) {
   }
   if (actionType?.actionKey === "propose_sprint_plan" && execStatus === "human_completed") {
     advanceBuildQueueIfIdle(pending.founderId);
+    triggerAgentAssignedTasks(pending.founderId);
   }
   if (["github_open_pr", "github_merge_staging"].includes(actionType?.actionKey) && execStatus !== "failed") {
     autoAdvancePipeline({

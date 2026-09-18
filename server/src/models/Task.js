@@ -117,6 +117,16 @@ const taskSchema = new mongoose.Schema(
       trim: true,
       maxlength: [500, "Build file path cannot exceed 500 characters"],
     },
+    // Real Sales/Marketing hand-off details (2026-09-18) — the same pattern
+    // as buildTask/buildFilePath above, generalized to the other real agents
+    // now that they have real actions: AI PM flags a sprint-plan task as
+    // real Sales/Marketing work (via assignedAgentKey, already added above,
+    // plus which real action and payload to run), and
+    // orchestrator.service.js's triggerAgentAssignedTasks() reads these back
+    // to actually propose the hand-off once the plan is approved — no
+    // separate chat message needed for the founder to trigger it by hand.
+    agentActionKey: { type: String, default: "", trim: true, maxlength: 60 },
+    agentPayload: { type: mongoose.Schema.Types.Mixed, default: null },
     incentive: { 
       type: String, 
       default: "",
