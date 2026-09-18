@@ -14,7 +14,7 @@
  * check-in backend exists anywhere in the app).
  */
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState, lazy, Suspense } from "react";
 import { useNavigate } from "react-router-dom";
 import { cn } from "../ui/utils";
 
@@ -32,7 +32,12 @@ import { useOfficeStore } from "../../state/useOfficeStore";
 import { useWeeklyLoopStore } from "../../state/useWeeklyLoopStore";
 import { V2TeamChatPane } from "../office/v2/V2TeamChatPane";
 import { useCallCoordinator } from "../../contexts/CallCoordinatorContext";
-import V2CallRoom from "../calls/v2/V2CallRoom";
+// Lazy — pulls in the LiveKit SDK, previously downloaded by every founder
+// who simply opened Virtual Office (a common page) whether or not they
+// ever started a call. Only rendered when `activeCall` is set (see the
+// `if (activeCall)` guard below), so lazy-loading it has no effect on the
+// common "no call yet" path.
+const V2CallRoom = lazy(() => import("../calls/v2/V2CallRoom"));
 import { V2TaskManagementPanel } from "../office/v2/V2TaskManagementPanel";
 
 import { Users, ListChecks, UserPlus, MessageSquare, X, Video, PhoneCall } from "lucide-react";
@@ -235,10 +240,14 @@ function LiveSessionCard() {
               : "flex h-[620px] flex-col overflow-hidden p-0"
           }
         >
-          <V2CallRoom
-            {...callRoomProps}
-            variant={poppedOut ? "fullpage" : "inline"}
-          />
+          <Suspense fallback={
+            <div className="flex h-full w-full items-center justify-center font-body text-[13px] text-v2-muted">Connecting…</div>
+          }>
+            <V2CallRoom
+              {...callRoomProps}
+              variant={poppedOut ? "fullpage" : "inline"}
+            />
+          </Suspense>
         </V2Card>
       </>
     );
