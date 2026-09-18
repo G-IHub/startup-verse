@@ -1035,18 +1035,26 @@ async function processAiPmReply({ raw, ctx, messages, founderId, agent, allowedM
   }
 
   // Real bug found live: the model can also just write confident prose
-  // claiming a real action happened — using this system's own 🛠️/📋
+  // claiming a real action happened — using this system's own 🛠️/📋/✅
   // confirmation style — with no fenced block at all. Confirmed via direct
   // DB query: a reply read "🛠️ Handed to AI Developer — it opened a real
   // PR..." and nothing was ever created. The prompt rule above is necessary
   // but not sufficient — a rule the model can still choose not to follow —
   // so this is the same "escalate to a structural guard" principle already
   // used for the multi-marker and owner/repo cases. If no real marker
-  // closed this turn and nothing was actually proposed, those two glyphs
-  // are reserved (per the system prompt) for real, server-appended
+  // closed this turn and nothing was actually proposed, these glyphs are
+  // reserved (per the system prompt) for real, server-appended
   // confirmations only — their presence here means a fabricated one.
+  // Real bug found live again, 2026-09-18, on the real production account:
+  // a reply read "✅ Updated \"Book 10 agency owners this week\"." — the
+  // exact template UPDATE_TASK's own real success branch uses — with no
+  // marker closed and no event created (confirmed against the real Audit
+  // Trail: entry count never moved). The model had seen that real phrasing
+  // earlier in the same conversation (from an actual successful update) and
+  // imitated it. ✅ was missing from this list — added, closing the gap on
+  // the exact glyph the newest marker (UPDATE_TASK) introduced.
   if (!closed && !proposedEvent) {
-    const glyphIndexes = ["🛠️", "📋"].map((g) => replyText.indexOf(g)).filter((i) => i >= 0);
+    const glyphIndexes = ["🛠️", "📋", "✅"].map((g) => replyText.indexOf(g)).filter((i) => i >= 0);
     if (glyphIndexes.length) {
       replyText = replyText.slice(0, Math.min(...glyphIndexes)).trim();
       replyText += "\n\n(That last line described an action as if it happened, but nothing was actually sent — ask me again and I'll either do it for real or tell you what's missing.)";
